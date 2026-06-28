@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+*.whl
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Caches
+embeddings_cache/
+
+# Generated artifacts
+data/code_graph/
+
+# API keys / secrets
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+
+# Temporary files
+*.tmp
+*.corrupt
+*.bak
+
+# Jupyter
+.ipynb_checkpoints/
