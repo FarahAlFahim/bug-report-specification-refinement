@@ -1,0 +1,33 @@
+diff --git a/django/contrib/auth/tokens.py b/django/contrib/auth/tokens.py
+index 93e2d71af2..0048dc14fa 100644
+--- a/django/contrib/auth/tokens.py
++++ b/django/contrib/auth/tokens.py
+@@ -94,7 +94,27 @@ class PasswordResetTokenGenerator:
+         # Truncate microseconds so that tokens are consistent even if the
+         # database doesn't support microseconds.
+         login_timestamp = '' if user.last_login is None else user.last_login.replace(microsecond=0, tzinfo=None)
+-        return str(user.pk) + user.password + str(login_timestamp) + str(timestamp)
++
++        # Include the user's email (if any) in the hash material so that
++        # changing a user's email invalidates previously-issued tokens.
++        # Use the model's configured email field name when available.
++        email_field = getattr(user.__class__, 'get_email_field_name', lambda: 'email')()
++        # Fall back to attribute lookup; handle missing, None or non-str values
++        email_value = ''
++        try:
++            raw_email = getattr(user, email_field, '')
++        except Exception:
++            raw_email = ''
++        if raw_email is None:
++            email_value = ''
++        elif isinstance(raw_email, str):
++            email_value = raw_email
++        else:
++            # Coerce non-string values (e.g. related objects) to a stable
++            # string representation.
++            email_value = str(raw_email)
++
++        return str(user.pk) + user.password + str(login_timestamp) + email_value + str(timestamp)
+ 
+     def _num_seconds(self, dt):
+         return int((dt - datetime(2001, 1, 1)).total_seconds())

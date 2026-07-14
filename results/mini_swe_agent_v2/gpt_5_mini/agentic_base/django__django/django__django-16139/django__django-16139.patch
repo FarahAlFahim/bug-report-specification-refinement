@@ -1,0 +1,26 @@
+diff --git a/django/contrib/auth/forms.py b/django/contrib/auth/forms.py
+index b3cfc6723c..e527b83832 100644
+--- a/django/contrib/auth/forms.py
++++ b/django/contrib/auth/forms.py
+@@ -163,7 +163,20 @@ class UserChangeForm(forms.ModelForm):
+         super().__init__(*args, **kwargs)
+         password = self.fields.get("password")
+         if password:
+-            password.help_text = password.help_text.format("../password/")
++            # The password change URL must contain the user's primary key.
++            # When the admin change view is reached via a non-PK lookup
++            # (using the _to_field GET parameter), the current path's
++            # identifier segment may not be the user's PK. In that case the
++            # relative "../password/" link would produce a URL with the
++            # non-PK value and the password-change view would 404. Use the
++            # instance's PK when available to construct a correct link, and
++            # fall back to the original relative path when no PK is present
++            # (e.g. when creating a new user).
++            if getattr(self.instance, "pk", None) is not None:
++                password_link = f"../../{self.instance.pk}/password/"
++            else:
++                password_link = "../password/"
++            password.help_text = password.help_text.format(password_link)
+         user_permissions = self.fields.get("user_permissions")
+         if user_permissions:
+             user_permissions.queryset = user_permissions.queryset.select_related(

@@ -1,0 +1,24 @@
+diff --git a/sklearn/ensemble/voting.py b/sklearn/ensemble/voting.py
+index 7afa7180c..f393784c5 100644
+--- a/sklearn/ensemble/voting.py
++++ b/sklearn/ensemble/voting.py
+@@ -78,9 +78,16 @@ class _BaseVoting(_BaseComposition, TransformerMixin):
+ 
+         if sample_weight is not None:
+             for name, step in self.estimators:
+-                if not has_fit_parameter(step, 'sample_weight'):
+-                    raise ValueError('Underlying estimator \'%s\' does not'
+-                                     ' support sample weights.' % name)
++                # ignore estimators that were set to None via set_params
++                if step is None:
++                    continue
++                # protect against objects that do not expose a fit
++                # method (be defensive and raise a clear error instead
++                # of letting has_fit_parameter raise an AttributeError)
++                if not hasattr(step, 'fit') or not has_fit_parameter(
++                        step, 'sample_weight'):
++                    raise ValueError("Underlying estimator '%s' does not"
++                                     " support sample weights." % name)
+ 
+         names, clfs = zip(*self.estimators)
+         self._validate_names(names)

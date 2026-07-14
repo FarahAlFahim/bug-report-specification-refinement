@@ -1,0 +1,24 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 901918674a..ed50d045d3 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1435,10 +1435,16 @@ def _print_MatrixBase(self, expr):
+     _print_ImmutableMatrix = _print_ImmutableDenseMatrix \
+                            = _print_Matrix \
+                            = _print_MatrixBase
+-
+     def _print_MatrixElement(self, expr):
+-        return self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True) \
+-            + '_{%s, %s}' % (expr.i, expr.j)
++        # Render the parent (matrix) with appropriate parentheses and ensure
++        # that the indices are printed using the active LatexPrinter. The
++        # previous implementation relied on Python's str() conversion for
++        # expr.i and expr.j which uses StrPrinter; that can produce
++        # representations (e.g. leading underscores for Dummy symbols)
++        # that are not valid LaTeX. Use self._print to get LaTeX-safe
++        # renderings of the indices.
++        return (self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True)
++                + '_{%s, %s}' % (self._print(expr.i), self._print(expr.j)))
+ 
+     def _print_MatrixSlice(self, expr):
+         def latexslice(x):

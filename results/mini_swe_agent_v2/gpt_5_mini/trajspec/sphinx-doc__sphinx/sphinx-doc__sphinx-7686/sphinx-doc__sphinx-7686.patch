@@ -1,0 +1,59 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..1a3cecb77 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -246,7 +246,22 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        # populate members honoring the imported_members flag so that
++        # templates see a consistent, filtered view of module members.
++        def _filter_members(obj, imported):
++            names = []
++            for name in dir(obj):
++                try:
++                    value = safe_getattr(obj, name)
++                except AttributeError:
++                    continue
++                # keep the member if imported members are allowed or the
++                # member appears to be defined in the module itself
++                if imported or getattr(value, '__module__', None) == obj.__name__:
++                    names.append(name)
++            return names
++
++        ns['members'] = _filter_members(obj, imported_members)
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \
+@@ -259,14 +274,27 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+         if ispackage and recursive:
+             ns['modules'], ns['all_modules'] = get_modules(obj)
+     elif doc.objtype == 'class':
+-        ns['members'] = dir(obj)
+-        ns['inherited_members'] = \
+-            set(dir(obj)) - set(obj.__dict__.keys())
++        # For classes, similarly filter members so templates don't see
++        # imported/inherited names when imported_members is False.
++        def _filter_members(obj, imported):
++            names = []
++            for name in dir(obj):
++                try:
++                    value = safe_getattr(obj, name)
++                except AttributeError:
++                    continue
++                if imported or getattr(value, '__module__', None) == obj.__name__:
++                    names.append(name)
++            return names
++
++        ns['members'] = _filter_members(obj, imported_members)
++        ns['inherited_members'] = set(ns['members']) - set(obj.__dict__.keys())
+         ns['methods'], ns['all_methods'] = \
+             get_members(obj, {'method'}, ['__init__'])
+         ns['attributes'], ns['all_attributes'] = \
+             get_members(obj, {'attribute', 'property'})
+ 
++
+     modname, qualname = split_full_qualified_name(name)
+     if doc.objtype in ('method', 'attribute', 'property'):
+         ns['class'] = qualname.rsplit(".", 1)[0]

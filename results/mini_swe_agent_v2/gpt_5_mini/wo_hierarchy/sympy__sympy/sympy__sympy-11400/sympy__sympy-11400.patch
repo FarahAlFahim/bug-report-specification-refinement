@@ -1,0 +1,22 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..f57d020be3 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -251,6 +251,17 @@ def _print_For(self, expr):
+     def _print_sign(self, func):
+         return '((({0}) > 0) - (({0}) < 0))'.format(self._print(func.args[0]))
+ 
++    def _print_sinc(self, expr):
++        """Print sinc(x) as a piecewise expression that preserves the
++        defined value at x == 0. The mathematical definition is
++        Piecewise((sin(x)/x, Ne(x, 0)), (1, True)).
++        """
++        from sympy import Piecewise, sin, Ne, S
++
++        x = expr.args[0]
++        pw = Piecewise((sin(x)/x, Ne(x, S.Zero)), (S.One, True))
++        return self._print(pw)
++
+     def indent_code(self, code):
+         """Accepts a string of code or a list of code lines"""
+ 

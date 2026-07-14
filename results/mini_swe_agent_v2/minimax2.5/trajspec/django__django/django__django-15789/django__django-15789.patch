@@ -1,0 +1,41 @@
+diff --git a/django/template/defaultfilters.py b/django/template/defaultfilters.py
+index 46334791c6..e36382f5a8 100644
+--- a/django/template/defaultfilters.py
++++ b/django/template/defaultfilters.py
+@@ -82,12 +82,12 @@ def escapejs_filter(value):
+ 
+ 
+ @register.filter(is_safe=True)
+-def json_script(value, element_id=None):
++def json_script(value, element_id=None, encoder=None):
+     """
+     Output value JSON-encoded, wrapped in a <script type="application/json">
+     tag (with an optional id).
+     """
+-    return _json_script(value, element_id)
++    return _json_script(value, element_id, encoder=encoder)
+ 
+ 
+ @register.filter(is_safe=True)
+diff --git a/django/utils/html.py b/django/utils/html.py
+index d0bc97be80..4db089d528 100644
+--- a/django/utils/html.py
++++ b/django/utils/html.py
+@@ -59,7 +59,7 @@ _json_script_escapes = {
+ }
+ 
+ 
+-def json_script(value, element_id=None):
++def json_script(value, element_id=None, encoder=None):
+     """
+     Escape all the HTML/XML special characters with their unicode escapes, so
+     value is safe to be output anywhere except for inside a tag attribute. Wrap
+@@ -67,7 +67,7 @@ def json_script(value, element_id=None):
+     """
+     from django.core.serializers.json import DjangoJSONEncoder
+ 
+-    json_str = json.dumps(value, cls=DjangoJSONEncoder).translate(_json_script_escapes)
++    json_str = json.dumps(value, cls=encoder or DjangoJSONEncoder).translate(_json_script_escapes)
+     if element_id:
+         template = '<script id="{}" type="application/json">{}</script>'
+         args = (element_id, mark_safe(json_str))

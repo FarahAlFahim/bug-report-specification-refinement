@@ -1,0 +1,27 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index c913267476..39655222a0 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1776,7 +1776,22 @@ class Query(BaseExpression):
+         return condition, needed_inner
+ 
+     def set_empty(self):
++        """Mark this Query as empty.
++
++        In addition to inserting a NothingNode into the WHERE tree, clear
++        any combinator metadata so that previously-combined queries (union,
++        intersection, difference) are not consulted by the SQL compiler when
++        the query is meant to be empty.
++        """
+         self.where.add(NothingNode(), AND)
++        # Ensure combinator-related state is cleared. None() on a
++        # QuerySet should produce a truly empty query: leaving
++        # combined_queries/combinator behind means the compiler may still
++        # iterate and compile subqueries that are actually supposed to be
++        # ignored when the query is empty.
++        self.combinator = None
++        self.combinator_all = False
++        self.combined_queries = ()
+ 
+     def is_empty(self):
+         return any(isinstance(c, NothingNode) for c in self.where.children)

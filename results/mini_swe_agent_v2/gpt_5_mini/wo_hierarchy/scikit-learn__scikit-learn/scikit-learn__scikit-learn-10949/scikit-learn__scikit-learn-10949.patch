@@ -1,0 +1,33 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index fe1f7236e..76472c037 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -464,7 +464,28 @@ def check_array(array, accept_sparse=False, accept_large_sparse=True,
+     dtype_orig = getattr(array, "dtype", None)
+     if not hasattr(dtype_orig, 'kind'):
+         # not a data type (e.g. a column named dtype in a pandas DataFrame)
++        # For pandas DataFrame objects the per-column dtypes are exposed on
++        # ``array.dtypes`` (a Series) rather than a single numpy.dtype. In
++        # that case, if all columns share the same dtype we treat that common
++        # dtype as the original dtype so that later comparisons (and
++        # warn_on_dtype) behave as expected. If the DataFrame has mixed
++        # dtypes we remain conservative and leave dtype_orig as None.
+         dtype_orig = None
++        dtypes = getattr(array, "dtypes", None)
++        try:
++            if dtypes is not None:
++                # pandas.Series.unique() returns an ndarray of dtypes; if all
++                # columns share the same dtype uniques will have length 1.
++                uniques = getattr(dtypes, "unique", None)
++                if uniques is not None:
++                    uniques = dtypes.unique()
++                    if len(uniques) == 1:
++                        dtype_orig = uniques[0]
++        except Exception:
++            # Be conservative: if anything goes wrong while introspecting
++            # array.dtypes, fall back to dtype_orig == None so we don't raise
++            # spurious warnings.
++            dtype_orig = None
+ 
+     if dtype_numeric:
+         if dtype_orig is not None and dtype_orig.kind == "O":

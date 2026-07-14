@@ -1,0 +1,47 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..ba25f9ae6d 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,9 +148,42 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++
++    if name == "version_info":
++        # Ensure __version__ is computed and cached using the existing logic.
++        # Calling getattr on the module will trigger the __version__ branch
++        # above if needed.
++        mod = sys.modules[__name__]
++        if "__version__" not in globals():
++            # Trigger computation of __version__
++            getattr(mod, "__version__")
++        ver_str = globals().get("__version__", _version.version)
++
++        parsed = parse_version(ver_str)
++        # packaging.version.Version has a .release attribute (a tuple of ints).
++        release = getattr(parsed, "release", None)
++        if release:
++            version_tuple = tuple(release)
++        else:
++            # Fallback: extract numeric groups from the version string.
++            nums = tuple(int(x) for x in re.findall(r"\d+", str(ver_str)))
++            version_tuple = nums
++
++        global version_info  # cache it on the module
++        version_info = version_tuple
++        return version_info
++
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 
++def __dir__():
++    """Module dir() should include dynamically provided attributes."""
++    names = set(globals().keys())
++    # Make sure dynamic names are advertised.
++    names.update({"__version__", "version_info"})
++    return sorted(names)
++
++
+ def _check_versions():
+ 
+     # Quickfix to ensure Microsoft Visual C++ redistributable

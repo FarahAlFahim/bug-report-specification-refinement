@@ -1,0 +1,55 @@
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index f71bea25f5..2dfde0e26d 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -532,7 +532,7 @@ def lambdastr(args, expr, printer=None, dummify=False):
+     """
+     # Transforming everything to strings.
+     from sympy.matrices import DeferredVector
+-    from sympy import Dummy, sympify, Symbol, Function, flatten
++    from sympy import Dummy, sympify, Symbol, Function, MatrixSymbol, flatten
+ 
+     if printer is not None:
+         if inspect.isfunction(printer):
+@@ -560,6 +560,13 @@ def sub_args(args, dummies_dict):
+                 dummies = Dummy()
+                 dummies_dict.update({args : dummies})
+                 return str(dummies)
++            elif isinstance(args, MatrixSymbol):
++                from sympy import MatrixSymbol as MS
++                # Use a MatrixSymbol with a valid name as the dummy
++                # Generate a unique name using id to avoid conflicts
++                dummies = MS('x' + str(id(args)), *args.shape)
++                dummies_dict.update({args : dummies})
++                return str(dummies)
+             else:
+                 return str(args)
+ 
+@@ -707,7 +714,7 @@ def _preprocess(self, args, expr):
+ 
+         Returns string form of args, and updated expr.
+         """
+-        from sympy import Dummy, Symbol, Function, flatten
++        from sympy import Dummy, Symbol, Function, MatrixSymbol, flatten
+         from sympy.matrices import DeferredVector
+ 
+         dummify = self._dummify
+@@ -734,6 +741,18 @@ def _preprocess(self, args, expr):
+                     expr = self._subexpr(expr, {arg: dummy})
+                 else:
+                     argstrs.append(argrep)
++            elif isinstance(arg, MatrixSymbol):
++                argrep = self._argrepr(arg)
++
++                if dummify or not self._is_safe_ident(argrep):
++                    from sympy import MatrixSymbol as MS
++                    # Use a MatrixSymbol with a valid name as the dummy
++                    # Generate a unique name using id to avoid conflicts
++                    dummy = MS('x' + str(id(arg)), *arg.shape)
++                    argstrs.append(self._argrepr(dummy))
++                    expr = self._subexpr(expr, {arg: dummy})
++                else:
++                    argstrs.append(argrep)
+             elif isinstance(arg, Function):
+                 dummy = Dummy()
+                 argstrs.append(self._argrepr(dummy))

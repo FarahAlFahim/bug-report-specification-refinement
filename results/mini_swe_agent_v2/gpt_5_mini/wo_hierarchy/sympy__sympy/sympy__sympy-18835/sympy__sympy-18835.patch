@@ -1,0 +1,46 @@
+diff --git a/sympy/utilities/iterables.py b/sympy/utilities/iterables.py
+index d96e76263b..e22b69b9c5 100644
+--- a/sympy/utilities/iterables.py
++++ b/sympy/utilities/iterables.py
+@@ -2106,24 +2106,40 @@ def uniq(seq, result=None):
+     >>> list(uniq([[1], [2, 1], [1]]))
+     [[1], [2, 1]]
+     """
++    # If the sequence supports __len__, record its initial length and
++    # ensure that it does not change during iteration. If it does, raise
++    # a RuntimeError so that callers who mutate the sequence are made
++    # aware of the unsafe operation instead of silently producing wrong
++    # results.
+     try:
+         seen = set()
+         result = result or []
++        initial_len = len(seq) if hasattr(seq, '__len__') else None
+         for i, s in enumerate(seq):
++            # detect size mutation before yielding
++            if initial_len is not None and len(seq) != initial_len:
++                raise RuntimeError("sequence changed size during iteration")
+             if not (s in seen or seen.add(s)):
+                 yield s
+     except TypeError:
++        # In the unhashable-element path we also need to ensure that the
++        # sequence length has not changed since the function entry (for
++        # sequences that support __len__).
++        if 'initial_len' in locals() and initial_len is not None and hasattr(seq, '__len__') and len(seq) != initial_len:
++            raise RuntimeError("sequence changed size during iteration")
+         if s not in result:
+             yield s
+             result.append(s)
+         if hasattr(seq, '__getitem__'):
++            # Before recursing on a slice, ensure length still matches.
++            if 'initial_len' in locals() and initial_len is not None and hasattr(seq, '__len__') and len(seq) != initial_len:
++                raise RuntimeError("sequence changed size during iteration")
+             for s in uniq(seq[i + 1:], result):
+                 yield s
+         else:
+             for s in uniq(seq, result):
+                 yield s
+ 
+-
+ def generate_bell(n):
+     """Return permutations of [0, 1, ..., n - 1] such that each permutation
+     differs from the last by the exchange of a single pair of neighbors.

@@ -1,0 +1,38 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..28d732d253 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -867,10 +867,31 @@ class Poly3DCollection(PolyCollection):
+         self.stale = True
+ 
+     def get_facecolor(self):
+-        return self._facecolors2d
++        """Return projected face colors if available, else fall back to 3D
++        stored facecolor or the base PolyCollection implementation.
++        """
++        if hasattr(self, '_facecolors2d'):
++            return self._facecolors2d
++        fc3d = getattr(self, '_facecolor3d', None)
++        if fc3d is None:
++            return PolyCollection.get_facecolor(self)
++        alpha = getattr(self, '_alpha3d', self.get_alpha())
++        return mcolors.to_rgba_array(fc3d, alpha)
+ 
+     def get_edgecolor(self):
+-        return self._edgecolors2d
++        """Return projected edge colors if available, else fall back to 3D
++        stored edgecolor or the base PolyCollection implementation. Special
++        case when edge color is 'face' to return the face colors.
++        """
++        if hasattr(self, '_edgecolors2d'):
++            return self._edgecolors2d
++        ec3d = getattr(self, '_edgecolor3d', None)
++        if ec3d is None:
++            return PolyCollection.get_edgecolor(self)
++        if cbook._str_equal(ec3d, 'face'):
++            return self.get_facecolor()
++        alpha = getattr(self, '_alpha3d', self.get_alpha())
++        return mcolors.to_rgba_array(ec3d, alpha)
+ 
+ 
+ def poly_collection_2d_to_3d(col, zs=0, zdir='z'):

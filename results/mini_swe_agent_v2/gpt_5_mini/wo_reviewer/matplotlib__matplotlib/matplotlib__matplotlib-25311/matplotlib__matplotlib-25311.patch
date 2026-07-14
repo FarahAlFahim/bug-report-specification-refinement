@@ -1,0 +1,94 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index ff6abdb958..c6fb04aeca 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -1208,6 +1208,34 @@ class Legend(Artist):
+         """Return ``True`` if the legend is draggable, ``False`` otherwise."""
+         return self._draggable is not None
+ 
++    def __getstate__(self):
++        # Remove runtime-only draggable helper from pickled state so that the
++        # FigureCanvas is not pulled into the pickle via the helper's canvas
++        # reference. Also disconnect it to avoid leaving callbacks attached.
++        state = super().__getstate__()
++        dr = state.pop('_draggable', None)
++        try:
++            if dr is not None:
++                try:
++                    dr.disconnect()
++                except Exception:
++                    pass
++        except Exception:
++            pass
++        # ensure the attribute exists on unpickling
++        state['_draggable'] = None
++        return state
++
++    def __setstate__(self, state):
++        # Restore state and ensure no stale draggable helper remains.
++        self.__dict__.update(state)
++        if getattr(self, '_draggable', None) is not None:
++            try:
++                self._draggable.disconnect()
++            except Exception:
++                pass
++            self._draggable = None
++
+ 
+ # Helper functions to parse legend arguments for both `figure.legend` and
+ # `axes.legend`:
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 1dee8a23d9..5e56e2376e 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1514,6 +1514,27 @@ class DraggableBase:
+                 'button_release_event', self.on_release),
+         ]
+ 
++    def __getstate__(self):
++        """Prepare state for pickling by removing runtime-only attributes.
++
++        The canvas and related callback/connect ids are backend/runtime
++        specific and not picklable. Remove them so that a draggable helper
++        attached to an artist does not pull the FigureCanvas into the
++        pickled object graph.
++        """
++        state = self.__dict__.copy()
++        for key in ("canvas", "background", "cids", "_c1"):
++            state.pop(key, None)
++        return state
++
++    def __setstate__(self, state):
++        """Restore state after unpickling; initialize runtime-only attrs."""
++        self.__dict__.update(state)
++        # Runtime-only attributes should be re-initialized to safe defaults.
++        self.canvas = None
++        self.background = None
++        self.cids = []
++
+     def on_motion(self, evt):
+         if self._check_still_parented() and self.got_artist:
+             dx = evt.x - self.mouse_x
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 0f874ba33d..bbd044853a 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,18 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++        # remove draggable helper from pickled state so that the FigureCanvas
++        # is not pulled into the pickle via the helper's canvas reference.
++        dr = d.pop('_draggable', None)
++        try:
++            if dr is not None:
++                try:
++                    dr.disconnect()
++                except Exception:
++                    pass
++        except Exception:
++            pass
++        d['_draggable'] = None
+         return d
+ 
+     def contains(self, mouseevent):

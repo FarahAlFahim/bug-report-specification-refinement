@@ -1,0 +1,24 @@
+--- sympy/simplify/cse_main.py.bak	2026-06-10 14:33:08.167313009 +0000
++++ sympy/simplify/cse_main.py	2026-06-10 14:33:08.261313009 +0000
+@@ -616,6 +616,21 @@
+         if isinstance(e, Basic):
+             _find_repeated(e)
+ 
++    # Avoid eliminating MatrixElement nodes when their parent MatrixExpr
++    # is already selected for elimination. If we keep both, the rebuild
++    # step will create a MatrixSymbol replacement for the parent and
++    # element-level replacements that reference that symbol, which leads
++    # to redundant temporaries and full-matrix copies in generated code.
++    try:
++        # Import here to avoid module-level circular imports
++        from sympy.matrices.expressions.matexpr import MatrixElement
++    except Exception:
++        MatrixElement = None
++
++    if MatrixElement is not None:
++        to_eliminate = {e for e in to_eliminate
++                        if not (isinstance(e, MatrixElement) and e.parent in to_eliminate)}
++
+     ## Rebuild tree
+ 
+     # Remove symbols from the generator that conflict with names in the expressions.

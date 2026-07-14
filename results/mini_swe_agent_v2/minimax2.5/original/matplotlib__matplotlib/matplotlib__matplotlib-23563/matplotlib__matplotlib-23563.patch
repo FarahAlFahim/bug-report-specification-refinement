@@ -1,0 +1,15 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..4f75babc3c 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -211,6 +211,10 @@ class Line3D(lines.Line2D):
+ 
+     @artist.allow_rasterization
+     def draw(self, renderer):
++        # Ensure _verts3d is set (it may not be if line_2d_to_3d failed
++        # partway through, e.g., due to an exception during set_3d_properties)
++        if not hasattr(self, "_verts3d"):
++            self.set_3d_properties(zs=0, zdir='z')
+         xs3d, ys3d, zs3d = self._verts3d
+         xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, self.axes.M)
+         self.set_data(xs, ys)

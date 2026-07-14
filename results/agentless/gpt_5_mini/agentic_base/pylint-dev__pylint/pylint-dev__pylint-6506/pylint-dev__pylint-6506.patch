@@ -1,0 +1,35 @@
+diff --git a/pylint/lint/run.py b/pylint/lint/run.py
+index 75cba62..175c286 100644
+--- a/pylint/lint/run.py
++++ b/pylint/lint/run.py
+@@ -1,3 +1,4 @@
++
+ # Licensed under the GPL: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+ # For details: https://github.com/PyCQA/pylint/blob/main/LICENSE
+ # Copyright (c) https://github.com/PyCQA/pylint/blob/main/CONTRIBUTORS.txt
+@@ -7,6 +8,7 @@ from __future__ import annotations
+ import os
+ import sys
+ import warnings
++from pylint.config.exceptions import _UnrecognizedOptionError
+ from collections.abc import Sequence
+ from pathlib import Path
+ from typing import Any
+@@ -132,9 +134,14 @@ group are mutually exclusive.",
+         linter.disable("I")
+         linter.enable("c-extension-no-member")
+ 
+-        args = _config_initialization(
+-            linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
+-        )
++        try:
++            args = _config_initialization(
++                linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
++            )
++        except _UnrecognizedOptionError:
++            # The reporter already emitted an "unrecognized-option" message;
++            # exit cleanly with a non-zero status (consistent with other early exits).
++            sys.exit(32)
+ 
+         if linter.config.jobs < 0:
+             print(

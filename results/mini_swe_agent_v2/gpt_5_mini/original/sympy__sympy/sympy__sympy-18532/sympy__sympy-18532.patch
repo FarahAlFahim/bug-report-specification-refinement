@@ -1,0 +1,43 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 6866648d4e..f40b5eaf75 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -501,15 +501,30 @@ def atoms(self, *types):
+ 
+         """
+         if types:
+-            types = tuple(
+-                [t if isinstance(t, type) else type(t) for t in types])
++            # If types are given, keep the old behavior: collect
++            # instances matching the given types (or the types of the
++            # given examples).
++            types = tuple([
++                t if isinstance(t, type) else type(t) for t in types])
++            result = set()
++            for expr in preorder_traversal(self):
++                if isinstance(expr, types):
++                    result.add(expr)
++            return result
+         else:
+-            types = (Atom,)
+-        result = set()
+-        for expr in preorder_traversal(self):
+-            if isinstance(expr, types):
+-                result.add(expr)
+-        return result
++            # No types given: collect leaf nodes. A leaf node is one
++            # that has no .args (i.e., cannot be decomposed further).
++            result = set()
++            for expr in preorder_traversal(self):
++                # Use truthiness of .args: empty tuple -> False
++                try:
++                    if not expr.args:
++                        result.add(expr)
++                except Exception:
++                    # Be conservative: if accessing args fails, skip
++                    # the node.
++                    continue
++            return result
+ 
+     @property
+     def free_symbols(self):

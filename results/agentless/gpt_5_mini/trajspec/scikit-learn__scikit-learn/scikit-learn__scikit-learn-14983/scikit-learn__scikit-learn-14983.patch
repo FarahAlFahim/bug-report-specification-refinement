@@ -1,0 +1,33 @@
+diff --git a/sklearn/model_selection/_split.py b/sklearn/model_selection/_split.py
+index 8743303..9cf8d60 100644
+--- a/sklearn/model_selection/_split.py
++++ b/sklearn/model_selection/_split.py
+@@ -1063,7 +1063,7 @@ class LeavePGroupsOut(BaseCrossValidator):
+         return super().split(X, y, groups)
+ 
+ 
+-class _RepeatedSplits(metaclass=ABCMeta):
++class _RepeatedSplits(BaseCrossValidator, metaclass=ABCMeta):
+     """Repeated splits for an arbitrary randomized CV splitter.
+ 
+     Repeats splits for cross-validators n times with different randomization
+@@ -1213,6 +1213,9 @@ class RepeatedKFold(_RepeatedSplits):
+     RepeatedStratifiedKFold: Repeats Stratified K-Fold n times.
+     """
+     def __init__(self, n_splits=5, n_repeats=10, random_state=None):
++        # expose n_splits as an instance attribute so BaseCrossValidator.__repr__
++        # and other tools that inspect instance attributes can find it
++        self.n_splits = n_splits
+         super().__init__(
+             KFold, n_repeats, random_state, n_splits=n_splits)
+ 
+@@ -1266,6 +1269,9 @@ class RepeatedStratifiedKFold(_RepeatedSplits):
+     RepeatedKFold: Repeats K-Fold n times.
+     """
+     def __init__(self, n_splits=5, n_repeats=10, random_state=None):
++        # expose n_splits as an instance attribute so BaseCrossValidator.__repr__
++        # and other tools that inspect instance attributes can find it
++        self.n_splits = n_splits
+         super().__init__(
+             StratifiedKFold, n_repeats, random_state, n_splits=n_splits)
+ 

@@ -1,0 +1,25 @@
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836e..209b9b9706 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,17 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
++        # If the indices are the exact same Python object, they are equal.
++        if i is j:
+             return S.One
+-        else:
+-            return S.Zero
++        # If both are concrete integer-like indices, we can decide equality cheaply.
++        # Use hasattr check to avoid importing Integer and to handle plain Python ints.
++        if getattr(i, 'is_Integer', False) and getattr(j, 'is_Integer', False):
++            return S.One if i == j else S.Zero
++        # For symbolic/indeterminate indices where cheap equality cannot decide,
++        # return a KroneckerDelta so summation/delta machinery can simplify correctly.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One

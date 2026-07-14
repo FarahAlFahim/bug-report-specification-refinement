@@ -1,0 +1,65 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index d685b12..8dfd13e 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1214,8 +1214,41 @@ class ManyToManyField(RelatedField):
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
++            *self._check_related_name_symmetrical_self(**kwargs),
+         ]
+ 
++    def _check_related_name_symmetrical_self(self, from_model=None, **kwargs):
++        """
++        Warn if a developer supplied related_name on a symmetrical self-referential
++        ManyToManyField, because such relations do not create a reverse accessor.
++        """
++        # We need a concrete model to reliably resolve 'self' references.
++        if from_model is None:
++            return []
++
++        # Only relevant for symmetrical many-to-many relations.
++        if not self.remote_field.symmetrical:
++            return []
++
++        to_model = resolve_relation(from_model, self.remote_field.model)
++        if to_model != from_model:
++            return []
++
++        # If a user explicitly provided related_name (preserved in _related_name),
++        # warn that it will be ignored because symmetrical self relations have no reverse accessor.
++        if getattr(self, '_related_name', None) is not None:
++            return [
++                checks.Warning(
++                    "ManyToManyField(..., related_name=%r) is a symmetrical self-referential "
++                    "relation; the related_name is ignored and no reverse accessor will be created." %
++                    (self._related_name,),
++                    hint=("Remove the related_name, set symmetrical=False, or point the relation to a different model."),
++                    obj=self,
++                    id='fields.W344',
++                )
++            ]
++        return []
++
+     def _check_unique(self, **kwargs):
+         if self.unique:
+             return [
+@@ -1632,10 +1665,17 @@ class ManyToManyField(RelatedField):
+         # specify *what* on my non-reversible relation?!"), so we set it up
+         # automatically. The funky name reduces the chance of an accidental
+         # clash.
++        # To support multiple relations to self, it's useful to have a non-None
++        # related name on symmetrical relations for internal reasons. The
++        # concept doesn't make a lot of sense externally ("you want me to
++        # specify *what* on my non-reversible relation?!"), so we set it up
++        # automatically. The funky name reduces the chance of an accidental
++        # clash. However, do not override a related_name explicitly provided
++        # by the developer; instead surface a system check warning in that case.
+         if self.remote_field.symmetrical and (
+             self.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT or
+             self.remote_field.model == cls._meta.object_name
+-        ):
++        ) and getattr(self, '_related_name', None) is None:
+             self.remote_field.related_name = "%s_rel_+" % name
+         elif self.remote_field.is_hidden():
+             # If the backwards relation is disabled, replace the original

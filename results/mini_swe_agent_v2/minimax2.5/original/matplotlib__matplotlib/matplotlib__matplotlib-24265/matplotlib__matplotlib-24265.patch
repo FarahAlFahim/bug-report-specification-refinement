@@ -1,0 +1,42 @@
+diff --git a/lib/matplotlib/style/core.py b/lib/matplotlib/style/core.py
+index fb0a5426e6..4543184d49 100644
+--- a/lib/matplotlib/style/core.py
++++ b/lib/matplotlib/style/core.py
+@@ -251,10 +251,37 @@ library = None
+ available = []
+ 
+ 
++def _apply_style_aliases(library):
++    """Apply aliases for deprecated seaborn style names."""
++    # Map old seaborn style names to new seaborn-v0_8 style names
++    for old_name in [
++        "seaborn",
++        "seaborn-bright",
++        "seaborn-colorblind",
++        "seaborn-dark",
++        "seaborn-darkgrid",
++        "seaborn-dark-palette",
++        "seaborn-deep",
++        "seaborn-muted",
++        "seaborn-notebook",
++        "seaborn-paper",
++        "seaborn-pastel",
++        "seaborn-poster",
++        "seaborn-talk",
++        "seaborn-ticks",
++        "seaborn-white",
++        "seaborn-whitegrid",
++    ]:
++        new_name = old_name.replace("seaborn", "seaborn-v0_8")
++        if new_name in library and old_name not in library:
++            library[old_name] = library[new_name]
++
++
+ def reload_library():
+     """Reload the style library."""
+     global library
+     library = update_user_library(_base_library)
++    _apply_style_aliases(library)
+     available[:] = sorted(library.keys())
+ 
+ 

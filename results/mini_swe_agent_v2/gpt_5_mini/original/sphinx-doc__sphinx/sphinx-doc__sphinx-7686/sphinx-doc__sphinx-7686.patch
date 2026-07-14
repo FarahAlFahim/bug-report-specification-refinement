@@ -1,0 +1,56 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..9680826f2 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -246,7 +246,50 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        # Provide a members list for templates.  By default this is the
++        # full dir() of the module, but when imported_members is False we
++        # should avoid listing members that were imported from other
++        # modules (e.g. ``import os`` resulting in ``os`` appearing).
++        #
++        # We try to detect imported members conservatively: for module
++        # objects, functions and classes we compare their ``__module__``
++        # attribute to the module's name.  For values without a
++        # ``__module__`` attribute (like strings, paths, etc.) we keep
++        # them, since they are likely module metadata (e.g. __file__).
++        members_list = []
++        for name in dir(obj):
++            try:
++                value = safe_getattr(obj, name)
++            except Exception:
++                # keep the name if we can't access the value
++                members_list.append(name)
++                continue
++
++            if imported_members:
++                members_list.append(name)
++                continue
++
++            # If it's a module object, consider it imported unless it's
++            # the module itself.
++            if isinstance(value, ModuleType):
++                if getattr(value, '__name__', None) == obj.__name__:
++                    members_list.append(name)
++                else:
++                    # skip imported module
++                    continue
++                continue
++
++            mod = getattr(value, '__module__', None)
++            if mod is None:
++                # keep values without __module__ (module metadata etc.)
++                members_list.append(name)
++            elif mod == obj.__name__:
++                members_list.append(name)
++            else:
++                # skip imported member
++                continue
++
++        ns['members'] = members_list
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \

@@ -1,0 +1,65 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 5af213932..d0d6f7928 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -100,19 +100,29 @@ class IndexEntries:
+ 
+         # sort the index entries; put all symbols at the front, even those
+         # following the letters in ASCII, this is where the chr(127) comes from
+-        def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
++        def keyfunc(entry: Tuple[str, List]) -> Tuple[int, str, str]:
++            """Sort key for top-level index entries.
++
++            Use an explicit category flag (0 for symbols/others, 1 for
++            letters/underscore) as the primary sort key instead of
++            prefixing with a sentinel character. That sentinel-based
++            approach (chr(127)) failed for non-ASCII symbol characters
++            whose codepoints are greater than 127. Using a tuple ensures
++            a stable ordering across Unicode.
++            """
+             key, (void, void, category_key) = entry
+             if category_key:
+                 # using specified category key to sort
+                 key = category_key
+             lckey = unicodedata.normalize('NFD', key.lower())
+-            if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
++            if lckey.startswith('‏'):
+                 lckey = lckey[1:]
+-            if lckey[0:1].isalpha() or lckey.startswith('_'):
+-                lckey = chr(127) + lckey
+-            # ensure a determinstic order *within* letters by also sorting on
+-            # the entry itself
+-            return (lckey, entry[0])
++            # determine whether this is a letter/underscore leading key
++            is_letter = 1 if (lckey[0:1].isalpha() or lckey.startswith('_')) else 0
++            # ensure a determinstic order *within* categories by also
++            # sorting on the normalized key and the original entry name
++            return (is_letter, lckey, entry[0])
++
+         newlist = sorted(new.items(), key=keyfunc)
+ 
+         if group_entries:
+@@ -146,13 +156,18 @@ class IndexEntries:
+                 i += 1
+ 
+         # sort the sub-index entries
+-        def keyfunc2(entry: Tuple[str, List]) -> str:
++        def keyfunc2(entry: Tuple[str, List]) -> Tuple[int, str]:
++            """Sort key for sub-index entries.
++
++            Return a tuple (is_letter, normalized_key) to keep ordering
++            consistent with top-level sorting logic.
++            """
+             key = unicodedata.normalize('NFD', entry[0].lower())
+-            if key.startswith('\N{RIGHT-TO-LEFT MARK}'):
++            if key.startswith('‏'):
+                 key = key[1:]
+-            if key[0:1].isalpha() or key.startswith('_'):
+-                key = chr(127) + key
+-            return key
++            is_letter = 1 if (key[0:1].isalpha() or key.startswith('_')) else 0
++            return (is_letter, key)
++
+ 
+         # group the entries by letter
+         def keyfunc3(item: Tuple[str, List]) -> str:

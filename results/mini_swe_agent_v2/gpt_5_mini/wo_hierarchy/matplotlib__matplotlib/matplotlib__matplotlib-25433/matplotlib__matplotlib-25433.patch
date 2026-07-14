@@ -1,0 +1,25 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..85fa4755d2 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -927,6 +927,20 @@ default: %(va)s
+                         return last_ax
+             return None
+ 
++        # If the Axes currently holds the canvas mouse grab, release it
++        # before removing the Axes to avoid leaving a stale reference in
++        # the canvas (see GitHub issue).  Calling release_mouse is safe
++        # even if *ax* does not hold the grab.
++        canvas = getattr(self, "canvas", None)
++        if canvas is not None:
++            try:
++                canvas.release_mouse(ax)
++            except Exception:
++                # Be defensive: releasing the mouse grab should not raise
++                # in normal operation; if it does, ignore to avoid
++                # interfering with axes removal.
++                pass
++
+         self._axstack.remove(ax)
+         self._axobservers.process("_axes_change_event", self)
+         self.stale = True

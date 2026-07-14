@@ -1,0 +1,39 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 69a2d9298f..2ea4681c76 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -6,6 +6,7 @@ from itertools import chain
+ 
+ from django.core.exceptions import EmptyResultSet, FieldError
+ from django.db import DatabaseError, NotSupportedError
++from django.db.models.fields import BooleanField
+ from django.db.models.constants import LOOKUP_SEP
+ from django.db.models.expressions import F, OrderBy, RawSQL, Ref, Value
+ from django.db.models.functions import Cast, Random
+@@ -280,6 +281,26 @@ class SQLCompiler:
+                 else:
+                     sql, params = self.compile(Value(empty_result_set_value))
+             else:
++                # Some expressions (notably WhereNode) use the sentinel
++                # ``('', [])`` to mean "matches everything". That sentinel
++                # is correct in WHERE contexts but not in SELECT contexts
++                # where an empty SQL fragment would produce malformed SQL
++                # (e.g. "SELECT AS ..."). Map an empty SQL fragment to a
++                # boolean TRUE literal for boolean-valued expressions so the
++                # SELECT list remains valid. The eventual call to
++                # col.select_format() will wrap the literal if needed for
++                # backends that don't support boolean expressions in the
++                # SELECT clause.
++                if not sql:
++                    try:
++                        output_field = getattr(col, 'output_field', None)
++                        if isinstance(output_field, BooleanField):
++                            sql, params = '1', ()
++                    except Exception:
++                        # Be conservative: if anything goes wrong, fall back
++                        # to a SQL TRUE literal so the SELECT is syntactically
++                        # valid.
++                        sql, params = '1', ()
+                 sql, params = col.select_format(self, sql, params)
+             ret.append((col, (sql, params), alias))
+         return ret, klass_info, annotations

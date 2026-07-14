@@ -1,0 +1,51 @@
+diff --git a/pylint/lint/run.py b/pylint/lint/run.py
+index 778e64441..b304197a0 100644
+--- a/pylint/lint/run.py
++++ b/pylint/lint/run.py
+@@ -132,9 +132,20 @@ group are mutually exclusive.",
+         linter.disable("I")
+         linter.enable("c-extension-no-member")
+ 
+-        args = _config_initialization(
+-            linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
+-        )
++        try:
++            args = _config_initialization(
++                linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
++            )
++        except Exception as ex:
++            # _config_initialization emits a reporter message for unrecognized
++            # options and then raises _UnrecognizedOptionError. Handle that
++            # specific exception here so we exit cleanly (no traceback) like
++            # other early CLI errors.
++            from pylint.config.exceptions import _UnrecognizedOptionError
++
++            if isinstance(ex, _UnrecognizedOptionError):
++                sys.exit(32)
++            raise
+ 
+         if linter.config.jobs < 0:
+             print(
+diff --git a/pylint/pyreverse/main.py b/pylint/pyreverse/main.py
+index 830664366..342311d00 100644
+--- a/pylint/pyreverse/main.py
++++ b/pylint/pyreverse/main.py
+@@ -216,7 +216,17 @@ class Run(_ArgumentsManager, _ArgumentsProvider):
+ 
+         # Parse options
+         insert_default_options()
+-        args = self._parse_command_line_configuration(args)
++        try:
++            args = self._parse_command_line_configuration(args)
++        except Exception as ex:
++            # _parse_command_line_configuration may propagate
++            # _UnrecognizedOptionError after the reporter already emitted a
++            # user-facing message. Handle it here to exit cleanly without a traceback.
++            from pylint.config.exceptions import _UnrecognizedOptionError
++
++            if isinstance(ex, _UnrecognizedOptionError):
++                sys.exit(32)
++            raise
+ 
+         if self.config.output_format not in DIRECTLY_SUPPORTED_FORMATS:
+             check_graphviz_availability()

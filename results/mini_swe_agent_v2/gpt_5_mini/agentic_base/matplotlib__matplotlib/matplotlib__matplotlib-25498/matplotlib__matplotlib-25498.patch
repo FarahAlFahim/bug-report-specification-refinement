@@ -1,0 +1,58 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..bca82915fc 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -508,7 +508,22 @@ class Colorbar:
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
++            # Adopt the mappable's norm. If the newly assigned norm does not
++            # yet have vmin/vmax set (i.e. is not "scaled"), try to
++            # initialize it from the mappable's data so that non-linear
++            # norms (e.g. LogNorm) receive valid positive vmin/vmax and do
++            # not later raise in inverse/transform operations.
+             self.norm = mappable.norm
++            try:
++                if not self.norm.scaled() and hasattr(mappable, 'autoscale_None'):
++                    # autoscale_None will only set vmin/vmax if they are
++                    # currently None, which is the desired behavior here.
++                    mappable.autoscale_None()
++            except Exception:
++                # Be conservative: if autoscaling fails for any reason,
++                # fall back to leaving the norm as-is; downstream code will
++                # handle fallback behavior.
++                pass
+             self._reset_locator_formatter_scale()
+ 
+         self._draw_all()
+@@ -1100,10 +1115,27 @@ class Colorbar:
+         if self._extend_upper():
+             b = np.hstack((b, b[-1] + 1))
+ 
+-        # transform from 0-1 to vmin-vmax:
++        # transform from 0-1 to vmin-vmax. If the norm is not yet scaled,
++        # try to initialize it from the mappable's data so that non-linear
++        # norms (e.g. LogNorm) get valid positive vmin/vmax. Only fall back
++        # to the 0..1 range if autoscaling is not possible or does not set
++        # the bounds.
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
++            try:
++                if hasattr(self, 'mappable') and getattr(self.mappable, 'get_array', None) is not None:
++                    # autoscale_None will set vmin/vmax only if they are None.
++                    if hasattr(self.mappable, 'autoscale_None'):
++                        self.mappable.autoscale_None()
++            except Exception:
++                # If autoscale fails for any reason, we will fall back to
++                # explicit 0..1 so that subsequent code has numeric bounds.
++                pass
++            if not self.norm.scaled():
++                # As a last resort, use a linear 0..1 range. This is only
++                # appropriate for norms that can accept zero; log-like norms
++                # should have been initialized from the mappable above.
++                self.norm.vmin = 0
++                self.norm.vmax = 1
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

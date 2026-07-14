@@ -1,0 +1,30 @@
+diff --git a/src/_pytest/_io/saferepr.py b/src/_pytest/_io/saferepr.py
+index 23af4d0bb..9765861f7 100644
+--- a/src/_pytest/_io/saferepr.py
++++ b/src/_pytest/_io/saferepr.py
+@@ -9,7 +9,11 @@ def _try_repr_or_str(obj):
+     except (KeyboardInterrupt, SystemExit):
+         raise
+     except BaseException:
+-        return '{}("{}")'.format(type(obj).__name__, obj)
++        # Avoid calling back into the object (via __str__/__format__/
++        # __repr__) while producing a fallback. Use type(obj).__name__ and
++        # id(obj) which are side-effect-free operations that do not trigger
++        # instance attribute access.
++        return "{} object at 0x{:x}".format(type(obj).__name__, id(obj))
+ 
+ 
+ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+@@ -19,8 +23,11 @@ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+         raise
+     except BaseException as exc:
+         exc_info = "unpresentable exception ({})".format(_try_repr_or_str(exc))
++    # Use type(obj).__name__ rather than obj.__class__.__name__ to avoid
++    # invoking instance attribute lookup (which may trigger a
++    # user-defined __getattribute__ and run user code).
+     return "<[{} raised in repr()] {} object at 0x{:x}>".format(
+-        exc_info, obj.__class__.__name__, id(obj)
++        exc_info, type(obj).__name__, id(obj)
+     )
+ 
+ 

@@ -1,0 +1,66 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 66461181d0..b6dbd38b0c 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -1143,25 +1143,46 @@ def _print_BasisDependent(self, expr):
+             # XXX: What is this hack?
+             if '\n' in partstr:
+                 tempstr = partstr
+-                tempstr = tempstr.replace(vectstrs[i], '')
+-                if '\N{right parenthesis extension}' in tempstr:   # If scalar is a fraction
+-                    for paren in range(len(tempstr)):
+-                        flag[i] = 1
+-                        if tempstr[paren] == '\N{right parenthesis extension}':
+-                            tempstr = tempstr[:paren] + '\N{right parenthesis extension}'\
+-                                         + ' '  + vectstrs[i] + tempstr[paren + 1:]
+-                            break
+-                elif '\N{RIGHT PARENTHESIS LOWER HOOK}' in tempstr:
++                # Instead of blindly removing occurrences of the vector name
++                # (which could corrupt the pretty form if the name occurs in
++                # the scalar's representation), find the last location of
++                # a parenthesis "hook" or extension and insert the vector
++                # name there. This places the basis vector next to the
++                # closing parenthesis of the scalar, preserving the scalar
++                # layout.
++                vname = vectstrs[i]
++                # If scalar is a fraction with right parenthesis extension
++                ext = '\N{right parenthesis extension}'
++                idx = tempstr.rfind(ext)
++                if idx != -1:
+                     flag[i] = 1
+-                    tempstr = tempstr.replace('\N{RIGHT PARENTHESIS LOWER HOOK}',
+-                                        '\N{RIGHT PARENTHESIS LOWER HOOK}'
+-                                        + ' ' + vectstrs[i])
++                    insert_at = idx + len(ext)
++                    tempstr = tempstr[:insert_at] + ' ' + vname + tempstr[insert_at:]
+                 else:
+-                    tempstr = tempstr.replace('\N{RIGHT PARENTHESIS UPPER HOOK}',
+-                                        '\N{RIGHT PARENTHESIS UPPER HOOK}'
+-                                        + ' ' + vectstrs[i])
++                    # Try lower hook
++                    lower = '\N{RIGHT PARENTHESIS LOWER HOOK}'
++                    idx = tempstr.rfind(lower)
++                    if idx != -1:
++                        flag[i] = 1
++                        insert_at = idx + len(lower)
++                        tempstr = tempstr[:insert_at] + ' ' + vname + tempstr[insert_at:]
++                    else:
++                        # Fallback to upper hook
++                        upper = '\N{RIGHT PARENTHESIS UPPER HOOK}'
++                        idx = tempstr.rfind(upper)
++                        if idx != -1:
++                            insert_at = idx + len(upper)
++                            tempstr = tempstr[:insert_at] + ' ' + vname + tempstr[insert_at:]
++                        else:
++                            # If no special hooks were found, leave the
++                            # pretty form as-is (it already contains the
++                            # appended vector name). This preserves the
++                            # original formatting when no insertion point
++                            # is available.
++                            pass
+                 o1[i] = tempstr
+ 
++
+         o1 = [x.split('\n') for x in o1]
+         n_newlines = max([len(x) for x in o1])  # Width of part in its pretty form
+ 

@@ -1,0 +1,21 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 901918674a..22c410c5b5 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1437,8 +1437,15 @@ def _print_MatrixBase(self, expr):
+                            = _print_MatrixBase
+ 
+     def _print_MatrixElement(self, expr):
++        # Ensure index expressions are printed via the latex printer so that
++        # any special characters (e.g. leading underscores in Dummy names)
++        # are properly represented and do not inject raw LaTeX tokens into
++        # an existing subscript. This mirrors the behavior of other index
++        # handlers like _print_Indexed which call self._print on indices.
++        i_str = self._print(expr.i)
++        j_str = self._print(expr.j)
+         return self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True) \
+-            + '_{%s, %s}' % (expr.i, expr.j)
++            + '_{%s, %s}' % (i_str, j_str)
+ 
+     def _print_MatrixSlice(self, expr):
+         def latexslice(x):

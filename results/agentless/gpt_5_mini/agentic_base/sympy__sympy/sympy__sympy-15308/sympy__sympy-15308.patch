@@ -1,0 +1,22 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 056ef25..b2b3cb5 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -2190,6 +2190,17 @@ class LatexPrinter(Printer):
+         contents = self._print(p.args[0])
+         return r'\mbox{Tr}\left(%s\right)' % (contents)
+ 
++    def _print_Trace(self, expr):
++        """
++        Print the matrix Trace expression and ensure the inner matrix
++        expression is recursively passed through the LaTeX printer so
++        that e.g. Trace(A**2) yields \operatorname{Tr}{\left(A^{2}\right)}.
++        """
++        # Use operatorname for proper formatting and spacing, and recursively
++        # print the argument so inner structure (powers, transposes, etc.)
++        # is formatted correctly.
++        return r"\operatorname{Tr}{\left(%s\right)}" % self._print(expr.arg)
++
+     def _print_totient(self, expr, exp=None):
+         if exp is not None:
+             return r'\left(\phi\left(%s\right)\right)^{%s}' % (self._print(expr.args[0]),

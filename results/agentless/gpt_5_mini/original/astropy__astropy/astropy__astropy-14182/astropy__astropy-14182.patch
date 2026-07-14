@@ -1,0 +1,31 @@
+diff --git a/astropy/io/ascii/core.py b/astropy/io/ascii/core.py
+index 4656111..6138885 100644
+--- a/astropy/io/ascii/core.py
++++ b/astropy/io/ascii/core.py
+@@ -1787,6 +1787,7 @@ extra_writer_pars = (
+     "fill_values",
+     "fill_include_names",
+     "fill_exclude_names",
++    "header_rows",
+ )
+ 
+ 
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index 00bbbaf..89a468e 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -57,10 +57,11 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, *args, **kwargs):
++        # Allow writer-specific kwargs (e.g. header_rows) to be passed through.
++        super().__init__(delimiter_pad=None, bookend=False, *args, **kwargs)
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+         lines = [lines[1]] + lines + [lines[1]]
+-        return lines
++        return lines

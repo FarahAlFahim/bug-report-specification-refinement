@@ -1,0 +1,42 @@
+diff --git a/sympy/functions/elementary/integers.py b/sympy/functions/elementary/integers.py
+index fe1e71e3f2..83346f9913 100644
+--- a/sympy/functions/elementary/integers.py
++++ b/sympy/functions/elementary/integers.py
+@@ -65,16 +65,29 @@ def eval(cls, arg):
+                 npart = S.Zero
+             except (PrecisionExhausted, NotImplementedError):
+                 pass
+-
+-        spart += npart
+-        if not spart:
++        # combine the symbolic and numeric parts, but avoid the case
++        # where a floor/ceiling that was already present in the
++        # symbolic part gets separated from a numeric term.  If the
++        # original symbolic part was itself a floor/ceiling and there
++        # is a non-zero numeric part, we should keep the whole
++        # argument together inside the rounding function to avoid
++        # inadvertently moving numeric offsets outside the function
++        # (which can change the meaning).  See issue where
++        # ceiling(x/4 - 3/4) became ceiling(x/4) + (-3/4).
++        spart0 = spart
++        combined = spart0 + npart
++        if not combined:
+             return ipart
+-        elif spart.is_imaginary or (S.ImaginaryUnit*spart).is_real:
+-            return ipart + cls(im(spart), evaluate=False)*S.ImaginaryUnit
+-        elif isinstance(spart, (floor, ceiling)):
+-            return ipart + spart
++        elif combined.is_imaginary or (S.ImaginaryUnit*combined).is_real:
++            return ipart + cls(im(combined), evaluate=False)*S.ImaginaryUnit
++        # If the original symbolic part was exactly a floor/ceiling and
++        # there was no numeric term, return it directly to avoid
++        # double-wrapping.  Otherwise, wrap the combined argument in
++        # the rounding function so that numeric offsets stay inside.
++        elif isinstance(spart0, (floor, ceiling)) and npart == 0:
++            return ipart + spart0
+         else:
+-            return ipart + cls(spart, evaluate=False)
++            return ipart + cls(combined, evaluate=False)
+ 
+     def _eval_is_finite(self):
+         return self.args[0].is_finite

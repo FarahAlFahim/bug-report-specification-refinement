@@ -1,0 +1,174 @@
+diff --git a/django/template/context_processors.py b/django/template/context_processors.py
+index 0e9efb2f69..ea6f55c7eb 100644
+--- a/django/template/context_processors.py
++++ b/django/template/context_processors.py
+@@ -8,9 +8,11 @@ of a DjangoTemplates backend and used by RequestContext.
+ """
+ 
+ import itertools
++from urllib.parse import urlsplit
+ 
+ from django.conf import settings
+ from django.middleware.csrf import get_token
++from django.utils.encoding import iri_to_uri
+ from django.utils.functional import SimpleLazyObject, lazy
+ 
+ 
+@@ -63,18 +65,62 @@ def tz(request):
+     return {'TIME_ZONE': timezone.get_current_timezone_name()}
+ 
+ 
++def _maybe_prefix_with_script_name(url, request):
++    """Prefix a path-only URL with the WSGI SCRIPT_NAME from request.
++
++    Rules:
++    - Only apply when url starts with a single '/' (not '//') and has no scheme.
++    - Normalize SCRIPT_NAME to start with '/' and have no trailing '/'.
++    - Do nothing if script_name is empty or '/'.
++    - Avoid double-prepending if url already starts with script_name.
++    """
++    if not request:
++        return url
++    try:
++        script_name = request.META.get('SCRIPT_NAME', '')
++    except Exception:
++        return url
++    if not script_name:
++        return url
++    # Only prefix path-only URLs: starts with '/' but not with '//' and no scheme
++    if not url or not url.startswith('/') or url.startswith('//'):
++        return url
++    if urlsplit(url).scheme:
++        return url
++    # Normalize script_name
++    script = '/' + script_name.strip('/')
++    if script == '/':
++        return url
++    # Avoid double-prepending
++    if url == script or url.startswith(script + '/'):
++        return url
++    return script + url
++
++
+ def static(request):
+     """
+     Add static-related context variables to the context.
+     """
+-    return {'STATIC_URL': settings.STATIC_URL}
++    static_url = settings.STATIC_URL
++    try:
++        static_url = iri_to_uri(static_url)
++    except Exception:
++        pass
++    static_url = _maybe_prefix_with_script_name(static_url, request)
++    return {'STATIC_URL': static_url}
+ 
+ 
+ def media(request):
+     """
+     Add media-related context variables to the context.
+     """
+-    return {'MEDIA_URL': settings.MEDIA_URL}
++    media_url = settings.MEDIA_URL
++    try:
++        media_url = iri_to_uri(media_url)
++    except Exception:
++        pass
++    media_url = _maybe_prefix_with_script_name(media_url, request)
++    return {'MEDIA_URL': media_url}
+ 
+ 
+ def request(request):
+diff --git a/django/templatetags/static.py b/django/templatetags/static.py
+index 39712aaba0..79ccfa42bb 100644
+--- a/django/templatetags/static.py
++++ b/django/templatetags/static.py
+@@ -1,4 +1,4 @@
+-from urllib.parse import quote, urljoin
++from urllib.parse import quote, urljoin, urlsplit
+ 
+ from django import template
+ from django.apps import apps
+@@ -37,17 +37,41 @@ class PrefixNode(template.Node):
+         return cls(varname, name)
+ 
+     @classmethod
+-    def handle_simple(cls, name):
++    def handle_simple(cls, name, request=None):
++        """Return the prefix for the given setting name, optionally
++        prefixing with request.META['SCRIPT_NAME'] for path-only URLs.
++        """
+         try:
+             from django.conf import settings
+         except ImportError:
+             prefix = ''
+         else:
+             prefix = iri_to_uri(getattr(settings, name, ''))
+-        return prefix
++
++        # Only prefix when a request with a SCRIPT_NAME is available.
++        if not request:
++            return prefix
++
++        script_name = request.META.get('SCRIPT_NAME', '')
++        if not script_name:
++            return prefix
++
++        # Only prefix path-only URLs: starts with '/' but not with '//' and no scheme
++        if not prefix or not prefix.startswith('/') or prefix.startswith('//'):
++            return prefix
++        if urlsplit(prefix).scheme:
++            return prefix
++
++        script = '/' + script_name.strip('/')
++        if script == '/':
++            return prefix
++        if prefix == script or prefix.startswith(script + '/'):
++            return prefix
++        return script + prefix
+ 
+     def render(self, context):
+-        prefix = self.handle_simple(self.name)
++        request = context.get('request')
++        prefix = self.handle_simple(self.name, request=request)
+         if self.varname is None:
+             return prefix
+         context[self.varname] = prefix
+@@ -100,7 +124,8 @@ class StaticNode(template.Node):
+ 
+     def url(self, context):
+         path = self.path.resolve(context)
+-        return self.handle_simple(path)
++        request = context.get('request')
++        return self.handle_simple(path, request=request)
+ 
+     def render(self, context):
+         url = self.url(context)
+@@ -112,12 +137,24 @@ class StaticNode(template.Node):
+         return ''
+ 
+     @classmethod
+-    def handle_simple(cls, path):
++    def handle_simple(cls, path, request=None):
+         if apps.is_installed('django.contrib.staticfiles'):
+             from django.contrib.staticfiles.storage import staticfiles_storage
+-            return staticfiles_storage.url(path)
++            url = staticfiles_storage.url(path)
++            # storage.url is request-agnostic; prefix with SCRIPT_NAME if needed
++            if request:
++                try:
++                    script_name = request.META.get('SCRIPT_NAME', '')
++                except Exception:
++                    script_name = ''
++                if script_name and url.startswith('/') and not url.startswith('//') and not urlsplit(url).scheme:
++                    script = '/' + script_name.strip('/')
++                    if not (url == script or url.startswith(script + '/')):
++                        url = script + url
++            return url
+         else:
+-            return urljoin(PrefixNode.handle_simple("STATIC_URL"), quote(path))
++            base = PrefixNode.handle_simple("STATIC_URL", request=request)
++            return urljoin(base, quote(path))
+ 
+     @classmethod
+     def handle_token(cls, parser, token):

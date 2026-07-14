@@ -1,0 +1,35 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..8abc6d027e 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -257,8 +257,11 @@ class RoutePattern(CheckURLMixin):
+             for key, value in kwargs.items():
+                 converter = self.converters[key]
+                 try:
++                    # Import Http404 locally to avoid touching top-level imports.
++                    from django.http import Http404
+                     kwargs[key] = converter.to_python(value)
+-                except ValueError:
++                except (ValueError, Http404):
++                    # Treat Http404 raised by converters as a non-match, same as ValueError.
+                     return None
+             return path[match.end():], (), kwargs
+         return None
+diff --git a/django/views/debug.py b/django/views/debug.py
+index cb3e8c7ec1..8661ce7032 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -482,8 +482,12 @@ def technical_404_response(request, exception):
+ 
+     caller = ''
+     try:
++        # Import Http404 locally to avoid adding module-level imports.
++        from django.http import Http404
+         resolver_match = resolve(request.path)
+-    except Resolver404:
++    except (Resolver404, Http404):
++        # Treat Http404 raised during resolution as equivalent to Resolver404
++        # for the purposes of building the technical 404 page.
+         pass
+     else:
+         obj = resolver_match.func

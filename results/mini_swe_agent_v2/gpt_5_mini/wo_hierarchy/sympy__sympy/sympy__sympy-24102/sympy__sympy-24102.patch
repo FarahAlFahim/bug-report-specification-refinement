@@ -1,0 +1,132 @@
+diff --git a/sympy/parsing/mathematica.py b/sympy/parsing/mathematica.py
+index 7ea14ce33a..48df5dada3 100644
+--- a/sympy/parsing/mathematica.py
++++ b/sympy/parsing/mathematica.py
+@@ -174,9 +174,9 @@ class MathematicaParser:
+         # a single whitespace to '*'
+         'whitespace': (
+             re.compile(r'''
+-                (?:(?<=[a-zA-Z\d])|(?<=\d\.))     # a letter or a number
++                (?:(?<=[^\W_])|(?<=\d\.))     # a letter or a number
+                 \s+                               # any number of whitespaces
+-                (?:(?=[a-zA-Z\d])|(?=\.\d))       # a letter or a number
++                (?:(?=[^\W_])|(?=\.\d))       # a letter or a number
+                 ''', re.VERBOSE),
+             '*'),
+ 
+@@ -185,14 +185,14 @@ class MathematicaParser:
+             re.compile(r'''
+                 (?:(?<=[])\d])|(?<=\d\.))       # ], ) or a number
+                                                 # ''
+-                (?=[(a-zA-Z])                   # ( or a single letter
++                (?=(?:\(|[^\W\d_]))                   # ( or a single letter
+                 ''', re.VERBOSE),
+             '*'),
+ 
+         # add omitted '*' character (variable letter preceding)
+         'add*_2': (
+             re.compile(r'''
+-                (?<=[a-zA-Z])       # a letter
++                (?<=[^\W\d_])       # a letter
+                 \(                  # ( as a character
+                 (?=.)               # any characters
+                 ''', re.VERBOSE),
+@@ -202,10 +202,10 @@ class MathematicaParser:
+         'Pi': (
+             re.compile(r'''
+                 (?:
+-                \A|(?<=[^a-zA-Z])
++                \A|(?<=[\W\d_])
+                 )
+                 Pi                  # 'Pi' is 3.14159... in Mathematica
+-                (?=[^a-zA-Z])
++                (?=[\W\d_])
+                 ''', re.VERBOSE),
+             'pi'),
+     }
+@@ -213,9 +213,9 @@ class MathematicaParser:
+     # Mathematica function name pattern
+     FM_PATTERN = re.compile(r'''
+                 (?:
+-                \A|(?<=[^a-zA-Z])   # at the top or a non-letter
++                \A|(?<=[\W\d_])   # at the top or a non-letter
+                 )
+-                [A-Z][a-zA-Z\d]*    # Function
++                [^\W\d_][^\W_]*    # Function
+                 (?=\[)              # [ as a character
+                 ''', re.VERBOSE)
+ 
+@@ -227,10 +227,10 @@ class MathematicaParser:
+     # regex string for function argument pattern
+     ARGS_PATTERN_TEMPLATE = r'''
+                 (?:
+-                \A|(?<=[^a-zA-Z])
++                \A|(?<=[\W\d_])
+                 )
+                 {arguments}         # model argument like x, y,...
+-                (?=[^a-zA-Z])
++                (?=[\W\d_])
+                 '''
+ 
+     # will contain transformed CORRESPONDENCES dictionary
+@@ -336,16 +336,18 @@ def _compile_dictionary(cls, dic):
+ 
+         return d
+ 
++
+     def _convert_function(self, s):
+-        '''Parse Mathematica function to SymPy one'''
++        """Parse Mathematica function to SymPy one"""
+ 
+         # compiled regex object
+         pat = self.FM_PATTERN
+ 
+         scanned = ''                # converted string
+         cur = 0                     # position cursor
++        search_pos = 0
+         while True:
+-            m = pat.search(s)
++            m = pat.search(s, search_pos)
+ 
+             if m is None:
+                 # append the rest of string
+@@ -355,14 +357,20 @@ def _convert_function(self, s):
+             # get Mathematica function name
+             fm = m.group()
+ 
++            # Only treat as a Mathematica function if the first character is uppercase
++            if not fm[0].isupper():
++                # continue searching after this match
++                search_pos = m.end()
++                continue
++
+             # get arguments, and the end position of fm function
+-            args, end = self._get_args(m)
++            args, endpos = self._get_args(m)
+ 
+             # the start position of fm function
+             bgn = m.start()
+ 
+             # convert Mathematica function to SymPy one
+-            s = self._convert_one_function(s, fm, args, bgn, end)
++            s = self._convert_one_function(s, fm, args, bgn, endpos)
+ 
+             # update cursor
+             cur = bgn
+@@ -372,6 +380,7 @@ def _convert_function(self, s):
+ 
+             # shrink s
+             s = s[cur:]
++            search_pos = 0
+ 
+         return scanned
+ 
+@@ -586,7 +595,7 @@ def parse(self, s):
+         "##": lambda: ["SlotSequence", "1"],
+     }
+ 
+-    _literal = r"[A-Za-z][A-Za-z0-9]*"
++    _literal = r"[^\W\d_][^\W_]*"
+     _number = r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
+ 
+     _enclosure_open = ["(", "[", "[[", "{"]

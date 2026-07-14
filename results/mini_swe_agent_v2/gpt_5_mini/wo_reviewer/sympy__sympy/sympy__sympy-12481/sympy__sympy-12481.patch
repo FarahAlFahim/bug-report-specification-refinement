@@ -1,0 +1,25 @@
+diff --git a/sympy/combinatorics/permutations.py b/sympy/combinatorics/permutations.py
+index 136ed5a47..8971a23cb 100644
+--- a/sympy/combinatorics/permutations.py
++++ b/sympy/combinatorics/permutations.py
+@@ -895,12 +895,14 @@ def __new__(cls, *args, **kwargs):
+         # counting starts from 1.
+ 
+         temp = flatten(args)
+-        if has_dups(temp):
+-            if is_cycle:
+-                raise ValueError('there were repeated elements; to resolve '
+-                'cycles use Cycle%s.' % ''.join([str(tuple(c)) for c in args]))
+-            else:
+-                raise ValueError('there were repeated elements.')
++        # If the input is given in cyclic form (is_cycle is True) then
++        # duplicates across different cycles are allowed because the
++        # cycles will be composed. Only array-form inputs (is_cycle is
++        # False) should be rejected for duplicate elements. Per-cycle
++        # uniqueness is still enforced by Cycle.__init__ when cycles are
++        # constructed below.
++        if not is_cycle and has_dups(temp):
++            raise ValueError('there were repeated elements.')
+         temp = set(temp)
+ 
+         if not is_cycle and \

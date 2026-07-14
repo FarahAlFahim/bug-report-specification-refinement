@@ -1,0 +1,23 @@
+diff --git a/sklearn/utils/_set_output.py b/sklearn/utils/_set_output.py
+index 335773c6a..29daf9c34 100644
+--- a/sklearn/utils/_set_output.py
++++ b/sklearn/utils/_set_output.py
+@@ -52,6 +52,18 @@ def _wrap_in_pandas_container(
+ 
+     pd = check_pandas_support("Setting output container to 'pandas'")
+ 
++    # Validate index length matches data length if index is provided
++    if index is not None:
++        # Get the expected length from the data
++        if isinstance(data_to_wrap, pd.DataFrame):
++            data_len = len(data_to_wrap)
++        else:
++            data_len = data_to_wrap.shape[0]
++        
++        # Only use the provided index if lengths match
++        if len(index) != data_len:
++            index = None
++
+     if isinstance(data_to_wrap, pd.DataFrame):
+         if columns is not None:
+             data_to_wrap.columns = columns

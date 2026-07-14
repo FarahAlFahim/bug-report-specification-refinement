@@ -1,0 +1,91 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afce..246d75dec 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -24,16 +24,25 @@ def _modpath_from_file(filename: str, is_namespace: bool, path: list[str]) -> li
+ 
+ 
+ def get_python_path(filepath: str) -> str:
+-    """TODO This get the python path with the (bad) assumption that there is always
+-    an __init__.py.
++    """Return the python path root for `filepath`.
+ 
+-    This is not true since python 3.3 and is causing problem.
++    Historically this implementation assumed that a package root is marked by
++    the existence of an ``__init__.py`` file. Since Python 3.3 namespace
++    packages can exist without an ``__init__.py`` and directories passed to
++    pylint should not be assumed to always map to a real ``__init__.py`` file.
++
++    This implementation walks up the filesystem from ``filepath`` (or its
++    parent when a file is passed) and returns the first directory that does not
++    contain an ``__init__.py`` file. If the filesystem root is reached the
++    current working directory is returned as a fallback.
+     """
+     dirname = os.path.realpath(os.path.expanduser(filepath))
+     if not os.path.isdir(dirname):
+         dirname = os.path.dirname(dirname)
+     while True:
+-        if not os.path.exists(os.path.join(dirname, "__init__.py")):
++        # Treat a package marker only when the file actually exists. Use
++        # isfile() rather than exists() to avoid considering non-files.
++        if not os.path.isfile(os.path.join(dirname, "__init__.py")):
+             return dirname
+         old_dirname = dirname
+         dirname = os.path.dirname(dirname)
+@@ -121,16 +130,24 @@ def expand_modules(
+         else:
+             is_namespace = modutils.is_namespace(spec)
+             is_directory = modutils.is_directory(spec)
++        # Only treat the directory itself as a package module when an actual
++        # __init__.py exists (or modutils reports it as a namespace package).
+         if not is_namespace:
+-            result.append(
+-                {
+-                    "path": filepath,
+-                    "name": modname,
+-                    "isarg": True,
+-                    "basepath": filepath,
+-                    "basename": modname,
+-                }
+-            )
++            if os.path.isfile(filepath):
++                result.append(
++                    {
++                        "path": filepath,
++                        "name": modname,
++                        "isarg": True,
++                        "basepath": filepath,
++                        "basename": modname,
++                    }
++                )
++        else:
++            # For namespace packages we don't expect a real __init__.py file
++            # but we still want to enumerate contained modules, so don't add
++            # the artificial package file entry.
++            pass
+         has_init = (
+             not (modname.endswith(".__init__") or modname == "__init__")
+             and os.path.basename(filepath) == "__init__.py"
+@@ -146,10 +163,18 @@ def expand_modules(
+                 ) or _is_in_ignore_list_re(subfilepath, ignore_list_paths_re):
+                     continue
+ 
+-                modpath = _modpath_from_file(
+-                    subfilepath, is_namespace, path=additional_search_path
+-                )
+-                submodname = ".".join(modpath)
++                try:
++                    modpath = _modpath_from_file(
++                        subfilepath, is_namespace, path=additional_search_path
++                    )
++                    submodname = ".".join(modpath)
++                except Exception:
++                    # Be conservative: if astroid/modutils fails to compute a
++                    # modpath for this subfile, fall back to a module name
++                    # based on the file's basename (without extension). This
++                    # avoids bubbling exceptions or producing entries that
++                    # point to non-existent __init__.py files.
++                    submodname = os.path.splitext(os.path.basename(subfilepath))[0]
+                 result.append(
+                     {
+                         "path": subfilepath,

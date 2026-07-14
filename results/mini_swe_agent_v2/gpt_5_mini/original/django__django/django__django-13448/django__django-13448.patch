@@ -1,0 +1,32 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index 503f7f56fd..d44f9af51b 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -112,10 +112,23 @@ class BaseDatabaseCreation:
+                             model._meta.can_migrate(self.connection) and
+                             router.allow_migrate_model(self.connection.alias, model)
+                         ):
+-                            queryset = model._default_manager.using(
+-                                self.connection.alias,
+-                            ).order_by(model._meta.pk.name)
+-                            yield from queryset.iterator()
++                            # When TEST['MIGRATE'] is False the test database may not
++                            # have the tables for all models. Querying such models
++                            # would raise ProgrammingError / OperationalError and
++                            # could leave server-side cursors in a bad state
++                            # (see ticket about cursor "does not exist"). To be
++                            # resilient, catch database errors and skip models
++                            # whose tables are missing.
++                            try:
++                                queryset = model._default_manager.using(
++                                    self.connection.alias,
++                                ).order_by(model._meta.pk.name)
++                                yield from queryset.iterator()
++                            except Exception:
++                                # Any error while loading objects for serialization
++                                # means we can't include this model's data. Skip it
++                                # and continue with others.
++                                continue
+         # Serialize to a string
+         out = StringIO()
+         serializers.serialize("json", get_objects(), indent=None, stream=out)

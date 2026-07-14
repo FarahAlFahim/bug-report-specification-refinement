@@ -1,0 +1,35 @@
+diff --git a/astropy/wcs/wcs.py b/astropy/wcs/wcs.py
+index d3a06f2b31..7cad6698ad 100644
+--- a/astropy/wcs/wcs.py
++++ b/astropy/wcs/wcs.py
+@@ -1220,6 +1220,19 @@ reduce these to 2 dimensions using the naxis kwarg.
+ 
+             xy = np.hstack([x.reshape((x.size, 1)) for x in axes])
+ 
++            # If there are no input points, avoid calling into wcslib
++            # which can raise on zero-sized inputs. Instead, return
++            # empty arrays with the same shape as the broadcasted
++            # input axes. This mirrors the behaviour expected by
++            # callers when passing empty lists/arrays.
++            if xy.shape[0] == 0:
++                if ra_dec_order and sky == 'output':
++                    # Return a pair of empty arrays for (ra, dec)-ordered output
++                    return (np.empty(axes[0].shape, dtype=float),
++                            np.empty(axes[0].shape, dtype=float))
++                return [np.empty(axes[0].shape, dtype=float)
++                        for _ in range(self.naxis)]
++
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
+             output = func(xy, origin)
+@@ -1235,6 +1248,10 @@ reduce these to 2 dimensions using the naxis kwarg.
+                 raise ValueError(
+                     "When providing two arguments, the array must be "
+                     "of shape (N, {0})".format(self.naxis))
++            # Short-circuit zero-length arrays to avoid calling wcslib
++            # with ncoord/nelem == 0 which may raise InconsistentAxisTypesError.
++            if xy.shape[0] == 0:
++                return np.empty((0, self.naxis), dtype=float)
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
+             result = func(xy, origin)

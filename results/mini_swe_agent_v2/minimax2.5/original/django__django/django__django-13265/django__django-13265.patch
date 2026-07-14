@@ -1,0 +1,48 @@
+diff --git a/django/db/migrations/autodetector.py b/django/db/migrations/autodetector.py
+index 89e2dceeaf..471e64fa24 100644
+--- a/django/db/migrations/autodetector.py
++++ b/django/db/migrations/autodetector.py
+@@ -421,6 +421,12 @@ class MigrationAutodetector:
+                 operation.name_lower == dependency[1].lower() and
+                 (operation.order_with_respect_to or "").lower() != dependency[2].lower()
+             )
++        # order_with_respect_to being set for a field
++        elif dependency[3] == "order_wrt":
++            return (
++                isinstance(operation, operations.AlterOrderWithRespectTo) and
++                operation.name_lower == dependency[1].lower()
++            )
+         # Field is removed and part of an index/unique_together
+         elif dependency[2] is not None and dependency[3] == "foo_together_change":
+             return (
+@@ -1015,12 +1021,29 @@ class MigrationAutodetector:
+     def generate_added_indexes(self):
+         for (app_label, model_name), alt_indexes in self.altered_indexes.items():
+             for index in alt_indexes['added_indexes']:
++                # Add dependency on AlterOrderWithRespectTo if the index
++                # includes the _order field (which is created by
++                # AlterOrderWithRespectTo).
++                dependencies = []
++                if '_order' in index.fields:
++                    old_model_name = self.renamed_models.get((app_label, model_name), model_name)
++                    old_model_state = self.from_state.models.get((app_label, old_model_name))
++                    # Only add dependency if _order field doesn't exist yet
++                    # (i.e., it's created by AlterOrderWithRespectTo)
++                    if old_model_state and '_order' not in old_model_state.fields:
++                        dependencies.append((
++                            app_label,
++                            model_name,
++                            None,
++                            'order_wrt',
++                        ))
+                 self.add_operation(
+                     app_label,
+                     operations.AddIndex(
+                         model_name=model_name,
+                         index=index,
+-                    )
++                    ),
++                    dependencies=dependencies,
+                 )
+ 
+     def generate_removed_indexes(self):

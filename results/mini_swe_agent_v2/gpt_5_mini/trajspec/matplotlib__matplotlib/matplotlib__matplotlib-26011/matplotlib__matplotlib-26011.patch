@@ -1,0 +1,34 @@
+diff --git a/lib/matplotlib/axis.py b/lib/matplotlib/axis.py
+index e6e7e29f11..675f35f29c 100644
+--- a/lib/matplotlib/axis.py
++++ b/lib/matplotlib/axis.py
+@@ -1238,12 +1238,28 @@ class Axis(martist.Artist):
+             self._set_autoscale_on(bool(auto))
+ 
+         if emit:
++            # Notify callbacks registered on the initiating Axes.
+             self.axes.callbacks.process(f"{name}lim_changed", self.axes)
+-            # Call all of the other axes that are shared with this one
++            # Propagate the new limits to all other Axes that share this
++            # axis.  Call their internal setter with emit=False to avoid
++            # re-entering the propagation logic, but still invoke their
++            # own CallbackRegistry so observers registered on sibling Axes
++            # are notified.
+             for other in self._get_shared_axes():
+                 if other is not self.axes:
+                     other._axis_map[name]._set_lim(
+                         v0, v1, emit=False, auto=auto)
++                    # Manually process the sibling Axes' callbacks so that
++                    # observers registered on them are invoked.  This keeps
++                    # the propagation path from suppressing sibling callbacks
++                    # while also avoiding recursive propagation.
++                    try:
++                        other.callbacks.process(f"{name}lim_changed", other)
++                    except Exception:
++                        # Be conservative: if running sibling callbacks
++                        # raises, continue to attempt to update other axes.
++                        _log.exception("Exception in processing %slim_changed for %s",
++                                       name, other)
+                     if other.figure != self.figure:
+                         other.figure.canvas.draw_idle()
+ 

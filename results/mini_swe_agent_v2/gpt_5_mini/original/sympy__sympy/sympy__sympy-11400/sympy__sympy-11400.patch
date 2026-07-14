@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..4ddcc34894 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -152,6 +152,35 @@ def _print_Pow(self, expr):
+             return 'pow(%s, %s)' % (self._print(expr.base),
+                                  self._print(expr.exp))
+ 
++    def _print_Function(self, expr):
++        """Special-case certain functions for C printing.
++
++        The generic Function printer is implemented in CodePrinter, but
++        for some SymPy functions (e.g. sinc) we prefer to rewrite them to
++        simpler expressions that map to C standard library functions
++        (for sinc: sin(x)/x) rather than marking them as not supported.
++        """
++        # Special-case sinc: prefer to print as sin(x)/x
++        try:
++            func_name = expr.func.__name__
++        except Exception:
++            func_name = None
++
++        if func_name == 'sinc':
++            # rewrite sinc(x) as sin(x)/x which the C printer already
++            # knows how to print
++            from sympy import sin
++            try:
++                rewritten = expr.rewrite(sin)
++            except Exception:
++                rewritten = None
++            if rewritten is not None:
++                return self._print(rewritten)
++
++        # Fallback to the generic implementation
++        return super(CCodePrinter, self)._print_Function(expr)
++
++
+     def _print_Rational(self, expr):
+         p, q = int(expr.p), int(expr.q)
+         return '%d.0L/%d.0L' % (p, q)

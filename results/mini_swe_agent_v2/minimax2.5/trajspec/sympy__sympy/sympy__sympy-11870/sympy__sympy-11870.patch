@@ -1,0 +1,30 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..530afa2ed6 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -503,7 +503,7 @@ def traverse(e):
+ 
+     trigsimpfunc = {
+         'fu': (lambda x: fu(x, **opts)),
+-        'matching': (lambda x: futrig(x)),
++        'matching': (lambda x: futrig(exptrigsimp(x) if x.has(exp) else x)),
+         'groebner': (lambda x: groebnersimp(x, **opts)),
+         'combined': (lambda x: futrig(groebnersimp(x,
+                                polynomial=True, hints=[2, tan]))),
+@@ -538,7 +538,15 @@ def exp_trig(e):
+         if e.has(*_trigs):
+             choices.append(e.rewrite(exp))
+         choices.append(e.rewrite(cos))
+-        return min(*choices, key=count_ops)
++        choices.append(e.rewrite(sin))
++        # Use cancel to simplify the rewritten expressions (but avoid recursion)
++        # cancel is safer than simplify as it doesn't call trigsimp
++        # Only apply cancel to the rewritten expressions, not the original
++        from sympy.polys import cancel
++        new_choices = [choices[0]]
++        for i in choices[1:]:
++            new_choices.append(cancel(i))
++        return min(*new_choices, key=count_ops)
+     newexpr = bottom_up(expr, exp_trig)
+ 
+     def f(rv):

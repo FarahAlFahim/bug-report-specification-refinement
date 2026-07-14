@@ -1,0 +1,71 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index ff6abdb958..b7099c0960 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -1208,6 +1208,33 @@ class Legend(Artist):
+         """Return ``True`` if the legend is draggable, ``False`` otherwise."""
+         return self._draggable is not None
+ 
++    def __getstate__(self):
++        """
++        Ensure runtime-only draggable helper is not serialized.
++
++        The draggable helper registers callbacks on the figure canvas and
++        holds backend-specific objects that are not picklable. Disconnect the
++        helper (if present) and remove it from the state dict returned for
++        pickling.
++        """
++        d = super().__getstate__()
++
++        dr = getattr(self, '_draggable', None)
++        if dr is not None:
++            try:
++                dr.disconnect()
++            except Exception:
++                # Best-effort disconnect; do not raise during pickling.
++                pass
++            try:
++                self._draggable = None
++            except Exception:
++                pass
++
++        # Remove the runtime-only helper from the serialized dict.
++        d.pop('_draggable', None)
++        return d
++
+ 
+ # Helper functions to parse legend arguments for both `figure.legend` and
+ # `axes.legend`:
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 0f874ba33d..ce5dc6c70f 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,28 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++
++        # The draggable helper (if present) is a runtime-only object that
++        # may hold references to backend-specific canvas and callbacks, which
++        # are not picklable. Ensure we disconnect it and exclude it from the
++        # serialized state.
++        dr = getattr(self, '_draggable', None)
++        if dr is not None:
++            try:
++                # If the helper exposes a disconnect method, try to unregister
++                # callbacks now to avoid dangling registrations.
++                dr.disconnect()
++            except Exception:
++                # Be conservative: don't raise during pickling; best-effort only.
++                pass
++            # Also clear it on the live object to avoid holding dangling refs.
++            try:
++                self._draggable = None
++            except Exception:
++                pass
++
++        # Ensure _draggable is not included in the pickled state.
++        d.pop('_draggable', None)
+         return d
+ 
+     def contains(self, mouseevent):

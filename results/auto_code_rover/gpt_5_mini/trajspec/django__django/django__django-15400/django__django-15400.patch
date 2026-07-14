@@ -1,0 +1,51 @@
+diff --git a/django/utils/functional.py b/django/utils/functional.py
+index 9e1be0fe0f..6d36d5da4e 100644
+--- a/django/utils/functional.py
++++ b/django/utils/functional.py
+@@ -373,6 +373,46 @@ class LazyObject:
+     __len__ = new_method_proxy(len)
+     __contains__ = new_method_proxy(operator.contains)
+ 
++    # Arithmetic operators (left and reflected)
++    __add__ = new_method_proxy(operator.add)
++    __radd__ = new_method_proxy(lambda w, other: w.__radd__(other))
++    __sub__ = new_method_proxy(operator.sub)
++    __rsub__ = new_method_proxy(lambda w, other: w.__rsub__(other))
++    __mul__ = new_method_proxy(operator.mul)
++    __rmul__ = new_method_proxy(lambda w, other: w.__rmul__(other))
++    __truediv__ = new_method_proxy(operator.truediv)
++    __rtruediv__ = new_method_proxy(lambda w, other: w.__rtruediv__(other))
++    __floordiv__ = new_method_proxy(operator.floordiv)
++    __rfloordiv__ = new_method_proxy(lambda w, other: w.__rfloordiv__(other))
++    __mod__ = new_method_proxy(operator.mod)
++    __rmod__ = new_method_proxy(lambda w, other: w.__rmod__(other))
++    __divmod__ = new_method_proxy(divmod)
++    __rdivmod__ = new_method_proxy(lambda w, other: w.__rdivmod__(other))
++    __pow__ = new_method_proxy(operator.pow)
++    __rpow__ = new_method_proxy(lambda w, other: w.__rpow__(other))
++
++    # Bitwise and shift operators (left and reflected)
++    __lshift__ = new_method_proxy(operator.lshift)
++    __rlshift__ = new_method_proxy(lambda w, other: w.__rlshift__(other))
++    __rshift__ = new_method_proxy(operator.rshift)
++    __rrshift__ = new_method_proxy(lambda w, other: w.__rrshift__(other))
++    __and__ = new_method_proxy(operator.and_)
++    __rand__ = new_method_proxy(lambda w, other: w.__rand__(other))
++    __xor__ = new_method_proxy(operator.xor)
++    __rxor__ = new_method_proxy(lambda w, other: w.__rxor__(other))
++    __or__ = new_method_proxy(operator.or_)
++    __ror__ = new_method_proxy(lambda w, other: w.__ror__(other))
++
++    # Matrix multiplication (Python 3.5+)
++    __matmul__ = new_method_proxy(lambda w, other: w.__matmul__(other))
++    __rmatmul__ = new_method_proxy(lambda w, other: w.__rmatmul__(other))
++
++    # Unary numeric operations
++    __neg__ = new_method_proxy(operator.neg)
++    __pos__ = new_method_proxy(operator.pos)
++    __abs__ = new_method_proxy(abs)
++    __invert__ = new_method_proxy(operator.invert)
++
+ 
+ def unpickle_lazyobject(wrapped):
+     """

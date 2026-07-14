@@ -1,0 +1,26 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 157903faf..3e113f074 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -742,8 +742,19 @@ class AssertionRewriter(ast.NodeVisitor):
+                     nodes.append(field)
+ 
+     @staticmethod
+-    def is_rewrite_disabled(docstring: str) -> bool:
+-        return "PYTEST_DONT_REWRITE" in docstring
++    def is_rewrite_disabled(docstring: object) -> bool:
++        """Return True if rewriting is disabled by module docstring.
++
++        Some modules may have a top-level expression whose value is not a
++        string (for example a bare number). In that case the check for the
++        PYTEST_DONT_REWRITE marker would raise TypeError when using the
++        ``in`` operator. Accept any object here and handle non-string values
++        gracefully by returning False.
++        """
++        try:
++            return "PYTEST_DONT_REWRITE" in docstring  # type: ignore[arg-type]
++        except Exception:
++            return False
+ 
+     def variable(self) -> str:
+         """Get a new variable."""

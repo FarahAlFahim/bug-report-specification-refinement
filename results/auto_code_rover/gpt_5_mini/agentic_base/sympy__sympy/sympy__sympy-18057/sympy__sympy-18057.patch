@@ -1,0 +1,47 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 24d89897f7..b1e85ead5f 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -121,7 +121,7 @@ def _hashable_content(self):
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
++            other = _sympify(other)
+             if not isinstance(other, Expr):
+                 return False
+         except (SympifyError, SyntaxError):
+diff --git a/sympy/matrices/dense.py b/sympy/matrices/dense.py
+index 6b42b7ab8e..e15650e227 100644
+--- a/sympy/matrices/dense.py
++++ b/sympy/matrices/dense.py
+@@ -44,7 +44,10 @@ class DenseMatrix(MatrixBase):
+     _class_priority = 4
+ 
+     def __eq__(self, other):
+-        other = sympify(other)
++        try:
++            other = sympify(other, strict=True)
++        except (SympifyError, SyntaxError):
++            return False
+         self_shape = getattr(self, 'shape', None)
+         other_shape = getattr(other, 'shape', None)
+         if None in (self_shape, other_shape):
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 96b6751597..5e09e778c6 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -649,7 +649,12 @@ def __sub__(self, other):
+         return Complement(self, other)
+ 
+     def __contains__(self, other):
+-        other = sympify(other)
++        try:
++            other = sympify(other, strict=True)
++        except (SympifyError, SyntaxError):
++            # Do not attempt to parse/exec repr/str of arbitrary objects during
++            # an implicit containment check; treat as not contained.
++            return False
+         c = self._contains(other)
+         b = tfn[c]
+         if b is None:

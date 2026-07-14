@@ -1,0 +1,17 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index 6ec7bd891c..7c04e9f1ff 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -526,6 +526,12 @@ def _print_DotProduct(self, expr):
+                                self._print(arg1),
+                                self._print(arg2))
+ 
++    def _print_Identity(self, expr):
++        "Identity matrix printer"
++        if not expr.args[0].is_Integer:
++            raise NotImplementedError("Cannot generate identity matrix with non-integer size")
++        return '{0}({1})'.format(self._module_format('numpy.eye'), self._print(expr.args[0]))
++
+     def _print_Piecewise(self, expr):
+         "Piecewise function printer"
+         exprs = '[{0}]'.format(','.join(self._print(arg.expr) for arg in expr.args))

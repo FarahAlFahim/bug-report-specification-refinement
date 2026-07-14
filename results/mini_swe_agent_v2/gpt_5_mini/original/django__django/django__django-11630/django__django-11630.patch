@@ -1,0 +1,73 @@
+diff --git a/django/core/checks/model_checks.py b/django/core/checks/model_checks.py
+index 5c2266ca1d..c916139c3c 100644
+--- a/django/core/checks/model_checks.py
++++ b/django/core/checks/model_checks.py
+@@ -4,11 +4,17 @@ from collections import defaultdict
+ from itertools import chain
+ 
+ from django.apps import apps
++from django.db import connections, router
+ from django.core.checks import Error, Tags, register
+ 
+ 
+ @register(Tags.models)
+ def check_all_models(app_configs=None, **kwargs):
++    # Map (db_table, db_alias) -> [model_labels]. By taking the database
++    # routing into account, we only report a collision when two models
++    # would be migrated to the same database. This allows different apps
++    # that use different databases (via DATABASE_ROUTERS) to share the
++    # same db_table name without triggering an error.
+     db_table_models = defaultdict(list)
+     indexes = defaultdict(list)
+     constraints = defaultdict(list)
+@@ -17,14 +23,26 @@ def check_all_models(app_configs=None, **kwargs):
+         models = apps.get_models()
+     else:
+         models = chain.from_iterable(app_config.get_models() for app_config in app_configs)
++    # Pre-compute available database aliases. Iterating connections yields
++    # the configured aliases from settings.DATABASES.
++    db_aliases = list(connections)
++
+     for model in models:
+         if model._meta.managed and not model._meta.proxy:
+-            db_table_models[model._meta.db_table].append(model._meta.label)
++            # Determine which databases this model is allowed to be migrated
++            # to. If routers are configured, allow_migrate_model will consult
++            # them to decide which DB(s) the model belongs to.
++            allowed = [db for db in db_aliases if router.allow_migrate_model(db, model)]
++            # If a model isn't allowed on any configured database, fall back
++            # to the default alias to preserve previous behaviour.
++            if not allowed:
++                allowed = ["default"]
++            for db_alias in allowed:
++                db_table_models[(model._meta.db_table, db_alias)].append(model._meta.label)
+         if not inspect.ismethod(model.check):
+             errors.append(
+                 Error(
+-                    "The '%s.check()' class method is currently overridden by %r."
+-                    % (model.__name__, model.check),
++                    "The '%s.check()' class method is currently overridden by %r."                    % (model.__name__, model.check),
+                     obj=model,
+                     id='models.E020'
+                 )
+@@ -35,17 +53,17 @@ def check_all_models(app_configs=None, **kwargs):
+             indexes[model_index.name].append(model._meta.label)
+         for model_constraint in model._meta.constraints:
+             constraints[model_constraint.name].append(model._meta.label)
+-    for db_table, model_labels in db_table_models.items():
++for (db_table, db_alias), model_labels in db_table_models.items():
+         if len(model_labels) != 1:
+             errors.append(
+                 Error(
+                     "db_table '%s' is used by multiple models: %s."
+-                    % (db_table, ', '.join(db_table_models[db_table])),
++                    % (db_table, ', '.join(model_labels)),
+                     obj=db_table,
+                     id='models.E028',
+                 )
+             )
+-    for index_name, model_labels in indexes.items():
++for index_name, model_labels in indexes.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)
+             errors.append(

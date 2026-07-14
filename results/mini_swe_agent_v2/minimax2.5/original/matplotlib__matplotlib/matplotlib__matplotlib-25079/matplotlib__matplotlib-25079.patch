@@ -1,0 +1,23 @@
+diff --git a/lib/matplotlib/colors.py b/lib/matplotlib/colors.py
+index f9e4dcbd62..2aac8c4091 100644
+--- a/lib/matplotlib/colors.py
++++ b/lib/matplotlib/colors.py
+@@ -1717,6 +1717,18 @@ def _make_norm_from_scale(
+                      .reshape(np.shape(value)))
+             return value[0] if is_scalar else value
+ 
++        def autoscale(self, A):
++            # i.e. A[np.isfinite(...)], but also for non-array A's
++            in_trf_domain = np.extract(np.isfinite(self._trf.transform(A)), A)
++            if in_trf_domain.size == 0:
++                in_trf_domain = np.ma.masked
++            # The base class autoscale would set vmin/vmax = None first,
++            # which triggers callbacks and causes issues with colorbars.
++            # Instead, we directly set vmin/vmax to the min/max of the
++            # filtered data, which is what the old implementation did.
++            self.vmin = in_trf_domain.min()
++            self.vmax = in_trf_domain.max()
++
+         def autoscale_None(self, A):
+             # i.e. A[np.isfinite(...)], but also for non-array A's
+             in_trf_domain = np.extract(np.isfinite(self._trf.transform(A)), A)

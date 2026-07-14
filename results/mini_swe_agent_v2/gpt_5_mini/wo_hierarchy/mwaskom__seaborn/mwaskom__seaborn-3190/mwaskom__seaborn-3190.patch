@@ -1,0 +1,26 @@
+diff --git a/seaborn/_core/properties.py b/seaborn/_core/properties.py
+index cd10e260..b30bd1c1 100644
+--- a/seaborn/_core/properties.py
++++ b/seaborn/_core/properties.py
+@@ -549,6 +549,21 @@ class Color(Property):
+         else:
+             return to_rgb(val)
+ 
++    def default_scale(self, data: Series) -> Scale:
++        """Given data, initialize appropriate scale class for colors.
++
++        Colors should treat boolean-like data as categorical by default so that
++        boolean inputs map to discrete palette values rather than a continuous
++        gradient (which would attempt numeric operations on boolean arrays).
++        """
++        var_type = variable_type(data, boolean_type="categorical")
++        if var_type == "numeric":
++            return Continuous()
++        elif var_type == "datetime":
++            return Temporal()
++        else:
++            return Nominal()
++
+     def _standardize_color_sequence(self, colors: ArrayLike) -> ArrayLike:
+         """Convert color sequence to RGB(A) array, preserving but not adding alpha."""
+         def has_alpha(x):

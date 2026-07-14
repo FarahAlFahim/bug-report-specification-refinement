@@ -1,0 +1,31 @@
+diff --git a/django/core/management/commands/shell.py b/django/core/management/commands/shell.py
+index 2b306a579e..c9f0d1cb5b 100644
+--- a/django/core/management/commands/shell.py
++++ b/django/core/management/commands/shell.py
+@@ -84,13 +84,24 @@ class Command(BaseCommand):
+     def handle(self, **options):
+         # Execute the command and exit.
+         if options['command']:
+-            exec(options['command'])
++            # Execute the given command using an explicit globals mapping so
++            # that names created by the executed code (for example imports)
++            # are available as module-level globals to functions defined by
++            # that code. This matches the semantics of running code with
++            # python -c.
++            exec_globals = {'__name__': '__main__', '__package__': None}
++            exec(options['command'], exec_globals)
+             return
+ 
+         # Execute stdin if it has anything to read and exit.
+         # Not supported on Windows due to select.select() limitations.
+         if sys.platform != 'win32' and not sys.stdin.isatty() and select.select([sys.stdin], [], [], 0)[0]:
+-            exec(sys.stdin.read())
++            # See comment above for -c handling: use an explicit globals
++            # mapping so that top-level names created by the executed
++            # stdin code are visible as globals to functions defined in
++            # that code.
++            exec_globals = {'__name__': '__main__', '__package__': None}
++            exec(sys.stdin.read(), exec_globals)
+             return
+ 
+         available_shells = [options['interface']] if options['interface'] else self.shells

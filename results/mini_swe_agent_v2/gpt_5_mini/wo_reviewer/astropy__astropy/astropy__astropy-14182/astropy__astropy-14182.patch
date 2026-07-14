@@ -1,0 +1,64 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8ef..79d926397 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -14,7 +14,9 @@ from .fixedwidth import (
+ 
+ 
+ class SimpleRSTHeader(FixedWidthHeader):
+-    position_line = 0
++    # position_line is set by the RST writer based on the number of header
++    # rows provided.  Leave as None by default to allow the writer to set it.
++    position_line = None
+     start_line = 1
+     splitter_class = DefaultSplitter
+     position_char = "="
+@@ -27,7 +29,9 @@ class SimpleRSTHeader(FixedWidthHeader):
+ 
+ 
+ class SimpleRSTData(FixedWidthData):
+-    start_line = 3
++    # Data start line is computed by the writer based on the position_line
++    # (border line) location.  Leave as None to be set by RST.__init__.
++    start_line = None
+     end_line = -1
+     splitter_class = FixedWidthTwoLineDataSplitter
+ 
+@@ -57,10 +61,33 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, position_line=None, position_char="=", delimiter_pad=None, bookend=False, header_rows=None):
++        # Mirror the FixedWidthTwoLine pattern: accept writer kwargs, forward
++        # header_rows to the base class and then set position/data attributes
++        # appropriately.
++        if len(position_char) != 1:
++            raise ValueError(f'Position_char="{position_char}" must be a single character')
++        super().__init__(delimiter_pad=delimiter_pad, bookend=bookend, header_rows=header_rows)
++        if position_line is None:
++            # position_line is the index of the border line after the header
++            # rows; by default it should be at the end of the header rows.
++            position_line = len(self.header.header_rows)
++        self.header.position_line = position_line
++        self.header.position_char = position_char
++        # Data starts on the line after the position/border line
++        self.data.start_line = position_line + 1
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
+-        return lines
++        # The position/border line produced by the base writer will be at
++        # index == self.header.position_line.  Prepend and append that line
++        # to create the top and bottom borders required by RST simple tables.
++        pos_index = self.header.position_line
++        if pos_index is None:
++            # Nothing to do special
++            return lines
++        # Guard against out-of-range indexes
++        if pos_index < 0 or pos_index >= len(lines):
++            return lines
++        border_line = lines[pos_index]
++        return [border_line] + lines + [border_line]

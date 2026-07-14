@@ -1,0 +1,57 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..f46137491b 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -820,12 +820,51 @@ def _print_BlockMatrix(self, B):
+ 
+     def _print_MatAdd(self, expr):
+         s = None
++        from sympy import MatMul, Basic
+         for item in expr.args:
+             pform = self._print(item)
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                omit_plus = False
++                try:
++                    # If item is a matrix multiplication, try to extract a scalar
++                    # coefficient in a safe way.
++                    if isinstance(item, MatMul):
++                        coeff = None
++                        # Try a few possible coefficient-extraction APIs.
++                        if hasattr(item, 'as_coeff_matrices'):
++                            coeff, mats = item.as_coeff_matrices()
++                        elif hasattr(item, 'as_coeff_mmul'):
++                            coeff, mats = item.as_coeff_mmul()
++                        else:
++                            coeff = None
++                        if coeff is not None:
++                            is_neg = getattr(coeff, 'is_negative', None)
++                            omit_plus = bool(is_neg)
++                    elif isinstance(item, Basic):
++                        # If it's a Mul (scalar * matrix), use as_coeff_mul.
++                        if getattr(item, 'is_Mul', False):
++                            coeff, rest = item.as_coeff_mul(rational=False)
++                            if coeff is not None:
++                                is_neg = getattr(coeff, 'is_negative', None)
++                                omit_plus = bool(is_neg)
++                        # Plain numbers: check sign directly.
++                        elif getattr(item, 'is_Number', False):
++                            omit_plus = bool(getattr(item, 'is_negative', False))
++                        else:
++                            # As a last resort, inspect the first argument if it is a
++                            # SymPy Basic and see if it is negative. Do not attempt to
++                            # sympify raw strings or non-Basic objects.
++                            if item.args:
++                                first = item.args[0]
++                                if isinstance(first, Basic):
++                                    omit_plus = bool(getattr(first, 'is_negative', False))
++                except Exception:
++                    # If anything goes wrong, conservatively assume non-negative.
++                    omit_plus = False
++
++                if omit_plus:
+                     s = prettyForm(*stringPict.next(s, ' '))
+                     pform = self._print(item)
+                 else:

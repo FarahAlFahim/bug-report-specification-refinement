@@ -1,0 +1,36 @@
+diff --git a/django/utils/decorators.py b/django/utils/decorators.py
+index 5c9a5d01c7..aa90918411 100644
+--- a/django/utils/decorators.py
++++ b/django/utils/decorators.py
+@@ -33,11 +33,26 @@ def _multi_decorate(decorators, method):
+         decorators = [decorators]
+ 
+     def _wrapper(self, *args, **kwargs):
+-        # bound_method has the signature that 'decorator' expects i.e. no
+-        # 'self' argument, but it's a closure over self so it can call
+-        # 'func'. Also, wrap method.__get__() in a function because new
+-        # attributes can't be set on bound method objects, only on functions.
+-        bound_method = partial(method.__get__(self, type(self)))
++        # Create a real function that delegates to the bound method so that
++        # decorators that inspect the callable (for example, those using
++        # functools.wraps) see proper function metadata like __name__ and
++        # __module__. Using functools.partial here previously produced a
++        # functools.partial object which does not expose those attributes and
++        # caused AttributeError inside decorators expecting a function.
++        bound = method.__get__(self, type(self))
++        # If 'bound' is a bound-method (has __func__), use that underlying
++        # function as the metadata source, otherwise fall back to the
++        # original 'method' object.
++        metadata_source = getattr(bound, '__func__', method)
++
++        def _bound_method(*a, **kw):
++            return bound(*a, **kw)
++
++        # Copy function metadata so decorators that rely on attributes like
++        # __name__ and __module__ work correctly.
++        update_wrapper(_bound_method, metadata_source)
++
++        bound_method = _bound_method
+         for dec in decorators:
+             bound_method = dec(bound_method)
+         return bound_method(*args, **kwargs)

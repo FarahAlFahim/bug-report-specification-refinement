@@ -1,0 +1,30 @@
+diff --git a/django/views/debug.py b/django/views/debug.py
+index e6b7d4d821..db82b118d7 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -90,6 +90,25 @@ class SafeExceptionReporterFilter:
+                 cleansed = self.cleansed_substitute
+             elif isinstance(value, dict):
+                 cleansed = {k: self.cleanse_setting(k, v) for k, v in value.items()}
++            # Recurse into common iterable containers so that dicts nested
++            # inside lists/tuples/sets/frozensets are inspected and their
++            # sensitive keys are masked. Strings/bytes are not considered
++            # here because they are technically iterable but should be
++            # treated as atomic values.
++            elif isinstance(value, (list, tuple, set, frozenset)):
++                # Process each element via cleanse_setting. We don't have a
++                # meaningful key for elements of sequences, so pass an empty
++                # string as the key; if an element is a dict, its own keys
++                # will be inspected by the dict branch above.
++                processed = [self.cleanse_setting('', item) for item in value]
++                if isinstance(value, list):
++                    cleansed = processed
++                elif isinstance(value, tuple):
++                    cleansed = tuple(processed)
++                elif isinstance(value, set):
++                    cleansed = set(processed)
++                else:  # frozenset
++                    cleansed = frozenset(processed)
+             else:
+                 cleansed = value
+         except TypeError:

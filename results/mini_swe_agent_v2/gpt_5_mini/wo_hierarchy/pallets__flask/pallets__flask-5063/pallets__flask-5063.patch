@@ -1,0 +1,54 @@
+diff --git a/src/flask/cli.py b/src/flask/cli.py
+index 37a15ff2..ff7c47c6 100644
+--- a/src/flask/cli.py
++++ b/src/flask/cli.py
+@@ -1018,20 +1018,45 @@ def routes_command(sort: str, all_methods: bool) -> None:
+         for rule in rules
+     ]
+ 
+-    headers = ("Endpoint", "Methods", "Rule")
++    # Determine host display for each rule. Prefer explicit host, then
++    # subdomain, then the map's default_subdomain. If a subdomain is used
++    # and SERVER_NAME is configured, render as "<subdomain>.<SERVER_NAME>".
++    map_default_subdomain = current_app.url_map.default_subdomain
++    server_name = current_app.config.get("SERVER_NAME")
++
++    def _host_for_rule(rule):
++        # Rule.host is set when a host option was provided to add_url_rule
++        host = getattr(rule, "host", None)
++        if host:
++            return host
++        subdomain = getattr(rule, "subdomain", None)
++        if subdomain:
++            if server_name:
++                return f"{subdomain}.{server_name}"
++            return subdomain
++        if map_default_subdomain:
++            if server_name:
++                return f"{map_default_subdomain}.{server_name}"
++            return map_default_subdomain
++        return ""
++
++    hosts = [_host_for_rule(rule) for rule in rules]
++
++    headers = ("Endpoint", "Methods", "Host", "Rule")
+     widths = (
+         max(len(rule.endpoint) for rule in rules),
+         max(len(methods) for methods in rule_methods),
++        max(len(host) for host in hosts),
+         max(len(rule.rule) for rule in rules),
+     )
+     widths = [max(len(h), w) for h, w in zip(headers, widths)]
+-    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}".format(*widths)
++    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}  {{3:<{3}}}".format(*widths)
+ 
+     click.echo(row.format(*headers).strip())
+     click.echo(row.format(*("-" * width for width in widths)))
+ 
+-    for rule, methods in zip(rules, rule_methods):
+-        click.echo(row.format(rule.endpoint, methods, rule.rule).rstrip())
++    for rule, methods, host in zip(rules, rule_methods, hosts):
++        click.echo(row.format(rule.endpoint, methods, host, rule.rule).rstrip())
+ 
+ 
+ cli = FlaskGroup(

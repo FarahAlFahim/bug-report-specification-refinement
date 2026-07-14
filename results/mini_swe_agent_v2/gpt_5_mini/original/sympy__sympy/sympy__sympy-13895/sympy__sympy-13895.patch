@@ -1,0 +1,120 @@
+diff --git a/sympy/assumptions/sathandlers.py b/sympy/assumptions/sathandlers.py
+index 61d62d04cf..881a5f9ba8 100644
+--- a/sympy/assumptions/sathandlers.py
++++ b/sympy/assumptions/sathandlers.py
+@@ -1,6 +1,7 @@
+ from __future__ import print_function, division
+ 
+-from collections import MutableMapping, defaultdict
++from collections.abc import MutableMapping
++from collections import defaultdict
+ 
+ from sympy.core import (Add, Mul, Pow, Integer, Number, NumberSymbol,)
+ from sympy.core.numbers import ImaginaryUnit
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index d4ca323e0d..b42fd1d75c 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,7 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++from collections.abc import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..a9b8948ebe 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,7 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++from collections.abc import MutableSet
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +269,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index b3b0237d19..0b959a43a4 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,7 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++from collections.abc import Callable
+ import warnings
+ import sys
+ 
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index d5ac051f63..3c04dcd339 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -3,7 +3,7 @@
+ from __future__ import print_function, division
+ 
+ from sympy.core import (
+-    S, Basic, Expr, I, Integer, Add, Mul, Dummy, Tuple
++    S, Basic, Expr, I, Integer, Add, Mul, Dummy, Tuple, Pow
+ )
+ 
+ from sympy.core.mul import _keep_coeff
+@@ -6542,6 +6542,17 @@ def cancel(f, *gens, **args):
+             return f
+         f = factor_terms(f, radical=True)
+         p, q = f.as_numer_denom()
++        # If there are power expressions with a symbolic or non-rational
++        # exponent in the numerator or denominator then attempting to
++        # cancel by treating the expression as a rational function can
++        # lead to invalid transformations (e.g. ((a/b)**x - 1) ->
++        # b**(-x)*(a**x - b**x)). In such cases, avoid cancel and
++        # return the original expression.
++        for part in (p, q):
++            for pw in part.atoms(Pow):
++                b, e = pw.as_base_exp()
++                if e.free_symbols and not (e.is_Integer or e.is_Rational):
++                    return f
+ 
+     elif len(f) == 2:
+         p, q = f
+diff --git a/sympy/simplify/simplify.py b/sympy/simplify/simplify.py
+index 1acc00be3a..1ba78cdeee 100644
+--- a/sympy/simplify/simplify.py
++++ b/sympy/simplify/simplify.py
+@@ -131,7 +131,23 @@ def _separatevars(expr, force):
+     expr = expr.expand(mul=False, multinomial=False, force=force)
+ 
+     _expr, reps = posify(expr) if force else (expr, {})
+-    expr = factor(_expr).subs(reps)
++    # Avoid factoring when there are powers with symbolic or non-integer
++    # exponents as factoring out common numeric powers can introduce
++    # branch cuts (e.g. (-a/b)**x -> b**(-x)*( -b**x + (-a)**x ) ) and
++    # produce expressions that are not equivalent for general x.
++    safe_to_factor = True
++    if _expr.is_Add:
++        for p in _expr.atoms(Pow):
++            b, e = p.as_base_exp()
++            # if exponent contains symbols or is not rational/integer,
++            # then factoring may be unsafe
++            if e.free_symbols or (not (e.is_Integer or e.is_Rational)):
++                safe_to_factor = False
++                break
++    if safe_to_factor:
++        expr = factor(_expr).subs(reps)
++    else:
++        expr = _expr
+ 
+     if not expr.is_Add:
+         return expr

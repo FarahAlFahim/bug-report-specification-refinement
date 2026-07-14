@@ -1,0 +1,50 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index 5ac2407ea3..165d6cda42 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -810,9 +810,14 @@ class QuerySet(AltersData):
+                     unique_fields=unique_fields,
+                 )
+                 connection = connections[self.db]
++                # If the backend can return rows for bulk inserts, we expect a
++                # one-to-one correspondence between input rows and returned
++                # rows when conflicts are not ignored (i.e., no ON CONFLICT or
++                # ON CONFLICT DO UPDATE). We exclude OnConflict.IGNORE because
++                # DO NOTHING may omit rows.
+                 if (
+                     connection.features.can_return_rows_from_bulk_insert
+-                    and on_conflict is None
++                    and on_conflict != OnConflict.IGNORE
+                 ):
+                     assert len(returned_columns) == len(objs_without_pk)
+                 for obj_without_pk, results in zip(objs_without_pk, returned_columns):
+@@ -1837,13 +1842,28 @@ class QuerySet(AltersData):
+         inserted_rows = []
+         bulk_return = connection.features.can_return_rows_from_bulk_insert
+         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
+-            if bulk_return and on_conflict is None:
++            # If the backend can return rows from a bulk insert, and it also
++            # supports returning columns from INSERT, we can request RETURNING
++            # even when using ON CONFLICT DO UPDATE (OnConflict.UPDATE). Do not
++            # request RETURNING for ON CONFLICT DO NOTHING (OnConflict.IGNORE)
++            # because rows may be omitted for ignored values.
++            can_return_with_conflict = (
++                bulk_return
++                and (
++                    on_conflict is None or on_conflict == OnConflict.UPDATE
++                )
++                and connection.features.can_return_columns_from_insert
++            )
++            if can_return_with_conflict:
+                 inserted_rows.extend(
+                     self._insert(
+                         item,
+                         fields=fields,
+                         using=self.db,
+                         returning_fields=self.model._meta.db_returning_fields,
++                        on_conflict=on_conflict,
++                        update_fields=update_fields,
++                        unique_fields=unique_fields,
+                     )
+                 )
+             else:

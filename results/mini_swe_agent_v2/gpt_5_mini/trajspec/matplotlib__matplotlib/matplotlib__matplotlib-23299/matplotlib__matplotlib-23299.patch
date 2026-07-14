@@ -1,0 +1,20 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..17690e74ee 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -1175,7 +1175,14 @@ def get_backend():
+     --------
+     matplotlib.use
+     """
+-    return rcParams['backend']
++    # Avoid triggering RcParams.__getitem__ which may have the side-effect
++    # of importing pyplot and switching backends when the stored value is
++    # rcsetup._auto_backend_sentinel.  Use the helper that does not resolve
++    # the auto sentinel; if that returns None, fall back to a raw dict
++    # lookup to return whatever is stored (which may be the auto sentinel
++    # object).  This makes get_backend() a non-destructive query.
++    backend = rcParams._get_backend_or_none()
++    return backend if backend is not None else dict.__getitem__(rcParams, 'backend')
+ 
+ 
+ def interactive(b):

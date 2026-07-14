@@ -1,0 +1,21 @@
+diff --git a/django/db/migrations/autodetector.py b/django/db/migrations/autodetector.py
+index 89e2dceeaf..7065d594bd 100644
+--- a/django/db/migrations/autodetector.py
++++ b/django/db/migrations/autodetector.py
+@@ -184,10 +184,15 @@ class MigrationAutodetector:
+         self.generate_altered_fields()
+         self.generate_altered_unique_together()
+         self.generate_altered_index_together()
++        # Ensure implicit fields from options changes (e.g. order_with_respect_to)
++        # are generated before emitting AddIndex operations that may reference
++        # those implicit fields. Generate altered order_with_respect_to prior
++        # to added indexes so the migration ordering will create the implicit
++        # column before any indexes on it are added.
++        self.generate_altered_order_with_respect_to()
+         self.generate_added_indexes()
+         self.generate_added_constraints()
+         self.generate_altered_db_table()
+-        self.generate_altered_order_with_respect_to()
+ 
+         self._sort_migrations()
+         self._build_migration_list(graph)

@@ -1,0 +1,38 @@
+--- /tmp/expr_HEAD.py	2026-05-28 09:48:55.285296006 +0000
++++ sympy/core/expr.py	2026-05-28 09:47:22.831316005 +0000
+@@ -121,7 +121,9 @@
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
++            # Use strict sympification for implicit/operator APIs so that
++            # arbitrary objects' repr()/str() are not parsed/evaluated.
++            other = _sympify(other)
+             if not isinstance(other, Expr):
+                 return False
+         except (SympifyError, SyntaxError):
+--- /tmp/dense_HEAD.py	2026-05-28 09:48:55.321296006 +0000
++++ sympy/matrices/dense.py	2026-05-28 09:47:30.567316008 +0000
+@@ -9,7 +9,7 @@
+ from sympy.core.function import expand_mul
+ from sympy.core.singleton import S
+ from sympy.core.symbol import Symbol
+-from sympy.core.sympify import sympify
++from sympy.core.sympify import sympify, _sympify
+ from sympy.functions.elementary.miscellaneous import sqrt
+ from sympy.functions.elementary.trigonometric import cos, sin
+ from sympy.matrices.common import \
+@@ -44,7 +44,12 @@
+     _class_priority = 4
+ 
+     def __eq__(self, other):
+-        other = sympify(other)
++        # Use strict sympification for implicit/operator APIs so that
++        # arbitrary objects' repr()/str() are not parsed/evaluated.
++        try:
++            other = _sympify(other)
++        except SympifyError:
++            return False
+         self_shape = getattr(self, 'shape', None)
+         other_shape = getattr(other, 'shape', None)
+         if None in (self_shape, other_shape):

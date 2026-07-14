@@ -1,0 +1,33 @@
+diff --git a/requests/utils.py b/requests/utils.py
+index 8d17b6b2..c1fa1ec0 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -194,7 +194,7 @@ def to_key_val_list(value):
+     if isinstance(value, (str, bytes, bool, int)):
+         raise ValueError('cannot encode objects that are not 2-tuples')
+ 
+-    if isinstance(value, collections.Mapping):
++    if isinstance(value, collections.abc.Mapping):
+         value = value.items()
+ 
+     return list(value)
+@@ -359,12 +359,18 @@ def get_encoding_from_headers(headers):
+ def stream_decode_response_unicode(iterator, r):
+     """Stream decodes a iterator."""
+ 
++    # Try charset from content-type, fall back to apparent_encoding
+     if r.encoding is None:
++        encoding = r.apparent_encoding
++    else:
++        encoding = r.encoding
++
++    if encoding is None:
+         for item in iterator:
+             yield item
+         return
+ 
+-    decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
++    decoder = codecs.getincrementaldecoder(encoding)(errors='replace')
+     for chunk in iterator:
+         rv = decoder.decode(chunk)
+         if rv:

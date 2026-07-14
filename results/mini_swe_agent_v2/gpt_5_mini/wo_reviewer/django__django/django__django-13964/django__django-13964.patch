@@ -1,0 +1,37 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 2428218696..0f29ac0b45 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -933,10 +933,28 @@ class Model(metaclass=ModelBase):
+                         "%s() prohibited to prevent data loss due to unsaved "
+                         "related object '%s'." % (operation_name, field.name)
+                     )
+-                elif getattr(self, field.attname) is None:
+-                    # Use pk from related object if it has been saved after
+-                    # an assignment.
+-                    setattr(self, field.attname, obj.pk)
++                else:
++                    # Determine whether the local FK value should be treated
++                    # as "missing". Historically this was implemented as a
++                    # simple ``is None`` check, but that fails for target
++                    # fields that allow empty strings (or databases that
++                    # interpret empty strings as NULL). Mirror the
++                    # semantics of ForeignKey.get_db_prep_save() to ensure
++                    # consistency: treat '' as missing when the target field
++                    # doesn't allow empty strings or the DB interprets empty
++                    # strings as NULL.
++                    current_val = getattr(self, field.attname)
++                    using = router.db_for_write(self.__class__, instance=self)
++                    empty_strings_as_null = connections[using].features.interprets_empty_strings_as_nulls
++                    target_allows_empty = field.target_field.empty_strings_allowed
++                    is_missing = (
++                        current_val is None or
++                        (current_val == '' and (not target_allows_empty or empty_strings_as_null))
++                    )
++                    if is_missing:
++                        # Use pk from related object if it has been saved after
++                        # an assignment.
++                        setattr(self, field.attname, obj.pk)
+                 # If the relationship's pk/to_field was changed, clear the
+                 # cached relationship.
+                 if getattr(obj, field.target_field.attname) != getattr(self, field.attname):

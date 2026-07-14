@@ -1,0 +1,18 @@
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index c2623f099f..0d0e753f17 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -57,6 +57,13 @@ class Q(tree.Node):
+         obj.add(other, conn)
+         return obj
+ 
++    def __deepcopy__(self, memodict):
++        obj = self.__class__()
++        obj.connector = self.connector
++        obj.negated = self.negated
++        obj.children = self.children[:]
++        return obj
++
+     def __or__(self, other):
+         return self._combine(other, self.OR)
+ 

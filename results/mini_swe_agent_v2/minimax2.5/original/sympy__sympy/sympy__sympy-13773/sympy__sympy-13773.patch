@@ -1,0 +1,83 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 379a2917aa..14cdd73811 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1973,7 +1973,20 @@ def __div__(self, other):
+ 
+     @call_highest_priority('__rmatmul__')
+     def __matmul__(self, other):
+-        return self.__mul__(other)
++        other = _matrixify(other)
++        # matrix-like objects can have shapes.  This is
++        # our first sanity check.
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            if self.shape[1] != other.shape[0]:
++                raise ShapeError("Matrix size mismatch: %s * %s." % (
++                    self.shape, other.shape))
++            # honest sympy matrices defer to their class's routine
++            if getattr(other, 'is_Matrix', False):
++                return self._eval_matrix_mul(other)
++            # Matrix-like objects can be passed to CommonMatrix routines directly.
++            if getattr(other, 'is_MatrixLike', False):
++                return MatrixArithmetic._eval_matrix_mul(self, other)
++        raise TypeError("Scalar operands are not allowed, use '*' instead")
+ 
+     @call_highest_priority('__rmul__')
+     def __mul__(self, other):
+@@ -2068,7 +2081,19 @@ def __radd__(self, other):
+ 
+     @call_highest_priority('__matmul__')
+     def __rmatmul__(self, other):
+-        return self.__rmul__(other)
++        other = _matrixify(other)
++        # matrix-like objects can have shapes.  This is
++        # our first sanity check.
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            if self.shape[0] != other.shape[1]:
++                raise ShapeError("Matrix size mismatch.")
++            # honest sympy matrices defer to their class's routine
++            if getattr(other, 'is_Matrix', False):
++                return other._new(other.as_mutable() * self)
++            # Matrix-like objects can be passed to CommonMatrix routines directly.
++            if getattr(other, 'is_MatrixLike', False):
++                return MatrixArithmetic._eval_matrix_rmul(self, other)
++        raise TypeError("Scalar operands are not allowed, use '*' instead")
+ 
+     @call_highest_priority('__mul__')
+     def __rmul__(self, other):
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index 92627132e9..90ccba382b 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -10,6 +10,7 @@
+ from sympy.functions import conjugate, adjoint
+ from sympy.functions.special.tensor_functions import KroneckerDelta
+ from sympy.matrices import ShapeError
++from sympy.matrices.common import _matrixify
+ from sympy.simplify import simplify
+ from sympy.utilities.misc import filldedent
+ 
+@@ -112,7 +113,10 @@ def __mul__(self, other):
+     @_sympifyit('other', NotImplemented)
+     @call_highest_priority('__rmul__')
+     def __matmul__(self, other):
+-        return MatMul(self, other).doit()
++        other = _matrixify(other)
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            return MatMul(self, other).doit()
++        raise TypeError("Scalar operands are not allowed, use '*' instead")
+ 
+     @_sympifyit('other', NotImplemented)
+     @call_highest_priority('__mul__')
+@@ -122,7 +126,10 @@ def __rmul__(self, other):
+     @_sympifyit('other', NotImplemented)
+     @call_highest_priority('__mul__')
+     def __rmatmul__(self, other):
+-        return MatMul(other, self).doit()
++        other = _matrixify(other)
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            return MatMul(other, self).doit()
++        raise TypeError("Scalar operands are not allowed, use '*' instead")
+ 
+     @_sympifyit('other', NotImplemented)
+     @call_highest_priority('__rpow__')

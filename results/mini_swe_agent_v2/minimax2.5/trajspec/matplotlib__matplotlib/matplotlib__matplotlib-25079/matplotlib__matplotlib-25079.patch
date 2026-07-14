@@ -1,0 +1,27 @@
+diff --git a/lib/matplotlib/colors.py b/lib/matplotlib/colors.py
+index f9e4dcbd62..3e4d7f5188 100644
+--- a/lib/matplotlib/colors.py
++++ b/lib/matplotlib/colors.py
+@@ -1724,6 +1724,22 @@ def _make_norm_from_scale(
+                 in_trf_domain = np.ma.masked
+             return super().autoscale_None(in_trf_domain)
+ 
++        def autoscale(self, A):
++            # i.e. A[np.isfinite(...)], but also for non-array A's
++            in_trf_domain = np.extract(np.isfinite(self._trf.transform(A)), A)
++            if in_trf_domain.size == 0:
++                in_trf_domain = np.ma.masked
++            # Set vmin/vmax directly to avoid triggering callbacks with None values
++            # before the data is filtered
++            # Use compressed() to get only valid (non-masked) values
++            valid_vals = in_trf_domain.compressed()
++            if valid_vals.size:
++                self.vmin = valid_vals.min()
++                self.vmax = valid_vals.max()
++            else:
++                self.vmin = None
++                self.vmax = None
++
+     if base_norm_cls is Normalize:
+         Norm.__name__ = f"{scale_cls.__name__}Norm"
+         Norm.__qualname__ = f"{scale_cls.__qualname__}Norm"

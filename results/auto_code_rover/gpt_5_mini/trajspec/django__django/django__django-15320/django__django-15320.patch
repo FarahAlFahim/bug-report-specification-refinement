@@ -1,0 +1,68 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..9f8122a22b 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1150,6 +1150,9 @@ class Subquery(BaseExpression, Combinable):
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+         self.query = getattr(queryset, 'query', queryset)
++        # Prepare the stored query for use as an inner subquery. Prefer cloning
++        # to avoid mutating the caller's Query/QuerySet.
++        self.query = self._prepare_subquery(self.query)
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1157,14 +1160,38 @@ class Subquery(BaseExpression, Combinable):
+         return [self.query]
+ 
+     def set_source_expressions(self, exprs):
+-        self.query = exprs[0]
++        # When replacing the inner expression, prefer cloning and ensure the
++        # subquery flag is set on the stored query to guarantee parenthesized SQL.
++        self.query = self._prepare_subquery(exprs[0])
++
++    def _prepare_subquery(self, query):
++        """
++        Ensure the given query/expression is prepared for subquery SQL
++        generation. If the object supports clone(), clone it and set
++        .subquery = True on the clone. Otherwise, set .subquery = True on
++        the original if that attribute exists.
++        """
++        clone_method = getattr(query, 'clone', None)
++        if callable(clone_method):
++            q = query.clone()
++            if hasattr(q, 'subquery'):
++                q.subquery = True
++            return q
++        # Fall back to setting the flag on the original if possible.
++        if hasattr(query, 'subquery'):
++            query.subquery = True
++        return query
+ 
+     def _resolve_output_field(self):
+         return self.query.output_field
+ 
+     def copy(self):
+         clone = super().copy()
++        # Ensure the copied subquery uses a cloned Query and that the clone is
++        # marked as a subquery so Query.as_sql will parenthesize it.
+         clone.query = clone.query.clone()
++        if hasattr(clone.query, 'subquery'):
++            clone.query.subquery = True
+         return clone
+ 
+     @property
+@@ -1177,8 +1204,12 @@ class Subquery(BaseExpression, Combinable):
+     def as_sql(self, compiler, connection, template=None, query=None, **extra_context):
+         connection.ops.check_expression_support(self)
+         template_params = {**self.extra, **extra_context}
++        # Use the provided query override if present, otherwise the stored one.
++        # In either case, prefer a clone with subquery=True to ensure the inner
++        # SQL is parenthesized (so subquery_sql[1:-1] is safe).
+         query = query or self.query
+-        subquery_sql, sql_params = query.as_sql(compiler, connection)
++        prepared_query = self._prepare_subquery(query)
++        subquery_sql, sql_params = prepared_query.as_sql(compiler, connection)
+         template_params['subquery'] = subquery_sql[1:-1]
+ 
+         template = template or template_params.get('template', self.template)

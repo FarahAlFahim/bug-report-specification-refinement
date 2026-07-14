@@ -1,0 +1,34 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..c98a7feb5f 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -30,7 +30,28 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     camat = Matrix([[dimension_system.get_dimensional_dependencies(i, mark_dimensionless=True).get(j, 0) for i in target_dims] for j in canon_dim_units])
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+-    res_exponents = camat.solve_least_squares(exprmat, method=None)
++    # Try to get an exact solution for the integer/rational exponents
++    # expressing the expression in terms of the target dimensions. Using
++    # a least-squares fit (as was done previously) can produce spurious
++    # fractional exponents when the dimensions are not exactly
++    # representable by the target units (e.g. trying to express Joule*second
++    # in terms of Joule). In that case we should indicate that conversion
++    # is not possible by returning None.
++    try:
++        # gauss_jordan_solve returns (solution_matrix, free_symbols_matrix)
++        res_exponents, free = camat.gauss_jordan_solve(exprmat)
++    except Exception:
++        return None
++
++    # If there are free parameters (underdetermined system) we don't have
++    # a unique exact representation, so refuse to convert.
++    try:
++        # free is a Matrix; an empty matrix has size (0, 0)
++        if getattr(free, 'shape', (0, 0)) != (0, 0):
++            return None
++    except Exception:
++        return None
++
+     return res_exponents
+ 
+ 

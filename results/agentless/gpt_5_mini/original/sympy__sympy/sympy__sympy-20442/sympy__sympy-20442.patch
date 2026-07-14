@@ -1,0 +1,23 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index f42b6a4..5b2b12d 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -31,6 +31,18 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
++    # The least-squares solver can return a best-fit solution even when the
++    # provided target_units do not exactly span the dimensional space of
++    # `expr` (this may produce nonsensical fractional exponents that combine
++    # orthogonal dimensions). Ensure the solution exactly reproduces the
++    # required dimensional exponents; otherwise signal that no exact
++    # conversion is possible.
++    try:
++        exact_match = (camat * res_exponents).equals(exprmat)
++    except Exception:
++        exact_match = False
++    if not exact_match:
++        return None
+     return res_exponents
+ 
+ 

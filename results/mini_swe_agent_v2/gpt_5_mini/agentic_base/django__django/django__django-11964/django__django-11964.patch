@@ -1,0 +1,51 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index d610dc86f0..93153c5d42 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -790,8 +790,21 @@ class Field(RegisterLookupMixin):
+ 
+     def get_prep_value(self, value):
+         """Perform preliminary non-db specific value checks and conversions."""
++        # Convert Promise objects
+         if isinstance(value, Promise):
+             value = value._proxy____cast()
++
++        # Normalize enum.Enum inputs to their underlying value so that
++        # in-memory assignments behave the same as values loaded from the DB
++        # (which go through from_db_value/field-specific conversion).
++        try:
++            import enum as _enum
++        except Exception:
++            _enum = None
++
++        if _enum is not None and isinstance(value, _enum.Enum):
++            return value.value
++
+         return value
+ 
+     def get_db_prep_value(self, value, connection, prepared=False):
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index 189fb4fa44..09b2d916ae 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -138,6 +138,20 @@ class DeferredAttribute:
+             data[field_name] = val
+         return data[field_name]
+ 
++    def __set__(self, instance, value):
++        """
++        Normalize and set the value on the instance dict. Assignments to
++        field-backed attributes should store the canonical Python value
++        (for example converting enum members to their underlying value)
++        so that newly-created instances have the same in-memory types as
++        instances loaded from the database.
++        """
++        # Use the field's get_prep_value to perform centralized normalization
++        # for value types (e.g. enum.Enum -> enum.value, Promise conversion,
++        # etc.). We intentionally write to instance.__dict__ to mirror the
++        # behavior of attribute storage used elsewhere.
++        instance.__dict__[self.field.attname] = self.field.get_prep_value(value)
++
+     def _check_parent_chain(self, instance):
+         """
+         Check if the field value can be fetched from a parent field already

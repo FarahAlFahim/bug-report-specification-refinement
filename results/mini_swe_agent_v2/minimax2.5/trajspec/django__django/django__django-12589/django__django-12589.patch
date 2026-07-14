@@ -1,0 +1,20 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 63ca817355..3fb02a24e2 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -133,7 +133,14 @@ class SQLCompiler:
+         expressions = self.collapse_group_by(expressions, having_group_by)
+ 
+         for expr in expressions:
+-            sql, params = self.compile(expr)
++            # If the expression is a Ref with a Subquery source, we need to include
++            # the full subquery in the GROUP BY to avoid ambiguous column errors
++            # when there's a join with a table that has the same column name.
++            from django.db.models.expressions import Subquery
++            if isinstance(expr, Ref) and isinstance(expr.source, Subquery):
++                sql, params = expr.source.as_sql(self, self.connection)
++            else:
++                sql, params = self.compile(expr)
+             params_hash = make_hashable(params)
+             if (sql, params_hash) not in seen:
+                 result.append((sql, params))

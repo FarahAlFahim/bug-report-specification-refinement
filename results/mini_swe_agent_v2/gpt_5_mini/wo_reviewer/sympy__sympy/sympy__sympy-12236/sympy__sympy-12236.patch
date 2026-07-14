@@ -1,0 +1,29 @@
+diff --git a/sympy/polys/constructor.py b/sympy/polys/constructor.py
+index f62532ef93..1241ae2ed4 100644
+--- a/sympy/polys/constructor.py
++++ b/sympy/polys/constructor.py
+@@ -120,6 +120,24 @@ def _construct_composite(coeffs, opt):
+         return None
+ 
+     if opt.composite is None:
++    # If the coefficient generator set overlaps with any outer gens
++    # (opt.gens) we must drop those gens from the coefficient gens and
++    # reorder the polynomial dict representations so that monomial
++    # tuples remain consistent with the filtered gens ordering.
++    if getattr(opt, "gens", None):
++        # filter out any gens that are part of the outer gens
++        filtered_gens = tuple(g for g in gens if g not in opt.gens)
++
++        if len(filtered_gens) != len(gens):
++            new_polys = []
++
++            for rep in polys:
++                new_monoms, coeffs = _dict_reorder(rep, gens, filtered_gens)
++                new_polys.append(dict(zip(list(new_monoms), list(coeffs))))
++
++            polys = new_polys
++            gens = filtered_gens
++
+         if any(gen.is_number for gen in gens):
+             return None # generators are number-like so lets better use EX
+ 

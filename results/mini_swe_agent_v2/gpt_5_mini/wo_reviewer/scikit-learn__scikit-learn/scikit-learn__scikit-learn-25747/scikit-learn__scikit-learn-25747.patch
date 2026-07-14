@@ -1,0 +1,33 @@
+diff --git a/sklearn/utils/_set_output.py b/sklearn/utils/_set_output.py
+index 335773c6a..0627a3d70 100644
+--- a/sklearn/utils/_set_output.py
++++ b/sklearn/utils/_set_output.py
+@@ -52,6 +52,28 @@ def _wrap_in_pandas_container(
+ 
+     pd = check_pandas_support("Setting output container to 'pandas'")
+ 
++    # Only apply/forward an index from the original input when the number
++    # of rows of the transformed output matches the length of the index.
++    # Some transformers (e.g. groupby aggregations) reduce the number of
++    # rows. In that case we should preserve the transformer's own index and
++    # not force the original input index which would raise a pandas
++    # Length mismatch error.
++    if index is not None:
++        try:
++            output_len = len(data_to_wrap)
++        except Exception:
++            output_len = None
++
++        try:
++            index_len = len(index)
++        except Exception:
++            index_len = None
++
++        if output_len is None or index_len is None or output_len != index_len:
++            # Ignore the provided index when lengths are not comparable or
++            # not equal. Let pandas preserve the transformed object's index.
++            index = None
++
+     if isinstance(data_to_wrap, pd.DataFrame):
+         if columns is not None:
+             data_to_wrap.columns = columns

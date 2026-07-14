@@ -1,0 +1,20 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 4038859cfa..6d8c0707e8 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1297,8 +1297,14 @@ class Model(metaclass=ModelBase):
+ 
+     @classmethod
+     def _check_default_pk(cls):
++        # Exclude parent-link primary keys that are auto_created because
++        # they represent a primary key declared on an ancestor (multi-
++        # table inheritance). Only warn when the primary key was
++        # auto-created for this model itself.
++        pk = cls._meta.pk
+         if (
+-            cls._meta.pk.auto_created and
++            pk.auto_created and
++            not (hasattr(pk, 'remote_field') and getattr(pk.remote_field, 'parent_link', False)) and
+             not settings.is_overridden('DEFAULT_AUTO_FIELD') and
+             not cls._meta.app_config._is_default_auto_field_overridden
+         ):

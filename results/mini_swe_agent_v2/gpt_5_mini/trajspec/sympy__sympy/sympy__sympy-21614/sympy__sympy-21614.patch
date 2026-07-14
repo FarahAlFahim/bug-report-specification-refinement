@@ -1,0 +1,47 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..b2ee47a9a7 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1923,6 +1923,42 @@ def as_finite_difference(self, points=1, x0=None, wrt=None):
+         from ..calculus.finite_diff import _as_finite_diff
+         return _as_finite_diff(self, points, x0, wrt)
+ 
++    @property
++    def kind(self):
++        """Infer the mathematical kind of a (possibly unevaluated) derivative.
++
++        The kind is derived from the expression being differentiated and the
++        kinds of differentiation variables.  If either the expression or any
++        differentiation variable is array-like, an ArrayKind/MatrixKind with
++        appropriate element_kind is returned.  Otherwise the expression kind
++        is propagated.
++        """
++        expr_kind = getattr(self.expr, 'kind', None)
++        # element kind is either expr_kind.element_kind (for arrays/matrices)
++        # or the expr_kind itself (for scalars)
++        elem_kind = getattr(expr_kind, 'element_kind', expr_kind)
++        # lazy import to avoid circular imports
++        from sympy.matrices.common import MatrixKind
++        from sympy.tensor.array.ndim_array import ArrayKind
++
++        # examine differentiation variables
++        for v, _count in self.variable_count:
++            vk = getattr(v, 'kind', None)
++            if isinstance(vk, ArrayKind):
++                return ArrayKind(elem_kind)
++            if isinstance(vk, MatrixKind):
++                # if expression is array-like prefer ArrayKind
++                if isinstance(expr_kind, ArrayKind):
++                    return ArrayKind(elem_kind)
++                return MatrixKind(elem_kind)
++
++        # if no variable forces an array-kind, fall back to expression kind
++        if isinstance(expr_kind, ArrayKind):
++            return ArrayKind(elem_kind)
++        if isinstance(expr_kind, MatrixKind):
++            return MatrixKind(elem_kind)
++        return expr_kind
++
+     @classmethod
+     def _get_zero_with_shape_like(cls, expr):
+         return S.Zero

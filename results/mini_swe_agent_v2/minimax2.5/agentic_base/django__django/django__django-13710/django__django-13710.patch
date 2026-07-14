@@ -1,0 +1,23 @@
+diff --git a/django/contrib/admin/options.py b/django/contrib/admin/options.py
+index dadd4acfa1..891cf45487 100644
+--- a/django/contrib/admin/options.py
++++ b/django/contrib/admin/options.py
+@@ -2037,10 +2037,17 @@ class InlineModelAdmin(BaseModelAdmin):
+         self.opts = self.model._meta
+         self.has_registered_model = admin_site.is_registered(self.model)
+         super().__init__()
++        # Check if verbose_name was explicitly set on the class
+         if self.verbose_name is None:
+             self.verbose_name = self.model._meta.verbose_name
+         if self.verbose_name_plural is None:
+-            self.verbose_name_plural = self.model._meta.verbose_name_plural
++            # If verbose_name was explicitly set (not the class default None),
++            # derive verbose_name_plural from it, similar to Model Meta behavior.
++            # Otherwise, fall back to the model's verbose_name_plural.
++            if 'verbose_name' in self.__class__.__dict__:
++                self.verbose_name_plural = format_lazy('{}s', self.verbose_name)
++            else:
++                self.verbose_name_plural = self.model._meta.verbose_name_plural
+ 
+     @property
+     def media(self):

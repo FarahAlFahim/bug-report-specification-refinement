@@ -1,0 +1,107 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..c5b356f192 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -12,7 +12,7 @@
+ """
+ from __future__ import division, print_function
+ 
+-from sympy import Function, Symbol, solve
++from sympy import Function, Symbol, solve, Relational
+ from sympy.core.compatibility import (
+     is_sequence, range, string_types, ordered)
+ from sympy.core.containers import OrderedSet
+@@ -565,28 +565,83 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # canonicalize relational to an expression
++    if hasattr(eq, 'is_Relational') and eq.is_Relational:
++        eq = eq.lhs - eq.rhs
++
++    # normalize dependent variables into a list
+     if is_sequence(y):
+-        dep = set(y)
+-        y = y[0]
+-    elif isinstance(y, Symbol):
+-        dep = {y}
++        dep_list = list(y)
+     else:
++        dep_list = [y]
++
++    if not dep_list:
+         raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
+ 
+-    f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+-    dydx = Function(y.name)(x).diff(x)
+-    eq = eq.subs(f)
++    # Build substitution mapping from user-visible dependent symbols/expressions
++    # to internal Function(...) forms depending on x. Also build reverse map.
++    subs_to_internal = {}
++    for dep in dep_list:
++        # symbol case: map Symbol -> Function(Symbol.name)(x)
++        if isinstance(dep, Symbol):
++            subs_to_internal[dep] = Function(dep.name)(x)
++        else:
++            # assume an applied function or expression like f(x)
++            # create an internal symbolic name based on the function's name
++            fname = None
++            try:
++                fname = dep.func.__name__
++            except Exception:
++                fname = getattr(dep.func, 'name', None)
++            if not fname:
++                fname = str(dep.func)
++            internal_sym = Symbol(fname)
++            subs_to_internal[dep] = Function(internal_sym.name)(x)
++
++    # also include any dependent plain symbols that appear in the equation
++    # and were listed by the user (e.g. [y, a]) -- ensure they are mapped
++    for s_sym in list(eq.free_symbols):
++        if s_sym == x:
++            continue
++        if s_sym in subs_to_internal:
++            # already mapped
++            continue
++        # if user provided a Symbol with same name, map it
++        for dep in dep_list:
++            if isinstance(dep, Symbol) and dep == s_sym:
++                subs_to_internal[s_sym] = Function(s_sym.name)(x)
++                break
++
++    # pick the primary dependent variable and its internal representation
++    primary = dep_list[0]
++    internal_primary = subs_to_internal.get(primary)
++    if internal_primary is None:
++        # if primary was a Symbol and not in subs_to_internal, create mapping
++        if isinstance(primary, Symbol):
++            internal_primary = Function(primary.name)(x)
++            subs_to_internal[primary] = internal_primary
++        else:
++            # fallback: create an internal symbol
++            try:
++                pname = primary.func.__name__
++            except Exception:
++                pname = getattr(primary.func, 'name', str(primary.func))
++            internal_primary = Function(Symbol(pname).name)(x)
++            subs_to_internal[primary] = internal_primary
++
++    dydx = internal_primary.diff(x)
++    eq = eq.subs(subs_to_internal)
+     derivs = {}
++    # solve iteratively for derivatives and then reverse substitute
++    reverse_subs = dict((v, k) for k, v in subs_to_internal.items())
+     for i in range(n):
+         yp = solve(eq.diff(x), dydx)[0].subs(derivs)
+         if i == n - 1:
+-            return yp.subs([(v, k) for k, v in f.items()])
++            return yp.subs(reverse_subs)
+         derivs[dydx] = yp
+         eq = dydx - yp
+         dydx = dydx.diff(x)
+ 
+-
+ def intersection(*entities, **kwargs):
+     """The intersection of a collection of GeometryEntity instances.
+ 

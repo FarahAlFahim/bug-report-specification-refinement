@@ -1,0 +1,26 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index 9b53255..36d3b09 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -282,6 +282,21 @@ class AbstractPythonCodePrinter(CodePrinter):
+         _print_ImmutableDenseMatrix = \
+         lambda self, expr: self._print_MatrixBase(expr)
+ 
++    def _print_Tuple(self, expr):
++        """
++        Print a SymPy Tuple in valid Python syntax.
++
++        Important: a single-element tuple must include a trailing comma,
++        e.g. (x,) otherwise Python will treat it as just (x).
++        """
++        n = len(expr.args)
++        if n == 0:
++            return "()"
++        inner = ', '.join([self._print(arg) for arg in expr.args])
++        if n == 1:
++            inner = inner + ','
++        return '(%s)' % inner
++
+     def _indent_codestring(self, codestring):
+         return '\n'.join([self.tab + line for line in codestring.split('\n')])
+ 

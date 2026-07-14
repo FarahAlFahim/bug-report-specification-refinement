@@ -1,0 +1,55 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 16823e9..74433a9 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -976,7 +976,49 @@ class CharField(Field):
+                 )
+             ]
+         else:
+-            return []
++            errors = []
++            # If choices are defined, ensure max_length can accommodate the longest choice value.
++            choices = getattr(self, 'choices', None)
++            if choices:
++                max_choice_length = 0
++                for choice in choices:
++                    # Grouped choices are of the form (group_name, [(value, label), ...])
++                    if (isinstance(choice, (list, tuple)) and len(choice) == 2 and
++                            isinstance(choice[1], (list, tuple))):
++                        group_choices = choice[1]
++                        for subchoice in group_choices:
++                            value = subchoice[0] if isinstance(subchoice, (list, tuple)) else subchoice
++                            if value is None:
++                                length = 0
++                            else:
++                                try:
++                                    length = len(value)
++                                except Exception:
++                                    length = len(str(value))
++                            if length > max_choice_length:
++                                max_choice_length = length
++                    else:
++                        # Simple choice: (value, label) or just a value
++                        value = choice[0] if isinstance(choice, (list, tuple)) else choice
++                        if value is None:
++                            length = 0
++                        else:
++                            try:
++                                length = len(value)
++                            except Exception:
++                                length = len(str(value))
++                        if length > max_choice_length:
++                            max_choice_length = length
++                if max_choice_length > self.max_length:
++                    errors.append(
++                        checks.Error(
++                            "The 'max_length' of this CharField (%d) is not large enough to store the longest choice (%d)." % (
++                                self.max_length, max_choice_length),
++                            obj=self,
++                            id='fields.E122',
++                        )
++                    )
++            return errors
+ 
+     def cast_db_type(self, connection):
+         if self.max_length is None:

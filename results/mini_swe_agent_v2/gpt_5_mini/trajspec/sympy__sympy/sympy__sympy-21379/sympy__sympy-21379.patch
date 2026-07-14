@@ -1,0 +1,60 @@
+diff --git a/sympy/polys/polyutils.py b/sympy/polys/polyutils.py
+index f51f80098d..7d9abb54e9 100644
+--- a/sympy/polys/polyutils.py
++++ b/sympy/polys/polyutils.py
+@@ -177,6 +177,21 @@ def _not_a_coeff(expr):
+     return  # could be
+ 
+ 
++def _has_piecewise(expr):
++    """Return True if ``expr`` contains a Piecewise node somewhere in its tree.
++
++    We avoid importing Piecewise here to prevent circular imports; instead we
++    detect Piecewise by the ``is_Piecewise`` attribute set on the class.
++    """
++    try:
++        for i in expr.preorder_traversal():
++            if getattr(i, 'is_Piecewise', False):
++                return True
++    except Exception:
++        return False
++    return False
++
++
+ def _parallel_dict_from_expr_if_gens(exprs, opt):
+     """Transform expressions into a multinomial form given generators. """
+     k, indices = len(opt.gens), {}
+@@ -210,7 +225,15 @@ def _parallel_dict_from_expr_if_gens(exprs, opt):
+ 
+                         monom[indices[base]] = exp
+                     except KeyError:
+-                        if not factor.free_symbols.intersection(opt.gens):
++                        # If the factor does not contain any of the declared
++                        # generators then it is a coefficient. Also, structural
++                        # objects like Piecewise should be treated as part of
++                        # the coefficient rather than as a generator even if
++                        # they happen to mention generator symbols. This
++                        # avoids treating Piecewise instances as polynomial
++                        # generators which does not make sense.
++                        if (not factor.free_symbols.intersection(opt.gens)
++                                or _has_piecewise(factor)):
+                             coeff.append(factor)
+                         else:
+                             raise PolynomialError("%s contains an element of "
+@@ -266,8 +289,14 @@ def _is_coeff(factor):
+                     else:
+                         base, exp = decompose_power_rat(factor)
+ 
+-                    elements[base] = elements.setdefault(base, 0) + exp
+-                    gens.add(base)
++                    # Treat structural bases (e.g. Piecewise) as part of the
++                    # coefficient rather than as polynomial generators. See
++                    # gh-XXXX: Piecewise objects do not make sense as gens.
++                    if getattr(base, 'is_Piecewise', False) or _has_piecewise(base):
++                        coeff.append(factor)
++                    else:
++                        elements[base] = elements.setdefault(base, 0) + exp
++                        gens.add(base)
+ 
+             terms.append((coeff, elements))
+ 

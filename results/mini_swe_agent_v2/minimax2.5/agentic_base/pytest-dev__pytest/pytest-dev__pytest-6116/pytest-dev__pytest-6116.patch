@@ -1,0 +1,23 @@
+diff --git a/src/_pytest/main.py b/src/_pytest/main.py
+index 843c5b5f7..4a5dac1f4 100644
+--- a/src/_pytest/main.py
++++ b/src/_pytest/main.py
+@@ -82,7 +82,7 @@ def pytest_addoption(parser):
+         help="markers not registered in the `markers` section of the configuration file raise errors.",
+     )
+     group._addoption(
+-        "-c",
++        "--inifilename",
+         metavar="file",
+         type=str,
+         dest="inifilename",
+@@ -106,7 +106,8 @@ def pytest_addoption(parser):
+     )
+ 
+     group = parser.getgroup("collect", "collection")
+-    group.addoption(
++    group._addoption(
++        "-c",
+         "--collectonly",
+         "--collect-only",
+         action="store_true",

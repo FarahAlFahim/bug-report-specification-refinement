@@ -1,0 +1,69 @@
+diff --git a/sklearn/neighbors/base.py b/sklearn/neighbors/base.py
+index 3e5e729c2..9ce7d34ea 100644
+--- a/sklearn/neighbors/base.py
++++ b/sklearn/neighbors/base.py
+@@ -55,6 +55,31 @@ def _check_weights(weights):
+                          "'distance', or a callable function")
+ 
+ 
++def _check_n_neighbors(n_neighbors):
++    """Validate and coerce n_neighbors.
++
++    Accept integer types and integer-valued floats (e.g. 3.0) and return
++    a Python int. None is passed through. Non-integer floats (e.g. 3.5)
++    or other types raise an informative error.
++    """
++    if n_neighbors is None:
++        return None
++    # Accept Python and numpy integer types
++    if isinstance(n_neighbors, numbers.Integral):
++        if n_neighbors <= 0:
++            raise ValueError("Expected n_neighbors > 0. Got %d" % n_neighbors)
++        return int(n_neighbors)
++    # Accept floats that are integer-valued
++    if isinstance(n_neighbors, numbers.Real):
++        if n_neighbors != int(n_neighbors):
++            raise ValueError("n_neighbors must be an integer. Got %r" % n_neighbors)
++        n_neighbors = int(n_neighbors)
++        if n_neighbors <= 0:
++            raise ValueError("Expected n_neighbors > 0. Got %d" % n_neighbors)
++        return n_neighbors
++    raise TypeError("n_neighbors must be an integer. Got type %r" % type(n_neighbors))
++
++
+ def _get_weights(dist, weights):
+     """Get the weights from an array of distances and a parameter ``weights``
+ 
+@@ -107,7 +132,7 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+                  algorithm='auto', leaf_size=30, metric='minkowski',
+                  p=2, metric_params=None, n_jobs=1):
+ 
+-        self.n_neighbors = n_neighbors
++        self.n_neighbors = _check_n_neighbors(n_neighbors)
+         self.radius = radius
+         self.algorithm = algorithm
+         self.leaf_size = leaf_size
+@@ -328,6 +353,12 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Validate and coerce n_neighbors to an integer early so that
++        # downstream code can rely on it being a Python int. This also
++        # provides a clear error message for invalid (non-integer)
++        # values instead of a low-level TypeError in Cython.
++        n_neighbors = _check_n_neighbors(n_neighbors)
++
+         if X is not None:
+             query_is_train = False
+             X = check_array(X, accept_sparse='csr')
+@@ -467,6 +498,10 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Validate and coerce n_neighbors to an integer before it is used
++        # in array sizing and arithmetic below.
++        n_neighbors = _check_n_neighbors(n_neighbors)
++
+         # kneighbors does the None handling.
+         if X is not None:
+             X = check_array(X, accept_sparse='csr')

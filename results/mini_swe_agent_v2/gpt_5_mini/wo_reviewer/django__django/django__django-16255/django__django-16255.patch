@@ -1,0 +1,29 @@
+diff --git a/django/contrib/sitemaps/__init__.py b/django/contrib/sitemaps/__init__.py
+index 27756d9d96..9a5063763b 100644
+--- a/django/contrib/sitemaps/__init__.py
++++ b/django/contrib/sitemaps/__init__.py
+@@ -166,12 +166,20 @@ class Sitemap:
+         if not hasattr(self, "lastmod"):
+             return None
+         if callable(self.lastmod):
++            # Compute per-item lastmod values, drop None values and then take
++            # the maximum. This handles the case where items() is empty
++            # (max() on an empty sequence would raise ValueError) and also
++            # where some per-item lastmod values are None. Catch both
++            # TypeError (incomparable types) and ValueError (empty sequence)
++            # and return None in those cases to match the behaviour of
++            # GenericSitemap.get_latest_lastmod().
++            values = [self.lastmod(item) for item in self.items()]
++            non_none_values = [v for v in values if v is not None]
+             try:
+-                return max([self.lastmod(item) for item in self.items()])
+-            except TypeError:
++                return max(non_none_values)
++            except (TypeError, ValueError):
+                 return None
+-        else:
+-            return self.lastmod
++        return self.lastmod
+ 
+     def _urls(self, page, protocol, domain):
+         urls = []

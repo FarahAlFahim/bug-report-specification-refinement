@@ -1,0 +1,34 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index b19ee7c64..6d3b447d3 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -76,7 +76,28 @@ class Code:
+ 
+     @property
+     def firstlineno(self) -> int:
+-        return self.raw.co_firstlineno - 1
++        # In Python 3.9+, co_firstlineno points to the decorator line for decorated
++        # functions. We need to find the actual function definition line.
++        # We can detect this by checking if the first line of the code object's source
++        # starts with @. If so, we need to find the actual function definition line.
++        co_firstlineno = self.raw.co_firstlineno
++        # Try to get the source lines of the code object
++        try:
++            import inspect
++            lines, _ = inspect.getsourcelines(self.raw)
++            if lines:
++                first_line = lines[0].strip()
++                if first_line.startswith("@"):
++                    # This is a decorator line, find the actual function definition
++                    for i, line in enumerate(lines):
++                        stripped = line.strip()
++                        if not stripped.startswith("@") and stripped:
++                            # Found the function definition
++                            # Return the line number relative to the full source
++                            return co_firstlineno + i - 1
++        except (OSError, IOError):
++            pass
++        return co_firstlineno - 1
+ 
+     @property
+     def name(self) -> str:

@@ -1,0 +1,21 @@
+diff --git a/django/core/management/templates.py b/django/core/management/templates.py
+index 8dc6068286..e17a661ec0 100644
+--- a/django/core/management/templates.py
++++ b/django/core/management/templates.py
+@@ -73,9 +73,14 @@ class TemplateCommand(BaseCommand):
+             except OSError as e:
+                 raise CommandError(e)
+         else:
++            # Normalize the target (after expanding ~) before extracting the
++            # basename so that trailing separators (e.g. "myapp/") don't
++            # produce an empty name.
++            expanded_target = os.path.expanduser(target)
+             if app_or_project == 'app':
+-                self.validate_name(os.path.basename(target), 'directory')
+-            top_dir = os.path.abspath(os.path.expanduser(target))
++                dir_name = os.path.basename(os.path.normpath(expanded_target))
++                self.validate_name(dir_name, 'directory')
++            top_dir = os.path.abspath(expanded_target)
+             if not os.path.exists(top_dir):
+                 raise CommandError("Destination directory '%s' does not "
+                                    "exist, please create it first." % top_dir)

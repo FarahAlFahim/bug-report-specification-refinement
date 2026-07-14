@@ -1,0 +1,25 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 1a55d3d417..6d1fd06591 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,10 +764,18 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            # Only avoid installing the generated accessor when the class
++            # explicitly defines one. Using hasattr() here would treat an
++            # inherited accessor (for example, an accessor generated for an
++            # abstract base's Field) the same as a user-defined override and
++            # prevent rebinding the accessor for a copied Field on a
++            # subclass. Check the class's __dict__ so that inherited
++            # attributes don't block installation/rebinding.
++            accessor_name = 'get_%s_display' % self.name
++            if accessor_name not in cls.__dict__:
+                 setattr(
+                     cls,
+-                    'get_%s_display' % self.name,
++                    accessor_name,
+                     partialmethod(cls._get_FIELD_display, field=self),
+                 )
+ 

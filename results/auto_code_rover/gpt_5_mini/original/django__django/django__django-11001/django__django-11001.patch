@@ -1,0 +1,40 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7649c39262..e08c1f16a5 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -32,7 +32,14 @@ class SQLCompiler:
+         self.select = None
+         self.annotation_col_map = None
+         self.klass_info = None
+-        self.ordering_parts = re.compile(r'(.*)\s(ASC|DESC)(.*)')
++        # Match the entire SQL expression up to the ordering direction (ASC/DESC),
++        # across multiple lines and in a case-insensitive manner. Accept optional
++        # "NULLS FIRST"/"NULLS LAST" tokens after the direction. Anchor to the end
++        # so the last ordering direction is matched.
++        self.ordering_parts = re.compile(
++            r'(.*)\s+(ASC|DESC)(?:\s+NULLS\s+(FIRST|LAST))?\s*$',
++            re.IGNORECASE | re.DOTALL
++        )
+         self._meta_ordering = None
+ 
+     def setup_query(self):
+@@ -353,7 +360,8 @@ class SQLCompiler:
+             # not taken into account so we strip it. When this entire method
+             # is refactored into expressions, then we can check each part as we
+             # generate it.
+-            without_ordering = self.ordering_parts.search(sql).group(1)
++            m = self.ordering_parts.search(sql)
++            without_ordering = m.group(1) if m else sql
+             params_hash = make_hashable(params)
+             if (without_ordering, params_hash) in seen:
+                 continue
+@@ -366,7 +374,8 @@ class SQLCompiler:
+         if self.query.distinct and not self.query.distinct_fields:
+             select_sql = [t[1] for t in select]
+             for expr, (sql, params, is_ref) in order_by:
+-                without_ordering = self.ordering_parts.search(sql).group(1)
++                m = self.ordering_parts.search(sql)
++                without_ordering = m.group(1) if m else sql
+                 if not is_ref and (without_ordering, params) not in select_sql:
+                     extra_select.append((expr, (without_ordering, params), None))
+         return extra_select

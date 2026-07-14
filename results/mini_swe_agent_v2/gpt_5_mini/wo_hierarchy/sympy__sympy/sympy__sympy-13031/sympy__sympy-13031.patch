@@ -1,0 +1,40 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 7ef51bc84..dd03817c6 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -376,9 +376,17 @@ def hstack(cls, *args):
+         """
+         if len(args) == 0:
+             return cls._new()
+-
+-        kls = type(args[0])
+-        return reduce(kls.row_join, args)
++        # Use the runtime-bound row_join on the accumulator so that the
++        # join implementation used at each reduction step is determined
++        # by the current accumulator's type/shape.  Selecting the
++        # unbound method from the first argument's class (as was done
++        # previously) could cause incorrect behavior when the first
++        # argument is a degenerate (zero-dimension) matrix or a
++        # different subclass: intermediate joins would be executed via
++        # that first-class implementation instead of the accumulator's
++        # current type.  Using a lambda that calls the bound method on
++        # the left operand ensures correct dynamic dispatch.
++        return reduce(lambda a, b: a.row_join(b), args)
+ 
+     def reshape(self, rows, cols):
+         """Reshape the matrix. Total number of elements must remain the same.
+@@ -599,9 +607,11 @@ def vstack(cls, *args):
+         """
+         if len(args) == 0:
+             return cls._new()
+-
+-        kls = type(args[0])
+-        return reduce(kls.col_join, args)
++        # See comment in hstack: use the runtime-bound col_join so that
++        # each reduction step dispatches based on the current
++        # accumulator's class/shape rather than the first argument's
++        # class.
++        return reduce(lambda a, b: a.col_join(b), args)
+ 
+ 
+ class MatrixSpecial(MatrixRequired):

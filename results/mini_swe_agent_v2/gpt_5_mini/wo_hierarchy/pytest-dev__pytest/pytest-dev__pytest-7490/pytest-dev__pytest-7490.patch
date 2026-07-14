@@ -1,0 +1,24 @@
+diff --git a/src/_pytest/skipping.py b/src/_pytest/skipping.py
+index 335e10996..b2cc697b3 100644
+--- a/src/_pytest/skipping.py
++++ b/src/_pytest/skipping.py
+@@ -261,7 +261,19 @@ def pytest_runtest_call(item: Item) -> Generator[None, None, None]:
+ def pytest_runtest_makereport(item: Item, call: CallInfo[None]):
+     outcome = yield
+     rep = outcome.get_result()
++    # Make a last-chance evaluation of xfail markers here.  Earlier hooks
++    # (pytest_runtest_setup and pytest_runtest_call) may have evaluated and
++    # stored the result in item._store[xfailed_key].  However, tests are
++    # allowed to add xfail markers dynamically during their execution (for
++    # example via request.node.add_marker). In that case the stored value may
++    # still be None here, but item.iter_markers(name="xfail") will include
++    # markers appended during the call. Re-evaluate and store the result so
++    # that the final TestReport correctly reflects dynamically-added xfail
++    # markers.
+     xfailed = item._store.get(xfailed_key, None)
++    if xfailed is None:
++        xfailed = evaluate_xfail_marks(item)
++        item._store[xfailed_key] = xfailed
+     # unittest special case, see setting of unexpectedsuccess_key
+     if unexpectedsuccess_key in item._store and rep.when == "call":
+         reason = item._store[unexpectedsuccess_key]

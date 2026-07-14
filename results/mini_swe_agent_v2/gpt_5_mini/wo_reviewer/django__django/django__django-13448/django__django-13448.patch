@@ -1,0 +1,29 @@
+diff --git a/django/test/utils.py b/django/test/utils.py
+index 4f4ce99967..8f2f9ec467 100644
+--- a/django/test/utils.py
++++ b/django/test/utils.py
+@@ -176,11 +176,23 @@ def setup_databases(verbosity, interactive, *, time_keeper=None, keepdb=False, d
+             if first_alias is None:
+                 first_alias = alias
+                 with time_keeper.timed("  Creating '%s'" % alias):
++                    # Determine whether to serialize the DB state. If the
++                    # SERIALIZE option is explicitly provided in the TEST
++                    # settings, respect it. Otherwise, default serialization
++                    # to the same value as MIGRATE. This avoids attempting to
++                    # serialize (which queries model tables) when migrations
++                    # were skipped via TEST['MIGRATE']=False.
++                    test_opts = connection.settings_dict.get('TEST', {})
++                    if 'SERIALIZE' in test_opts:
++                        serialize = test_opts['SERIALIZE']
++                    else:
++                        serialize = test_opts.get('MIGRATE', True)
++
+                     connection.creation.create_test_db(
+                         verbosity=verbosity,
+                         autoclobber=not interactive,
+                         keepdb=keepdb,
+-                        serialize=connection.settings_dict['TEST'].get('SERIALIZE', True),
++                        serialize=serialize,
+                     )
+                 if parallel > 1:
+                     for index in range(parallel):

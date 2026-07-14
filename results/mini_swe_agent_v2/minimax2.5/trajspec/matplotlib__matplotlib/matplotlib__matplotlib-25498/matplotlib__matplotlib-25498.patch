@@ -1,0 +1,37 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..329e1e769d 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -509,6 +509,10 @@ class Colorbar:
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
+             self.norm = mappable.norm
++            # Ensure the mappable's norm has appropriate vmin and vmax
++            # set even if mappable.draw has not yet been called.
++            if mappable.get_array() is not None:
++                mappable.autoscale_None()
+             self._reset_locator_formatter_scale()
+ 
+         self._draw_all()
+@@ -1102,8 +1106,19 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
++            # Ensure vmin/vmax are set from the data if possible
++            if self.mappable.get_array() is not None:
++                self.mappable.autoscale_None()
++            with self.norm.callbacks.blocked():
++                if hasattr(self.norm, '_trf'):
++                    # For scale-based norms (e.g., LogNorm), use a small
++                    # positive value instead of 0 to avoid -inf from log(0).
++                    if self.norm.vmin is None or self.norm.vmin <= 0:
++                        self.norm.vmin = 1e-10
++                if self.norm.vmin is None:
++                    self.norm.vmin = 0
++                if self.norm.vmax is None or self.norm.vmax <= self.norm.vmin:
++                    self.norm.vmax = 1
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

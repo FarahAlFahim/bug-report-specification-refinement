@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 901918674a..bf3a791dae 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1349,8 +1349,18 @@ def _print_Symbol(self, expr):
+         if expr in self._settings['symbol_names']:
+             return self._settings['symbol_names'][expr]
+ 
+-        return self._deal_with_super_sub(expr.name) if \
+-            '\\' not in expr.name else expr.name
++        # Some internal symbols (e.g. Dummies created during
++        # transformations) may be generated with a leading underscore to
++        # avoid name collisions (e.g. "_i_1").  When printing these
++        # symbols in LaTeX, a leading underscore can inject a raw
++        # subscript marker into an already-subscripted expression,
++        # producing invalid LaTeX.  Strip a single leading underscore
++        # for printing purposes so that "_i_1" becomes "i_{1}".
++        name = expr.name
++        if name.startswith("_"):
++            name = name[1:]
++
++        return self._deal_with_super_sub(name) if '\\' not in name else name
+ 
+     _print_RandomSymbol = _print_Symbol
+     _print_MatrixSymbol = _print_Symbol
+@@ -1437,8 +1447,13 @@ def _print_MatrixBase(self, expr):
+                            = _print_MatrixBase
+ 
+     def _print_MatrixElement(self, expr):
++        # Print the matrix element indices using the LaTeX printer to
++        # ensure that any special characters (e.g. leading underscores in
++        # Dummy names) are properly escaped/handled.  Using str(expr.i)
++        # directly can inject raw underscores into an already-subscripted
++        # expression, producing invalid LaTeX/MathJax output.
+         return self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True) \
+-            + '_{%s, %s}' % (expr.i, expr.j)
++            + '_{%s, %s}' % (self._print(expr.i), self._print(expr.j))
+ 
+     def _print_MatrixSlice(self, expr):
+         def latexslice(x):

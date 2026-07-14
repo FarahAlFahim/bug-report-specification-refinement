@@ -1,0 +1,42 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index 95302a05ca..cacd45cc54 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -164,7 +164,36 @@ def structurally_equal(self, other):
+     def _blockmul(self, other):
+         if (isinstance(other, BlockMatrix) and
+                 self.colblocksizes == other.rowblocksizes):
+-            return BlockMatrix(self.blocks*other.blocks)
++            # Perform blockwise multiplication explicitly so that
++            # block entries remain MatrixExpr instances. Relying on
++            # DenseMatrix multiplication (self.blocks*other.blocks)
++            # can lead to scalar zeros (sympy.core.numbers.Zero)
++            # in positions that should be ZeroMatrix objects. This
++            # breaks later assumptions in BlockMatrix that each
++            # block has .rows and .cols. Construct each resulting
++            # block as the sum of products of corresponding blocks
++            # and if that sum reduces to the scalar 0, replace it
++            # with a ZeroMatrix of the appropriate shape.
++
++            A = self.blocks
++            B = other.blocks
++            r = self.blockshape[0]
++            c = other.blockshape[1]
++            n = self.blockshape[1]
++            row_sizes = self.rowblocksizes
++            col_sizes = other.colblocksizes
++            data = [[None for _ in range(c)] for _ in range(r)]
++            for i in range(r):
++                for j in range(c):
++                    terms = [A[i, k]*B[k, j] for k in range(n)]
++                    expr = Add(*terms)
++                    # If the resulting expression is the scalar 0,
++                    # replace with a ZeroMatrix of the proper shape.
++                    if expr == 0:
++                        data[i][j] = ZeroMatrix(row_sizes[i], col_sizes[j])
++                    else:
++                        data[i][j] = expr
++            return BlockMatrix(data)
+ 
+         return self * other
+ 

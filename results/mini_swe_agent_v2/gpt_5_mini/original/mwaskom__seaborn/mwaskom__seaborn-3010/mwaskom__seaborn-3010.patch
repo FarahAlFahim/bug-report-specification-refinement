@@ -1,0 +1,40 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..da05f34c 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -23,13 +23,29 @@ class PolyFit(Stat):
+ 
+         x = data["x"]
+         y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
+-            xx = yy = []
+-        else:
++        # Drop missing values and coerce to numeric arrays for numpy
++        xy = pd.DataFrame({"x": x, "y": y}).dropna()
++        if xy.empty:
++            return pd.DataFrame(dict(x=[], y=[]))
++
++        # Convert to numpy arrays of floats; errors='coerce' would have
++        # introduced NaNs which we've already dropped, but ensure dtype
++        x = pd.to_numeric(xy["x"]).to_numpy()
++        y = pd.to_numeric(xy["y"]).to_numpy()
++
++        # Need at least order + 1 unique x values to fit polynomial
++        if np.unique(x).size <= self.order:
++            # Not enough information to fit; return empty result
++            return pd.DataFrame(dict(x=[], y=[]))
++
++        try:
+             p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++        except np.linalg.LinAlgError:
++            # Numerical issue fitting the polynomial; return empty result
++            return pd.DataFrame(dict(x=[], y=[]))
++
++        xx = np.linspace(x.min(), x.max(), self.gridsize)
++        yy = np.polyval(p, xx)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 

@@ -1,0 +1,104 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..048dec9370 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,88 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    _get_axis(ax, "bottom").toggle(ticklabels=bottom_off,
++                                     label=bottom_off)
++    _get_axis(ax, "left").toggle(ticklabels=left_off, label=left_off)
++
++
++def _get_axis(ax, side):
++    """Return an object with a ``toggle(...)`` method for the given
++    side ("bottom", "top", "left", "right").
++
++    The old code assumed ``ax.axis`` is subscriptable (the toolkit
++    ``Axes`` provides an AxisDict).  For regular Axes (and many
++    third-party Axes subclasses) ``ax.axis`` is a callable method and
++    cannot be indexed.  To support both, try to index ``ax.axis`` and
++    fall back to a thin wrapper that implements the minimal ``toggle``
++    behaviour by calling ``Axes.tick_params`` and manipulating the
++    axis label visibility/position.
++    """
++    try:
++        return ax.axis[side]
++    except Exception:
++        class _Fallback:
++            def __init__(self, ax, side):
++                self.ax = ax
++                self.side = side
++
++            def toggle(self, all=None, ticks=None, ticklabels=None,
++                       label=None):
++                # Map the same semantics as SimpleAxisArtist.toggle
++                if all:
++                    _ticks = _ticklabels = _label = True
++                elif all is not None:
++                    _ticks = _ticklabels = _label = False
++                else:
++                    _ticks = _ticklabels = _label = None
++
++                if ticks is not None:
++                    _ticks = ticks
++                if ticklabels is not None:
++                    _ticklabels = ticklabels
++                if label is not None:
++                    _label = label
++
++                # Toggle tick visibility using tick_params
++                if _ticks is not None:
++                    # enable/disable ticks on the given side
++                    # e.g., bottom=True/False, left=True/False
++                    try:
++                        self.ax.tick_params(**{self.side: _ticks})
++                    except Exception:
++                        # Some Axes implementations may not accept the
++                        # side keyword; ignore failures silently to keep
++                        # behaviour conservative.
++                        pass
++
++                if _ticklabels is not None:
++                    key = "label" + self.side
++                    try:
++                        self.ax.tick_params(**{key: _ticklabels})
++                    except Exception:
++                        pass
++
++                if _label is not None:
++                    # Show/hide and set label position on the underlying
++                    # XAxis/YAxis object.
++                    if self.side in ("bottom", "top"):
++                        axisobj = self.ax.xaxis
++                        direction = self.side
++                    else:
++                        axisobj = self.ax.yaxis
++                        direction = self.side
++
++                    try:
++                        if (axisobj.get_label_position() == direction) and not _label:
++                            axisobj.label.set_visible(False)
++                        elif _label:
++                            axisobj.label.set_visible(True)
++                            axisobj.set_label_position(direction)
++                    except Exception:
++                        # Best-effort only.
++                        pass
++
++        return _Fallback(ax, side)
+ 
+ 
+ class CbarAxesBase:
+@@ -28,7 +108,7 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
++        axis = _get_axis(self, self.orientation)
+         axis.toggle(ticklabels=b, label=b)
+ 
+ 

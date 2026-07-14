@@ -1,0 +1,52 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index 8747844e5..fd9e3beca 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -972,7 +972,46 @@ def check_scalar(x, name, target_type, min_val=None, max_val=None):
+         If the parameter's value violates the given bounds.
+     """
+ 
+-    if not isinstance(x, target_type):
++    # Accept numpy scalar types that are the equivalent of the builtin
++    # target types (int, float, bool). Historically check_scalar used a
++    # strict isinstance(x, target_type) check which rejected numpy scalar
++    # types such as np.int64 or np.float64 when target_type is the Python
++    # builtin int/float/bool. To be more permissive while preserving the
++    # existing behaviour for other target types, we allow numpy scalars
++    # whose dtype is a subtype that corresponds to the requested builtin
++    # type.
++    def _is_accepted_type(obj, tgt):
++        # First try the normal isinstance check; it handles tuples as well.
++        try:
++            if isinstance(obj, tgt):
++                return True
++        except TypeError:
++            # If tgt is not a valid argument for isinstance, fall back to
++            # conservative behaviour and treat as not matching.
++            return False
++
++        # Handle numpy scalar types (np.generic) specially: accept them when
++        # they are of the corresponding numpy dtype kind for builtin types.
++        # E.g., np.int64 should be accepted when tgt is int.
++        try:
++            if isinstance(obj, np.generic):
++                # Normalize tgt to an iterable of types
++                tups = tgt if isinstance(tgt, tuple) else (tgt,)
++                for t in tups:
++                    if t is int and np.issubdtype(type(obj), np.integer):
++                        return True
++                    if t is float and np.issubdtype(type(obj), np.floating):
++                        return True
++                    if t is bool and np.issubdtype(type(obj), np.bool_):
++                        return True
++        except Exception:
++            # Be conservative on any unexpected failure and do not accept
++            # the type.
++            pass
++
++        return False
++
++    if not _is_accepted_type(x, target_type):
+         raise TypeError('`{}` must be an instance of {}, not {}.'
+                         .format(name, target_type, type(x)))
+ 

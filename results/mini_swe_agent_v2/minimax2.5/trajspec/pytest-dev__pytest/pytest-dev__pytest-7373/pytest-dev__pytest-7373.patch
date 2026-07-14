@@ -1,0 +1,50 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..d81609c85 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -18,16 +18,19 @@ from _pytest.store import StoreKey
+ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
++def cached_eval(config: Config, expr: str, d: Dict[str, object], globals_id: int) -> Any:
+     default = {}  # type: Dict[str, object]
+     evalcache = config._store.setdefault(evalcache_key, default)
++    # Use the id of the module's __globals__ as part of the cache key to ensure
++    # different modules with different globals get different cache entries.
++    key = (expr, globals_id)
+     try:
+-        return evalcache[expr]
++        return evalcache[key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        evalcache[key] = x = eval(exprcode, d)
+         return x
+ 
+ 
+@@ -79,6 +82,12 @@ class MarkEvaluator:
+             d.update(self.item.obj.__globals__)  # type: ignore[attr-defined] # noqa: F821
+         return d
+ 
++    def _getglobals_id(self) -> int:
++        """Return the id of the module's __globals__ dictionary for use as cache key."""
++        if hasattr(self.item, "obj"):
++            return id(self.item.obj.__globals__)  # type: ignore[attr-defined] # noqa: F821
++        return id({})
++
+     def _istrue(self) -> bool:
+         if hasattr(self, "result"):
+             result = getattr(self, "result")  # type: bool
+@@ -98,7 +107,8 @@ class MarkEvaluator:
+                     self.expr = expr
+                     if isinstance(expr, str):
+                         d = self._getglobals()
+-                        result = cached_eval(self.item.config, expr, d)
++                        globals_id = self._getglobals_id()
++                        result = cached_eval(self.item.config, expr, d, globals_id)
+                     else:
+                         if "reason" not in mark.kwargs:
+                             # XXX better be checked at collection time

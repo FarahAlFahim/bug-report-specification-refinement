@@ -1,0 +1,61 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 2ad720d35a..c15dfb8ca4 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,12 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++from collections import defaultdict
++try:
++    # Python 3.3+: Mapping lives in collections.abc
++    from collections.abc import Mapping
++except ImportError:
++    # Python <3.3: Mapping was in collections
++    from collections import Mapping
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index ba6ee29a9c..4e9db23fb2 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1087,7 +1087,21 @@ def __getstate__(self):
+         return {'_prec': self._prec}
+ 
+     def _hashable_content(self):
+-        return (self._mpf_, self._prec)
++        # Use a normalized mpf representation for hashing so that
++        # Float objects that represent the same numeric value but
++        # may have been created with different internal precisions
++        # compare equal. Including _prec in the hash makes two
++        # numerically-equal Floats have different hashes which causes
++        # structurally-equal-looking expressions (e.g. x**2.5) to be
++        # treated as different dict keys when collecting like terms.
++        # Normalizing the mpf to the object's precision yields a
++        # representation that reflects the numeric value alone.
++        try:
++            norm = mpf_norm(self._mpf_, self._prec)
++        except Exception:
++            # Fallback to original content if normalization fails
++            return (self._mpf_,)
++        return (norm,)
+ 
+     def floor(self):
+         return Integer(int(mlib.to_int(
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index d5abe84da9..f424df5b70 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,10 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    from collections.abc import Callable
++except ImportError:
++    from collections import Callable
+ import warnings
+ import sys
+ 

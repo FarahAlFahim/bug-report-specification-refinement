@@ -1,0 +1,119 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..967de090 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -1,3 +1,4 @@
++import numpy as np
+ import pandas as pd
+ 
+ from . import dtypes, utils
+@@ -211,9 +212,11 @@ def _calc_concat_over(datasets, dim, dim_names, data_vars, coords, compat):
+                             equals[k] = True
+ 
+             elif opt == "all":
+-                concat_over.update(
+-                    set(getattr(datasets[0], subset)) - set(datasets[0].dims)
+-                )
++                # Collect variables from ALL datasets, not just the first one
++                for ds in datasets:
++                    concat_over.update(
++                        set(getattr(ds, subset)) - set(ds.dims)
++                    )
+             elif opt == "minimal":
+                 pass
+             else:
+@@ -328,7 +331,15 @@ def _dataset_concat(
+             )
+     else:
+         result_vars = {}
+-    result_vars.update(dim_coords)
++    
++    # Add data variables that are not in concat_over or variables_to_merge
++    # These should be copied from the first dataset
++    for var in data_names:
++        if var not in concat_over and var not in variables_to_merge:
++            if var in datasets[0].variables:
++                result_vars[var] = datasets[0].variables[var]
++    
++    # Don't update dim_coords here - they're handled in the concat_over loop
+ 
+     # assign attrs and encoding from first dataset
+     result_attrs = datasets[0].attrs
+@@ -348,23 +359,67 @@ def _dataset_concat(
+         common_dims = tuple(pd.unique([d for v in vars for d in v.dims]))
+         if dim not in common_dims:
+             common_dims = (dim,) + common_dims
++        # Calculate total size for concat dimension
++        total_concat_dim_size = sum(concat_dim_lengths)
+         for var, dim_len in zip(vars, concat_dim_lengths):
+             if var.dims != common_dims:
+-                common_shape = tuple(dims_sizes.get(d, dim_len) for d in common_dims)
++                common_shape = []
++                for d in common_dims:
++                    if d == dim:
++                        common_shape.append(total_concat_dim_size)
++                    else:
++                        common_shape.append(dims_sizes.get(d, dim_len))
++                common_shape = tuple(common_shape)
+                 var = var.set_dims(common_dims, common_shape)
+             yield var
+ 
+     # stack up each variable to fill-out the dataset (in order)
+     # n.b. this loop preserves variable order, needed for groupby.
+-    for k in datasets[0].variables:
+-        if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
+-            combined = concat_vars(vars, dim, positions)
+-            assert isinstance(combined, Variable)
+-            result_vars[k] = combined
++    # Handle missing variables by creating filled variables
++    for k in concat_over:
++        # Skip coordinates - they are handled separately
++        if k in dim_coords:
++            continue
++        # Collect variables from all datasets, creating filled variables for missing ones
++        vars = []
++        for ds in datasets:
++            if k in ds.variables:
++                vars.append(ds.variables[k])
++            else:
++                # Variable is missing from this dataset, create a filled variable
++                # Find a template from another dataset
++                template = None
++                for other_ds in datasets:
++                    if k in other_ds.variables:
++                        template = other_ds.variables[k]
++                        break
++                if template is None:
++                    continue  # No template found, skip
++                # Create a filled variable with the same dimensions
++                shape = tuple(ds.dims.get(d, 1) for d in template.dims)
++                if fill_value is dtypes.NA:
++                    fill_value_for_dtype = dtypes.get_fill_value(template.dtype)
++                else:
++                    fill_value_for_dtype = fill_value
++                # Convert dtype if needed to accommodate fill_value
++                if isinstance(fill_value_for_dtype, float) and not np.issubdtype(template.dtype, np.floating):
++                    actual_dtype = np.float64
++                else:
++                    actual_dtype = template.dtype
++                fill_var = Variable(
++                    template.dims,
++                    np.full(shape, fill_value_for_dtype, dtype=actual_dtype),
++                    template.attrs,
++                    template.encoding
++                )
++                vars.append(fill_var)
++        
++        if not vars:
++            continue
++        vars = ensure_common_dims(vars)
++        combined = concat_vars(vars, dim, positions)
++        assert isinstance(combined, Variable)
++        result_vars[k] = combined
+ 
+     result = Dataset(result_vars, attrs=result_attrs)
+     absent_coord_names = coord_names - set(result.variables)

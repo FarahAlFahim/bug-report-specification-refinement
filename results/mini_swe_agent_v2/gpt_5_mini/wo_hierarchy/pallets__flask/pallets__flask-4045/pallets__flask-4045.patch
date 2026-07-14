@@ -1,0 +1,25 @@
+diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py
+index 5fb84d86..3d4c4d6a 100644
+--- a/src/flask/blueprints.py
++++ b/src/flask/blueprints.py
+@@ -189,6 +189,9 @@ class Blueprint(Scaffold):
+             root_path=root_path,
+         )
+         self.name = name
++        # Blueprint names must not contain '.' because it's the reserved separator for nested blueprint scoping.
++        if '.' in self.name:
++            raise ValueError("Blueprint names must not contain '.'")
+         self.url_prefix = url_prefix
+         self.subdomain = subdomain
+         self.deferred_functions: t.List[DeferredSetupFunction] = []
+@@ -267,6 +270,10 @@ class Blueprint(Scaffold):
+         """
+         first_registration = False
+ 
++        # Enforce the same invariant at registration time in case the blueprint name was mutated after construction.
++        if '.' in self.name:
++            raise ValueError("Blueprint name must not contain '.' when registering.")
++
+         if self.name in app.blueprints:
+             assert app.blueprints[self.name] is self, (
+                 "A name collision occurred between blueprints"

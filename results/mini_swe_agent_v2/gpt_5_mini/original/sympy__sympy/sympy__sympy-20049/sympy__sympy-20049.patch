@@ -1,0 +1,51 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..bd01de4e01 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -518,11 +518,41 @@ def vel(self, frame):
+         """
+ 
+         _check_frame(frame)
+-        if not (frame in self._vel_dict):
+-            raise ValueError('Velocity of point ' + self.name + ' has not been'
+-                             ' defined in ReferenceFrame ' + frame.name)
+-        return self._vel_dict[frame]
+-
++        # If an explicit velocity has been set for this frame, return it
++        if frame in self._vel_dict:
++            return self._vel_dict[frame]
++
++        # If position(s) relative to other point(s) have been defined we can
++        # attempt to compute the velocity by differentiating the position and
++        # adding the velocity of the reference point (if available).
++        if len(self._pos_dict) > 0:
++            # Prefer a point that has a defined velocity in the requested
++            # frame. Otherwise fall back to the first positional reference and
++            # assume its velocity is zero.
++            other = None
++            other_vel = Vector(0)
++            for p in self._pos_dict.keys():
++                # Only consider connected points that have an explicit
++                # velocity defined in the requested frame. Avoid calling
++                # p.vel(frame) here to prevent potential recursive
++                # lookups through positional relationships.
++                if frame in getattr(p, '_vel_dict', {}):
++                    other_vel = p._vel_dict[frame]
++                    other = p
++                    break
++
++            if other is None:
++                # No connected point had a defined velocity in this frame;
++                # just use the first positional reference and assume its
++                # velocity is zero.
++                other = list(self._pos_dict.keys())[0]
++
++            pos_vec = self.pos_from(other)
++            return pos_vec.dt(frame) + other_vel
++
++        # No velocity or position information available for this frame
++        raise ValueError('Velocity of point ' + self.name + ' has not been'
++                         ' defined in ReferenceFrame ' + frame.name)
+     def partial_velocity(self, frame, *gen_speeds):
+         """Returns the partial velocities of the linear velocity vector of this
+         point in the given frame with respect to one or more provided

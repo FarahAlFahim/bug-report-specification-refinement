@@ -1,0 +1,24 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 6d3cc05bd3..8391a664f3 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -490,10 +490,17 @@ def _print_Product(self, expr):
+         sign_height = 0
+ 
+         for lim in expr.limits:
+-            width = (func_height + 2) * 5 // 3 - 2
++            # make the product sign a bit slimmer than before and avoid an
++            # extra blank line at the bottom. The previous formula made the
++            # sign unnecessarily fat and added one too many vertical rows
++            # (func_height + 1) which produced an extra empty line under the
++            # horizontal bar. Use a slightly smaller width and only
++            # func_height vertical lines so the symbol is more compact and
++            # symmetric.
++            width = max(1, (func_height + 1) * 4 // 3 - 1)
+             sign_lines = []
+             sign_lines.append(corner_chr + (horizontal_chr*width) + corner_chr)
+-            for i in range(func_height + 1):
++            for i in range(func_height):
+                 sign_lines.append(vertical_chr + (' '*width) + vertical_chr)
+ 
+             pretty_sign = stringPict('')

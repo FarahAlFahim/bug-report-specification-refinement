@@ -1,0 +1,22 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7c433b3f06..b122fe17a0 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1272,7 +1272,16 @@ class SQLCompiler:
+             def local_setter(final_field, obj, from_obj):
+                 # Set a reverse fk object when relation is non-empty.
+                 if from_obj:
+-                    final_field.remote_field.set_cached_value(from_obj, obj)
++                    # Check if this is a multi-level path that returns to a model
++                    # in the path. In this case, we need to set the cache on the
++                    # parent object (obj) using the forward relation's field.
++                    # Otherwise, set the cache on the child object (from_obj).
++                    if hasattr(final_field, 'field') and len(joins) > 3:
++                        # Multi-level path: set cache on parent object.
++                        final_field.field.set_cached_value(obj, from_obj)
++                    else:
++                        # Single-level path: set cache on child object.
++                        final_field.remote_field.set_cached_value(from_obj, obj)
+ 
+             def remote_setter(name, obj, from_obj):
+                 setattr(from_obj, name, obj)

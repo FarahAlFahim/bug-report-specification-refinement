@@ -1,0 +1,38 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..8983f4f619 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1372,7 +1372,10 @@ def _handle_finite_sets(args):
+             if not other_sets:
+                 return S.EmptySet  # b/c we use evaluate=False below
+             elif other_sets == S.UniversalSet:
+-                res += FiniteSet(*unk)
++                # When other_sets is UniversalSet, unknown elements cannot be
++                # determined to be in the intersection, so we should not include them.
++                # Return unevaluated Intersection with all original sets.
++                return Intersection(*args, evaluate=False)
+             else:
+                 res += Intersection(
+                     FiniteSet(*unk),
+@@ -1991,6 +1994,21 @@ def simplify_intersection(args):
+     if S.EmptySet in args:
+         return S.EmptySet
+ 
++    # Deduplicate sets - remove duplicate sets
++    # Use a list to preserve order, but check for duplicates using frozenset
++    seen = set()
++    unique_args = []
++    for arg in args:
++        # For FiniteSets, use frozenset of args as key
++        if hasattr(arg, "_argset"):
++            key = arg._argset
++        else:
++            key = arg
++        if key not in seen:
++            seen.add(key)
++            unique_args.append(arg)
++    args = unique_args
++
+     # Handle Finite sets
+     rv = Intersection._handle_finite_sets(args)
+ 

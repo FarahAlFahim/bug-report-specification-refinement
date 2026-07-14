@@ -1,0 +1,30 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..b6868d8fc5 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -30,8 +30,23 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     camat = Matrix([[dimension_system.get_dimensional_dependencies(i, mark_dimensionless=True).get(j, 0) for i in target_dims] for j in canon_dim_units])
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+-    res_exponents = camat.solve_least_squares(exprmat, method=None)
+-    return res_exponents
++    # Solve exactly and only accept unique exact solutions.
++    # Use gauss_jordan_solve to detect underdetermined systems (free parameters)
++    # and to obtain an exact rational solution when one exists.
++    try:
++        sol, params = camat.gauss_jordan_solve(exprmat)
++    except Exception:
++        return None
++
++    # If there are free parameters, the solution is not unique -> reject.
++    if getattr(params, 'rows', 0) != 0:
++        return None
++
++    # Ensure the solution exactly satisfies the system (consistency check).
++    if camat * sol != exprmat:
++        return None
++
++    return sol
+ 
+ 
+ def convert_to(expr, target_units, unit_system="SI"):

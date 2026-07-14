@@ -1,0 +1,83 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index 52a1560..91776c8 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -13,6 +13,8 @@ are_similar
+ from __future__ import division, print_function
+ 
+ from sympy import Function, Symbol, solve
++from sympy.core.function import AppliedUndef
++from sympy.core.relational import Relational
+ from sympy.core.compatibility import (
+     is_sequence, range, string_types, ordered)
+ from sympy.core.containers import OrderedSet
+@@ -565,22 +567,65 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # Accept relational Eq(lhs, rhs) by converting to an expression lhs - rhs
++    if isinstance(eq, Relational):
++        eq = eq.lhs - eq.rhs
++
++    # Normalize dependent variable(s). Accept:
++    # - a Symbol
++    # - an applied function like f(x) (AppliedUndef)
++    # - a sequence of the above
+     if is_sequence(y):
+-        dep = set(y)
+-        y = y[0]
++        norm = []
++        dep = set()
++        for yi in y:
++            if isinstance(yi, Symbol):
++                sym = yi
++            elif isinstance(yi, AppliedUndef) or (getattr(yi, 'is_Function', False) and yi.args):
++                # map applied function f(x) -> symbol 'f'
++                try:
++                    name = yi.func.__name__
++                except Exception:
++                    name = getattr(yi.func, 'name', None)
++                if name is None:
++                    raise ValueError("expecting x-dependent symbol(s) but got: %s" % yi)
++                sym = Symbol(name)
++            else:
++                raise ValueError("expecting x-dependent symbol(s) but got: %s" % yi)
++            norm.append(sym)
++            dep.add(sym)
++        # use the first as the primary dependent variable
++        y = norm[0]
+     elif isinstance(y, Symbol):
+         dep = {y}
++    elif isinstance(y, AppliedUndef) or (getattr(y, 'is_Function', False) and y.args):
++        # single applied function like f(x)
++        try:
++            name = y.func.__name__
++        except Exception:
++            name = getattr(y.func, 'name', None)
++        if name is None:
++            raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        sym = Symbol(name)
++        dep = {sym}
++        y = sym
+     else:
+         raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
+ 
+-    f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
++    # Build substitution mapping: symbol -> Function(symbol_name)(x) for any
++    # dependent symbols that actually appear as bare symbols in eq.
++    f = dict([(s, Function(s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
++
++    # dydx is the derivative symbol we want to solve for; use the function form
+     dydx = Function(y.name)(x).diff(x)
++
++    # Substitute any bare dependent symbols in eq to their applied-function form
+     eq = eq.subs(f)
+     derivs = {}
+     for i in range(n):
+         yp = solve(eq.diff(x), dydx)[0].subs(derivs)
+         if i == n - 1:
++            # Replace applied-function forms back to the original bare symbols
+             return yp.subs([(v, k) for k, v in f.items()])
+         derivs[dydx] = yp
+         eq = dydx - yp

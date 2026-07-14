@@ -1,0 +1,41 @@
+diff --git a/astropy/wcs/wcs.py b/astropy/wcs/wcs.py
+index d3a06f2b31..df97aa0982 100644
+--- a/astropy/wcs/wcs.py
++++ b/astropy/wcs/wcs.py
+@@ -1220,6 +1220,23 @@ reduce these to 2 dimensions using the naxis kwarg.
+ 
+             xy = np.hstack([x.reshape((x.size, 1)) for x in axes])
+ 
++            # If there are no coordinates to transform, do not call
++            # into the underlying wcslib routines (they raise when
++            # given zero-length arrays). Instead, return empty arrays
++            # shaped according to the broadcast input and the expected
++            # output dimensionality.
++            if xy.shape[0] == 0:
++                out_shape = axes[0].shape
++                # Special-case: when caller requested RA/Dec ordering for
++                # output sky coordinates, return a 2-tuple of empty
++                # arrays shaped like the broadcast input.
++                if ra_dec_order and sky == 'output':
++                    return (np.empty(out_shape), np.empty(out_shape))
++                # Otherwise, return a sequence of empty arrays with one
++                # entry per output axis (use self.naxis as the expected
++                # output axis count for the common WCS transforms).
++                return [np.empty(out_shape) for _ in range(self.naxis)]
++
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
+             output = func(xy, origin)
+@@ -1235,6 +1252,12 @@ reduce these to 2 dimensions using the naxis kwarg.
+                 raise ValueError(
+                     "When providing two arguments, the array must be "
+                     "of shape (N, {0})".format(self.naxis))
++            # If there are no rows, avoid calling into wcslib and return
++            # an empty array with the appropriate number of columns.
++            if xy.shape[0] == 0:
++                k = 2 if (ra_dec_order and sky == 'output') else self.naxis
++                return np.empty((0, k))
++
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
+             result = func(xy, origin)

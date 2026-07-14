@@ -1,0 +1,34 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index ebe5da43e2..1bbd166d17 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -104,7 +104,28 @@ class Widget:
+            True if the canvas has been changed.
+ 
+         """
+-        return self.canvas is not self.ax.figure.canvas
++        # If the Axes' figure (and thus its canvas) has changed, try to
++        # release any mouse grab the old canvas may have held for this Axes
++        # so that widgets do not leave the canvas in a grabbed state
++        # (which would block input to other widgets).  After attempting to
++        # release, update our stored canvas reference.
++        if self.canvas is not self.ax.figure.canvas:
++            try:
++                # Only attempt release if the old canvas implements it and
++                # if it currently has this Axes as the mouse grabber.
++                if getattr(self.canvas, "mouse_grabber", None) is self.ax:
++                    # release_mouse is expected to be safe to call even if
++                    # the grab is already gone.
++                    self.canvas.release_mouse(self.ax)
++            except Exception:
++                # Be conservative: on any error, don't let this propagate
++                # from an internal state-change check.
++                pass
++            # Update to the new canvas so future operations use the
++            # correct canvas.
++            self.canvas = self.ax.figure.canvas
++            return True
++        return False
+ 
+ 
+ class AxesWidget(Widget):

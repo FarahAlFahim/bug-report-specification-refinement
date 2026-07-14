@@ -1,0 +1,45 @@
+diff --git a/sympy/combinatorics/permutations.py b/sympy/combinatorics/permutations.py
+index 136ed5a47..2ac448437 100644
+--- a/sympy/combinatorics/permutations.py
++++ b/sympy/combinatorics/permutations.py
+@@ -801,8 +801,17 @@ class Permutation(Basic):
+     def __new__(cls, *args, **kwargs):
+         """
+         Constructor for the Permutation object from a list or a
+-        list of lists in which all elements of the permutation may
+-        appear only once.
++        list of lists.
++
++        Notes
++        =====
++        - Array-form input (a single list, e.g. [0, 2, 1]) must contain
++          each element exactly once (integers 0..n-1).
++        - Cycle-form input (a list of lists, e.g. [[1, 2], [2, 3]]) is
++          interpreted as a product of cycles applied left-to-right; in
++          this case elements may appear in more than one cycle and the
++          constructor will compute the resulting permutation. Uniqueness
++          is still enforced within a single cycle (see Cycle).
+ 
+         Examples
+         ========
+@@ -895,12 +904,14 @@ def __new__(cls, *args, **kwargs):
+         # counting starts from 1.
+ 
+         temp = flatten(args)
+-        if has_dups(temp):
+-            if is_cycle:
+-                raise ValueError('there were repeated elements; to resolve '
+-                'cycles use Cycle%s.' % ''.join([str(tuple(c)) for c in args]))
+-            else:
+-                raise ValueError('there were repeated elements.')
++        # Duplicate-elements are an error for array-form input since
++        # array-form must be a permutation of 0..n-1.  For cycle-form
++        # (list-of-lists) duplicates across separate cycles are allowed
++        # because those cycles are multiplied together; the Cycle class
++        # already enforces uniqueness within a single cycle, so only
++        # raise for non-cycle (array) input.
++        if has_dups(temp) and not is_cycle:
++            raise ValueError('there were repeated elements.')
+         temp = set(temp)
+ 
+         if not is_cycle and \

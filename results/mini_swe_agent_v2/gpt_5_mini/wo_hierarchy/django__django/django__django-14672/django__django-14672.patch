@@ -1,0 +1,50 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index f208067aae..d51fc52000 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1405,7 +1405,15 @@ class Model(metaclass=ModelBase):
+         fields = (f for f in fields if isinstance(f.remote_field.through, ModelBase))
+ 
+         for f in fields:
+-            signature = (f.remote_field.model, cls, f.remote_field.through, f.remote_field.through_fields)
++            # Canonicalize through_fields into a hashable representation so
++            # that equivalent inputs (e.g. list vs tuple) compare equally
++            # when used in signatures.
++            signature = (
++                f.remote_field.model,
++                cls,
++                f.remote_field.through,
++                make_hashable(f.remote_field.through_fields),
++            )
+             if signature in seen_intermediary_signatures:
+                 errors.append(
+                     checks.Error(
+diff --git a/django/db/models/fields/reverse_related.py b/django/db/models/fields/reverse_related.py
+index ccc2223a5f..8c3969e933 100644
+--- a/django/db/models/fields/reverse_related.py
++++ b/django/db/models/fields/reverse_related.py
+@@ -301,16 +301,22 @@ class ManyToManyRel(ForeignObjectRel):
+ 
+         if through_fields and not through:
+             raise ValueError("Cannot specify through_fields without a through model")
+-        self.through_fields = through_fields
++        # Normalize through_fields into a canonical, hashable form. Many
++        # callers may provide a list or other iterable; storing a tuple
++        # guarantees it's hashable and comparable regardless of the input
++        # type (e.g. list vs tuple).
++        self.through_fields = tuple(through_fields) if through_fields is not None else None
+ 
+         self.symmetrical = symmetrical
+         self.db_constraint = db_constraint
+ 
+     @property
+     def identity(self):
++        # Ensure the through_fields element is represented in a hashable
++        # way (make_hashable is defensive for nested structures).
+         return super().identity + (
+             self.through,
+-            self.through_fields,
++            make_hashable(self.through_fields),
+             self.db_constraint,
+         )
+ 

@@ -1,0 +1,55 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..831b7bc4c3 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,6 +148,40 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    if name == "version_info":
++        # Ensure __version__ is computed and cached.
++        if "__version__" in globals():
++            ver = __version__
++        else:
++            # Delegate to __getattr__ to compute and cache __version__.
++            ver = __getattr__("__version__")
++        # Try to produce a comparable numeric tuple from the version.
++        try:
++            parsed = parse_version(ver)
++            release = getattr(parsed, "release", None)
++            if release:
++                vi = tuple(release)
++            else:
++                # Fallback: extract groups of digits.
++                vi = tuple(int(g) for g in re.findall(r"\d+", ver))
++        except Exception:
++            vi = tuple(int(g) for g in re.findall(r"\d+", ver))
++        global version_info
++        version_info = vi
++        return version_info
++    if name == "version":
++        # Expose the parsed packaging.version.Version object where possible.
++        if "__version__" in globals():
++            ver = __version__
++        else:
++            ver = __getattr__("__version__")
++        try:
++            pv = parse_version(ver)
++        except Exception:
++            pv = ver
++        global version
++        version = pv
++        return version
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 
+@@ -1410,3 +1444,9 @@ def _preprocess_data(func=None, *, replace_names=None, label_namer=None):
+ _log.debug('interactive is %s', is_interactive())
+ _log.debug('platform is %s', sys.platform)
+ _log.debug('loaded modules: %s', list(sys.modules))
++
++
++def __dir__():
++    # Advertise dynamic attributes provided via __getattr__.
++    dynamic = ["__version__", "version_info", "version"]
++    return sorted(list(globals().keys()) + dynamic)

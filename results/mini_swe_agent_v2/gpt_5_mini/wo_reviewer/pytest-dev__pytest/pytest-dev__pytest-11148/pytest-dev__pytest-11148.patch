@@ -1,0 +1,78 @@
+diff --git a/src/_pytest/_py/path.py b/src/_pytest/_py/path.py
+index 73a070d19..82d56e971 100644
+--- a/src/_pytest/_py/path.py
++++ b/src/_pytest/_py/path.py
+@@ -1100,7 +1100,73 @@ class LocalPath:
+                     f"Can't find module {modname} at location {str(self)}"
+                 )
+             mod = importlib.util.module_from_spec(spec)
++            # Execute module in its own namespace
+             spec.loader.exec_module(mod)
++
++            # Ensure the module is available in sys.modules under the
++            # requested module name. Some callers expect importlib-style
++            # imports to behave like normal imports and refer to the
++            # same module object when importing by package-qualified
++            # names. When the same source file is loaded multiple times
++            # under different module names (e.g. via file-based
++            # imports), mutations to class objects on one module object
++            # are not visible on the other module objects. To reduce
++            # surprising duplicate-module issues we register the newly
++            # loaded module and attempt to unify class objects across
++            # any existing modules that point to the same __file__.
++            try:
++                sys.modules[modname] = mod
++            except Exception:
++                # Be conservative: if we cannot register, just return mod
++                return mod
++
++            # Normalize file path for comparison; some loaders may use
++            # different string representations of the path.
++            mod_file = getattr(mod, "__file__", None)
++            if mod_file:
++                try:
++                    mod_file_norm = os.path.normcase(os.path.realpath(mod_file))
++                except Exception:
++                    mod_file_norm = os.path.normcase(os.path.abspath(mod_file))
++
++                # For any other module objects that were loaded from the
++                # same source file but under a different name, try to
++                # replace class objects in the old module with the
++                # ones from the newly loaded module. This makes
++                # class-level mutations (like setting class attributes)
++                # visible to all aliases of the same source file.
++                for name, other in list(sys.modules.items()):
++                    if other is None or other is mod:
++                        continue
++                    other_file = getattr(other, "__file__", None)
++                    if not other_file:
++                        continue
++                    try:
++                        other_file_norm = os.path.normcase(os.path.realpath(other_file))
++                    except Exception:
++                        other_file_norm = os.path.normcase(os.path.abspath(other_file))
++                    if other_file_norm == mod_file_norm:
++                        # Replace classes in 'other' with those from 'mod'
++                        for attr in dir(mod):
++                            try:
++                                new_val = getattr(mod, attr)
++                            except Exception:
++                                continue
++                            # Only replace class objects; avoid mutating
++                            # functions/modules/constants which may have
++                            # different intended identities.
++                            if isinstance(new_val, type):
++                                try:
++                                    old_val = getattr(other, attr, None)
++                                except Exception:
++                                    old_val = None
++                                if isinstance(old_val, type) and old_val is not new_val:
++                                    try:
++                                        setattr(other, attr, new_val)
++                                    except Exception:
++                                        # Ignore failures to set attributes on
++                                        # modules we don't control.
++                                        pass
+             return mod
+ 
+         pkgpath = None

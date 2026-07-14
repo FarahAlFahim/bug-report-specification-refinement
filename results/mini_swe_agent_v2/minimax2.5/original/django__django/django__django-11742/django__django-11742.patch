@@ -1,0 +1,87 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..64b30c63a1 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -202,6 +202,7 @@ class Field(RegisterLookupMixin):
+         return [
+             *self._check_field_name(),
+             *self._check_choices(),
++            *self._check_max_length_with_choices(),
+             *self._check_db_index(),
+             *self._check_null_allowed_for_primary_keys(),
+             *self._check_backend_specific_checks(**kwargs),
+@@ -291,6 +292,74 @@ class Field(RegisterLookupMixin):
+             )
+         ]
+ 
++    def _check_max_length_with_choices(self):
++        if not self.choices or self.max_length is None:
++            return []
++
++        # Get all choice values
++        choice_values = []
++        for choices_group in self.choices:
++            # Skip non-tuple/list choices groups (e.g., custom iterables)
++            if not isinstance(choices_group, (tuple, list)):
++                continue
++
++            # Check if it's a grouped choice (group_name, group_choices)
++            # Grouped choices have the format: (group_name, [(value, display), ...])
++            # We can distinguish grouped from simple choices by checking if the second
++            # element is a list of pairs (each pair has length 2)
++            if (
++                len(choices_group) == 2 and
++                isinstance(choices_group[0], str) and
++                is_iterable(choices_group[1])
++            ):
++                # Check if the second element is a list of pairs
++                second_elem = choices_group[1]
++                try:
++                    first_elem = list(second_elem)[0]
++                    if isinstance(first_elem, tuple) and len(first_elem) == 2:
++                        # This is a grouped choice
++                        group_name, group_choices = choices_group
++                        for value, human_name in group_choices:
++                            choice_values.append(value)
++                    else:
++                        # This is a simple choice
++                        value, human_name = choices_group
++                        choice_values.append(value)
++                except (TypeError, IndexError):
++                    # Not a valid grouped choice, treat as simple choice
++                    try:
++                        value, human_name = choices_group
++                        choice_values.append(value)
++                    except ValueError:
++                        # Invalid choice format, skip this group
++                        pass
++            else:
++                # Simple choice (value, human_name)
++                try:
++                    value, human_name = choices_group
++                    choice_values.append(value)
++                except ValueError:
++                    # Invalid choice format, skip this group
++                    pass
++
++        # If no valid choice values found, skip the check
++        if not choice_values:
++            return []
++
++        # Find the longest choice value
++        max_choice_length = max(len(str(value)) for value in choice_values)
++
++        if max_choice_length > self.max_length:
++            return [
++                checks.Error(
++                    "max_length must be at least the length of the longest choice value.",
++                    obj=self,
++                    id='fields.E122',
++                )
++            ]
++        return []
++
++
+     def _check_db_index(self):
+         if self.db_index not in (None, True, False):
+             return [

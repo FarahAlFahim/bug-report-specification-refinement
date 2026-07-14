@@ -1,0 +1,47 @@
+--- /tmp/orig.py	2026-05-14 21:19:42.394288000 +0000
++++ sphinx/ext/autodoc/__init__.py	2026-05-14 21:18:59.384822009 +0000
+@@ -110,11 +110,27 @@
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :members: option to auto directives.
++
++    Normalize the option to a canonical collection of class names.
++    - flag/no-arg (None or True) historically returned the sentinel
++      string 'object'; preserve that behavior by returning a set
++      containing 'object'.
++    - if a sequence (list/tuple/set) is supplied, convert it to a set
++      of strings.
++    - if a comma-separated string is supplied, split it and
++      strip whitespace to produce the set of names.
++    """
+     if arg in (None, True):
+-        return 'object'
+-    else:
+-        return arg
++        return {'object'}
++    # If a boolean False was passed, preserve falsy semantics.
++    if arg is False:
++        return False
++    # If already a set or other collection, convert elements to strings.
++    if isinstance(arg, (set, list, tuple)):
++        return {str(x).strip() for x in arg if str(x).strip()}
++    # Otherwise assume a string (possibly comma-separated)
++    return {x.strip() for x in str(arg).split(',') if x.strip()}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -682,7 +698,11 @@
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+             if inspect.isclass(self.object):
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
++                    # options.inherited_members is normalized to a collection of
++                    # class names (or False).  Check membership rather than
++                    # equality so multiple base names can be provided.
++                    inh = self.options.inherited_members
++                    if inh and cls.__name__ in inh and cls != self.object:
+                         # given member is a member of specified *super class*
+                         return True
+                     elif name in cls.__dict__:

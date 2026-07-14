@@ -1,0 +1,34 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..b08d0576a9 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -39,7 +39,7 @@ def doit(p, q):
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    p.is_Pow and p.exp.is_Integer and p.base == q and p.base.is_integer or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 
+@@ -86,10 +86,18 @@ def doit(p, q):
+             # XXX other possibilities?
+ 
+         # extract gcd; any further simplification should be done by the user
++        # But only if the base is known to be an integer
+         G = gcd(p, q)
+         if G != 1:
+-            p, q = [
+-                gcd_terms(i/G, clear=False, fraction=False) for i in (p, q)]
++            # Check if we can safely extract the gcd
++            # If p is a Power with base == q and base is not known to be integer, skip
++            # Also skip if p == q and p is not known to be integer
++            if not ((p.is_Pow and p.base == q) or p == q) or (p.is_Pow and p.base == q and p.base.is_integer) or (p == q and p.is_integer):
++                p, q = [
++                    gcd_terms(i/G, clear=False, fraction=False) for i in (p, q)]
++            else:
++                # Reset G to 1 if we skip the gcd extraction
++                G = S.One
+         pwas, qwas = p, q
+ 
+         # simplify terms

@@ -1,0 +1,44 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index b89b6b511b..6f4bb1001b 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -187,14 +187,35 @@ class CreateModel(ModelOperation):
+             isinstance(operation, AlterTogetherOptionOperation)
+             and self.name_lower == operation.name_lower
+         ):
++            # Special-case index_together: when squashing migrations we want to
++            # represent index tuples as modern models.Index instances under the
++            # 'indexes' option, instead of preserving the deprecated
++            # 'index_together' key which would emit deprecation warnings when
++            # the squashed migration is loaded.
++            if operation.option_name == "index_together":
++                options = self.options.copy()
++                # Drop the deprecated key if present.
++                options.pop("index_together", None)
++                # Ensure we have an 'indexes' list to merge into.
++                existing_indexes = list(options.get("indexes", []))
++                existing_fields = {tuple(idx.fields) for idx in existing_indexes}
++                # operation.option_value is a set of tuples (or None). Add
++                # Index(...) objects for any tuples that aren't already
++                # represented in existing indexes.
++                if operation.option_value:
++                    for fields in operation.option_value:
++                        if tuple(fields) not in existing_fields:
++                            existing_indexes.append(models.Index(fields=list(fields)))
++                            existing_fields.add(tuple(fields))
++                options["indexes"] = existing_indexes
++            else:
++                options = {**self.options, **{operation.option_name: operation.option_value}}
++
+             return [
+                 CreateModel(
+                     self.name,
+                     fields=self.fields,
+-                    options={
+-                        **self.options,
+-                        **{operation.option_name: operation.option_value},
+-                    },
++                    options=options,
+                     bases=self.bases,
+                     managers=self.managers,
+                 ),

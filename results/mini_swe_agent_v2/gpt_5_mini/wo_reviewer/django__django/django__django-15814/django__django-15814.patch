@@ -1,0 +1,93 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 461e1ae156..6c8d7ab85d 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -263,7 +263,7 @@ class SQLCompiler:
+                 select.append((col, None))
+                 select_idx += 1
+             klass_info = {
+-                "model": self.query.model,
++                "model": self.query.model._meta.concrete_model,
+                 "select_fields": select_list,
+             }
+         for alias, annotation in self.query.annotation_select.items():
+@@ -1060,7 +1060,7 @@ class SQLCompiler:
+             ):
+                 continue
+             klass_info = {
+-                "model": f.remote_field.model,
++                "model": f.remote_field.model._meta.concrete_model,
+                 "field": f,
+                 "reverse": False,
+                 "local_setter": f.set_cached_value,
+@@ -1111,7 +1111,7 @@ class SQLCompiler:
+                 alias = join_info.joins[-1]
+                 from_parent = issubclass(model, opts.model) and model is not opts.model
+                 klass_info = {
+-                    "model": model,
++                    "model": model._meta.concrete_model,
+                     "field": f,
+                     "reverse": True,
+                     "local_setter": f.remote_field.set_cached_value,
+@@ -1156,7 +1156,7 @@ class SQLCompiler:
+                         issubclass(model, opts.model) and model is not opts.model
+                     )
+                     klass_info = {
+-                        "model": model,
++                        "model": model._meta.concrete_model,
+                         "field": f,
+                         "reverse": True,
+                         "local_setter": local_setter,
+@@ -1208,7 +1208,7 @@ class SQLCompiler:
+             for parent_model, parent_link in concrete_model._meta.parents.items():
+                 parent_list = parent_model._meta.get_parent_list()
+                 yield {
+-                    "model": parent_model,
++                    "model": parent_model._meta.concrete_model,
+                     "field": parent_link,
+                     "reverse": False,
+                     "select_fields": [
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 33cc636b22..2bd9286354 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -734,11 +734,15 @@ class Query(BaseExpression):
+             return
+         orig_opts = self.get_meta()
+         seen = {}
++        # must_include maps concrete model classes -> set(of fields).
+         must_include = {orig_opts.concrete_model: {orig_opts.pk}}
+         for field_name in field_names:
+             parts = field_name.split(LOOKUP_SEP)
++            # Start traversal from the concrete model for the current query
++            # model. Use concrete model _meta throughout to avoid proxy
++            # model confusion: we need DB-owning Options instances.
+             cur_model = self.model._meta.concrete_model
+-            opts = orig_opts
++            opts = orig_opts.concrete_model._meta
+             for name in parts[:-1]:
+                 old_model = cur_model
+                 if name in self._filtered_relations:
+@@ -748,13 +752,19 @@ class Query(BaseExpression):
+                     cur_model = source.related_model
+                 else:
+                     cur_model = source.remote_field.model
+-                opts = cur_model._meta
++                # Ensure we always use the concrete model options for
++                # traversal so that keys in must_include stay consistent
++                # (concrete model classes).
++                opts = cur_model._meta.concrete_model._meta
+                 # Even if we're "just passing through" this model, we must add
+                 # both the current model's pk and the related reference field
+                 # (if it's not a reverse relation) to the things we select.
+                 if not is_reverse_o2o(source):
+-                    must_include[old_model].add(source)
+-                add_to_dict(must_include, cur_model, opts.pk)
++                    # old_model may be a proxy; ensure we add to the
++                    # concrete model key.
++                    add_to_dict(must_include, old_model._meta.concrete_model, source)
++                # Add the concrete model pk for the model we're traversing
++                add_to_dict(must_include, cur_model._meta.concrete_model, opts.pk)
+             field = opts.get_field(parts[-1])
+             is_reverse_object = field.auto_created and not field.concrete
+             model = field.related_model if is_reverse_object else field.model

@@ -1,0 +1,26 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 7bc96e68eb..66c71d03e4 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1038,11 +1038,17 @@ def __new__(cls, num, dps=None, prec=None, precision=None):
+             else:
+                 raise ValueError("unexpected decimal value %s" % str(num))
+         elif isinstance(num, tuple) and len(num) in (3, 4):
+-            if type(num[1]) is str:
+-                # it's a hexadecimal (coming from a pickled object)
+-                # assume that it is in standard form
++            if isinstance(num[1], string_types):
++                # it's a hexadecimal (possibly coming from a pickled object).
++                # In cross-version pickles mantissa strings produced by Python 2
++                # long() may include a trailing 'L' suffix (e.g. '1L'). Strip any
++                # such suffix before converting. Also accept string_types to
++                # tolerate unicode on Py2/py3.
++                s = num[1]
++                if s.endswith(("L", "l")):
++                    s = s[:-1]
+                 num = list(num)
+-                num[1] = long(num[1], 16)
++                num[1] = long(s, 16)
+                 _mpf_ = tuple(num)
+             else:
+                 if len(num) == 4:

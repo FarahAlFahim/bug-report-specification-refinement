@@ -1,0 +1,61 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index b992b45c26..12a88761be 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,11 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    # Python 3.3+: Mapping is in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    # Older Pythons have it in collections
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index 664602d6ba..e5ded5b571 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,12 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    # Python 3.3+: Callable is in collections.abc
++    from collections.abc import Callable
++except Exception:
++    # Fallback for older Pythons
++    from collections import Callable
+ import warnings
+ import sys
+ 
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index 77772f6775..5fe83bdae5 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -1563,7 +1563,20 @@ def div(f, g, auto=True):
+             except CoercionFailed:
+                 pass
+             else:
+-                q, r = Q, R
++                # Only accept the ring versions if they reproduce the original
++                # polynomial division result in the ring. In some cases
++                # conversion back to the ring can lose fractional parts and
++                # give an incorrect quotient/remainder (see issue with
++                # symbolic coefficients). Verify by checking f == Q*g + R.
++                try:
++                    Qpoly = per(Q)
++                    Rpoly = per(R)
++                    # if equality holds in the polynomial ring then accept
++                    if f == (Qpoly* g + Rpoly):
++                        q, r = Q, R
++                except Exception:
++                    # if any check fails, do not retract to ring
++                    pass
+ 
+         return per(q), per(r)
+ 

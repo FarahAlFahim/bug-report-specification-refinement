@@ -1,0 +1,79 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 2428218696..3cf11bc48e 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -933,10 +933,35 @@ class Model(metaclass=ModelBase):
+                         "%s() prohibited to prevent data loss due to unsaved "
+                         "related object '%s'." % (operation_name, field.name)
+                     )
+-                elif getattr(self, field.attname) is None:
+-                    # Use pk from related object if it has been saved after
+-                    # an assignment.
+-                    setattr(self, field.attname, obj.pk)
++                else:
++                    # Determine whether the local foreign-key value is
++                    # "missing" according to DB semantics. Historically
++                    # this method only considered None to be missing; the
++                    # database preparation logic (ForeignKey.get_db_prep_save)
++                    # also treats the empty string as missing in some
++                    # backends or when the target field disallows empty
++                    # strings. Align the behaviour here so that a parent's
++                    # FK attribute set to '' at assignment time will be
++                    # treated as missing and updated with the related
++                    # object's pk when that object is later saved.
++                    current_val = getattr(self, field.attname)
++                    try:
++                        # Use the field's DB prep logic when available to
++                        # determine whether the current value is effectively
++                        # missing for persistence.
++                        if hasattr(field, 'get_db_prep_save'):
++                            missing = field.get_db_prep_save(current_val, connection=connection) is None
++                        else:
++                            missing = current_val is None
++                    except Exception:
++                        # In case DB prep raises for unexpected values,
++                        # fall back to the simpler None check.
++                        missing = current_val is None
++
++                    if missing:
++                        # Use pk from related object if it has been saved after
++                        # an assignment.
++                        setattr(self, field.attname, obj.pk)
+                 # If the relationship's pk/to_field was changed, clear the
+                 # cached relationship.
+                 if getattr(obj, field.target_field.attname) != getattr(self, field.attname):
+diff --git a/django/db/models/fields/related_descriptors.py b/django/db/models/fields/related_descriptors.py
+index 872a4c98dc..095a3cabfc 100644
+--- a/django/db/models/fields/related_descriptors.py
++++ b/django/db/models/fields/related_descriptors.py
+@@ -254,7 +254,29 @@ class ForwardManyToOneDescriptor:
+         # Set the values of the related field.
+         else:
+             for lh_field, rh_field in self.field.related_fields:
+-                setattr(instance, lh_field.attname, getattr(value, rh_field.attname))
++                val = getattr(value, rh_field.attname)
++                # Normalize empty-string PKs to None when the database
++                # semantics consider empty strings as missing. This keeps
++                # behaviour consistent with ForeignKey.get_db_prep_save and
++                # ensures that assigning an unsaved related instance whose
++                # PK defaults to '' doesn't leave the local FK attname set
++                # to the empty string (which would prevent later updates
++                # when the related instance is saved).
++                # If assigning an unsaved related instance whose primary key
++                # attribute defaults to the empty string (e.g. Product() where
++                # sku == ''), prefer to store None on the local FK attname so
++                # that later saving of the related instance (when its PK is
++                # set) will cause Model._prepare_related_fields_for_save to
++                # pick up and copy the real PK value into the parent's
++                # attname. This avoids leaving a stale empty string in the
++                # parent's FK column.
++                try:
++                    if val == '' and getattr(value, '_state', None) and value._state.adding:
++                        val = None
++                except Exception:
++                    # Be conservative on error: leave the original value.
++                    pass
++                setattr(instance, lh_field.attname, val)
+ 
+         # Set the related instance cache used by __get__ to avoid an SQL query
+         # when accessing the attribute we just set.

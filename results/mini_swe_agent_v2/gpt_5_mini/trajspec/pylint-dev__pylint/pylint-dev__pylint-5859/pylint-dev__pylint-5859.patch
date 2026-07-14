@@ -1,0 +1,41 @@
+diff --git a/pylint/checkers/misc.py b/pylint/checkers/misc.py
+index 69149e61a..a7cb50d1e 100644
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -120,10 +120,13 @@ class EncodingChecker(BaseChecker):
+         super().open()
+ 
+         notes = "|".join(re.escape(note) for note in self.config.notes)
++        # Use a negative lookahead (?!\w) instead of a word boundary so
++        # punctuation-only note tags (for example '???') are matched.
++        # See: https://github.com/PyCQA/pylint/pull/... (discussion)
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})(?!\w)"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes})(?!\w)"
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)
+ 
+@@ -177,8 +180,20 @@ class EncodingChecker(BaseChecker):
+                     except PragmaParserError:
+                         # Printing useful information dealing with this error is done in the lint package
+                         pass
++
++                    # If the pragma parser produced any message names that match
++                    # configured notes, respect those disables.
+                     if set(values) & set(self.config.notes):
+                         continue
++
++                    # Fallback: the pragma parser only recognizes message tokens
++                    # matching certain identifier rules and will ignore
++                    # punctuation-only tokens (for example '???'). To allow
++                    # users to disable such tags via inline pragmas, also look
++                    # for the literal note tokens in the raw pragma text.
++                    disable_text = disable_option_match.group(2).lower()
++                    if any(str(note).lower() in disable_text for note in self.config.notes):
++                        continue
+                 except ValueError:
+                     self.add_message(
+                         "bad-inline-option",

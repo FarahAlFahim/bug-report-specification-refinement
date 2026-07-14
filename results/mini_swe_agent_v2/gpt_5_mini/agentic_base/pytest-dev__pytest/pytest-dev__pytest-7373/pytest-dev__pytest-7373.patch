@@ -1,0 +1,45 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..332c9f0eb 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -6,6 +6,7 @@ from typing import Any
+ from typing import Dict
+ from typing import List
+ from typing import Optional
++from typing import Tuple
+ 
+ from ..outcomes import fail
+ from ..outcomes import TEST_OUTCOME
+@@ -15,19 +16,28 @@ from _pytest.nodes import Item
+ from _pytest.store import StoreKey
+ 
+ 
+-evalcache_key = StoreKey[Dict[str, Any]]()
++evalcache_key = StoreKey[Dict[Tuple[str, int], Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    """Evaluate ``expr`` in globals ``d`` with caching keyed by both the
++    expression string and the identity of the globals mapping.
++
++    Previously the cache keyed only on the expression string which caused
++    results to be reused across different module globals (different tests
++    modules) leading to incorrect skip/xfail decisions. Using the id of the
++    globals mapping ensures caching is per-module (or per-evaluation-context).
++    """
++    default = {}  # type: Dict[Tuple[str, int], object]
+     evalcache = config._store.setdefault(evalcache_key, default)
++    key = (expr, id(d))
+     try:
+-        return evalcache[expr]
++        return evalcache[key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        evalcache[key] = x = eval(exprcode, d)
+         return x
+ 
+ 

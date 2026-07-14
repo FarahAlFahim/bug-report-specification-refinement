@@ -1,0 +1,19 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 16dff6a1cd..4a49762f33 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -442,4 +442,14 @@ class Collector:
+         for model, instances in self.data.items():
+             for instance in instances:
+                 setattr(instance, model._meta.pk.attname, None)
++        # Ensure that models that were considered for deletion but resulted
++# in zero deletions still appear in the returned dict with a zero
++# value. This makes the result of Collector.delete() consistent: the
++# second element is a mapping from model label to deletion count
++# (possibly zero) for every model involved in the collection phase.
++        for model in self.data:
++            # using += 0 guarantees the Counter will have the key with a
++            # zero value if it didn't already exist.
++            deleted_counter[model._meta.label] += 0
++
+         return sum(deleted_counter.values()), dict(deleted_counter)

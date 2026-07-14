@@ -1,0 +1,27 @@
+diff --git a/django/db/models/fields/related_descriptors.py b/django/db/models/fields/related_descriptors.py
+index 872a4c98dc..79e2a66a84 100644
+--- a/django/db/models/fields/related_descriptors.py
++++ b/django/db/models/fields/related_descriptors.py
+@@ -253,8 +253,21 @@ class ForwardManyToOneDescriptor:
+ 
+         # Set the values of the related field.
+         else:
++            # When assigning a related instance that hasn't been saved yet
++            # (value._state.adding is True), we must avoid copying any
++            # potentially-empty attribute values from the related instance
++            # onto the local foreign-key attname. If we copy through an
++            # empty string (common for CharField primary keys), the
++            # parent's attname will be stuck with that empty value and
++            # won't be updated later when the related instance is saved.
++            # Instead, clear the local attname so that the save() path can
++            # detect the assignment and populate the correct pk from the
++            # related object (see Model._prepare_related_fields_for_save).
+             for lh_field, rh_field in self.field.related_fields:
+-                setattr(instance, lh_field.attname, getattr(value, rh_field.attname))
++                if getattr(value, "_state", None) is not None and value._state.adding:
++                    setattr(instance, lh_field.attname, None)
++                else:
++                    setattr(instance, lh_field.attname, getattr(value, rh_field.attname))
+ 
+         # Set the related instance cache used by __get__ to avoid an SQL query
+         # when accessing the attribute we just set.

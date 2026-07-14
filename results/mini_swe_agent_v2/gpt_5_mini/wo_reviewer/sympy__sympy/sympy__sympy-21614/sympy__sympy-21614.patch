@@ -1,0 +1,61 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..9112a2b59e 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1265,6 +1265,56 @@ def _diff_wrt(self):
+         """
+         return self.expr._diff_wrt and isinstance(self.doit(), Derivative)
+ 
++    @property
++    def kind(self):
++        """Infer the mathematical kind of a Derivative.
++
++        The kind is primarily derived from the expression being
++        differentiated. If any differentiation variable is matrix-like
++        the derivative is MatrixKind(element_kind). If any
++        differentiation variable is array-like the derivative is
++        ArrayKind(element_kind). The element_kind is taken from
++        expr.kind.element_kind when available, otherwise expr.kind.
++        """
++        from sympy.core.kind import UndefinedKind
++
++        expr_kind = getattr(self.expr, 'kind', UndefinedKind)
++        element_kind = getattr(expr_kind, 'element_kind', expr_kind)
++
++        try:
++            from sympy.matrices.common import MatrixKind, MatrixCommon
++            from sympy.matrices.expressions.matexpr import MatrixExpr
++        except Exception:
++            MatrixKind = MatrixCommon = MatrixExpr = None
++        try:
++            from sympy.tensor.array.ndim_array import ArrayKind, NDimArray
++        except Exception:
++            ArrayKind = NDimArray = None
++
++        for v, _ in self.variable_count:
++            vk = getattr(v, 'kind', None)
++            if vk is not None:
++                if MatrixKind is not None and isinstance(vk, MatrixKind):
++                    return MatrixKind(element_kind)
++                if ArrayKind is not None and isinstance(vk, ArrayKind):
++                    return ArrayKind(element_kind)
++
++            if MatrixCommon is not None and isinstance(v, MatrixCommon):
++                return MatrixKind(element_kind)
++            if MatrixExpr is not None and isinstance(v, MatrixExpr):
++                return MatrixKind(element_kind)
++            if NDimArray is not None and isinstance(v, NDimArray):
++                return ArrayKind(element_kind)
++
++            if getattr(v, 'is_Matrix', False) or getattr(v, 'is_MatrixLike', False):
++                if MatrixKind is not None:
++                    return MatrixKind(element_kind)
++            if getattr(v, 'is_NDimArray', False) or getattr(v, 'is_ndim_array', False):
++                if ArrayKind is not None:
++                    return ArrayKind(element_kind)
++
++        return expr_kind
++
+     def __new__(cls, expr, *variables, **kwargs):
+ 
+         from sympy.matrices.common import MatrixCommon

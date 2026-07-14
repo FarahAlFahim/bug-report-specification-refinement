@@ -1,0 +1,22 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..02f3ae1c34 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -39,7 +39,16 @@ def doit(p, q):
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    # if p is a power with integer exponent and the
++                    # base equals the modulus, then p % q == 0 in the
++                    # algebraic/integer sense.  However, for non-integer
++                    # numeric bases (Float or non-integer Rational) the
++                    # numeric remainder is not necessarily zero
++                    # (e.g. Mod(1.5**2, 1.5) -> 0.75).  Only apply this
++                    # simplification when q is symbolic (not a Number) or
++                    # when q is an exact integer.
++                    (p.is_Pow and p.exp.is_Integer and p.base == q
++                        and (not q.is_Number or q.is_integer)) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

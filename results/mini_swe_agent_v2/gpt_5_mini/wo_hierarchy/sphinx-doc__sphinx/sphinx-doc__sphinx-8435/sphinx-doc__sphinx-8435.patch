@@ -1,0 +1,87 @@
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1702,10 +1702,28 @@
+         if not self.options.annotation:
+             # obtain annotation for this data
+             try:
+-                annotations = get_type_hints(self.parent)
++                annotations = get_type_hints(self.parent, None,
++                                             self.config.autodoc_type_aliases)
+             except NameError:
+-                # Failed to evaluate ForwardRef (maybe TYPE_CHECKING)
++                # Failed to evaluate ForwardRef (maybe TYPE_CHECKING).
++                # Fall back to raw __annotations__, but apply any
++                # autodoc_type_aliases mapping so aliases are still shown
++                # for simple string annotations.
+                 annotations = safe_getattr(self.parent, '__annotations__', {})
++                if isinstance(annotations, dict) and self.config.autodoc_type_aliases:
++                    mapped = {}
++                    for k, v in annotations.items():
++                        if isinstance(v, str):
++                            alias = self.config.autodoc_type_aliases.get(v)
++                            if alias is not None:
++                                # keep alias as-is if it's a string, else
++                                # leave the value (type object) to be stringified
++                                mapped[k] = alias if isinstance(alias, str) else alias
++                            else:
++                                mapped[k] = v
++                        else:
++                            mapped[k] = v
++                    annotations = mapped
+             except TypeError:
+                 annotations = {}
+             except KeyError:
+@@ -2093,10 +2111,28 @@
+         if not self.options.annotation:
+             # obtain type annotation for this attribute
+             try:
+-                annotations = get_type_hints(self.parent)
++                annotations = get_type_hints(self.parent, None,
++                                             self.config.autodoc_type_aliases)
+             except NameError:
+-                # Failed to evaluate ForwardRef (maybe TYPE_CHECKING)
++                # Failed to evaluate ForwardRef (maybe TYPE_CHECKING).
++                # Fall back to raw __annotations__, but apply any
++                # autodoc_type_aliases mapping so aliases are still shown
++                # for simple string annotations.
+                 annotations = safe_getattr(self.parent, '__annotations__', {})
++                if isinstance(annotations, dict) and self.config.autodoc_type_aliases:
++                    mapped = {}
++                    for k, v in annotations.items():
++                        if isinstance(v, str):
++                            alias = self.config.autodoc_type_aliases.get(v)
++                            if alias is not None:
++                                # keep alias as-is if it's a string, else
++                                # leave the value (type object) to be stringified
++                                mapped[k] = alias if isinstance(alias, str) else alias
++                            else:
++                                mapped[k] = v
++                        else:
++                            mapped[k] = v
++                    annotations = mapped
+             except TypeError:
+                 annotations = {}
+             except KeyError:
+--- a/sphinx/util/inspect.py
++++ b/sphinx/util/inspect.py
+@@ -691,7 +691,7 @@
+     empty = inspect.Signature.empty
+ 
+     def __init__(self, subject: Callable, bound_method: bool = False,
+-                 has_retval: bool = True) -> None:
++                 has_retval: bool = True, type_aliases: Dict = {}) -> None:
+         warnings.warn('sphinx.util.inspect.Signature() is deprecated',
+                       RemovedInSphinx40Warning, stacklevel=2)
+ 
+@@ -718,7 +718,10 @@
+                 raise
+ 
+         try:
+-            self.annotations = typing.get_type_hints(subject)
++            # Resolve annotations using provided type aliases if any.
++            # Some callers (e.g. autodoc) may provide a mapping from
++            # short names to fully-qualified types via ``autodoc_type_aliases``.
++            self.annotations = typing.get_type_hints(subject, None, type_aliases)
+         except Exception:
+             # get_type_hints() does not support some kind of objects like partial,
+             # ForwardRef and so on.  For them, it raises an exception. In that case,

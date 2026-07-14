@@ -1,0 +1,39 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index b89b6b511b..964103805c 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -647,6 +647,16 @@ class AlterIndexTogether(AlterTogetherOptionOperation):
+     def __init__(self, name, index_together):
+         super().__init__(name, index_together)
+ 
++    def reduce(self, operation, app_label):
++        if (
++            isinstance(operation, AddIndex)
++            and self.name_lower == operation.model_name_lower
++            and self.option_value is not None
++            and tuple(operation.index.fields) in self.option_value
++        ):
++            return [operation]
++        return super().reduce(operation, app_label)
++
+ 
+ class AlterOrderWithRespectTo(ModelOptionOperation):
+     """Represent a change with the order_with_respect_to option."""
+@@ -866,6 +876,17 @@ class AddIndex(IndexOperation):
+             return []
+         return super().reduce(operation, app_label)
+ 
++    def can_reduce_through(self, operation, app_label):
++        return (
++            not operation.references_model(self.model_name, app_label)
++            or (
++                isinstance(operation, AlterIndexTogether)
++                and self.model_name_lower == operation.name_lower
++                and operation.option_value is not None
++                and tuple(self.index.fields) in operation.option_value
++            )
++        )
++
+ 
+ class RemoveIndex(IndexOperation):
+     """Remove an index from a model."""

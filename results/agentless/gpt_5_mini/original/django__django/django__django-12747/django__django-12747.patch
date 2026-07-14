@@ -1,0 +1,31 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 5788d19..ef065fc 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -395,7 +395,13 @@ class Collector:
+                 with transaction.mark_for_rollback_on_error():
+                     count = sql.DeleteQuery(model).delete_batch([instance.pk], self.using)
+                 setattr(instance, model._meta.pk.attname, None)
+-                return count, {model._meta.label: count}
++                # Only include the model in the returned dict if at least one
++                # object was deleted. This keeps the return format consistent
++                # when no objects are deleted (empty dict instead of
++                # {'app.Model': 0}).
++                if count:
++                    return count, {model._meta.label: count}
++                return count, {}
+ 
+         with transaction.atomic(using=self.using, savepoint=False):
+             # send pre_delete signals
+@@ -442,4 +448,10 @@ class Collector:
+         for model, instances in self.data.items():
+             for instance in instances:
+                 setattr(instance, model._meta.pk.attname, None)
+-        return sum(deleted_counter.values()), dict(deleted_counter)
++        # Total number of deleted objects
++        total_deleted = sum(deleted_counter.values())
++        # Only include models with a positive deleted count. This avoids
++        # returning keys with zero values (e.g. {'app.Model': 0}) which leads
++        # to inconsistent results when nothing was deleted.
++        deleted_dict = {label: cnt for label, cnt in deleted_counter.items() if cnt}
++        return total_deleted, deleted_dict

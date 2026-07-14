@@ -1,0 +1,84 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 38da1e6ecc..ac64f8f53e 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -125,10 +125,75 @@ class EnumSerializer(BaseSerializer):
+     def serialize(self):
+         enum_class = self.value.__class__
+         module = enum_class.__module__
+-        return (
+-            "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
+-            {"import %s" % module},
+-        )
++        # If this enum value corresponds to a single named member and the
++        # name is a valid Python identifier (so attribute access works),
++        # emit that member by attribute (e.g. module.EnumClass.NAME).
++        if self.value.name is not None and isinstance(self.value.name, str) and self.value.name.isidentifier():
++            return (
++                "%s.%s.%s" % (module, enum_class.__qualname__, self.value.name),
++                {"import %s" % module},
++            )
++
++        # Handle Flag/IntFlag combined values by decomposing into named
++        # constituents. For combined values the .name attribute is None.
++        # Decompose using integer bit operations. Zero-valued named members
++        # are only emitted if the whole value equals that member.
++        try:
++            FlagBase = enum.Flag
++        except Exception:
++            FlagBase = None
++
++        if FlagBase is not None and issubclass(enum_class, FlagBase):
++            # Collect named members.
++            members = list(enum_class)
++            # Identify a zero-valued member, if any.
++            zero_member = next((m for m in members if int(m.value) == 0), None)
++            non_zero_members = [m for m in members if int(m.value) != 0]
++
++            remaining = int(self.value)
++            # Sort by value descending to greedily consume larger bitmasks
++            # first (handles composite named members).
++            non_zero_members.sort(key=lambda m: int(m.value), reverse=True)
++            constituents = []
++            for m in non_zero_members:
++                mv = int(m.value)
++                if mv != 0 and (remaining & mv) == mv:
++                    constituents.append(m)
++                    remaining &= ~mv
++
++            # If we've consumed all bits, emit an expression joining the
++            # constituent named members. If the value is exactly a zero
++            # member, emit that. Otherwise fall back to a safe constructor
++            # representation (EnumClass(<int>)).
++            if remaining == 0:
++                if not constituents:
++                    if zero_member is not None and int(self.value) == 0:
++                        return (
++                            "%s.%s[%r]"
++                            % (module, enum_class.__qualname__, zero_member.name),
++                            {"import %s" % module},
++                        )
++                    # No named constituents found: fall back below.
++                else:
++                    parts = []
++                    for m in constituents:
++                        parts.append("%s.%s[%r]" % (module, enum_class.__qualname__, m.name))
++                    return (" | ".join(parts), {"import %s" % module})
++
++            # Fallback: emit a constructor call with the integer value so the
++            # migration contains a valid Python expression that recreates the
++            # same combined flags.
++            try:
++                return (
++                    "%s.%s(%r)" % (module, enum_class.__qualname__, int(self.value)),
++                    {"import %s" % module},
++                )
++            except Exception:
++                return (repr(self.value), {"import %s" % module})
++
++        # For non-Flag enums with no name, fall back to repr to avoid
++        # emitting something like EnumClass[None].
++        return (repr(self.value), {"import %s" % module})
+ 
+ 
+ class FloatSerializer(BaseSimpleSerializer):

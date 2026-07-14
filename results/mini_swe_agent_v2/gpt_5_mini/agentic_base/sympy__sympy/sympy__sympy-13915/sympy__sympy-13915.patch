@@ -1,0 +1,62 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index d4ca323e0d..0ff1267e44 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,11 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    # Python 3.3+: Mapping is in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    from collections import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+@@ -1009,6 +1014,19 @@ def fallback(self, old, new):
+                     args[i] = arg
+             if hit:
+                 rv = self.func(*args)
++                # If any substituted argument is an undefined quantity
++                # such as NaN or ComplexInfinity (zoo) then the result
++                # of the substitution should generally reflect that
++                # undefinedness instead of allowing algebraic
++                # simplifications to hide it.  Propagate NaN first
++                # (stronger), then ComplexInfinity.
++                from .singleton import S
++                for a in args:
++                    if a is S.NaN:
++                        return S.NaN
++                for a in args:
++                    if a is S.ComplexInfinity:
++                        return S.ComplexInfinity
+                 hack2 = hints.get('hack2', False)
+                 if hack2 and self.is_Mul and not rv.is_Mul:  # 2-arg hack
+                     coeff = S.One
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..fba024e7e0 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,11 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++try:
++    # Python 3.3+: abstract base classes are in collections.abc
++    import collections.abc as _collections_abc
++except Exception:
++    _collections_abc = collections
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +273,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(_collections_abc.MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)

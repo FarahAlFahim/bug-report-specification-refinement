@@ -1,0 +1,157 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..466a71c336 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -59,22 +59,23 @@ class Media:
+ 
+     @property
+     def _css(self):
+-        css = self._css_lists[0]
+-        # filter(None, ...) avoids calling merge with empty dicts.
+-        for obj in filter(None, self._css_lists[1:]):
+-            css = {
+-                medium: self.merge(css.get(medium, []), obj.get(medium, []))
+-                for medium in css.keys() | obj.keys()
+-            }
+-        return css
++        css_lists = [c for c in self._css_lists if c]
++        if not css_lists:
++            return {}
++        media_keys = set().union(*[c.keys() for c in css_lists])
++        return {
++            medium: self.merge(*[c.get(medium, []) for c in css_lists])
++            for medium in media_keys
++        }
+ 
+     @property
+     def _js(self):
+-        js = self._js_lists[0]
+-        # filter(None, ...) avoids calling merge() with empty lists.
+-        for obj in filter(None, self._js_lists[1:]):
+-            js = self.merge(js, obj)
+-        return js
++        js_lists = [j for j in self._js_lists if j]
++        if not js_lists:
++            return []
++        if len(js_lists) == 1:
++            return list(js_lists[0])
++        return self.merge(*js_lists)
+ 
+     def render(self):
+         return mark_safe('\n'.join(chain.from_iterable(getattr(self, 'render_' + name)() for name in MEDIA_TYPES)))
+@@ -115,39 +116,84 @@ class Media:
+         raise KeyError('Unknown media type "%s"' % name)
+ 
+     @staticmethod
+-    def merge(list_1, list_2):
++    def merge(*lists):
+         """
+-        Merge two lists while trying to keep the relative order of the elements.
+-        Warn if the lists have the same two elements in a different relative
+-        order.
+-
+-        For static assets it can be important to have them included in the DOM
+-        in a certain order. In JavaScript you may not be able to reference a
+-        global or in CSS you might want to override a style.
++        Merge multiple lists while keeping relative order where possible.
++        Warn only when two files appear together in at least two input lists
++        with conflicting relative order.
+         """
+-        # Start with a copy of list_1.
+-        combined_list = list(list_1)
+-        last_insert_index = len(list_1)
+-        # Walk list_2 in reverse, inserting each element into combined_list if
+-        # it doesn't already exist.
+-        for path in reversed(list_2):
+-            try:
+-                # Does path already exist in the list?
+-                index = combined_list.index(path)
+-            except ValueError:
+-                # Add path to combined_list since it doesn't exist.
+-                combined_list.insert(last_insert_index, path)
+-            else:
+-                if index > last_insert_index:
+-                    warnings.warn(
+-                        'Detected duplicate Media files in an opposite order:\n'
+-                        '%s\n%s' % (combined_list[last_insert_index], combined_list[index]),
+-                        MediaOrderConflictWarning,
+-                    )
+-                # path already exists in the list. Update last_insert_index so
+-                # that the following elements are inserted in front of this one.
+-                last_insert_index = index
+-        return combined_list
++        lists = [list(l) for l in lists if l]
++        if not lists:
++            return []
++        if len(lists) == 1:
++            return list(lists[0])
++
++        # Preserve first-seen order for deterministic tie-breaking
++        node_index = {}
++        all_nodes = []
++        for lst in lists:
++            for item in lst:
++                if item not in node_index:
++                    node_index[item] = len(all_nodes)
++                    all_nodes.append(item)
++
++        # Build graph edges from consecutive pairs in each list
++        edges = {node: set() for node in all_nodes}
++        indegree = {node: 0 for node in all_nodes}
++        for lst in lists:
++            for a, b in zip(lst, lst[1:]):
++                if b not in edges[a]:
++                    edges[a].add(b)
++
++        # Compute indegrees
++        for a, successors in edges.items():
++            for b in successors:
++                indegree[b] += 1
++
++        # Detect explicit conflicts: pairs that appear together in at least two
++        # input lists with opposite orders. Warn using the actual pair.
++        reported = set()
++        n = len(all_nodes)
++        for i in range(n):
++            a = all_nodes[i]
++            for j in range(i+1, n):
++                b = all_nodes[j]
++                orders = set()
++                count = 0
++                for lst in lists:
++                    if a in lst and b in lst:
++                        count += 1
++                        orders.add(1 if lst.index(a) < lst.index(b) else -1)
++                        if len(orders) == 2 and count >= 2:
++                            pair = (a, b)
++                            if pair not in reported:
++                                warnings.warn(
++                                    'Detected duplicate Media files in an opposite order:\n%s\n%s' % (a, b),
++                                    MediaOrderConflictWarning,
++                                )
++                                reported.add(pair)
++                            break
++
++        # Topological sort (Kahn's algorithm) with deterministic selection
++        result = []
++        zero = [n for n in all_nodes if indegree[n] == 0]
++        while zero:
++            zero.sort(key=lambda x: node_index[x])
++            n = zero.pop(0)
++            result.append(n)
++            for m in list(edges[n]):
++                edges[n].remove(m)
++                indegree[m] -= 1
++                if indegree[m] == 0:
++                    zero.append(m)
++
++        # Append remaining nodes (cycles) in first-seen order
++        remaining = [x for x in all_nodes if x not in result]
++        if remaining:
++            remaining.sort(key=lambda x: node_index[x])
++            result.extend(remaining)
++
++        return result
+ 
+     def __add__(self, other):
+         combined = Media()

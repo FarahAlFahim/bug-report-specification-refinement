@@ -1,0 +1,23 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index abbb1e37cb..0873eb2870 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -727,7 +727,17 @@ class SQLCompiler:
+         # If we get to this point and the field is a relation to another model,
+         # append the default ordering for that model unless it is the pk
+         # shortcut or the attribute name of the field that is specified.
+-        if field.is_relation and opts.ordering and getattr(field, 'attname', None) != name and name != 'pk':
++        #
++        # Important: when ordering by a related field's raw column name (eg
++        # 'record__root_id'), the last piece of the lookup is the attribute
++        # name on the relation field (attname). Previously the code compared
++        # the full lookup string to field.attname which caused self-
++        # referential foreign keys like 'record__root_id' to be treated as a
++        # relation lookup and thus trigger expansion of the related model's
++        # default ordering and extra joins. Compare against the final piece
++        # of the lookup instead.
++        final_piece = pieces[-1]
++        if field.is_relation and opts.ordering and getattr(field, 'attname', None) != final_piece and name != 'pk':
+             # Firstly, avoid infinite loops.
+             already_seen = already_seen or set()
+             join_tuple = tuple(getattr(self.query.alias_map[j], 'join_cols', None) for j in joins)

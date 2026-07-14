@@ -1,0 +1,44 @@
+diff --git a/django/db/models/fields/related_descriptors.py b/django/db/models/fields/related_descriptors.py
+index 872a4c98dc..5b94bcf088 100644
+--- a/django/db/models/fields/related_descriptors.py
++++ b/django/db/models/fields/related_descriptors.py
+@@ -254,7 +254,19 @@ class ForwardManyToOneDescriptor:
+         # Set the values of the related field.
+         else:
+             for lh_field, rh_field in self.field.related_fields:
+-                setattr(instance, lh_field.attname, getattr(value, rh_field.attname))
++                # If assigning an unsaved related instance, its raw related-field
++                # attribute (for example a CharField primary key with a default
++                # empty string) may contain a placeholder value that doesn't
++                # reflect the final PK that will be assigned on save. In that
++                # case, avoid eagerly copying that raw value into the
++                # parent's local FK attribute so that Model._prepare_related_fields_for_save()
++                # can repopulate it from the related object's pk after the
++                # related object is saved. This preserves the expected
++                # semantics for non-auto CharField PKs.
++                if getattr(value, '_state', None) is not None and value._state.adding:
++                    setattr(instance, lh_field.attname, None)
++                else:
++                    setattr(instance, lh_field.attname, getattr(value, rh_field.attname))
+ 
+         # Set the related instance cache used by __get__ to avoid an SQL query
+         # when accessing the attribute we just set.
+@@ -319,8 +331,16 @@ class ForwardOneToOneDescriptor(ForwardManyToOneDescriptor):
+             ]
+             for field in inherited_pk_fields:
+                 rel_model_pk_name = field.remote_field.model._meta.pk.attname
+-                raw_value = getattr(value, rel_model_pk_name) if value is not None else None
+-                setattr(instance, rel_model_pk_name, raw_value)
++                # If the parent instance being assigned is unsaved, avoid
++                # copying its raw pk attribute (which may be a placeholder
++                # like an empty string) into the child instance. Let
++                # _prepare_related_fields_for_save() populate the value
++                # from obj.pk after the parent has been saved.
++                if value is not None and getattr(value, '_state', None) is not None and value._state.adding:
++                    setattr(instance, rel_model_pk_name, None)
++                else:
++                    raw_value = getattr(value, rel_model_pk_name) if value is not None else None
++                    setattr(instance, rel_model_pk_name, raw_value)
+ 
+ 
+ class ReverseOneToOneDescriptor:

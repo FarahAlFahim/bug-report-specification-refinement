@@ -1,0 +1,94 @@
+--- /tmp/orig_debug.py	2026-05-28 16:57:15.748181012 +0000
++++ django/views/debug.py	2026-05-28 16:55:57.795111003 +0000
+@@ -82,20 +82,81 @@
+ 
+     def cleanse_setting(self, key, value):
+         """
+-        Cleanse an individual setting key/value of sensitive content. If the
+-        value is a dictionary, recursively cleanse the keys in that dictionary.
++        Cleanse an individual setting key/value of sensitive content.
++
++        - If the provided key matches hidden_settings, return the masked
++          substitute immediately (no recursion).
++        - Otherwise, recursively cleanse Mapping instances and common
++          iterable containers (list, tuple, set, frozenset), preserving
++          container types. Strings and bytes are not iterated.
++        - If the key isn't regex-able (TypeError from search), treat it as
++          non-matching and continue recursion.
+         """
++        # Determine whether the key matches hidden settings. If the key
++        # cannot be used with the regex (e.g. non-string), treat it as
++        # non-matching and continue to recursively cleanse the value.
++        is_hidden = False
+         try:
+-            if self.hidden_settings.search(key):
+-                cleansed = self.cleansed_substitute
+-            elif isinstance(value, dict):
+-                cleansed = {k: self.cleanse_setting(k, v) for k, v in value.items()}
+-            else:
+-                cleansed = value
++            is_hidden = bool(self.hidden_settings.search(key))
+         except TypeError:
+-            # If the key isn't regex-able, just return as-is.
+-            cleansed = value
++            is_hidden = False
++
++        if is_hidden:
++            return self.cleansed_substitute
++
++        # Helper to cleanse values that don't have an associated mapping key
++        # (e.g. elements inside lists/tuples/sets).
++        def _clean_value(val):
++            # Don't treat strings/bytes as iterables to recurse into.
++            if isinstance(val, (str, bytes, bytearray)):
++                return val
++
++            # Mapping-like objects: recurse into their items, using the
++            # mapping keys for hidden-settings matching.
++            try:
++                from collections.abc import Mapping
++            except Exception:
++                Mapping = dict
++
++            if isinstance(val, Mapping):
++                # Prefer returning the same concrete mapping type where
++                # possible.
++                if isinstance(val, dict):
++                    return {k: self.cleanse_setting(k, v) for k, v in val.items()}
++                try:
++                    return val.__class__((k, self.cleanse_setting(k, v)) for k, v in val.items())
++                except Exception:
++                    return {k: self.cleanse_setting(k, v) for k, v in val.items()}
++
++            # Common iterable containers: recurse into elements and try to
++            # preserve the container type.
++            if isinstance(val, list):
++                return [_clean_value(x) for x in val]
++            if isinstance(val, tuple):
++                return tuple(_clean_value(x) for x in val)
++            if isinstance(val, set):
++                try:
++                    return set(_clean_value(x) for x in val)
++                except TypeError:
++                    # If elements became unhashable (e.g. dicts), fall back
++                    # to a list to avoid raising.
++                    return [_clean_value(x) for x in val]
++            if isinstance(val, frozenset):
++                try:
++                    return frozenset(_clean_value(x) for x in val)
++                except TypeError:
++                    return tuple(_clean_value(x) for x in val)
++
++            # Wrap callables encountered inside containers.
++            if callable(val):
++                return CallableSettingWrapper(val)
++
++            # Fallback: return the value as-is.
++            return val
++
++        cleansed = _clean_value(value)
+ 
++        # If the top-level value itself is a callable, wrap it.
+         if callable(cleansed):
+             cleansed = CallableSettingWrapper(cleansed)
+ 

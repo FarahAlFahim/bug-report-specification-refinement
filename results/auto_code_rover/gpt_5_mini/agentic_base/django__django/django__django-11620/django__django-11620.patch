@@ -1,0 +1,22 @@
+diff --git a/django/views/debug.py b/django/views/debug.py
+index cb3e8c7ec1..d34057ec0e 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -481,9 +481,16 @@ def technical_404_response(request, exception):
+         urlconf = urlconf.__name__
+ 
+     caller = ''
++    # Import Http404 locally so we can catch converters raising Http404 during
++    # diagnostic re-resolution without adding a top-level import.
++    from django.http import Http404
++
+     try:
+         resolver_match = resolve(request.path)
+-    except Resolver404:
++    except (Resolver404, Http404):
++        # If resolving for diagnostics raises Resolver404 or Http404 (e.g.
++        # a path converter raised Http404), proceed without resolver_match
++        # information so the technical 404 page can still be rendered.
+         pass
+     else:
+         obj = resolver_match.func

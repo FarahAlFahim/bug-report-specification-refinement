@@ -1,0 +1,32 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 25c3b44250..244280badd 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -143,6 +143,14 @@ def iter_modules_and_files(modules, extra_files):
+             # The module could have been removed, don't fail loudly if this
+             # is the case.
+             continue
++        except ValueError as exc:
++            # Path.resolve() can raise ValueError in rare cases (for
++            # example when os.readlink encounters an embedded null byte).
++            # Treat this as an unreadable path and skip it rather than
++            # crashing the reloader. Log at debug level to aid
++            # troubleshooting when necessary.
++            logger.debug('Skipping path %s due to ValueError from resolve(): %r', path, exc)
++            continue
+         results.add(resolved_path)
+     return frozenset(results)
+ 
+@@ -189,6 +197,12 @@ def sys_path_directories():
+             resolved_path = path.resolve(strict=True).absolute()
+         except FileNotFoundError:
+             continue
++        except ValueError as exc:
++            # As above, be defensive against ValueError from pathlib's
++            # resolve() (e.g. underlying os.readlink raising
++            # "embedded null byte"). Skip the problematic sys.path entry.
++            logger.debug('Skipping sys.path entry %s due to ValueError from resolve(): %r', path, exc)
++            continue
+         # If the path is a file (like a zip file), watch the parent directory.
+         if resolved_path.is_file():
+             yield resolved_path.parent

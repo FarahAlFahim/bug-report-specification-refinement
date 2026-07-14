@@ -1,0 +1,49 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index 7e2fa63..b373bd4 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -461,10 +461,41 @@ def check_array(array, accept_sparse=False, accept_large_sparse=True,
+     # store whether originally we wanted numeric dtype
+     dtype_numeric = isinstance(dtype, six.string_types) and dtype == "numeric"
+ 
++    # Try to infer the original dtype of the input. For numpy arrays and
++    # similar objects, this is available as .dtype. For pandas DataFrame-like
++    # objects, the per-column dtypes are exposed as .dtypes; if all columns
++    # share the same dtype we use that as the original dtype so that
++    # dtype-conversion warnings (warn_on_dtype) are emitted appropriately.
++    dtypes = getattr(array, "dtypes", None)
+     dtype_orig = getattr(array, "dtype", None)
+-    if not hasattr(dtype_orig, 'kind'):
+-        # not a data type (e.g. a column named dtype in a pandas DataFrame)
+-        dtype_orig = None
++
++    if dtypes is not None:
++        # dtypes could be a pandas Series/Index-like object. Attempt to
++        # determine if all columns have the same dtype.
++        try:
++            if hasattr(dtypes, "nunique") and dtypes.nunique() == 1:
++                # get the single dtype; dtypes may be an Index or Series
++                try:
++                    dtype_candidate = dtypes.iloc[0]
++                except Exception:
++                    dtype_candidate = dtypes[0]
++                if hasattr(dtype_candidate, "kind"):
++                    dtype_orig = dtype_candidate
++                else:
++                    dtype_orig = None
++            else:
++                # heterogeneous dtypes -> don't attempt to compare dtypes
++                dtype_orig = None
++        except Exception:
++            # If anything unexpected happens, fall back to dtype if it looks
++            # like a dtype, otherwise clear.
++            if not hasattr(dtype_orig, "kind"):
++                dtype_orig = None
++    else:
++        # No .dtypes attribute; ensure dtype_orig is a dtype-like object
++        if not hasattr(dtype_orig, "kind"):
++            # not a data type (e.g. a column named dtype in a pandas DataFrame)
++            dtype_orig = None
+ 
+     if dtype_numeric:
+         if dtype_orig is not None and dtype_orig.kind == "O":

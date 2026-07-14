@@ -1,0 +1,20 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index 11aebbc59f..52a240981a 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -301,7 +301,14 @@ def blocks(self):
+         data = [[mats[i] if i == j else ZeroMatrix(mats[i].rows, mats[j].cols)
+                         for j in range(len(mats))]
+                         for i in range(len(mats))]
+-        return ImmutableDenseMatrix(data)
++        # Construct the ImmutableDenseMatrix with evaluate=False so that
++        # nested Matrix objects are preserved as elements of the matrix-of-
++        # blocks rather than being concatenated/flattened into a numeric
++        # matrix. This matches the behavior used elsewhere (e.g.
++        # BlockMatrix.__new__) and prevents errors like
++        # TypeError: 'One' object is not subscriptable when a single block
++        # matrix would otherwise be expanded.
++        return ImmutableDenseMatrix(data, evaluate=False)
+ 
+     @property
+     def shape(self):

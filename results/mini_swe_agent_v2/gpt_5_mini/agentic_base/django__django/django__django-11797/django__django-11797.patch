@@ -1,0 +1,18 @@
+diff --git a/django/db/models/sql/where.py b/django/db/models/sql/where.py
+index bf0828dc8b..918e374911 100644
+--- a/django/db/models/sql/where.py
++++ b/django/db/models/sql/where.py
+@@ -239,7 +239,12 @@ class SubqueryConstraint:
+         self.query_object = query_object
+ 
+     def as_sql(self, compiler, connection):
+-        query = self.query_object
++        # Operate on a clone of the provided query_object so that preparing
++        # the subquery for a WHERE/IN comparison doesn't mutate the original
++        # Query instance (which may be reused elsewhere). See #PR: using a
++        # subquery in a filter should not change the inner query's SELECT/
++        # GROUP BY state.
++        query = self.query_object.clone()
+         query.set_values(self.targets)
+         query_compiler = query.get_compiler(connection=connection)
+         return query_compiler.as_subquery_condition(self.alias, self.columns, compiler)

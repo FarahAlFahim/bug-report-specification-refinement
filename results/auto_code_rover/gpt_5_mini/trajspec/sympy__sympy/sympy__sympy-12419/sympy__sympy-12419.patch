@@ -1,0 +1,46 @@
+diff --git a/sympy/matrices/expressions/diagonal.py b/sympy/matrices/expressions/diagonal.py
+index a0dc57a357..18d5130de3 100644
+--- a/sympy/matrices/expressions/diagonal.py
++++ b/sympy/matrices/expressions/diagonal.py
+@@ -8,7 +8,17 @@ class DiagonalMatrix(MatrixExpr):
+     shape = property(lambda self: (self.arg.shape[0], self.arg.shape[0]))
+ 
+     def _entry(self, i, j):
+-        return S.Zero if i != j else self.arg[i, 0]
++        # If indices are obviously equal, return the diagonal element.
++        if i == j:
++            return self.arg[i, 0]
++        # If both indices are concrete integers and unequal, return 0.
++        from sympy.core.numbers import Integer
++        if isinstance(i, (int, Integer)) and isinstance(j, (int, Integer)):
++            return S.Zero
++        # Otherwise expose a KroneckerDelta factor times the diagonal expression
++        # so that symbolic summation can use delta simplifications.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j) * self.arg[i, 0]
+ 
+ class DiagonalOf(MatrixExpr):
+     arg = property(lambda self: self.args[0])
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836e..a96b1d87c6 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,17 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
++        # If the indices are obviously equal, return 1.
+         if i == j:
+             return S.One
+-        else:
++        # If both indices are concrete integers and are unequal, return 0.
++        from sympy.core.numbers import Integer
++        if isinstance(i, (int, Integer)) and isinstance(j, (int, Integer)):
+             return S.Zero
++        # Otherwise, return a Kronecker delta to preserve symbolic equality information
++        # so that summation/delta machinery can simplify expressions correctly.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One

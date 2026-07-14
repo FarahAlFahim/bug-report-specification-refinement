@@ -1,0 +1,42 @@
+diff --git a/django/contrib/auth/migrations/0011_update_proxy_permissions.py b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+index 0e66649695..22292c2c0c 100644
+--- a/django/contrib/auth/migrations/0011_update_proxy_permissions.py
++++ b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+@@ -1,4 +1,4 @@
+-from django.db import migrations
++from django.db import migrations, connection
+ from django.db.models import Q
+ 
+ 
+@@ -24,10 +24,29 @@ def update_proxy_model_permissions(apps, schema_editor, reverse=False):
+         proxy_content_type = ContentType.objects.get_for_model(Model, for_concrete_model=False)
+         old_content_type = proxy_content_type if reverse else concrete_content_type
+         new_content_type = concrete_content_type if reverse else proxy_content_type
+-        Permission.objects.filter(
++        # Check if the target permission already exists to avoid IntegrityError.
++        # If it exists, we need to delete the old permission rather than update it.
++        old_permissions = list(Permission.objects.filter(
+             permissions_query,
+             content_type=old_content_type,
+-        ).update(content_type=new_content_type)
++        ))
++        for old_permission in old_permissions:
++            new_permission_exists = Permission.objects.filter(
++                codename=old_permission.codename,
++                content_type=new_content_type,
++            ).exists()
++            if new_permission_exists:
++                # Delete the old permission as the new one already exists.
++                # Use raw SQL to avoid issues with related objects.
++                with connection.cursor() as cursor:
++                    cursor.execute(
++                        "DELETE FROM auth_permission WHERE id = %s",
++                        [old_permission.pk],
++                    )
++            else:
++                # Update the content_type of the old permission to the new content_type
++                old_permission.content_type = new_content_type
++                old_permission.save()
+ 
+ 
+ def revert_proxy_model_permissions(apps, schema_editor):

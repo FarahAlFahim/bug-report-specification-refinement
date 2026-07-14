@@ -1,0 +1,32 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index 75a3b8b030..e8c10f21ed 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -562,11 +562,22 @@ class AlterTogetherOptionOperation(ModelOptionOperation):
+         if self.allow_migrate_model(schema_editor.connection.alias, new_model):
+             old_model = from_state.apps.get_model(app_label, self.name)
+             alter_together = getattr(schema_editor, "alter_%s" % self.option_name)
+-            alter_together(
+-                new_model,
+-                getattr(old_model._meta, self.option_name, set()),
+-                getattr(new_model._meta, self.option_name, set()),
+-            )
++            old_value = getattr(old_model._meta, self.option_name, set())
++            new_value = getattr(new_model._meta, self.option_name, set())
++            # Resolve deletions against the old model and creations against the
++            # new model to avoid trying to resolve old column names against a
++            # model where fields may no longer be column-backed (e.g. changed
++            # to a ManyToManyField).
++            olds = {tuple(fields) for fields in (old_value or [])}
++            news = {tuple(fields) for fields in (new_value or [])}
++            # Deleted (present in olds, not in news)
++            to_delete = olds.difference(news)
++            if to_delete:
++                alter_together(old_model, to_delete, set())
++            # Created (present in news, not in olds)
++            to_create = news.difference(olds)
++            if to_create:
++                alter_together(new_model, set(), to_create)
+ 
+     def database_backwards(self, app_label, schema_editor, from_state, to_state):
+         return self.database_forwards(app_label, schema_editor, from_state, to_state)

@@ -1,0 +1,34 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 781dfd5499..17efb4aa98 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -778,8 +778,27 @@ class Query(BaseExpression):
+         select_mask[opts.pk] = {}
+         # Only include fields mentioned in the mask.
+         for field_name, field_mask in mask.items():
+-            field = opts.get_field(field_name)
+-            field_select_mask = select_mask.setdefault(field, {})
++            # Handle filtered relations (keyed as (name, relation)) and
++            # reverse relations which are represented by relation descriptors
++            # (they have a ``field`` attribute referring to the forward
++            # Field on the related model). This mirrors the behaviour in
++            # _get_defer_select_mask and ensures the select_mask keys are
++            # in the shape expected by the SQL compiler (forward Field
++            # objects or (name, relation) tuples).
++            if filtered_relation := self._filtered_relations.get(field_name):
++                relation = opts.get_field(filtered_relation.relation_name)
++                field_select_mask = select_mask.setdefault((field_name, relation), {})
++                field = relation.field
++            else:
++                maybe_field = opts.get_field(field_name)
++                # Reverse relation descriptors have a ``field`` attribute
++                # pointing to the forward Field on the related model.
++                if hasattr(maybe_field, "field"):
++                    field = maybe_field.field
++                else:
++                    field = maybe_field
++                field_select_mask = select_mask.setdefault(field, {})
++
+             if field_mask:
+                 if not field.is_relation:
+                     raise FieldError(next(iter(field_mask)))

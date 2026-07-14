@@ -1,0 +1,41 @@
+diff --git a/sympy/physics/quantum/tensorproduct.py b/sympy/physics/quantum/tensorproduct.py
+index 78accaf295..cbf8937f52 100644
+--- a/sympy/physics/quantum/tensorproduct.py
++++ b/sympy/physics/quantum/tensorproduct.py
+@@ -246,8 +246,36 @@ def _eval_expand_tensorproduct(self, **hints):
+             if isinstance(args[i], Add):
+                 for aa in args[i].args:
+                     tp = TensorProduct(*args[:i] + (aa,) + args[i + 1:])
++                    # The TensorProduct constructor may pull commutative scalar
++                    # factors out front and return a Mul (e.g. Mul(scalar, TensorProduct(...))).
++                    # In that case we need to recurse into the inner TensorProduct
++                    # and distribute the scalar across any Add returned.
+                     if isinstance(tp, TensorProduct):
+                         tp = tp._eval_expand_tensorproduct()
++                        add_args.append(tp)
++                        continue
++                    if isinstance(tp, Mul):
++                        c_part, nc_part = tp.args_cnc()
++                        # If there is a single non-commutative part and it is a
++                        # TensorProduct (or a Pow of one) we should recurse into it.
++                        if len(nc_part) == 1:
++                            inner = nc_part[0]
++                            if isinstance(inner, Pow) and isinstance(inner.base, TensorProduct):
++                                inner_tp = tensor_product_simp_Pow(inner)
++                            elif isinstance(inner, TensorProduct):
++                                inner_tp = inner
++                            else:
++                                inner_tp = None
++
++                            if inner_tp is not None:
++                                inner_exp = inner_tp._eval_expand_tensorproduct()
++                                c_mul = Mul(*c_part)
++                                if isinstance(inner_exp, Add):
++                                    for term in inner_exp.args:
++                                        add_args.append(c_mul * term)
++                                else:
++                                    add_args.append(c_mul * inner_exp)
++                                continue
+                     add_args.append(tp)
+                 break
+ 

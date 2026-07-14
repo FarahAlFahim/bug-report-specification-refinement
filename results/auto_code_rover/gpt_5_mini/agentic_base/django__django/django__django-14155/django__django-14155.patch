@@ -1,0 +1,72 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..1f1f025cf1 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -45,12 +45,28 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # Special-case functools.partial so the dotted path reflects the underlying callable.
++        # Do not replace self.func or merge args/kwargs here; only derive the path for debugging.
++        try:
++            import functools
++        except Exception:
++            functools = None
++
++        if functools is not None and isinstance(func, functools.partial):
++            underlying = func.func
++            if hasattr(underlying, '__name__'):
++                # A function-based view wrapped by partial
++                self._func_path = underlying.__module__ + '.' + underlying.__name__
++            else:
++                # A class-based view or callable object wrapped by partial
++                self._func_path = underlying.__class__.__module__ + '.' + underlying.__class__.__name__
+         else:
+-            # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            if not hasattr(func, '__name__'):
++                # A class-based view
++                self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++            else:
++                # A function-based view
++                self._func_path = func.__module__ + '.' + func.__name__
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])
+@@ -59,8 +75,32 @@ class ResolverMatch:
+         return (self.func, self.args, self.kwargs)[index]
+ 
+     def __repr__(self):
++        # For functools.partial, show the effective call arguments (partial.args + URL args;
++        # partial.keywords overridden by URL kwargs) without mutating stored state.
++        try:
++            import functools
++        except Exception:
++            functools = None
++
++        if functools is not None and isinstance(self.func, functools.partial):
++            part = self.func
++            # partial.args may be a tuple; ensure self.args is treated as a tuple as well
++            part_args = tuple(part.args) if getattr(part, 'args', None) else ()
++            url_args = tuple(self.args) if self.args else ()
++            effective_args = part_args + url_args
++
++            effective_kwargs = {}
++            if getattr(part, 'keywords', None):
++                effective_kwargs.update(part.keywords)
++            if self.kwargs:
++                # URL-captured kwargs take precedence over partial's keywords
++                effective_kwargs.update(self.kwargs)
++        else:
++            effective_args = self.args
++            effective_kwargs = self.kwargs
++
+         return "ResolverMatch(func=%s, args=%s, kwargs=%s, url_name=%s, app_names=%s, namespaces=%s, route=%s)" % (
+-            self._func_path, self.args, self.kwargs, self.url_name,
++            self._func_path, effective_args, effective_kwargs, self.url_name,
+             self.app_names, self.namespaces, self.route,
+         )
+ 

@@ -1,0 +1,26 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 43f9e6ad8d..4941eff77c 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1968,10 +1968,20 @@ def _print_DiracDelta(self, expr, exp=None):
+             tex = r"\left(%s\right)^{%s}" % (tex, exp)
+         return tex
+ 
+-    def _print_SingularityFunction(self, expr):
++    def _print_SingularityFunction(self, expr, exp=None):
++        """Print SingularityFunction with optional exponent.
++
++        The printer infrastructure may call _print on the base of a Pow
++        with an additional keyword argument ``exp`` containing the
++        exponent to render. Accept that argument for compatibility so
++        that expressions like SingularityFunction(...)**n are printed
++        correctly and do not raise a TypeError.
++        """
+         shift = self._print(expr.args[0] - expr.args[1])
+         power = self._print(expr.args[2])
+         tex = r"{\left\langle %s \right\rangle}^{%s}" % (shift, power)
++        if exp:
++            tex = r"\left(%s\right)^{%s}" % (tex, exp)
+         return tex
+ 
+     def _print_Heaviside(self, expr, exp=None):

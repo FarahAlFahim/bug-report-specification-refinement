@@ -1,0 +1,81 @@
+diff --git a/sklearn/utils/multiclass.py b/sklearn/utils/multiclass.py
+index 5eaef2fde..396279302 100644
+--- a/sklearn/utils/multiclass.py
++++ b/sklearn/utils/multiclass.py
+@@ -20,6 +20,48 @@ from .validation import check_array, _assert_all_finite
+ from ..utils._array_api import get_namespace
+ 
+ 
++def _try_coerce_pandas_nullable(y, xp):
++    """If ``y`` is a pandas object with a nullable dtype (Int64, Float64,
++    boolean), try to coerce it to the equivalent numpy dtype using
++    ``to_numpy(dtype=...)``. If coercion fails or ``y`` is not a suitable
++    pandas object, return the original ``y``.
++
++    This helps avoid treating pandas nullable ExtensionDtypes as object when
++    passed through ``xp.asarray`` which would otherwise classify the target
++    as "unknown".
++    """
++    try:
++        # Avoid importing pandas at module import time; just probe object
++        # for attributes that pandas objects have.
++        dtype_name = getattr(getattr(y, "dtype", None), "name", None)
++        if dtype_name is None:
++            return y
++
++        mapping = {"Int64": "int64", "Float64": "float64", "boolean": "bool"}
++        target = mapping.get(dtype_name)
++        if target is None:
++            return y
++
++        # Pandas objects (Series, Index, ExtensionArray) expose to_numpy.
++        to_numpy = getattr(y, "to_numpy", None)
++        if to_numpy is None:
++            return y
++
++        try:
++            coerced = to_numpy(dtype=target)
++        except Exception:
++            # Coercion can fail due to pd.NA or other reasons; fall back.
++            return y
++
++        # Wrap coerced array in the array namespace if needed
++        try:
++            return xp.asarray(coerced)
++        except Exception:
++            return coerced
++    except Exception:
++        return y
++
++
+ def _unique_multiclass(y):
+     xp, is_array_api = get_namespace(y)
+     if hasattr(y, "__array__") or is_array_api:
+@@ -158,7 +200,12 @@ def is_multilabel(y):
+         with warnings.catch_warnings():
+             warnings.simplefilter("error", np.VisibleDeprecationWarning)
+             try:
+-                y = xp.asarray(y)
++                # Try to coerce pandas nullable dtypes to numpy dtypes first
++                y_coerced = _try_coerce_pandas_nullable(y, xp)
++                if y_coerced is not y:
++                    y = y_coerced
++                else:
++                    y = xp.asarray(y)
+             except (np.VisibleDeprecationWarning, ValueError):
+                 # dtype=object should be provided explicitly for ragged arrays,
+                 # see NEP 34
+@@ -306,7 +353,12 @@ def type_of_target(y, input_name=""):
+         warnings.simplefilter("error", np.VisibleDeprecationWarning)
+         if not issparse(y):
+             try:
+-                y = xp.asarray(y)
++                # Try to coerce pandas nullable dtypes to numpy dtypes first
++                y_coerced = _try_coerce_pandas_nullable(y, xp)
++                if y_coerced is not y:
++                    y = y_coerced
++                else:
++                    y = xp.asarray(y)
+             except (np.VisibleDeprecationWarning, ValueError):
+                 # dtype=object should be provided explicitly for ragged arrays,
+                 # see NEP 34

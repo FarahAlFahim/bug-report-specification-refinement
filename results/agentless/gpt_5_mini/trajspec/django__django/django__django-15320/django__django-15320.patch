@@ -1,0 +1,65 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index f1f229b..8c0a7cb 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1149,7 +1149,20 @@ class Subquery(BaseExpression, Combinable):
+ 
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+-        self.query = getattr(queryset, 'query', queryset)
++        # Clone the incoming Query/QuerySet.query where possible and mark it
++        # as a subquery so that Query.as_sql() will parenthesize its SQL.
++        q = getattr(queryset, 'query', queryset)
++        clone_method = getattr(q, 'clone', None)
++        if callable(clone_method):
++            try:
++                q = clone_method()
++            except Exception:
++                # If cloning fails for any unexpected reason, fall back to the
++                # original object to avoid masking the original error higher up.
++                q = getattr(queryset, 'query', queryset)
++        if hasattr(q, 'subquery'):
++            q.subquery = True
++        self.query = q
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1157,7 +1170,21 @@ class Subquery(BaseExpression, Combinable):
+         return [self.query]
+ 
+     def set_source_expressions(self, exprs):
+-        self.query = exprs[0]
++        # When replacing the inner expression, ensure any Query-like object
++        # is cloned and marked as a subquery so that Query.as_sql() will
++        # produce parenthesized SQL. This avoids relying on callers to have
++        # set the subquery flag.
++        q = exprs[0]
++        clone_method = getattr(q, 'clone', None)
++        if callable(clone_method):
++            try:
++                q = clone_method()
++            except Exception:
++                # If cloning fails, keep original expr to avoid hiding errors.
++                q = exprs[0]
++        if hasattr(q, 'subquery'):
++            q.subquery = True
++        self.query = q
+ 
+     def _resolve_output_field(self):
+         return self.query.output_field
+@@ -1179,7 +1206,14 @@ class Subquery(BaseExpression, Combinable):
+         template_params = {**self.extra, **extra_context}
+         query = query or self.query
+         subquery_sql, sql_params = query.as_sql(compiler, connection)
+-        template_params['subquery'] = subquery_sql[1:-1]
++        # Query.as_sql() will parenthesize the SQL when query.subquery is True.
++        # If it did, strip the surrounding parentheses because the template
++        # will add them. If not parenthesized, leave the SQL untouched so we
++        # don't remove real characters.
++        if isinstance(subquery_sql, str) and subquery_sql.startswith('(') and subquery_sql.endswith(')'):
++            template_params['subquery'] = subquery_sql[1:-1]
++        else:
++            template_params['subquery'] = subquery_sql
+ 
+         template = template or template_params.get('template', self.template)
+         sql = template % template_params

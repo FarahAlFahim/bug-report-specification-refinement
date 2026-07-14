@@ -1,0 +1,59 @@
+diff --git a/django/views/debug.py b/django/views/debug.py
+index e6b7d4d821..7d8c089cb9 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -86,16 +86,54 @@ class SafeExceptionReporterFilter:
+         value is a dictionary, recursively cleanse the keys in that dictionary.
+         """
+         try:
++            # If the setting name itself looks sensitive, replace the whole
++            # value with the cleansed substitute.
+             if self.hidden_settings.search(key):
+                 cleansed = self.cleansed_substitute
++            # Recurse into dicts so nested keys get inspected and masked.
+             elif isinstance(value, dict):
+                 cleansed = {k: self.cleanse_setting(k, v) for k, v in value.items()}
++            # Avoid treating strings/bytes and MultiValueDicts as generic
++            # iterables. For other iterables (lists, tuples, sets, generators)
++            # recurse into their elements so dicts inside them are cleansed.
++            elif isinstance(value, (str, bytes)):
++                cleansed = value
++            elif isinstance(value, MultiValueDict):
++                cleansed = value
++            elif hasattr(value, '__iter__'):
++                # Handle common concrete containers specially to preserve type.
++                if isinstance(value, tuple):
++                    cleansed = tuple(
++                        (self.cleanse_setting('', v) if not isinstance(v, dict)
++                         else {k: self.cleanse_setting(k, vv) for k, vv in v.items()})
++                        for v in value
++                    )
++                elif isinstance(value, list):
++                    cleansed = [
++                        (self.cleanse_setting('', v) if not isinstance(v, dict)
++                         else {k: self.cleanse_setting(k, vv) for k, vv in v.items()})
++                        for v in value
++                    ]
++                elif isinstance(value, set):
++                    cleansed = type(value)(
++                        (self.cleanse_setting('', v) if not isinstance(v, dict)
++                         else {k: self.cleanse_setting(k, vv) for k, vv in v.items()})
++                        for v in value
++                    )
++                else:
++                    # Fallback for generators and other iterables: consume into a list.
++                    cleansed = [
++                        (self.cleanse_setting('', v) if not isinstance(v, dict)
++                         else {k: self.cleanse_setting(k, vv) for k, vv in v.items()})
++                        for v in value
++                    ]
+             else:
+                 cleansed = value
+         except TypeError:
+             # If the key isn't regex-able, just return as-is.
+             cleansed = value
+ 
++        # Wrap callables so they are represented safely in debug output.
+         if callable(cleansed):
+             cleansed = CallableSettingWrapper(cleansed)
+ 

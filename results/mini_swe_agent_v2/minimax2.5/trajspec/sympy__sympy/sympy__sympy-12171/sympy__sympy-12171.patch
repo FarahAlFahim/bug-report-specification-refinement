@@ -1,0 +1,62 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..a990c96d9e 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -109,6 +109,57 @@ def _print_Integral(self, expr):
+     def _print_Sum(self, expr):
+         return "Hold[Sum[" + ', '.join(self.doprint(a) for a in expr.args) + "]]"
+ 
++    def _print_Derivative(self, expr):
++        # Derivative(expr, var1, var2, ...) represents the derivative of expr
++        # with respect to var1, var2, etc.
++        # In Mathematica, D[expr, var] gives the first derivative
++        # D[expr, {var, n}] gives the nth derivative
++        args = list(expr.args)
++        if len(args) == 0:
++            return "0"
++        
++        expr_to_diff = args[0]
++        variables = args[1:]
++        
++        # Group variables to handle higher-order derivatives
++        # e.g., Derivative(f(t), t, t) -> D[f[t], {t, 2}]
++        var_groups = []
++        current_var = None
++        current_count = 0
++        for var in variables:
++            if var == current_var:
++                current_count += 1
++            else:
++                if current_var is not None:
++                    var_groups.append((current_var, current_count))
++                current_var = var
++                current_count = 1
++        if current_var is not None:
++            var_groups.append((current_var, current_count))
++        
++        # Build the Mathematica D[] expression
++        diff_args = [self.doprint(expr_to_diff)]
++        for var, count in var_groups:
++            if count == 1:
++                diff_args.append(self.doprint(var))
++            else:
++                diff_args.append("{%s, %d}" % (self.doprint(var), count))
++        
++        return "D[" + ", ".join(diff_args) + "]"
++
++    def _print_Float(self, expr):
++        # Get the string representation using StrPrinter's method
++        # which produces Python's 'e' notation for scientific notation
++        s = StrPrinter._print_Float(self, expr)
++        
++        # Convert Python's 'e' notation to Mathematica's '*^' notation
++        # First handle 'e+' (positive exponents)
++        s = s.replace('e+', '*^')
++        # Then handle 'e' (negative exponents)
++        s = s.replace('e', '*^')
++        
++        return s
++
+ 
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code

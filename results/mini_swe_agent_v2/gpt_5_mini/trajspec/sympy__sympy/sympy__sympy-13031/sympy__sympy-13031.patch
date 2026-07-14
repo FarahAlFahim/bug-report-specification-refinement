@@ -1,0 +1,30 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 7ef51bc84..2809815f2 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -377,8 +377,11 @@ def hstack(cls, *args):
+         if len(args) == 0:
+             return cls._new()
+ 
+-        kls = type(args[0])
+-        return reduce(kls.row_join, args)
++        # Use the calling class for the reducer rather than the runtime
++        # type of the first argument. This ensures correct shape
++        # aggregation when the first argument may be a zero-dimension
++        # matrix.
++        return reduce(cls.row_join, args)
+ 
+     def reshape(self, rows, cols):
+         """Reshape the matrix. Total number of elements must remain the same.
+@@ -600,8 +603,9 @@ def vstack(cls, *args):
+         if len(args) == 0:
+             return cls._new()
+ 
+-        kls = type(args[0])
+-        return reduce(kls.col_join, args)
++        # Use the calling class for the reducer rather than the runtime
++        # type of the first argument. See hstack for rationale.
++        return reduce(cls.col_join, args)
+ 
+ 
+ class MatrixSpecial(MatrixRequired):

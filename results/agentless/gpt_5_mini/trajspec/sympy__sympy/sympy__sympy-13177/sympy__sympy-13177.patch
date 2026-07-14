@@ -1,0 +1,21 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 86036ef..6a31a99 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -39,7 +39,15 @@ class Mod(Function):
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    # Only treat p = q**n as divisible when the exponent is a
++                    # known positive integer and q is known to be an integer.
++                    # Previously any Integer exponent was accepted which caused
++                    # symbolic simplifications like Mod(x**2, x) -> 0 to be
++                    # applied even though that is not valid for numeric
++                    # remainder semantics (e.g. x=1.5 gives a non-zero
++                    # remainder). See issue discussion.
++                    (p.is_Pow and p.exp.is_Integer and p.exp.is_positive
++                     and p.base == q and q.is_integer) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

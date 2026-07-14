@@ -1,0 +1,30 @@
+diff --git a/lib/matplotlib/axis.py b/lib/matplotlib/axis.py
+index e6e7e29f11..7449b665b7 100644
+--- a/lib/matplotlib/axis.py
++++ b/lib/matplotlib/axis.py
+@@ -1238,12 +1238,24 @@ class Axis(martist.Artist):
+             self._set_autoscale_on(bool(auto))
+ 
+         if emit:
++            # Notify callbacks registered on the initiating Axes.
+             self.axes.callbacks.process(f"{name}lim_changed", self.axes)
+-            # Call all of the other axes that are shared with this one
++            # Call all of the other axes that are shared with this one.
++            # We call their internal _set_lim with emit=False to avoid
++            # re-propagation/recursion, but still explicitly invoke each
++            # sibling Axes' CallbackRegistry so observers attached to those
++            # Axes are notified of the propagated limit change.  This
++            # preserves the behavior expected when the original call had
++            # emit=True while ensuring share-setup calls (which use
++            # emit=False) remain silent.
+             for other in self._get_shared_axes():
+                 if other is not self.axes:
+                     other._axis_map[name]._set_lim(
+                         v0, v1, emit=False, auto=auto)
++                    # If the initiating call allowed emits, explicitly
++                    # process the sibling Axes' callbacks so observers on
++                    # those Axes see the change.
++                    other.callbacks.process(f"{name}lim_changed", other)
+                     if other.figure != self.figure:
+                         other.figure.canvas.draw_idle()
+ 

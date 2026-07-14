@@ -1,0 +1,32 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 9f609177dd..401a2d14cd 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1668,7 +1668,26 @@ def doit(self, **hints):
+     def simplify(self, **kwargs):
+         """See the simplify function in sympy.simplify"""
+         from sympy.simplify import simplify
+-        return simplify(self, **kwargs)
++        # Reconstruct the expression tree by calling constructors on
++        # subexpressions so that any evaluate logic suppressed during
++        # parsing (evaluate=False) is applied throughout the tree. This
++        # helps ensure that simplify gives consistent results regardless of
++        # whether the input expression was parsed with evaluate=False.
++        def _reconstruct(obj):
++            # Rebuild the expression tree by calling constructors on
++            # subexpressions so that any evaluate logic suppressed during
++            # parsing (evaluate=False) is applied throughout the tree.
++            if not isinstance(obj, Basic):
++                return obj
++            args = tuple(_reconstruct(a) for a in obj.args)
++            try:
++                return obj.func(*args)
++            except Exception:
++                # If reconstruction fails, fall back to the original
++                return obj
++
++        evaluated = _reconstruct(self)
++        return simplify(evaluated, **kwargs)
+ 
+     def _eval_rewrite(self, pattern, rule, **hints):
+         if self.is_Atom:

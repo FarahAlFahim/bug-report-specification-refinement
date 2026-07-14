@@ -1,0 +1,20 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 7bb3fa4706..3d77de5868 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1926,6 +1926,15 @@ class Model(metaclass=ModelBase):
+                         id='models.W038',
+                     )
+                 )
++
++            # Validate fields named in UniqueConstraint instances using the
++            # same validation as for indexes/unique_together/index_together.
++            # Collect all field names from constraints that have a "fields"
++            # attribute (e.g. UniqueConstraint) and run the shared
++            # _check_local_fields validator with the option name "constraints".
++            constraint_fields = [f for c in cls._meta.constraints if hasattr(c, "fields") for f in c.fields]
++            if constraint_fields:
++                errors.extend(cls._check_local_fields(constraint_fields, 'constraints'))
+         return errors
+ 
+ 

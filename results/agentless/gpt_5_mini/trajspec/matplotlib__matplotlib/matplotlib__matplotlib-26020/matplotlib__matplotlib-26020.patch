@@ -1,0 +1,44 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 1feaa7a..ac1d71e 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,19 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    # The toolkit's own Axes expose an AxisDict on ax.axis supporting
++    # subscription like ax.axis['bottom']. For third-party Axes (e.g.
++    # cartopy GeoAxes) ax.axis may be a method or otherwise not
++    # subscriptable. In that case, treat disabling/enabling of the side
++    # axis as a no-op to preserve compatibility.
++    try:
++        ax_axis = ax.axis
++        ax_axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
++        ax_axis["left"].toggle(ticklabels=left_off, label=left_off)
++    except (TypeError, KeyError, AttributeError):
++        # ax.axis is not subscriptable or doesn't provide the expected API.
++        # Do nothing (no-op) for non-toolkit Axes.
++        pass
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +39,15 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        # Guard against non-toolkit Axes where self.axis may not be a
++        # subscriptable AxisDict (for example, cartopy GeoAxes where
++        # .axis can be a method). In such cases, perform a no-op.
++        try:
++            axis = self.axis[self.orientation]
++            axis.toggle(ticklabels=b, label=b)
++        except (TypeError, KeyError, AttributeError):
++            # Axis not compatible with toolkit's AxisDict API: nothing to toggle.
++            return
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

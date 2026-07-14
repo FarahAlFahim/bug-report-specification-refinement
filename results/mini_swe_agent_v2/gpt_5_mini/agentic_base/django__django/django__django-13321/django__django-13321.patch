@@ -1,0 +1,54 @@
+diff --git a/django/contrib/sessions/backends/base.py b/django/contrib/sessions/backends/base.py
+index 187e14b1b7..6bcc06eaa7 100644
+--- a/django/contrib/sessions/backends/base.py
++++ b/django/contrib/sessions/backends/base.py
+@@ -1,5 +1,6 @@
+ import base64
+ import logging
++import binascii
+ import string
+ import warnings
+ from datetime import datetime, timedelta
+@@ -132,8 +133,9 @@ class SessionBase:
+ 
+     def _legacy_decode(self, session_data):
+         # RemovedInDjango40Warning: pre-Django 3.1 format will be invalid.
+-        encoded_data = base64.b64decode(session_data.encode('ascii'))
+         try:
++            encoded_data = base64.b64decode(session_data.encode('ascii'))
++
+             # could produce ValueError if there is no ':'
+             hash, serialized = encoded_data.split(b':', 1)
+             expected_hash = self._hash(serialized)
+diff --git a/django/core/cache/backends/db.py b/django/core/cache/backends/db.py
+index acbe702255..066bbe0304 100644
+--- a/django/core/cache/backends/db.py
++++ b/django/core/cache/backends/db.py
+@@ -1,6 +1,8 @@
+ "Database cache backend."
+ import base64
++import binascii
+ import pickle
++import logging
+ from datetime import datetime
+ 
+ from django.conf import settings
+@@ -89,7 +91,17 @@ class DatabaseCache(BaseDatabaseCache):
+                 expired_keys.append(key)
+             else:
+                 value = connection.ops.process_clob(value)
+-                value = pickle.loads(base64.b64decode(value.encode()))
++                try:
++                    decoded = base64.b64decode(value.encode())
++                    value = pickle.loads(decoded)
++                except (binascii.Error, pickle.PickleError, Exception) as e:
++                    # If the cached value is corrupted (invalid base64 or
++                    # unpickling error), log and skip this key rather than
++                    # raising and crashing request processing.
++                    logging.getLogger('django.cache').warning(
++                        'Skipping corrupted cache key %r: %s', key, e
++                    )
++                    continue
+                 result[key_map.get(key)] = value
+         self._base_delete_many(expired_keys)
+         return result

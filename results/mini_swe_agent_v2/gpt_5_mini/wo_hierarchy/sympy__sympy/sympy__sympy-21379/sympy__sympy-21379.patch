@@ -1,0 +1,45 @@
+diff --git a/sympy/polys/polyutils.py b/sympy/polys/polyutils.py
+index 0b9a020c83..e6eaa598dd 100644
+--- a/sympy/polys/polyutils.py
++++ b/sympy/polys/polyutils.py
+@@ -210,7 +210,15 @@ def _parallel_dict_from_expr_if_gens(exprs, opt):
+ 
+                         monom[indices[base]] = exp
+                     except KeyError:
+-                        if not factor.free_symbols.intersection(opt.gens):
++                        # If the factor is a Piecewise (or similar) object,
++                        # do not try to treat it as a generator even if its
++                        # free symbols intersect the provided generators.
++                        # Instead consider it as a coefficient. This avoids
++                        # spurious PolynomialError when Piecewise appears as
++                        # a multiplicative base.
++                        if getattr(factor, 'is_Piecewise', False):
++                            coeff.append(factor)
++                        elif not factor.free_symbols.intersection(opt.gens):
+                             coeff.append(factor)
+                         else:
+                             raise PolynomialError("%s contains an element of "
+@@ -266,14 +274,15 @@ def _is_coeff(factor):
+                     else:
+                         base, exp = decompose_power_rat(factor)
+ 
+-                    elements[base] = elements.setdefault(base, 0) + exp
+-                    # Do not treat Piecewise objects as polynomial generators.
+-                    # Piecewise can appear as multiplicative bases during
+-                    # expression traversal (e.g. Piecewise(...)/z) but they do
+-                    # not make sense as polynomial generators. Treat them as
+-                    # coefficients instead so that polification does not raise
+-                    # for expressions that merely contain Piecewise.
+-                    if not getattr(base, 'is_Piecewise', False):
++                    # If the multiplicative base is a Piecewise (or similar)
++                    # object, treat the entire factor as a coefficient rather
++                    # than as a polynomial generator. This prevents
++                    # including Piecewise into the deduced generators and
++                    # avoids KeyError/PolynomialError during polification.
++                    if getattr(base, 'is_Piecewise', False):
++                        coeff.append(factor)
++                    else:
++                        elements[base] = elements.setdefault(base, 0) + exp
+                         gens.add(base)
+ 
+             terms.append((coeff, elements))

@@ -1,0 +1,33 @@
+diff --git a/sympy/physics/units/systems/si.py b/sympy/physics/units/systems/si.py
+index 700495ad9d..5966a44c17 100644
+--- a/sympy/physics/units/systems/si.py
++++ b/sympy/physics/units/systems/si.py
+@@ -333,9 +333,12 @@
+ ):
+     dimex = SI.get_dimensional_expr(_scale_factor)
+     if dimex != 1:
+-        # XXX: equivalent_dims is an instance method taking two arguments in
+-        # addition to self so this can not work:
+-        if not DimensionSystem.equivalent_dims(_dimension, Dimension(dimex)):  # type: ignore
++        # Use the DimensionSystem instance associated with the SI unit system
++        # to test canonical dimensional equivalence. Calling the method on
++        # the class (DimensionSystem.equivalent_dims) was incorrect because
++        # equivalent_dims is an instance method that uses the system's
++        # dimensional dependency mapping.
++        if not SI.get_dimension_system().equivalent_dims(_dimension, Dimension(dimex)):
+             raise ValueError("quantity value and dimension mismatch")
+ del _scale_factor, _dimension
+ 
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index a436880c4b..5705c821c2 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -175,7 +175,7 @@ def _collect_factor_and_dimension(self, expr):
+             for addend in expr.args[1:]:
+                 addend_factor, addend_dim = \
+                     self._collect_factor_and_dimension(addend)
+-                if dim != addend_dim:
++                if not self.get_dimension_system().equivalent_dims(dim, addend_dim):
+                     raise ValueError(
+                         'Dimension of "{}" is {}, '
+                         'but it should be {}'.format(

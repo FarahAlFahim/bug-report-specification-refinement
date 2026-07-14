@@ -1,0 +1,38 @@
+diff --git a/django/contrib/sitemaps/__init__.py b/django/contrib/sitemaps/__init__.py
+index 27756d9d96..4b6059fa04 100644
+--- a/django/contrib/sitemaps/__init__.py
++++ b/django/contrib/sitemaps/__init__.py
+@@ -166,9 +166,32 @@ class Sitemap:
+         if not hasattr(self, "lastmod"):
+             return None
+         if callable(self.lastmod):
++            # Collect lastmod values for all items. Filter out None values
++            # because absence of lastmod for items should not cause an error
++            # when computing the latest lastmod. If there are no values
++            # (e.g. items() is empty or all lastmod() calls returned None),
++            # indicate absence by returning None. Catch both TypeError and
++            # ValueError to be defensive: TypeError for incomparable types
++            # returned by lastmod, ValueError for max() on an empty
++            # sequence.
+             try:
+-                return max([self.lastmod(item) for item in self.items()])
++                values = [self.lastmod(item) for item in self.items()]
+             except TypeError:
++                # If calling lastmod raised a TypeError (e.g. wrong args),
++                # behave as if no lastmod is available.
++                return None
++
++            # Filter out None values
++            values = [v for v in values if v is not None]
++            if not values:
++                return None
++
++            try:
++                return max(values)
++            except (TypeError, ValueError):
++                # Incomparable types or other issues mean we cannot
++                # determine a latest lastmod; return None to indicate
++                # absence.
+                 return None
+         else:
+             return self.lastmod

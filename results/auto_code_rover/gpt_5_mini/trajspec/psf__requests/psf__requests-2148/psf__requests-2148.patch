@@ -1,0 +1,46 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..a5e94d60 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -640,6 +640,41 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except Exception as e:
++                    # Map urllib3 and low-level socket errors to requests exceptions
++                    # so that callers get consistent requests-level exceptions.
++                    try:
++                        from requests.packages.urllib3.exceptions import (
++                            ProtocolError as _ProtocolError,
++                            ReadTimeoutError as _ReadTimeoutError,
++                            TimeoutError as _Urllib3TimeoutError
++                        )
++                    except Exception:
++                        _ProtocolError = _ReadTimeoutError = _Urllib3TimeoutError = None
++
++                    try:
++                        from .exceptions import ConnectionError as _ConnectionError, Timeout as _Timeout
++                    except Exception:
++                        from requests.exceptions import ConnectionError as _ConnectionError, Timeout as _Timeout
++
++                    import socket as _socket
++
++                    # urllib3 protocol errors indicate a broken connection -> ConnectionError
++                    if _ProtocolError is not None and isinstance(e, _ProtocolError):
++                        raise _ConnectionError(e, request=self.request)
++
++                    # urllib3 read/timeout errors -> Timeout
++                    if (_ReadTimeoutError is not None and isinstance(e, _ReadTimeoutError)) or (
++                        _Urllib3TimeoutError is not None and isinstance(e, _Urllib3TimeoutError)
++                    ):
++                        raise _Timeout(e, request=self.request)
++
++                    # Low-level socket/OSError -> ConnectionError
++                    if isinstance(e, (_socket.error, OSError)):
++                        raise _ConnectionError(e, request=self.request)
++
++                    # Unknown exception: re-raise it unchanged.
++                    raise
+             except AttributeError:
+                 # Standard file-like object.
+                 while True:

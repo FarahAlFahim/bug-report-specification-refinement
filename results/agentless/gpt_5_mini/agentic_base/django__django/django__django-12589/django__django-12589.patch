@@ -1,0 +1,22 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 56581f2..9ed8c57 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -109,6 +109,17 @@ class SQLCompiler:
+         # Note that even if the group_by is set, it is only the minimal
+         # set to group by. So, we need to add cols in select, order_by, and
+         # having into the select in any case.
++        # Normalize any Ref(...) that wraps a Subquery source: when an
++        # annotation provides a group-by Ref(alias, Subquery(...)), the GROUP
++        # BY should reference the underlying subquery expression, not the
++        # alias. Replace such Ref entries with their source expression so
++        # they are compiled as the full subquery SQL rather than an ambiguous
++        # alias.
++        from django.db.models.expressions import Subquery
++        for i, expr in enumerate(expressions):
++            if isinstance(expr, Ref) and isinstance(expr.source, Subquery):
++                expressions[i] = expr.source
++
+         ref_sources = {
+             expr.source for expr in expressions if isinstance(expr, Ref)
+         }

@@ -1,0 +1,29 @@
+diff --git a/django/template/autoreload.py b/django/template/autoreload.py
+index cf1b20ba95..e14c9a6f95 100644
+--- a/django/template/autoreload.py
++++ b/django/template/autoreload.py
+@@ -6,6 +6,7 @@ from django.template.backends.django import DjangoTemplates
+ from django.utils._os import to_path
+ from django.utils.autoreload import (
+     autoreload_started, file_changed, is_django_path,
++    iter_all_python_module_files,
+ )
+ 
+ 
+@@ -48,7 +49,16 @@ def watch_for_template_changes(sender, **kwargs):
+ 
+ @receiver(file_changed, dispatch_uid='template_loaders_file_changed')
+ def template_changed(sender, file_path, **kwargs):
++    # Build the set of Python module files the autoreloader watches. If the
++    # changed file is one of those module files, it should not be treated as
++    # a template-only change even if it's located under a template directory.
++    # In that case, reset the template loaders but allow the normal full
++    # reload behavior to proceed.
++    python_files = set(iter_all_python_module_files())
+     for template_dir in get_template_directories():
+         if template_dir in file_path.parents:
+             reset_loaders()
++            if file_path in python_files:
++                # Do not claim the change as handled; allow a full reload.
++                return None
+             return True

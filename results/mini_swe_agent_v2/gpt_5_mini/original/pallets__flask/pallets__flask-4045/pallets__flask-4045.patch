@@ -1,0 +1,15 @@
+diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py
+index 5fb84d86..8f61585b 100644
+--- a/src/flask/blueprints.py
++++ b/src/flask/blueprints.py
+@@ -189,6 +189,10 @@ class Blueprint(Scaffold):
+             root_path=root_path,
+         )
+         self.name = name
++        # Dots in blueprint names are not allowed because dots are used to
++        # separate nested blueprint names and endpoint prefixes. Disallowing
++        # dots here avoids ambiguity when registering blueprints.
++        assert "." not in self.name, "Blueprint names should not contain dots"
+         self.url_prefix = url_prefix
+         self.subdomain = subdomain
+         self.deferred_functions: t.List[DeferredSetupFunction] = []

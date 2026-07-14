@@ -1,0 +1,40 @@
+diff --git a/django/core/files/storage.py b/django/core/files/storage.py
+index 39f68c7..b74c9fc 100644
+--- a/django/core/files/storage.py
++++ b/django/core/files/storage.py
+@@ -281,7 +281,35 @@ class FileSystemStorage(Storage):
+                 break
+ 
+         if self.file_permissions_mode is not None:
++            # Explicit permissions requested via FILE_UPLOAD_PERMISSIONS.
+             os.chmod(full_path, self.file_permissions_mode)
++        else:
++            # No explicit FILE_UPLOAD_PERMISSIONS set. To avoid inconsistent
++            # permissions depending on upload handler (TemporaryUploadedFile
++            # rename/copy can preserve the tempfile's restrictive mode such
++            # as 0o600, whereas the streaming path creates files with mode
++            # 0o666 masked by the process umask, commonly 0o644), normalize
++            # the saved file's mode to what the streaming path would produce:
++            # 0o666 & ~umask.
++            try:
++                # os.umask() returns the previous umask and sets the current
++                # one; call it with 0 to read the current umask, restore it
++                # immediately, and compute the masked default mode.
++                old_umask = os.umask(0)
++                try:
++                    default_mode = 0o666 & ~old_umask
++                finally:
++                    os.umask(old_umask)
++            except Exception:
++                default_mode = None
++
++            if default_mode is not None:
++                try:
++                    os.chmod(full_path, default_mode)
++                except OSError:
++                    # Ignore failures to chmod (e.g. permission/FS errors),
++                    # keeping the file as-is if we can't change it.
++                    pass
+ 
+         # Store filenames with forward slashes, even on Windows.
+         return name.replace('\\', '/')

@@ -1,0 +1,57 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..530bff862f 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -11,7 +11,7 @@
+ 
+ 
+ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+-    from sympy import Matrix
++    from sympy import Matrix, N, Float
+ 
+     dimension_system = unit_system.get_dimension_system()
+ 
+@@ -31,7 +31,42 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
+-    return res_exponents
++
++    # Verify that the result exactly satisfies the linear system:
++    # camat * res_exponents == exprmat
++    diff = camat * res_exponents - exprmat
++
++    # If the difference is exactly zero for all entries, accept the solution.
++    try:
++        if all(d.equals(0) for d in diff):
++            return res_exponents
++    except Exception:
++        # If .equals() is not reliable for some entries, fall through to numeric check.
++        pass
++
++    # If any involved entries are floating point / approximate, allow a small numeric tolerance.
++    contains_float = False
++    for mat in (camat, exprmat, res_exponents):
++        for e in mat:
++            if getattr(e, 'is_Float', False):
++                contains_float = True
++                break
++        if contains_float:
++            break
++
++    if contains_float:
++        # Conservative tolerance for numerical equality
++        tol = 1e-12
++        try:
++            numeric_diffs = [abs(float(N(d))) for d in diff]
++            if numeric_diffs and max(numeric_diffs) < tol:
++                return res_exponents
++        except Exception:
++            # Fall through and treat as non-convertible if numeric evaluation fails.
++            pass
++
++    # Not an exact decomposition (and not within numeric tolerance), treat as non-convertible.
++    return None
+ 
+ 
+ def convert_to(expr, target_units, unit_system="SI"):

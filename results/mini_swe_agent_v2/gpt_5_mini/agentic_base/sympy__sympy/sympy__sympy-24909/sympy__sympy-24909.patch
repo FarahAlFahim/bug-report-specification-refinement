@@ -1,0 +1,60 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..2dc69ff233 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -83,33 +83,45 @@ def __mul__(self, other):
+         if not isinstance(other, (Quantity, Prefix)):
+             return super().__mul__(other)
+ 
+-        fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # If multiplying two prefixes, we may be able to simplify to a
++        # single prefix or to the dimensionless 1. For quantities (units),
++        # we must return the scaled unit expression even when the numeric
++        # scale factors multiply to 1 (because the unit carries dimensions).
++        if isinstance(other, Prefix):
++            fact = self.scale_factor * other.scale_factor
++            if fact == 1:
++                return 1
+             # simplify prefix
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # other is a Quantity (or quantity-like): apply the numeric
++        # scale factor to the quantity. Do not short-circuit when the
++        # combined numeric factor equals 1; the quantity itself should
++        # be returned or wrapped appropriately by Quantity multiplication.
+         return self.scale_factor * other
+ 
+     def __truediv__(self, other):
++        # If dividing by something that doesn't have a scale_factor, fall
++        # back to default implementation.
+         if not hasattr(other, "scale_factor"):
+             return super().__truediv__(other)
+ 
+-        fact = self.scale_factor / other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # If dividing by a Prefix, try to simplify to another prefix or
++        # dimensionless 1. If dividing by a Quantity (unit), return the
++        # scaled quantity expression even when numeric cancellation occurs.
++        if isinstance(other, Prefix):
++            fact = self.scale_factor / other.scale_factor
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # other is a Quantity: apply numeric division to the quantity.
+         return self.scale_factor / other
+ 
+     def __rtruediv__(self, other):

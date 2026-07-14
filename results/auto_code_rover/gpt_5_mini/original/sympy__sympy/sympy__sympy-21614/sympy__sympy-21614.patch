@@ -1,0 +1,30 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..e2ae41f758 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1670,6 +1670,25 @@ def eval(x):
+     def expr(self):
+         return self._args[0]
+ 
++    @property
++    def kind(self):
++        """
++        The kind of an unevaluated Derivative should reflect the kind
++        of the underlying expression when possible. If the wrapped
++        expression has a meaningful kind, return that; otherwise fall
++        back to UndefinedKind.
++        """
++        try:
++            k = getattr(self.expr, 'kind', None)
++            if k is not None:
++                return k
++        except Exception:
++            # If accessing expr.kind raises for some reason, fall through
++            # to returning UndefinedKind.
++            pass
++        from sympy.core.kind import UndefinedKind
++        return UndefinedKind
++
+     @property
+     def _wrt_variables(self):
+         # return the variables of differentiation without

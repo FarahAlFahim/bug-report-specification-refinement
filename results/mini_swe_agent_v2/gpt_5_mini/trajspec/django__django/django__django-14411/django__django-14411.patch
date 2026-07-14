@@ -1,0 +1,19 @@
+diff --git a/django/contrib/auth/forms.py b/django/contrib/auth/forms.py
+index 20d8922799..cf4a0090ba 100644
+--- a/django/contrib/auth/forms.py
++++ b/django/contrib/auth/forms.py
+@@ -34,6 +34,14 @@ class ReadOnlyPasswordHashWidget(forms.Widget):
+     template_name = 'auth/widgets/read_only_password_hash.html'
+     read_only = True
+ 
++    def id_for_label(self, id_):
++        """
++        This widget renders non-labelable static markup (a summary div), so
++        it should not supply an id for use by a <label for="...">. Return
++        None to indicate there is no single labelable control.
++        """
++        return None
++
+     def get_context(self, name, value, attrs):
+         context = super().get_context(name, value, attrs)
+         summary = []

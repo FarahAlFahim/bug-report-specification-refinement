@@ -1,0 +1,24 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index b821c42845..d8dd1b94ff 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -233,6 +233,19 @@ def transpose(self):
+         return self._eval_transpose()
+ 
+     def _entry(self, i, j, **kwargs):
++        from sympy.matrices.expressions.matexpr import MatrixElement
++        # If the indices are not concrete numbers, we can't determine which
++        # block the element belongs to, so return a MatrixElement.
++        # However, if all block sizes are symbolic, we use the original logic
++        # because we can't determine the block structure anyway.
++        if not i.is_number or not j.is_number:
++            # Check if all block sizes are symbolic
++            rowblocksizes = self.rowblocksizes
++            colblocksizes = self.colblocksizes
++            all_blocksizes_symbolic = all(not size.is_number for size in rowblocksizes) and \
++                                       all(not size.is_number for size in colblocksizes)
++            if not all_blocksizes_symbolic:
++                return MatrixElement(self, i, j)
+         # Find row entry
+         for row_block, numrows in enumerate(self.rowblocksizes):
+             if (i < numrows) != False:

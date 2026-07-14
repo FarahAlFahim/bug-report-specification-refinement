@@ -1,0 +1,33 @@
+diff --git a/django/contrib/sitemaps/__init__.py b/django/contrib/sitemaps/__init__.py
+index 27756d9d96..45360bc0b2 100644
+--- a/django/contrib/sitemaps/__init__.py
++++ b/django/contrib/sitemaps/__init__.py
+@@ -166,10 +166,25 @@ class Sitemap:
+         if not hasattr(self, "lastmod"):
+             return None
+         if callable(self.lastmod):
+-            try:
+-                return max([self.lastmod(item) for item in self.items()])
+-            except TypeError:
++            # Compute latest lastmod only when every item has a non-None
++            # lastmod. If items() is empty or any item's lastmod is None or
++            # the callable raises a TypeError during evaluation, return
++            # None. This mirrors the behaviour of _urls() which only sets
++            # sitemap-level latest_lastmod when all items provide lastmod.
++            lastmods = []
++            for item in self.items():
++                try:
++                    lm = self.lastmod(item)
++                except TypeError:
++                    # If the lastmod callable can't handle the item,
++                    # treat it as not having a lastmod.
++                    return None
++                if lm is None:
++                    return None
++                lastmods.append(lm)
++            if not lastmods:
+                 return None
++            return max(lastmods)
+         else:
+             return self.lastmod
+ 

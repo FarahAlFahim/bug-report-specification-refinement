@@ -1,0 +1,21 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index b91d26efb..a04a0b613 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -90,7 +90,7 @@ def expand_modules(
+                 )
+             except ImportError:
+                 modname = os.path.splitext(basename)[0]
+-                if os.path.isdir(something):
++            if os.path.isdir(something):
+                 # Only treat a directory as a package file (i.e. use its
+                 # __init__.py) when an actual __init__.py exists. Otherwise
+                 # keep the directory path so we can enumerate the contained
+@@ -116,7 +116,6 @@ def expand_modules(
+                 # removed once we move away from imp.find_module: https://bugs.python.org/issue10588
+                 errors.append({"key": "fatal", "mod": modname, "ex": ex})
+                 continue
+-        filepath = os.path.normpath(filepath)
+         modparts = (modname or something).split(".")
+         try:
+             spec = modutils.file_info_from_modpath(

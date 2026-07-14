@@ -1,0 +1,55 @@
+diff --git a/django/contrib/auth/migrations/0011_update_proxy_permissions.py b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+index 0e66649695..3fb9cd047f 100644
+--- a/django/contrib/auth/migrations/0011_update_proxy_permissions.py
++++ b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+@@ -6,9 +6,17 @@ def update_proxy_model_permissions(apps, schema_editor, reverse=False):
+     """
+     Update the content_type of proxy model permissions to use the ContentType
+     of the proxy model.
++
++    This avoids bulk-updating Permission.content_type which can create
++    duplicates on (content_type, codename). Instead, iterate over matching
++    Permission rows and either move them to the new content_type or, if a
++    Permission with the target (content_type, codename) already exists,
++    transfer M2M relations (users and groups) to the existing Permission
++    and delete the old one.
+     """
+     Permission = apps.get_model('auth', 'Permission')
+     ContentType = apps.get_model('contenttypes', 'ContentType')
++
+     for Model in apps.get_models():
+         opts = Model._meta
+         if not opts.proxy:
+@@ -24,10 +32,28 @@ def update_proxy_model_permissions(apps, schema_editor, reverse=False):
+         proxy_content_type = ContentType.objects.get_for_model(Model, for_concrete_model=False)
+         old_content_type = proxy_content_type if reverse else concrete_content_type
+         new_content_type = concrete_content_type if reverse else proxy_content_type
+-        Permission.objects.filter(
+-            permissions_query,
+-            content_type=old_content_type,
+-        ).update(content_type=new_content_type)
++
++        # Iterate to avoid creating duplicate (content_type, codename) rows.
++        qs = Permission.objects.filter(permissions_query, content_type=old_content_type)
++        for old_perm in qs:
++            try:
++                new_perm = Permission.objects.get(content_type=new_content_type, codename=old_perm.codename)
++            except Permission.DoesNotExist:
++                # Safe to switch content_type on this single instance.
++                old_perm.content_type = new_content_type
++                old_perm.save()
++            else:
++                # Transfer M2M relations from old_perm to new_perm, avoiding duplicates.
++                # Users (user_permissions) related_name is 'user_set' on Permission.
++                for user in list(old_perm.user_set.all()):
++                    if not new_perm.user_set.filter(pk=user.pk).exists():
++                        new_perm.user_set.add(user)
++                # Groups (Group.permissions) related_name is 'group_set' on Permission.
++                for group in list(old_perm.group_set.all()):
++                    if not new_perm.group_set.filter(pk=group.pk).exists():
++                        new_perm.group_set.add(group)
++                # Remove the old permission.
++                old_perm.delete()
+ 
+ 
+ def revert_proxy_model_permissions(apps, schema_editor):

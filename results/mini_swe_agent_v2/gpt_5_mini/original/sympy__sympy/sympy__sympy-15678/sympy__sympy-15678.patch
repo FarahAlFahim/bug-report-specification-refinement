@@ -1,0 +1,57 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..8258a0e557 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -565,14 +565,43 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # allow passing an Equality (Eq) object: treat as lhs - rhs == 0
++    try:
++        from sympy.core.relational import Relational
++    except Exception:
++        Relational = None
++    if Relational is not None and isinstance(eq, Relational):
++        eq = eq.lhs - eq.rhs
++
++    # allow y to be a symbol, a sequence of symbols, or an applied
++    # function like f(x). In the latter case extract the function name
++    # and treat it as the dependent symbol.
++    applied_given = False
++    original_y = y
+     if is_sequence(y):
+         dep = set(y)
+         y = y[0]
+     elif isinstance(y, Symbol):
+         dep = {y}
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        # try to accept applied functions e.g. f(x)
++        if hasattr(y, 'func') and hasattr(y, 'args') and len(y.args) >= 1:
++            name = getattr(getattr(y, 'func', None), 'name', None) or getattr(getattr(y, 'func', None), '__name__', None)
++            if name:
++                sname = Symbol(name)
++                dep = {sname}
++                y = sname
++                applied_given = True
++            else:
++                raise ValueError("expecting x-dependent symbol(s) but got: %s" % original_y)
++        else:
++            raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
+ 
++    # build mapping from dependent symbols to functions of x for
++    # substitution. If the user passed an applied function (e.g. f(x))
++    # the expression likely already contains f(x) and no substitution is
++    # necessary; the code below will still construct the appropriate
++    # derivative symbol.
+     f = dict([(s, Function(
+         s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+     dydx = Function(y.name)(x).diff(x)
+@@ -586,7 +615,6 @@ def idiff(eq, y, x, n=1):
+         eq = dydx - yp
+         dydx = dydx.diff(x)
+ 
+-
+ def intersection(*entities, **kwargs):
+     """The intersection of a collection of GeometryEntity instances.
+ 

@@ -1,0 +1,47 @@
+diff --git a/sympy/matrices/expressions/diagonal.py b/sympy/matrices/expressions/diagonal.py
+index 8b7a946..8df8d30 100644
+--- a/sympy/matrices/expressions/diagonal.py
++++ b/sympy/matrices/expressions/diagonal.py
+@@ -1,3 +1,4 @@
++
+ from __future__ import print_function, division
+ 
+ from sympy.matrices.expressions import MatrixExpr
+@@ -8,11 +9,15 @@ class DiagonalMatrix(MatrixExpr):
+     shape = property(lambda self: (self.arg.shape[0], self.arg.shape[0]))
+ 
+     def _entry(self, i, j):
+-        return S.Zero if i != j else self.arg[i, 0]
++        # Represent diagonal matrix entries with an explicit KroneckerDelta factor.
++        # This preserves symbolic index relationships (δ(i, j) * diag_entry(i))
++        # so the summation machinery can apply delta-based simplifications.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j) * self.arg[i, 0]
+ 
+ class DiagonalOf(MatrixExpr):
+     arg = property(lambda self: self.args[0])
+     shape = property(lambda self: (self.arg.shape[0], S.One))
+ 
+     def _entry(self, i, j):
+-        return self.arg[i, i]
++        return self.arg[i, i]
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index 8f30d0d..1e25fae 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,11 @@ class Identity(MatrixExpr):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
+-            return S.One
+-        else:
+-            return S.Zero
++        # Represent the (i, j) entry of the identity matrix using a KroneckerDelta.
++        # Using KroneckerDelta preserves symbolic index equality information so that
++        # summations over symbolic dummy indices can be simplified correctly.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One

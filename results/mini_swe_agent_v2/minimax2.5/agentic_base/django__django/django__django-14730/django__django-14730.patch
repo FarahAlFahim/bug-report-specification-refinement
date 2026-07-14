@@ -1,0 +1,23 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..e4f70c3143 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1258,6 +1258,18 @@ class ManyToManyField(RelatedField):
+                 )
+             )
+ 
++        if (self._related_name and self.remote_field.symmetrical and
++                self.remote_field.model == self.model):
++            warnings.append(
++                checks.Warning(
++                    'related_name has no effect on ManyToManyField '
++                    'with symmetrical=True (which is the default for '
++                    'self-referential relationships).',
++                    obj=self,
++                    id='fields.W345',
++                )
++            )
++
+         return warnings
+ 
+     def _check_relationship_model(self, from_model=None, **kwargs):

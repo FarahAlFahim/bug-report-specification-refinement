@@ -1,0 +1,37 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..3fd793c74c 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -580,6 +580,32 @@ def run_with_reloader(main_func, *args, **kwargs):
+         if os.environ.get(DJANGO_AUTORELOAD_ENV) == 'true':
+             reloader = get_reloader()
+             logger.info('Watching for file changes with %s', reloader.__class__.__name__)
++
++            # Ensure that an executing script (e.g. manage.py) is watched by the reloader.
++            # Scripts run as __main__ are not present in sys.modules and therefore are
++            # not discovered by iter_all_python_module_files. If the child process is
++            # running the autoreloader, and sys.argv[0] points to an existing file on
++            # disk that is not the django -m entrypoint, add it explicitly to extra files.
++            try:
++                from pathlib import Path
++                import django.__main__ as django_main
++
++                script = Path(sys.argv[0])
++                if script.exists():
++                    script_resolved = script.resolve()
++                    try:
++                        django_main_file = Path(django_main.__file__).resolve()
++                    except Exception:
++                        django_main_file = None
++
++                    if django_main_file is None or script_resolved != django_main_file:
++                        # BaseReloader.watch_file expects an absolute Path
++                        reloader.watch_file(script_resolved)
++            except Exception:
++                # Be conservative: if anything goes wrong here, don't prevent the server
++                # from starting. The autoreloader will continue with its existing behavior.
++                pass
++
+             start_django(reloader, main_func, *args, **kwargs)
+         else:
+             exit_code = restart_with_reloader()

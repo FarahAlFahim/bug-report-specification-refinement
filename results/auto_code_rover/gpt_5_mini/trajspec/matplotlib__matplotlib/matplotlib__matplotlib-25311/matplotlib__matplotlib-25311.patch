@@ -1,0 +1,63 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index ff6abdb958..4f2e790953 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -1208,6 +1208,18 @@ class Legend(Artist):
+         """Return ``True`` if the legend is draggable, ``False`` otherwise."""
+         return self._draggable is not None
+ 
++    def __getstate__(self):
++        """
++        Sanitize the Legend state for pickling.
++
++        Ensure the runtime-only draggable helper is not included in the pickled
++        state to avoid indirectly pickling GUI objects referenced by the helper.
++        """
++        state = super().__getstate__()
++        # Do not include the runtime-only draggable helper in the serialized state.
++        state['_draggable'] = None
++        return state
++
+ 
+ # Helper functions to parse legend arguments for both `figure.legend` and
+ # `axes.legend`:
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 1dee8a23d9..f9b99b67ef 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1571,6 +1571,21 @@ class DraggableBase:
+         else:
+             self.canvas.mpl_disconnect(c1)
+ 
++    def __getstate__(self):
++        """
++        Return a sanitized state for pickling.
++
++        Remove runtime-only attributes that reference GUI objects (e.g. the
++        FigureCanvas) or are related to active callbacks/interaction so that
++        pickling a Figure that references draggable helpers does not attempt
++        to serialize non-picklable GUI objects.
++        """
++        state = self.__dict__.copy()
++        for key in ('canvas', 'cids', '_c1', 'background',
++                    'got_artist', 'mouse_x', 'mouse_y'):
++            state.pop(key, None)
++        return state
++
+     def save_offset(self):
+         pass
+ 
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 0f874ba33d..bb744a5f1e 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,9 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++        # Remove any runtime-only draggable helper so pickling Text/Annotation
++        # does not include interactive helpers that reference GUI objects.
++        d.pop('_draggable', None)
+         return d
+ 
+     def contains(self, mouseevent):

@@ -1,0 +1,65 @@
+diff --git a/sympy/geometry/entity.py b/sympy/geometry/entity.py
+index ee5c910268..6c947d7699 100644
+--- a/sympy/geometry/entity.py
++++ b/sympy/geometry/entity.py
+@@ -139,7 +139,24 @@ def __repr__(self):
+ 
+     def __rmul__(self, a):
+         """Implementation of reverse multiplication method."""
+-        return a.__mul__(self)
++        # Delegate reversed multiplication to the geometry object's own
++        # multiplication implementation when possible. Previously this
++        # forwarded to the left-hand operand (a.__mul__(self)), which
++        # for numeric types like Float produced a generic Mul instead of
++        # a geometry object (e.g. Point). Calling self.__mul__(a)
++        # ensures that scalar * Point uses Point.__mul__ and yields a
++        # Point. If the geometry object does not implement multiplication
++        # for the given operand, fall back to the left operand's
++        # __mul__ implementation.
++        try:
++            res = self.__mul__(a)
++        except Exception:
++            return a.__mul__(self)
++        # Some implementations may return NotImplemented to indicate
++        # they don't handle the operation; in that case fall back.
++        if res is NotImplemented:
++            return a.__mul__(self)
++        return res
+ 
+     def __rsub__(self, a):
+         """Implementation of reverse subtraction method."""
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..7bcb4e4007 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,6 +213,30 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+ 
+         """
++        # Handle cases like numeric * Point which may produce a Mul( number, Point )
++        # (for example Float.__mul__ can return a Mul). In that case, try to
++        # extract the Point factor and perform the scalar multiplication using
++        # the geometry object's __mul__ so that scalar*Point yields a Point.
++        from sympy import Mul
++        if getattr(other, 'is_Mul', False):
++            # find a Point among the Mul args
++            point_f = None
++            scalar_factors = []
++            for a in other.args:
++                if isinstance(a, Point):
++                    point_f = a
++                else:
++                    scalar_factors.append(a)
++            if point_f is not None:
++                # compute the combined scalar (could be an expression)
++                from sympy import Mul as sympyMul
++                scalar = sympyMul(*scalar_factors) if scalar_factors else 1
++                try:
++                    other = point_f.__mul__(scalar)
++                except Exception:
++                    # fallback to original other if multiplication fails
++                    other = other
++
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:

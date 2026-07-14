@@ -1,0 +1,55 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 1a55d3d417..a8f1370e8a 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,10 +764,48 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            # Decide whether to install the get_<field>_display accessor.
++            # Historically this used ``hasattr`` which treated any inherited
++            # accessor (including the one generated on an abstract base)
++            # as an explicit user override, preventing subclasses from
++            # getting their own accessor bound to the copied Field
++            # instance. Instead, inspect where the attribute is defined:
++            attr_name = 'get_%s_display' % self.name
++            existing = None
++            for base in cls.mro():
++                if attr_name in base.__dict__:
++                    existing = base.__dict__[attr_name]
++                    break
++
++            # Install a new accessor if no attribute is defined anywhere in
++            # the MRO (existing is None), or if the attribute found is the
++            # auto-generated partialmethod bound to a different Field
++            # instance. Do NOT override a user-defined method (i.e. any
++            # attribute in a base class that isn't the generated
++            # partialmethod).
++            should_install = False
++            if existing is None:
++                should_install = True
++            else:
++                try:
++                    is_generated = isinstance(existing, partialmethod) and (
++                        existing.keywords is not None and 'field' in existing.keywords
++                    )
++                except Exception:
++                    is_generated = False
++
++                if is_generated:
++                    # If the generated accessor is bound to a different
++                    # Field instance, install a new accessor bound to this
++                    # Field. This covers the case where abstract base
++                    # Fields are deepcopy'd into subclasses.
++                    if existing.keywords.get('field') is not self:
++                        should_install = True
++
++            if should_install:
+                 setattr(
+                     cls,
+-                    'get_%s_display' % self.name,
++                    attr_name,
+                     partialmethod(cls._get_FIELD_display, field=self),
+                 )
+ 

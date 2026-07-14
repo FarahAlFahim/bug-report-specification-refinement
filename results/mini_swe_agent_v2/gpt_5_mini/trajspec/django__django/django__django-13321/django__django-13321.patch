@@ -1,0 +1,48 @@
+diff --git a/django/contrib/sessions/backends/base.py b/django/contrib/sessions/backends/base.py
+index 187e14b1b7..5b9daf591f 100644
+--- a/django/contrib/sessions/backends/base.py
++++ b/django/contrib/sessions/backends/base.py
+@@ -1,4 +1,5 @@
+ import base64
++import binascii
+ import logging
+ import string
+ import warnings
+@@ -132,7 +133,13 @@ class SessionBase:
+ 
+     def _legacy_decode(self, session_data):
+         # RemovedInDjango40Warning: pre-Django 3.1 format will be invalid.
+-        encoded_data = base64.b64decode(session_data.encode('ascii'))
++        try:
++            encoded_data = base64.b64decode(session_data.encode('ascii'))
++        except (binascii.Error, UnicodeEncodeError):
++            # Malformed base64 or non-ASCII input. Treat as empty session
++            # rather than raising an uncaught exception.
++            return {}
++
+         try:
+             # could produce ValueError if there is no ':'
+             hash, serialized = encoded_data.split(b':', 1)
+diff --git a/django/contrib/sessions/backends/db.py b/django/contrib/sessions/backends/db.py
+index 7c905a2c99..60fd8aad9c 100644
+--- a/django/contrib/sessions/backends/db.py
++++ b/django/contrib/sessions/backends/db.py
+@@ -41,7 +41,17 @@ class SessionStore(SessionBase):
+ 
+     def load(self):
+         s = self._get_session_from_db()
+-        return self.decode(s.session_data) if s else {}
++        if not s:
++            return {}
++        try:
++            return self.decode(s.session_data)
++        except Exception:
++            # If session decoding fails (for example, due to malformed
++            # legacy base64 data), treat the session as missing rather
++            # than crashing the request. This mirrors the behavior of
++            # the signed_cookies backend which resets sessions on error.
++            self._session_key = None
++            return {}
+ 
+     def exists(self, session_key):
+         return self.model.objects.filter(session_key=session_key).exists()

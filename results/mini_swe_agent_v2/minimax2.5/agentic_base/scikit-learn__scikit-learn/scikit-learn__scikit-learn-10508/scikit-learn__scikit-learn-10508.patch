@@ -1,0 +1,26 @@
+diff --git a/sklearn/tree/_splitter.pyx b/sklearn/tree/_splitter.pyx
+index 06dfab587..4e9b619b1 100644
+--- a/sklearn/tree/_splitter.pyx
++++ b/sklearn/tree/_splitter.pyx
+@@ -535,6 +535,8 @@ cdef class BestSplitter(BaseDenseSplitter):
+ # Sort n-element arrays pointed to by Xf and samples, simultaneously,
+ # by the values in Xf. Algorithm: Introsort (Musser, SP&E, 1997).
+ cdef inline void sort(DTYPE_t* Xf, SIZE_t* samples, SIZE_t n) nogil:
++    if n == 0:
++      return
+     cdef int maxd = 2 * <int>log(n)
+     introsort(Xf, samples, n, maxd)
+ 
+diff --git a/sklearn/metrics/cluster/supervised.py b/sklearn/metrics/cluster/supervised.py
+index 4545c97ee..949c63ad7 100644
+--- a/sklearn/metrics/cluster/supervised.py
++++ b/sklearn/metrics/cluster/supervised.py
+@@ -601,7 +601,7 @@ def mutual_info_score(labels_true, labels_pred, contingency=None):
+     log_contingency_nm = np.log(nz_val)
+     contingency_nm = nz_val / contingency_sum
+     # Don't need to calculate the full outer product, just for non-zeroes
+-    outer = pi.take(nzx) * pj.take(nzy)
++    outer = pi.take(nzx).astype(np.int64) * pj.take(nzy).astype(np.int64)
+     log_outer = -np.log(outer) + log(pi.sum()) + log(pj.sum())
+     mi = (contingency_nm * (log_contingency_nm - log(contingency_sum)) +
+           contingency_nm * log_outer)

@@ -1,0 +1,66 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..c469371c68 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -84,8 +84,13 @@ def __mul__(self, other):
+             return super().__mul__(other)
+ 
+         fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
++        # If the numeric factors cancel to 1 we must be careful:
++        # - if the other operand is a bare Prefix, the product is unitless 1
++        # - if the other operand is a Quantity we should preserve the unit
++        #   information. Prefer returning a canonical prefixed Quantity when
++        #   available (registered via prefix_unit), otherwise return the
++        #   expression `scale_factor * other` which keeps the unit.
++        if fact == 1 and isinstance(other, Prefix):
+             return 1
+         elif isinstance(other, Prefix):
+             # simplify prefix
+@@ -94,6 +99,15 @@ def __mul__(self, other):
+                     return PREFIXES[p]
+             return fact
+ 
++        # If other is a Quantity, try to return the canonical prefixed
++        # Quantity registered in the global mapping. Fall back to returning
++        # the numeric factor times the quantity to preserve the unit.
++        from sympy.physics.units import UnitSystem
++        if isinstance(other, Quantity):
++            for q, (mul_factor, base_unit) in UnitSystem._quantity_scale_factors_global.items():
++                if mul_factor == self.scale_factor and base_unit == other:
++                    return q
++
+         return self.scale_factor * other
+ 
+     def __truediv__(self, other):
+@@ -101,8 +115,9 @@ def __truediv__(self, other):
+             return super().__truediv__(other)
+ 
+         fact = self.scale_factor / other.scale_factor
+-
+-        if fact == 1:
++        # Similar handling as in __mul__: do not drop unit information when
++        # dividing by a Quantity whose scale factor cancels numerically.
++        if fact == 1 and isinstance(other, Prefix):
+             return 1
+         elif isinstance(other, Prefix):
+             for p in PREFIXES:
+@@ -110,6 +125,17 @@ def __truediv__(self, other):
+                     return PREFIXES[p]
+             return fact
+ 
++        # Try to return a canonical prefixed Quantity when dividing a prefix
++        # by a Quantity (avoid returning the bare number 1). Otherwise,
++        # return the numeric factor divided by the Quantity which preserves
++        # the unit.
++        from sympy.physics.units import UnitSystem
++        from sympy.physics.units import Quantity
++        if isinstance(other, Quantity):
++            for q, (mul_factor, base_unit) in UnitSystem._quantity_scale_factors_global.items():
++                if mul_factor == self.scale_factor and base_unit == other:
++                    return q
++
+         return self.scale_factor / other
+ 
+     def __rtruediv__(self, other):

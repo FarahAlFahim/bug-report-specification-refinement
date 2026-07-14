@@ -1,0 +1,26 @@
+diff --git a/sklearn/calibration.py b/sklearn/calibration.py
+index 2c4a33616..296d92a5a 100644
+--- a/sklearn/calibration.py
++++ b/sklearn/calibration.py
+@@ -760,7 +760,20 @@ class _CalibratedClassifier:
+                 # When binary, `predictions` consists only of predictions for
+                 # clf.classes_[1] but `pos_class_indices` = 0
+                 class_idx += 1
+-            proba[:, class_idx] = calibrator.predict(this_pred)
++            # Ensure the calibrator output is a flat 1d numpy array of length
++            # n_samples. Some calibrators (e.g. IsotonicRegression when
++            # set_config(transform_output="pandas") is enabled) may return a
++            # pandas Series or DataFrame with shape (n_samples, 1). Coerce the
++            # output to a numpy array and ravel it to preserve the consumer
++            # expectation that the RHS is shape (n_samples,).
++            pred = np.asarray(calibrator.predict(this_pred))
++            pred = pred.ravel()
++            if pred.shape[0] != proba.shape[0]:
++                raise ValueError(
++                    "Calibrator predicted array length does not match number "
++                    f"of samples: got {pred.shape}, expected ({proba.shape[0]},)"
++                )
++            proba[:, class_idx] = pred
+ 
+         # Normalize the probabilities
+         if n_classes == 2:

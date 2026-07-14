@@ -1,0 +1,64 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..d01088d7ed 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -866,12 +866,59 @@ class Poly3DCollection(PolyCollection):
+             pass
+         self.stale = True
+ 
++    def _ensure_2d_color_cache(self):
++        """Ensure that the 2D face/edge color caches exist.
++
++        This is needed because callers may request 2D face/edge colors
++        before the first draw/projection has occurred. In that case the
++        projection code that normally populates ``_facecolors2d`` and
++        ``_edgecolors2d`` has not run yet. Compute a safe fallback from
++        the 3D-stored colors.
++        """
++        # Face colors
++        if not hasattr(self, "_facecolors2d") or self._facecolors2d is None:
++            try:
++                fc3 = PolyCollection.get_facecolor(self)
++                alpha = PolyCollection.get_alpha(self)
++                self._facecolors2d = mcolors.to_rgba_array(fc3, alpha)
++            except (AttributeError, TypeError, IndexError):
++                # safe fallback
++                self._facecolors2d = np.empty((0, 4))
++
++        # Edge colors
++        if not hasattr(self, "_edgecolors2d") or self._edgecolors2d is None:
++            try:
++                ec3 = PolyCollection.get_edgecolor(self)
++                # If edgecolor is 'face', use the facecolors cache
++                if cbook._str_equal(ec3, 'face'):
++                    self._edgecolors2d = self._facecolors2d
++                else:
++                    alpha = PolyCollection.get_alpha(self)
++                    self._edgecolors2d = mcolors.to_rgba_array(ec3, alpha)
++            except (AttributeError, TypeError, IndexError):
++                self._edgecolors2d = np.empty((0, 4))
++
+     def get_facecolor(self):
++        """Return the 2D facecolors for this collection.
++
++        Ensure the 2D caches are initialized so callers may call this
++        before any draw/projection has happened.
++        """
++        self._ensure_2d_color_cache()
+         return self._facecolors2d
+ 
++    # Backwards/forwards compatibility: some callers use the plural name
++    # get_facecolors(). Provide an alias so both work consistently.
++    def get_facecolors(self):
++        return self.get_facecolor()
++
+     def get_edgecolor(self):
++        self._ensure_2d_color_cache()
+         return self._edgecolors2d
+ 
++    def get_edgecolors(self):
++        return self.get_edgecolor()
++
+ 
+ def poly_collection_2d_to_3d(col, zs=0, zdir='z'):
+     """Convert a PolyCollection to a Poly3DCollection object."""

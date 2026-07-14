@@ -1,0 +1,148 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 09e2b00735..dd79dd7c13 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -915,32 +915,80 @@ def _print_BasisDependent(self, expr):
+                               k._pretty_form)
+                 #For a general expr
+                 else:
+-                    #We always wrap the measure numbers in
+-                    #parentheses
+-                    arg_str = self._print(
+-                        v).parens()[0]
+-
+-                    o1.append(arg_str + ' ' + k._pretty_form)
++                    # We wrap the measure numbers in parentheses unless
++                    # it's a Pow expression, which already has parentheses
++                    # in its pretty form and doesn't need extra wrapping.
++                    from sympy.core.power import Pow
++                    printed_v = self._print(v)
++                    if isinstance(v, Pow):
++                        # Don't add parentheses for Pow expressions
++                        # as they already have their own parentheses.
++                        # Use the prettyForm directly to handle baselines.
++                        arg_str = printed_v.s
++                        # Get the baseline to place the vector component correctly
++                        baseline = printed_v.baseline
++                        # Convert to lines
++                        lines = arg_str.split('\n')
++                        # Add vector component at baseline
++                        if baseline < len(lines):
++                            lines[baseline] += ' ' + k._pretty_form
++                        # Create a prettyForm directly with the picture
++                        # Use left-alignment instead of centering
++                        picture = [line.rstrip() for line in lines]
++                        # Find the maximum width for padding
++                        max_width = max(len(line) for line in picture)
++                        # Pad each line to the max width on the left (for alignment)
++                        padded_picture = [line.ljust(max_width) for line in picture]
++                        # Create a prettyForm with the picture and baseline
++                        from .stringpict import prettyForm
++                        o1.append(prettyForm('\n'.join(padded_picture), baseline=baseline))
++                    else:
++                        arg_str = printed_v.parens()[0]
++                        o1.append(arg_str + ' ' + k._pretty_form)
+                 vectstrs.append(k._pretty_form)
+ 
+         #outstr = u("").join(o1)
+-        if o1[0].startswith(u" + "):
+-            o1[0] = o1[0][3:]
+-        elif o1[0].startswith(" "):
+-            o1[0] = o1[0][1:]
++        # Handle both strings and prettyForm objects
++        from .stringpict import prettyForm
++        first_elem = o1[0].s if isinstance(o1[0], prettyForm) else o1[0]
++        if first_elem.startswith(u" + "):
++            if isinstance(o1[0], prettyForm):
++                o1[0] = prettyForm(o1[0].s[3:], baseline=o1[0].baseline)
++            else:
++                o1[0] = o1[0][3:]
++        elif first_elem.startswith(" "):
++            if isinstance(o1[0], prettyForm):
++                o1[0] = prettyForm(o1[0].s[1:], baseline=o1[0].baseline)
++            else:
++                o1[0] = o1[0][1:]
+         #Fixing the newlines
+         lengths = []
+         strs = ['']
+         for i, partstr in enumerate(o1):
+             # XXX: What is this hack?
+-            if '\n' in partstr:
+-                tempstr = partstr
+-                tempstr = tempstr.replace(vectstrs[i], '')
+-                tempstr = tempstr.replace(u'\N{RIGHT PARENTHESIS UPPER HOOK}',
+-                                          u'\N{RIGHT PARENTHESIS UPPER HOOK}'
+-                                          + ' ' + vectstrs[i])
+-                o1[i] = tempstr
+-        o1 = [x.split('\n') for x in o1]
++            # This hack moves the vector component from inside the
++            # parentheses to after the closing parenthesis. Only apply
++            # when the first line starts with a left parenthesis (indicating
++            # extra parentheses were added around the whole expression).
++            # Also skip if partstr is already a prettyForm (from Pow handling).
++            if '\n' in partstr and not isinstance(partstr, prettyForm):
++                lines = partstr.split('\n')
++                left_paren = u'\N{LEFT PARENTHESIS UPPER HOOK}'
++                if lines[0].startswith(left_paren) or lines[0].startswith('('):
++                    tempstr = partstr
++                    tempstr = tempstr.replace(vectstrs[i], '')
++                    tempstr = tempstr.replace(u'\N{RIGHT PARENTHESIS UPPER HOOK}',
++                                              u'\N{RIGHT PARENTHESIS UPPER HOOK}'
++                                              + ' ' + vectstrs[i])
++                    o1[i] = tempstr
++        # Handle both strings and prettyForm objects
++        o1_split = []
++        for x in o1:
++            if isinstance(x, prettyForm):
++                o1_split.append(x.s.split('\n'))
++            else:
++                o1_split.append(x.split('\n'))
++        o1 = o1_split
+         n_newlines = max([len(x) for x in o1])
+         for parts in o1:
+             lengths.append(len(parts[0]))
+@@ -961,7 +1009,19 @@ def _print_BasisDependent(self, expr):
+                                            3*(len(lengths)-1)))
+                     strs[j] += ' '*(lengths[-1]+3)
+ 
+-        return prettyForm(u'\n'.join([s[:-3] for s in strs]))
++        # Join the strings and remove the trailing ' + ' from each line
++        # But don't remove more than 3 characters if the line is shorter
++        result_lines = []
++        for s in strs:
++            if s.endswith(' + '):
++                result_lines.append(s[:-3])
++            elif s.endswith(' +'):  # Handle edge case
++                result_lines.append(s[:-2])
++            elif s.endswith('+'):  # Handle edge case
++                result_lines.append(s[:-1])
++            else:
++                result_lines.append(s)
++        return prettyForm(u'\n'.join(result_lines))
+ 
+     def _print_NDimArray(self, expr):
+         from sympy import ImmutableMatrix
+@@ -1262,6 +1322,9 @@ def _print_FunctionClass(self, expr):
+         func_name = expr.__name__
+         return prettyForm(pretty_symbol(func_name))
+ 
++    def _print_UndefinedFunction(self, expr):
++        return self._print_Function(expr)
++
+     def _print_GeometryEntity(self, expr):
+         # GeometryEntity is based on Tuple but should not print like a Tuple
+         return self.emptyPrinter(expr)
+diff --git a/sympy/printing/printer.py b/sympy/printing/printer.py
+index 93578d0950..b2ef9278eb 100644
+--- a/sympy/printing/printer.py
++++ b/sympy/printing/printer.py
+@@ -259,7 +259,8 @@ def _print(self, expr, *args, **kwargs):
+             classes = type(expr).__mro__
+             if AppliedUndef in classes:
+                 classes = classes[classes.index(AppliedUndef):]
+-            if UndefinedFunction in classes:
++            # Check UndefinedFunction in the original MRO, not the sliced list
++            if UndefinedFunction in type(expr).__mro__:
+                 classes = classes[classes.index(UndefinedFunction):]
+             # Another exception: if someone subclasses a known function, e.g.,
+             # gamma, and changes the name, then ignore _print_gamma

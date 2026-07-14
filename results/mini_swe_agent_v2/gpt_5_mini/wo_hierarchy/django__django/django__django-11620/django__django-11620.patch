@@ -1,0 +1,73 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..cf61e99582 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -25,6 +25,7 @@ from django.utils.translation import get_language
+ 
+ from .converters import get_converter
+ from .exceptions import NoReverseMatch, Resolver404
++from django.http import Http404
+ from .utils import get_callable
+ 
+ 
+@@ -258,7 +259,9 @@ class RoutePattern(CheckURLMixin):
+                 converter = self.converters[key]
+                 try:
+                     kwargs[key] = converter.to_python(value)
+-                except ValueError:
++                except (ValueError, Http404):
++                    # Treat a converter raising Http404 as a non-match so
++                    # that resolution can continue trying other patterns.
+                     return None
+             return path[match.end():], (), kwargs
+         return None
+@@ -540,10 +543,17 @@ class URLResolver:
+             for pattern in self.url_patterns:
+                 try:
+                     sub_match = pattern.resolve(new_path)
+-                except Resolver404 as e:
+-                    sub_tried = e.args[0].get('tried')
+-                    if sub_tried is not None:
+-                        tried.extend([pattern] + t for t in sub_tried)
++                except (Resolver404, Http404) as e:
++                    # If a child resolver raises Http404 (for example, due to
++                    # a converter raising Http404), treat it as a non-match
++                    # and record the pattern as tried. If it's a Resolver404,
++                    # aggregate its 'tried' information.
++                    if isinstance(e, Resolver404):
++                        sub_tried = e.args[0].get('tried')
++                        if sub_tried is not None:
++                            tried.extend([pattern] + t for t in sub_tried)
++                        else:
++                            tried.append([pattern])
+                     else:
+                         tried.append([pattern])
+                 else:
+diff --git a/django/views/debug.py b/django/views/debug.py
+index cb3e8c7ec1..86729015ad 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -9,6 +9,7 @@ from django.http import HttpResponse, HttpResponseNotFound
+ from django.template import Context, Engine, TemplateDoesNotExist
+ from django.template.defaultfilters import pprint
+ from django.urls import Resolver404, resolve
++from django.http import Http404
+ from django.utils import timezone
+ from django.utils.datastructures import MultiValueDict
+ from django.utils.encoding import force_str
+@@ -483,9 +484,12 @@ def technical_404_response(request, exception):
+     caller = ''
+     try:
+         resolver_match = resolve(request.path)
+-    except Resolver404:
+-        pass
+-    else:
++    except (Resolver404, Http404):
++        # If resolving the request.path raises Http404 (for example,
++        # because a path converter raised Http404), treat it the same as
++        # a Resolver404 and continue building the technical 404 page.
++        resolver_match = None
++    if resolver_match:
+         obj = resolver_match.func
+ 
+         if hasattr(obj, '__name__'):

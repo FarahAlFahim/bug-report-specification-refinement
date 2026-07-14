@@ -1,0 +1,64 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..b4f3bc4bfe 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -224,9 +224,12 @@ def _subs_root(f, gen, zero):
+ 
+         return p
+ 
+-    def _solve_reduced_system(system, gens, entry=False):
+-        """Recursively solves reduced polynomial systems. """
+-        if len(system) == len(gens) == 1:
++    def _solve_reduced_system(system, gens, entry=False, orig_gens_len=None):
++        local_gens_len = len(gens)
++        if entry and orig_gens_len is None:
++            orig_gens_len = local_gens_len
++
++        if len(system) == local_gens_len == 1:
+             zeros = list(roots(system[0], gens[-1]).keys())
+             return [(zero,) for zero in zeros]
+ 
+@@ -248,6 +251,10 @@ def _solve_reduced_system(system, gens, entry=False):
+                 (finite number of solutions)
+                 '''))
+ 
++        # remember how many generators were expected at this recursion
++        # level before we reset gens to the polynomial's gens
++        this_level_gens_len = local_gens_len
++
+         gens = f.gens
+         gen = gens[-1]
+ 
+@@ -257,7 +264,18 @@ def _solve_reduced_system(system, gens, entry=False):
+             return []
+ 
+         if len(basis) == 1:
+-            return [(zero,) for zero in zeros]
++            # If the basis has only one polynomial but more than one
++            # generator was requested at this recursion level, then the
++            # system is positive-dimensional (infinite solutions). Only
++            # return finite 1-tuples when exactly one generator is being
++            # solved for.
++            if this_level_gens_len == 1:
++                return [(zero,) for zero in zeros]
++            else:
++                raise NotImplementedError(filldedent('''
++                    only zero-dimensional systems supported
++                    (finite number of solutions)
++                    '''))
+ 
+         solutions = []
+ 
+@@ -271,10 +289,10 @@ def _solve_reduced_system(system, gens, entry=False):
+                 if eq is not S.Zero:
+                     new_system.append(eq)
+ 
+-            for solution in _solve_reduced_system(new_system, new_gens):
++            for solution in _solve_reduced_system(new_system, new_gens, orig_gens_len=orig_gens_len):
+                 solutions.append(solution + (zero,))
+ 
+-        if solutions and len(solutions[0]) != len(gens):
++        if solutions and len(solutions[0]) != this_level_gens_len:
+             raise NotImplementedError(filldedent('''
+                 only zero-dimensional systems supported
+                 (finite number of solutions)

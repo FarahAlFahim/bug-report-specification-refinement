@@ -1,0 +1,51 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..abc261a269 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -109,6 +109,46 @@ def _print_Integral(self, expr):
+     def _print_Sum(self, expr):
+         return "Hold[Sum[" + ', '.join(self.doprint(a) for a in expr.args) + "]]"
+ 
++    def _print_Derivative(self, expr):
++        """Print Derivative using Mathematica's D[...] notation.
++
++        For example Derivative(f(t), t) -> D[f[t], t]
++        """
++        func = expr.expr
++        # Print the function and each differentiation variable
++        parts = [self.doprint(func)] + [self.doprint(v) for v in expr.variables]
++        return "D[%s]" % (', '.join(parts))
++
++    def _print_Float(self, expr):
++        """Print Float using Mathematica's exponent syntax '*^'.
++
++        This reuses the StrPrinter float formatting and then converts
++        the 'e' exponent marker (e.g. 1.0e-04) to Mathematica's '*^'
++        (e.g. 1.0*^-4). The exponent is canonicalized via int()
++        to remove unnecessary leading zeros/signs.
++        """
++        # Get the base float string from the StrPrinter implementation
++        from sympy.printing.str import StrPrinter
++        printed = StrPrinter._print_Float(self, expr)
++        # Look for either lowercase or uppercase exponent marker
++        idx = printed.find('e')
++        if idx == -1:
++            idx = printed.find('E')
++        if idx != -1:
++            mant = printed[:idx]
++            exp = printed[idx + 1:]
++            # Normalize exponent to an integer string (removes leading +/0s)
++            try:
++                exp_int = int(exp)
++            except Exception:
++                # If parsing fails, fall back to original exponent
++                exp_str = exp
++            else:
++                exp_str = str(exp_int)
++            return mant + '*^' + exp_str
++        # No exponent part, return as-is
++        return printed
++
+ 
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code

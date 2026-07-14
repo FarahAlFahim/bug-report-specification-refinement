@@ -1,0 +1,47 @@
+diff --git a/django/contrib/sessions/backends/base.py b/django/contrib/sessions/backends/base.py
+index 3174ba6..60a9b14 100644
+--- a/django/contrib/sessions/backends/base.py
++++ b/django/contrib/sessions/backends/base.py
+@@ -132,8 +132,10 @@ class SessionBase:
+ 
+     def _legacy_decode(self, session_data):
+         # RemovedInDjango40Warning: pre-Django 3.1 format will be invalid.
+-        encoded_data = base64.b64decode(session_data.encode('ascii'))
+         try:
++            # base64 decoding can raise binascii.Error for malformed data;
++            # include it in this try so we handle corrupted/legacy data gracefully.
++            encoded_data = base64.b64decode(session_data.encode('ascii'))
+             # could produce ValueError if there is no ':'
+             hash, serialized = encoded_data.split(b':', 1)
+             expected_hash = self._hash(serialized)
+@@ -142,8 +144,8 @@ class SessionBase:
+             else:
+                 return self.serializer().loads(serialized)
+         except Exception as e:
+-            # ValueError, SuspiciousOperation, unpickling exceptions. If any of
+-            # these happen, just return an empty dictionary (an empty session).
++            # ValueError, SuspiciousOperation, binascii.Error, unpickling exceptions.
++            # If any of these happen, just return an empty dictionary (an empty session).
+             if isinstance(e, SuspiciousOperation):
+                 logger = logging.getLogger('django.security.%s' % e.__class__.__name__)
+                 logger.warning(str(e))
+diff --git a/django/core/cache/backends/db.py b/django/core/cache/backends/db.py
+index 953e5b0..8f86096 100644
+--- a/django/core/cache/backends/db.py
++++ b/django/core/cache/backends/db.py
+@@ -89,7 +89,14 @@ class DatabaseCache(BaseDatabaseCache):
+                 expired_keys.append(key)
+             else:
+                 value = connection.ops.process_clob(value)
+-                value = pickle.loads(base64.b64decode(value.encode()))
++                try:
++                    # Value may be corrupted or not a valid base64-encoded pickle.
++                    # Don't allow decoding/unpickling errors to crash request handling;
++                    # treat such entries as expired and remove them.
++                    value = pickle.loads(base64.b64decode(value.encode()))
++                except Exception:
++                    expired_keys.append(key)
++                    continue
+                 result[key_map.get(key)] = value
+         self._base_delete_many(expired_keys)
+         return result

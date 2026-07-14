@@ -1,0 +1,28 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index c34b2ad..7737abe 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -342,6 +342,9 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
++        draggable=False,
++        draggable_use_blit=False,
++        draggable_update="loc",
+         ncol=1  # synonym for ncols (backward compatibility)
+     ):
+         """
+@@ -537,7 +540,13 @@ class Legend(Artist):
+             title_prop_fp.set_size(title_fontsize)
+ 
+         self.set_title(title, prop=title_prop_fp)
++        # initialize draggable helper (if requested) after the legend box /
++        # offsets have been initialized above.
+         self._draggable = None
++        if draggable:
++            # Delegate validation and creation to set_draggable
++            self.set_draggable(True, use_blit=draggable_use_blit,
++                               update=draggable_update)
+ 
+         # set the text color
+ 

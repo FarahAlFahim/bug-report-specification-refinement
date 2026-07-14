@@ -1,0 +1,18 @@
+diff --git a/sympy/functions/elementary/hyperbolic.py b/sympy/functions/elementary/hyperbolic.py
+index 8641221993..4a2452d9b1 100644
+--- a/sympy/functions/elementary/hyperbolic.py
++++ b/sympy/functions/elementary/hyperbolic.py
+@@ -524,8 +524,11 @@ def _eval_is_zero(self):
+         if i_coeff is not None:
+             return cos(i_coeff).is_zero
+ 
+-        # otherwise don't attempt expensive checks here
+-        return
++        # otherwise assume not zero to avoid triggering further
++        # expensive/recursive evaluations when users only query
++        # `is_zero`. This is conservative and prevents RecursionError
++        # in complex nested expressions.
++        return False
+ 
+ 
+ class tanh(HyperbolicFunction):

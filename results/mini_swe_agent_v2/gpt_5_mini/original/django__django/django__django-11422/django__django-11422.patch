@@ -1,0 +1,23 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..732a632d89 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -579,6 +579,18 @@ def run_with_reloader(main_func, *args, **kwargs):
+     try:
+         if os.environ.get(DJANGO_AUTORELOAD_ENV) == 'true':
+             reloader = get_reloader()
++            # Ensure the main script used to start the process (for example
++            # ./manage.py) is watched. When running "python manage.py ...,"
++            # the script is executed as __main__ and may not appear in
++            # sys.modules, so include it explicitly so edits to it trigger a
++            # reload.
++            try:
++                main_script = Path(sys.argv[0]).resolve()
++                if main_script.exists():
++                    reloader.watch_file(main_script)
++            except Exception:
++                # Don't fail autoreload setup if resolving the path fails.
++                pass
+             logger.info('Watching for file changes with %s', reloader.__class__.__name__)
+             start_django(reloader, main_func, *args, **kwargs)
+         else:

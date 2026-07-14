@@ -1,0 +1,33 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index 8747844e5..41b861e75 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -972,7 +972,27 @@ def check_scalar(x, name, target_type, min_val=None, max_val=None):
+         If the parameter's value violates the given bounds.
+     """
+ 
+-    if not isinstance(x, target_type):
++    # Accept a broader set of numeric scalar types for numeric target_type
++    # specifications. Historically, target_type was passed as the concrete
++    # Python builtins ``int`` or ``float``. However, valid numeric values
++    # include Python ints for float parameters and NumPy scalar types
++    # (e.g., np.int64, np.float64). To allow these while preserving
++    # non-numeric strictness for other types, map int -> numbers.Integral
++    # and float -> numbers.Real. If target_type is a tuple, map each
++    # constituent accordingly.
++    def _map_target(t):
++        if t is float:
++            return numbers.Real
++        if t is int:
++            return numbers.Integral
++        return t
++
++    if isinstance(target_type, (list, tuple)):
++        allowed_type = tuple(_map_target(t) for t in target_type)
++    else:
++        allowed_type = _map_target(target_type)
++
++    if not isinstance(x, allowed_type):
+         raise TypeError('`{}` must be an instance of {}, not {}.'
+                         .format(name, target_type, type(x)))
+ 

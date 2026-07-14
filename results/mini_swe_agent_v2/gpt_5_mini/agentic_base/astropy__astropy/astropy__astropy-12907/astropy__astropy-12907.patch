@@ -1,0 +1,17 @@
+diff --git a/astropy/modeling/separable.py b/astropy/modeling/separable.py
+index a308e2729..07b2c839d 100644
+--- a/astropy/modeling/separable.py
++++ b/astropy/modeling/separable.py
+@@ -242,7 +242,11 @@ def _cstack(left, right):
+         cright = _coord_matrix(right, 'right', noutp)
+     else:
+         cright = np.zeros((noutp, right.shape[1]))
+-        cright[-right.shape[0]:, -right.shape[1]:] = 1
++        # If the right operand is already a coord_matrix (ndarray), copy
++        # its contents into the bottom-right block. Previously this code
++        # filled the block with 1 which incorrectly marked all outputs as
++        # dependent on all inputs for nested CompoundModels.
++        cright[-right.shape[0]:, -right.shape[1]:] = right
+ 
+     return np.hstack([cleft, cright])
+ 

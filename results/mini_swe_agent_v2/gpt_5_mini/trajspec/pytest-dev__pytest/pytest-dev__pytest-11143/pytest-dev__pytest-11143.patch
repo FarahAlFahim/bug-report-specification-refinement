@@ -1,0 +1,39 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 157903faf..4244b1d28 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -677,10 +677,18 @@ class AssertionRewriter(ast.NodeVisitor):
+                 and isinstance(item, ast.Expr)
+                 and isinstance(item.value, ast.Constant)
+             ):
+-                doc = item.value.value
+-                if self.is_rewrite_disabled(doc):
+-                    return
+-                expect_docstring = False
++                # Only treat ast.Constant as a docstring when its value is a
++                # string. The AST may represent other bare constants (e.g.
++                # numeric literals) as ast.Constant; promoting those into the
++                # module docstring can lead to runtime errors when later code
++                # assumes a str. See: issue where "123" (int) caused a
++                # TypeError in is_rewrite_disabled.
++                val = item.value.value
++                if isinstance(val, str):
++                    doc = val
++                    if self.is_rewrite_disabled(doc):
++                        return
++                    expect_docstring = False
+             elif (
+                 isinstance(item, ast.ImportFrom)
+                 and item.level == 0
+@@ -743,7 +751,10 @@ class AssertionRewriter(ast.NodeVisitor):
+ 
+     @staticmethod
+     def is_rewrite_disabled(docstring: str) -> bool:
+-        return "PYTEST_DONT_REWRITE" in docstring
++        # Be defensive: callers may pass values that are not strings (for
++        # example when the first top-level expression is a non-string
++        # ast.Constant). Only perform the substring check on str instances.
++        return isinstance(docstring, str) and "PYTEST_DONT_REWRITE" in docstring
+ 
+     def variable(self) -> str:
+         """Get a new variable."""

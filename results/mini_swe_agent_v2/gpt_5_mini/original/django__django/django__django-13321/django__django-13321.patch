@@ -1,0 +1,22 @@
+diff --git a/django/contrib/sessions/backends/base.py b/django/contrib/sessions/backends/base.py
+index 187e14b1b7..97038a6b48 100644
+--- a/django/contrib/sessions/backends/base.py
++++ b/django/contrib/sessions/backends/base.py
+@@ -132,7 +132,16 @@ class SessionBase:
+ 
+     def _legacy_decode(self, session_data):
+         # RemovedInDjango40Warning: pre-Django 3.1 format will be invalid.
+-        encoded_data = base64.b64decode(session_data.encode('ascii'))
++        try:
++            encoded_data = base64.b64decode(session_data.encode('ascii'))
++        except Exception:
++            # base64.b64decode can raise binascii.Error for incorrect padding
++            # or a TypeError/UnicodeEncodeError for non-ascii input. Treat any
++            # of these as invalid/legacy session data and return an empty
++            # session instead of letting the exception bubble up and crash
++            # request processing.
++            return {}
++
+         try:
+             # could produce ValueError if there is no ':'
+             hash, serialized = encoded_data.split(b':', 1)

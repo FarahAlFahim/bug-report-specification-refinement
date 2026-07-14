@@ -1,0 +1,34 @@
+diff --git a/src/_pytest/assertion/util.py b/src/_pytest/assertion/util.py
+index 7aacf0d5e..91cf5bd46 100644
+--- a/src/_pytest/assertion/util.py
++++ b/src/_pytest/assertion/util.py
+@@ -185,18 +185,24 @@ def _diff_text(left, right, verbose=0):
+ 
+     def escape_for_readable_diff(binary_text):
+         """
+-        Ensures that the internal string is always valid unicode, converting any bytes safely to valid unicode.
+-        This is done using repr() which then needs post-processing to fix the encompassing quotes and un-escape
+-        newlines and carriage returns (#429).
++        Ensures that the internal string is always valid unicode, converting
++        bytes-like values safely to valid unicode for the diff output.
++
++        Accepts bytes, bytearray or memoryview (which are converted to
++        bytes), and uses repr() which then needs post-processing to fix the
++        encompassing quotes and un-escape newlines and carriage returns.
+         """
++        # Normalize memoryview/bytearray to bytes for consistent repr()
++        if isinstance(binary_text, (bytearray, memoryview)):
++            binary_text = bytes(binary_text)
+         r = str(repr(binary_text)[1:-1])
+         r = r.replace(r"\n", "\n")
+         r = r.replace(r"\r", "\r")
+         return r
+ 
+-    if isinstance(left, bytes):
++    if isinstance(left, (bytes, bytearray, memoryview)):
+         left = escape_for_readable_diff(left)
+-    if isinstance(right, bytes):
++    if isinstance(right, (bytes, bytearray, memoryview)):
+         right = escape_for_readable_diff(right)
+     if verbose < 1:
+         i = 0  # just in case left or right has zero length

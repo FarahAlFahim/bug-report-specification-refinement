@@ -1,0 +1,58 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 28374272f4..6ebc516da7 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -516,17 +516,51 @@ class Field(RegisterLookupMixin):
+     def __eq__(self, other):
+         # Needed for @total_ordering
+         if isinstance(other, Field):
++            # Two Field instances should only be equal if they represent the
++            # same logical field. Creation counter is the primary identity
++            # but can be duplicated when an abstract field is deep-copied
++            # into multiple concrete models. When fields are attached to
++            # models, include the model identity (label_lower) as part of
++            # the equality comparison. For unattached Field instances fall
++            # back to the legacy behaviour based on creation_counter alone.
++            if hasattr(self, 'model') and hasattr(other, 'model'):
++                return (
++                    self.creation_counter == other.creation_counter and
++                    self.model._meta.label_lower == other.model._meta.label_lower
++                )
+             return self.creation_counter == other.creation_counter
+         return NotImplemented
+ 
+     def __lt__(self, other):
+         # This is needed because bisect does not take a comparison function.
+         if isinstance(other, Field):
+-            return self.creation_counter < other.creation_counter
++            # Primary ordering is by creation_counter. If two fields share
++            # the same creation_counter (possible when copying abstract
++            # fields), provide a deterministic tie-breaker based on the
++            # attached model's label_lower. As a final fallback use the
++            # object's id() to ensure a total ordering.
++            if self.creation_counter != other.creation_counter:
++                return self.creation_counter < other.creation_counter
++            # creation_counter equal: try model-based tie-breaker
++            self_label = getattr(getattr(self, 'model', None), '_meta', None)
++            other_label = getattr(getattr(other, 'model', None), '_meta', None)
++            if self_label is not None and other_label is not None:
++                if self.model._meta.label_lower != other.model._meta.label_lower:
++                    return self.model._meta.label_lower < other.model._meta.label_lower
++            # Last resort: deterministic but arbitrary tie-breaker
++            return id(self) < id(other)
+         return NotImplemented
+ 
+     def __hash__(self):
+-        return hash(self.creation_counter)
++        # Incorporate attached model identity into the hash when
++        # available to avoid collisions for deep-copied abstract fields.
++        model_label = None
++        if hasattr(self, 'model'):
++            try:
++                model_label = self.model._meta.label_lower
++            except Exception:
++                model_label = None
++        return hash((self.creation_counter, model_label))
+ 
+     def __deepcopy__(self, memodict):
+         # We don't have to deepcopy very much here, since most things are not

@@ -1,0 +1,34 @@
+diff --git a/sympy/parsing/sympy_parser.py b/sympy/parsing/sympy_parser.py
+index 0e3c8e4be7..e99c851014 100644
+--- a/sympy/parsing/sympy_parser.py
++++ b/sympy/parsing/sympy_parser.py
+@@ -1096,3 +1096,29 @@ def visit_BinOp(self, node):
+ 
+             return new_node
+         return node
++
++    # Functions that should get evaluate=False
++    # These are SymPy functions that support the evaluate parameter
++    # Functions that start with a lowercase letter (like ceiling, floor) are also included
++    EVAL_FUNCTIONS = {'ceiling', 'floor', 'frac', 'Abs', 'sin', 'cos', 'tan', 'exp', 'log',
++                     'sqrt', 'Pow', 'Add', 'Mul', 'And', 'Or', 'Not', 'Eq', 'Ne', 'Lt', 'Le',
++                     'Gt', 'Ge', 'Sum', 'Product', 'Integral', 'Derivative', 'Limit'}
++
++    def visit_Call(self, node):
++        # Add evaluate=False to function calls to prevent evaluation
++        # This ensures that functions like ceiling, floor, etc. are not simplified
++        # But only add it if the function is a SymPy function (not a built-in function)
++        if isinstance(node.func, ast.Name):
++            func_name = node.func.id
++            # Check if this is a SymPy function that supports evaluate parameter
++            # We check if the function name is in the EVAL_FUNCTIONS set
++            if (func_name in self.EVAL_FUNCTIONS and 
++                not any(kw.arg == 'evaluate' for kw in node.keywords)):
++                new_keywords = list(node.keywords)
++                new_keywords.append(
++                    ast.keyword(arg='evaluate', value=ast.NameConstant(value=False, ctx=ast.Load()))
++                )
++                node.keywords = new_keywords
++        # Visit the arguments
++        node.args = [self.visit(arg) for arg in node.args]
++        return node

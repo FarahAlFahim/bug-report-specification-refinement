@@ -1,0 +1,14 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..cd49075c2a 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1352,6 +1352,9 @@ def _print_Symbol(self, expr):
+     _print_RandomSymbol = _print_Symbol
+     _print_MatrixSymbol = _print_Symbol
+ 
++    def _print_Trace(self, expr):
++        return r"\operatorname{tr}\left(%s\right)" % self._print(expr.arg)
++
+     def _deal_with_super_sub(self, string):
+         if '{' in string:
+             return string

@@ -1,0 +1,59 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..c9635819a 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -972,8 +972,23 @@ warn_explicit(
+         arg_expls = []
+         new_args = []
+         new_kwargs = []
++        # Special-case builtin all()/any() with a generator expression argument
++        # to materialize the generator into a list for better assertion
++        # diagnostics (shows contents/failing element rather than '<generator object>').
++        is_all_any_gen = (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        )
+         for arg in call.args:
+-            res, expl = self.visit(arg)
++            # If special case, wrap the original generator expression in a call to
++            # the rewriter's builtin list alias to avoid user shadowing.
++            if is_all_any_gen and arg is call.args[0]:
++                wrapped = ast_Call(self.builtin("list"), [arg], [])
++                res, expl = self.visit(wrapped)
++            else:
++                res, expl = self.visit(arg)
+             arg_expls.append(expl)
+             new_args.append(res)
+         for keyword in call.keywords:
+@@ -1006,8 +1021,19 @@ warn_explicit(
+         new_args = []
+         new_kwargs = []
+         new_star = new_kwarg = None
++        # Special-case builtin all()/any() with a generator expression argument
++        is_all_any_gen = (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        )
+         for arg in call.args:
+-            res, expl = self.visit(arg)
++            if is_all_any_gen and arg is call.args[0]:
++                wrapped = ast_Call(self.builtin("list"), [arg], [])
++                res, expl = self.visit(wrapped)
++            else:
++                res, expl = self.visit(arg)
+             new_args.append(res)
+             arg_expls.append(expl)
+         for keyword in call.keywords:
+@@ -1027,6 +1053,8 @@ warn_explicit(
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
+ 
++    # ast.Call signature changed on 3.5,
++
+     # ast.Call signature changed on 3.5,
+     # conditionally change  which methods is named
+     # visit_Call depending on Python version

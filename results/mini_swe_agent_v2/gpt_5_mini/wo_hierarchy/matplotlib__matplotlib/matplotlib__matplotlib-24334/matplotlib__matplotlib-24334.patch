@@ -1,0 +1,28 @@
+diff --git a/lib/matplotlib/axis.py b/lib/matplotlib/axis.py
+index af0815d41d..2e6d1e45bf 100644
+--- a/lib/matplotlib/axis.py
++++ b/lib/matplotlib/axis.py
+@@ -2023,7 +2023,23 @@ class Axis(martist.Artist):
+         """
+         result = self._set_tick_locations(ticks, minor=minor)
+         if labels is not None:
++            # If explicit labels are provided, delegate to set_ticklabels
++            # which will both set the labels and validate/apply any Text
++            # property kwargs.
+             self.set_ticklabels(labels, minor=minor, **kwargs)
++        else:
++            # Even when labels are not provided (the common case where the
++            # Formatter generates label strings), any kwargs passed that
++            # are intended as Text properties should be validated so that
++            # typos or invalid property names are caught rather than
++            # silently ignored. Apply/validate the kwargs on the tick
++            # label Text objects returned by _set_tick_locations.
++            if kwargs:
++                for tick in result:
++                    # _internal_update will validate kwarg names and
++                    # raise an AttributeError for unknown properties.
++                    tick.label1._internal_update(kwargs)
++                    tick.label2._internal_update(kwargs)
+         return result
+ 
+     def _get_tick_boxes_siblings(self, renderer):

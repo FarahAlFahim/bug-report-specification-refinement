@@ -1,0 +1,35 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 13debe8..c747acd 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -676,7 +676,12 @@ class AssertionRewriter(ast.NodeVisitor):
+                 expect_docstring
+                 and isinstance(item, ast.Expr)
+                 and isinstance(item.value, ast.Constant)
++                and isinstance(item.value.value, (str, bytes))
+             ):
++                # Only treat a Constant as a docstring when its value is a
++                # string (or bytes). Other Constant values (e.g. numeric
++                # literals) are not docstrings and should not affect where we
++                # insert the special imports.
+                 doc = item.value.value
+                 if self.is_rewrite_disabled(doc):
+                     return
+@@ -742,8 +747,15 @@ class AssertionRewriter(ast.NodeVisitor):
+                     nodes.append(field)
+ 
+     @staticmethod
+-    def is_rewrite_disabled(docstring: str) -> bool:
+-        return "PYTEST_DONT_REWRITE" in docstring
++    def is_rewrite_disabled(docstring) -> bool:
++        # Be defensive: callers may pass non-string values (e.g. the value of
++        # an ast.Constant). Only attempt the membership test for str/bytes;
++        # otherwise the rewrite marker can't be present.
++        if isinstance(docstring, str):
++            return "PYTEST_DONT_REWRITE" in docstring
++        if isinstance(docstring, (bytes, bytearray)):
++            return b"PYTEST_DONT_REWRITE" in docstring
++        return False
+ 
+     def variable(self) -> str:
+         """Get a new variable."""

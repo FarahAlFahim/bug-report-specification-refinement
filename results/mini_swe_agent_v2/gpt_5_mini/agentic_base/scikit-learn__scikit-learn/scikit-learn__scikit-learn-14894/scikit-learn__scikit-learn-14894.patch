@@ -1,0 +1,50 @@
+diff --git a/sklearn/svm/base.py b/sklearn/svm/base.py
+index 64cebe837..8cb609d75 100644
+--- a/sklearn/svm/base.py
++++ b/sklearn/svm/base.py
+@@ -280,18 +280,38 @@ class BaseLibSVM(BaseEstimator, metaclass=ABCMeta):
+ 
+         self._warn_from_fit_status()
+ 
++        # Determine number of classes and number of rows for dual_coef_
++        # For classification, libsvm represents dual_coef_ with
++        # (n_classes - 1) rows; for regression there is one row.
+         if hasattr(self, "classes_"):
+-            n_class = len(self.classes_) - 1
++            n_classes = len(self.classes_)
++            n_class = n_classes - 1
+         else:  # regression
++            n_classes = 1
+             n_class = 1
++
+         n_SV = self.support_vectors_.shape[0]
+ 
+-        dual_coef_indices = np.tile(np.arange(n_SV), n_class)
+-        dual_coef_indptr = np.arange(0, dual_coef_indices.size + 1,
+-                                     dual_coef_indices.size / n_class)
+-        self.dual_coef_ = sp.csr_matrix(
+-            (dual_coef_data, dual_coef_indices, dual_coef_indptr),
+-            (n_class, n_SV))
++        # Handle degenerate cases robustly: if there are no classes
++        # (n_class == 0) or no support vectors (n_SV == 0) or no
++        # dual coefficients returned, construct an appropriately-shaped
++        # empty CSR matrix instead of attempting to reconstruct from
++        # empty indices which can cause division by zero.
++        if n_class <= 0 or n_SV == 0 or len(dual_coef_data) == 0:
++            # Create an empty CSR matrix with the correct shape
++            # (n_class, n_SV). scipy will accept 0 for either dimension.
++            self.dual_coef_ = sp.csr_matrix((n_class, n_SV), dtype=np.float64)
++        else:
++            # Each row corresponds to n_SV entries; build indices and
++            # indptr accordingly. Use n_SV as the step to avoid any
++            # division and ensure integer steps.
++            dual_coef_indices = np.tile(np.arange(n_SV), n_class)
++            dual_coef_indptr = np.arange(0,
++                                         dual_coef_indices.size + 1,
++                                         n_SV, dtype=np.intp)
++            self.dual_coef_ = sp.csr_matrix(
++                (dual_coef_data, dual_coef_indices, dual_coef_indptr),
++                (n_class, n_SV))
+ 
+     def predict(self, X):
+         """Perform regression on samples in X.

@@ -1,0 +1,131 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..cac319ed9 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -549,6 +549,17 @@ def _call_reprcompare(ops, results, expls, each_obj):
+     return expl
+ 
+ 
++def _is_all_or_any_call(call):
++    """Check if call is to all() or any() builtins with a single iterable argument."""
++    if not isinstance(call.func, ast.Name):
++        return False
++    if call.func.id not in ("all", "any"):
++        return False
++    if len(call.args) != 1:
++        return False
++    arg = call.args[0]
++    return isinstance(arg, (ast.GeneratorExp, ast.ListComp, ast.SetComp, ast.DictComp))
++
+ unary_map = {ast.Not: "not %s", ast.Invert: "~%s", ast.USub: "-%s", ast.UAdd: "+%s"}
+ 
+ binop_map = {
+@@ -669,16 +680,16 @@ class AssertionRewriter(ast.NodeVisitor):
+             return
+         # Insert some special imports at the top of the module but after any
+         # docstrings and __future__ imports.
++        lineno = 1
+         aliases = [
+-            ast.alias(six.moves.builtins.__name__, "@py_builtins"),
+-            ast.alias("_pytest.assertion.rewrite", "@pytest_ar"),
++            ast.alias(six.moves.builtins.__name__, "@py_builtins", lineno=lineno, col_offset=0),
++            ast.alias("_pytest.assertion.rewrite", "@pytest_ar", lineno=lineno, col_offset=0),
+         ]
+         doc = getattr(mod, "docstring", None)
+         expect_docstring = doc is None
+         if doc is not None and self.is_rewrite_disabled(doc):
+             return
+         pos = 0
+-        lineno = 1
+         for item in mod.body:
+             if (
+                 expect_docstring
+@@ -968,6 +979,10 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Special handling for all() and any() with generator expressions or comprehensions
++        if _is_all_or_any_call(call):
++            return self.visit_AllAny(call)
++        
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1001,6 +1016,10 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
++        # Special handling for all() and any() with generator expressions or comprehensions
++        if _is_all_or_any_call(call):
++            return self.visit_AllAny(call)
++        
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1035,6 +1054,66 @@ warn_explicit(
+     else:
+         visit_Call = visit_Call_legacy
+ 
++    def visit_AllAny(self, call):
++        """Handle all() and any() calls with generator expressions or comprehensions.
++        
++        This provides better error messages by converting the generator/comprehension
++        to a list so the explanation shows actual values instead of <generator object>.
++        """
++        # Get the function name (all or any)
++        func_name = call.func.id
++        
++        # Get the generator expression or comprehension
++        genexp = call.args[0]
++        
++        # Visit the generator/comprehension - this will convert it to a list
++        new_arg, arg_expl = self.visit(genexp)
++        
++        # Create the all() or any() call with the evaluated argument
++        new_func = self.builtin(func_name)
++        
++        # Create the call
++        new_call = ast.Call(new_func, [new_arg], [])
++        res = self.assign(new_call)
++        
++        # Create the explanation
++        expl = "%s(%s)" % (func_name, arg_expl)
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++        return res, outer_expl
++
++    def visit_GeneratorExp(self, genexp):
++        """Convert generator expression to a list for better error messages."""
++        # Visit the generator expression elements
++        # This will create a list comprehension that evaluates the generator
++        list_comp = ast.ListComp(
++            elt=genexp.elt,
++            generators=genexp.generators
++        )
++        # Visit the list comprehension instead
++        return self.visit_ListComp(list_comp)
++
++    def visit_ListComp(self, listcomp):
++        """Visit list comprehension and convert to list for better error messages."""
++        # Evaluate the list comprehension to a list
++        list_call = ast.Call(self.builtin("list"), [listcomp], [])
++        res = self.assign(list_call)
++        return res, self.explanation_param(self.display(res))
++
++    def visit_SetComp(self, setcomp):
++        """Visit set comprehension and convert to set for better error messages."""
++        # Evaluate the set comprehension to a set
++        set_call = ast.Call(self.builtin("set"), [setcomp], [])
++        res = self.assign(set_call)
++        return res, self.explanation_param(self.display(res))
++
++    def visit_DictComp(self, dictcomp):
++        """Visit dict comprehension and convert to dict for better error messages."""
++        # Evaluate the dict comprehension to a dict
++        dict_call = ast.Call(self.builtin("dict"), [dictcomp], [])
++        res = self.assign(dict_call)
++        return res, self.explanation_param(self.display(res))
++
+     def visit_Attribute(self, attr):
+         if not isinstance(attr.ctx, ast.Load):
+             return self.generic_visit(attr)

@@ -1,0 +1,22 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 7a3de33522..87d4b92f1b 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -628,8 +628,16 @@ def adjust(s, wid=None, how='<^>'):
+             prettySign = prettyForm(*prettySign.right(pad))
+             # put the present prettyF to the right
+             prettyF = prettyForm(*prettySign.right(prettyF))
++            # if we computed a centered baseline for the inner function,
++            # make sure the assembled prettyForm keeps that baseline so that
++            # further composition (e.g. adding "+ 3") aligns to the same
++            # visual row
++            if 'centered_baseline' in locals() and centered_baseline is not None:
++                try:
++                    prettyF.baseline = centered_baseline
++                except Exception:
++                    pass
+ 
+-        prettyF.baseline = max_upper + sign_height//2
+         prettyF.binding = prettyForm.MUL
+         return prettyF
+ 

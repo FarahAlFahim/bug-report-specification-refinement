@@ -1,0 +1,168 @@
+diff --git a/doc/exts/pylint_options.py b/doc/exts/pylint_options.py
+index f402125a7..8a0d78cdb 100644
+--- a/doc/exts/pylint_options.py
++++ b/doc/exts/pylint_options.py
+@@ -97,12 +97,14 @@ def _create_checker_section(
+             continue
+ 
+         # Tomlkit doesn't support regular expressions
+-        if isinstance(value, re.Pattern):
++        # Recognize compiled patterns from any regex engine by checking for a
++        # .pattern attribute.
++        if hasattr(value, "pattern"):
+             value = value.pattern
+         elif (
+             isinstance(value, (list, tuple))
+             and value
+-            and isinstance(value[0], re.Pattern)
++            and hasattr(value[0], "pattern")
+         ):
+             value = [i.pattern for i in value]
+ 
+diff --git a/pylint/checkers/base/name_checker/checker.py b/pylint/checkers/base/name_checker/checker.py
+index 3f30fd8f0..606d3a8b5 100644
+--- a/pylint/checkers/base/name_checker/checker.py
++++ b/pylint/checkers/base/name_checker/checker.py
+@@ -282,12 +282,31 @@ class NameChecker(_BasicChecker):
+         regexps, hints = self._create_naming_rules()
+         self._name_regexps = regexps
+         self._name_hints = hints
+-        self._good_names_rgxs_compiled = [
+-            re.compile(rgxp) for rgxp in self.linter.config.good_names_rgxs
+-        ]
+-        self._bad_names_rgxs_compiled = [
+-            re.compile(rgxp) for rgxp in self.linter.config.bad_names_rgxs
+-        ]
++        # Prepare compiled patterns for name checks. Accept precompiled
++        # pattern objects (from any engine) or textual patterns. Attempt to
++        # compile textual patterns with the builtin re engine and fall back
++        # to the third-party `regex` module if available. If compilation fails,
++        # warn and skip the problematic pattern to avoid crashing on startup.
++        def _compile_pattern(rgxp):
++            if hasattr(rgxp, "match") or hasattr(rgxp, "pattern"):
++                return rgxp
++            try:
++                return re.compile(rgxp)
++            except re.error as exc:
++                try:
++                    import regex as _regex  # type: ignore
++
++                    return _regex.compile(rgxp)
++                except Exception:  # pragma: no cover - best-effort fallback
++                    import warnings
++
++                    warnings.warn(
++                        f"Could not compile regex %r with builtin re: %s; skipping it" % (rgxp, exc)
++                    )
++                    return None
++
++        self._good_names_rgxs_compiled = [p for p in (_compile_pattern(r) for r in self.linter.config.good_names_rgxs) if p]
++        self._bad_names_rgxs_compiled = [p for p in (_compile_pattern(r) for r in self.linter.config.bad_names_rgxs) if p]
+ 
+     def _create_naming_rules(self) -> tuple[dict[str, Pattern[str]], dict[str, str]]:
+         regexps: dict[str, Pattern[str]] = {}
+diff --git a/pylint/config/argument.py b/pylint/config/argument.py
+index 3c2951517..863f7c12d 100644
+--- a/pylint/config/argument.py
++++ b/pylint/config/argument.py
+@@ -103,7 +103,8 @@ def _regexp_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(re.compile(pattern))
++        # Keep textual patterns or precompiled objects; do not compile here.
++        patterns.append(pattern)
+     return patterns
+ 
+ 
+@@ -130,7 +131,7 @@ _TYPE_TRANSFORMERS: dict[str, Callable[[str], _ArgumentTypes]] = {
+     "non_empty_string": _non_empty_string_transformer,
+     "path": _path_transformer,
+     "py_version": _py_version_transformer,
+-    "regexp": re.compile,
++    "regexp": lambda v: v or "",
+     "regexp_csv": _regexp_csv_transfomer,
+     "regexp_paths_csv": _regexp_paths_csv_transfomer,
+     "string": pylint_utils._unquote,
+diff --git a/pylint/config/arguments_manager.py b/pylint/config/arguments_manager.py
+index eda1a583d..767c33b4e 100644
+--- a/pylint/config/arguments_manager.py
++++ b/pylint/config/arguments_manager.py
+@@ -733,11 +733,11 @@ class _ArgumentsManager:
+                         continue
+ 
+                 # Tomlkit doesn't support regular expressions
+-                if isinstance(value, re.Pattern):
++                # Recognize compiled patterns from any engine by checking for
++                # a .pattern attribute.
++                if hasattr(value, "pattern"):
+                     value = value.pattern
+-                elif isinstance(value, (list, tuple)) and isinstance(
+-                    value[0], re.Pattern
+-                ):
++                elif isinstance(value, (list, tuple)) and value and hasattr(value[0], "pattern"):
+                     value = [i.pattern for i in value]
+ 
+                 # Handle tuples that should be strings
+diff --git a/pylint/config/option.py b/pylint/config/option.py
+index 5043fe765..59184a023 100644
+--- a/pylint/config/option.py
++++ b/pylint/config/option.py
+@@ -21,9 +21,10 @@ def _csv_validator(_, name, value):
+ 
+ # pylint: disable=unused-argument
+ def _regexp_validator(_, name, value):
+-    if hasattr(value, "pattern"):
+-        return value
+-    return re.compile(value)
++    # Accept compiled patterns or textual patterns. Do not compile here to
++    # avoid raising re.error for constructs unsupported by the builtin
++    # re engine.
++    return value
+ 
+ 
+ # pylint: disable=unused-argument
+@@ -38,12 +39,14 @@ def _regexp_paths_csv_validator(
+         return value
+     patterns = []
+     for val in _csv_validator(_, name, value):
++        # Build the composed path-matching pattern as a string but do not
++        # compile it here. Leave compilation to consumers that need the
++        # builtin `re` engine so that option parsing doesn't raise
++        # re.error for constructs not supported by the builtin engine.
+         patterns.append(
+-            re.compile(
+-                str(pathlib.PureWindowsPath(val)).replace("\\", "\\\\")
+-                + "|"
+-                + pathlib.PureWindowsPath(val).as_posix()
+-            )
++            str(pathlib.PureWindowsPath(val)).replace("\", "\\")
++            + "|"
++            + pathlib.PureWindowsPath(val).as_posix()
+         )
+     return patterns
+ 
+@@ -103,7 +106,7 @@ VALIDATORS = {
+     "string": utils._unquote,
+     "int": int,
+     "float": float,
+-    "regexp": lambda pattern: re.compile(pattern or ""),
++    "regexp": lambda pattern: pattern or "",
+     "regexp_csv": _regexp_csv_validator,
+     "regexp_paths_csv": _regexp_paths_csv_validator,
+     "csv": _csv_validator,
+diff --git a/pylint/config/utils.py b/pylint/config/utils.py
+index bd6146336..326f8ab9c 100644
+--- a/pylint/config/utils.py
++++ b/pylint/config/utils.py
+@@ -150,7 +150,9 @@ def _parse_rich_type_value(value: Any) -> str:
+     """Parse rich (toml) types into strings."""
+     if isinstance(value, (list, tuple)):
+         return ",".join(_parse_rich_type_value(i) for i in value)
+-    if isinstance(value, re.Pattern):
++    # Recognize compiled patterns from any engine by checking for a
++    # .pattern attribute.
++    if hasattr(value, "pattern"):
+         return value.pattern
+     if isinstance(value, dict):
+         return ",".join(f"{k}:{v}" for k, v in value.items())

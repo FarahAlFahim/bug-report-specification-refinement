@@ -1,0 +1,25 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index df7452ee87..c564563227 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -1948,13 +1948,17 @@ def _print_nth_root(self, base, expt):
+         return s
+ 
+     def _print_Pow(self, power):
+-        from sympy.simplify.simplify import fraction
+         b, e = power.as_base_exp()
+         if power.is_commutative:
+             if e is S.NegativeOne:
+                 return prettyForm("1")/self._print(b)
+-            n, d = fraction(e)
+-            if n is S.One and d.is_Atom and not e.is_Integer and self._settings['root_notation']:
++            # Only render nth-root notation for rational exponents with
++            # numerator +/-1 and an integer denominator != 1. The previous
++            # implementation used fraction(e) and checked d.is_Atom which
++            # misclassified symbolic denominators (like 1/E) as integer
++            # indices. This stricter guard matches the LaTeX printer's
++            # behaviour and avoids rendering radicals for symbolic roots.
++            if e.is_Rational and abs(e.p) == 1 and e.q != 1 and self._settings['root_notation']:
+                 return self._print_nth_root(b, e)
+             if e.is_Rational and e < 0:
+                 return prettyForm("1")/self._print(Pow(b, -e, evaluate=False))

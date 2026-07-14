@@ -1,0 +1,66 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..81d56b0651 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -1,4 +1,5 @@
+ import builtins
++import importlib
+ import collections.abc
+ import datetime
+ import decimal
+@@ -95,8 +96,33 @@ class DeconstructableSerializer(BaseSerializer):
+             imports = {"from django.db import models"}
+             name = "models.%s" % name
+         else:
++            # Handle nested classes (e.g., Outer.Inner)
++            # Check if the full module exists
++            try:
++                if importlib.util.find_spec(module):
++                    # Module exists, use original behavior (return full path)
++                    imports = {"import %s" % module}
++                    return path, imports
++            except ModuleNotFoundError:
++                pass
++            # Module doesn't exist, try to find the actual module
++            # by progressively moving components from module to name
++            original_module = module
++            while module and '.' in module:
++                try:
++                    if importlib.util.find_spec(module):
++                        # Valid module found
++                        break
++                except ModuleNotFoundError:
++                    pass
++                # If not a valid module, move the last component to name
++                module, nested_name = module.rsplit(".", 1)
++                name = f"{nested_name}.{name}"
++            else:
++                # No valid module found, fall back to original behavior
++                module = original_module
++                name = path
+             imports = {"import %s" % module}
+-            name = path
+         return name, imports
+ 
+     def serialize(self):
+@@ -143,7 +169,7 @@ class FunctionTypeSerializer(BaseSerializer):
+         if getattr(self.value, "__self__", None) and isinstance(self.value.__self__, type):
+             klass = self.value.__self__
+             module = klass.__module__
+-            return "%s.%s.%s" % (module, klass.__name__, self.value.__name__), {"import %s" % module}
++            return "%s.%s.%s" % (module, klass.__qualname__, self.value.__name__), {"import %s" % module}
+         # Further error checking
+         if self.value.__name__ == '<lambda>':
+             raise ValueError("Cannot serialize function: lambda")
+@@ -267,9 +293,9 @@ class TypeSerializer(BaseSerializer):
+         if hasattr(self.value, "__module__"):
+             module = self.value.__module__
+             if module == builtins.__name__:
+-                return self.value.__name__, set()
++                return self.value.__qualname__, set()
+             else:
+-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
++                return "%s.%s" % (module, self.value.__qualname__), {"import %s" % module}
+ 
+ 
+ class UUIDSerializer(BaseSerializer):

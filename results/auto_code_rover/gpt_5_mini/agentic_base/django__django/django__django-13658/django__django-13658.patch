@@ -1,0 +1,36 @@
+diff --git a/django/core/management/__init__.py b/django/core/management/__init__.py
+index 1ba093e51f..62d1fc14cb 100644
+--- a/django/core/management/__init__.py
++++ b/django/core/management/__init__.py
+@@ -344,7 +344,7 @@ class ManagementUtility:
+         # Preprocess options to extract --settings and --pythonpath.
+         # These options could affect the commands that are available, so they
+         # must be processed early.
+-        parser = CommandParser(usage='%(prog)s subcommand [options] [args]', add_help=False, allow_abbrev=False)
++        parser = CommandParser(usage='%(prog)s subcommand [options] [args]', prog=self.prog_name, add_help=False, allow_abbrev=False)
+         parser.add_argument('--settings')
+         parser.add_argument('--pythonpath')
+         parser.add_argument('args', nargs='*')  # catch-all
+diff --git a/django/core/management/utils.py b/django/core/management/utils.py
+index 43addf8bdd..4d42102bf0 100644
+--- a/django/core/management/utils.py
++++ b/django/core/management/utils.py
+@@ -115,7 +115,17 @@ def get_command_line_option(argv, option):
+     dashes, e.g. '--testrunner') from an argument list. Return None if the
+     option wasn't passed or if the argument list couldn't be parsed.
+     """
+-    parser = CommandParser(add_help=False, allow_abbrev=False)
++    # Derive prog from the provided argv so that parser usage/help reflects
++    # the supplied program name rather than falling back to sys.argv[0].
++    import os
++    prog = None
++    if argv:
++        try:
++            prog = os.path.basename(argv[0]) if argv[0] else None
++        except Exception:
++            prog = None
++
++    parser = CommandParser(prog=prog, add_help=False, allow_abbrev=False)
+     parser.add_argument(option, dest='value')
+     try:
+         options, _ = parser.parse_known_args(argv[2:])

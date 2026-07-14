@@ -1,0 +1,45 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..4538ce5c14 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -286,6 +286,18 @@ handler_map : dict or None
+     The custom dictionary mapping instances or types to a legend
+     handler. This *handler_map* updates the default handler map
+     found at `matplotlib.legend.Legend.get_legend_handler_map`.
++
++draggable : bool, default: False
++    Whether the legend can be dragged with the mouse.
++
++draggable_use_blit : bool, default: False
++    Use blitting for faster image composition. For details see
++    :ref:`func-animation`. Only used if *draggable* is True.
++
++draggable_update : {"loc", "bbox"}, default: "loc"
++    The legend parameter to be changed when dragged. If "loc", update the
++    *loc* parameter of the legend. If "bbox", update the *bbox_to_anchor*
++    parameter. Only used if *draggable* is True.
+ """)
+ 
+ 
+@@ -342,7 +354,10 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
+-        ncol=1  # synonym for ncols (backward compatibility)
++        ncol=1,  # synonym for ncols (backward compatibility)
++        draggable=None,  # whether the legend is draggable
++        draggable_use_blit=False,  # use blitting for dragging
++        draggable_update="loc",  # update "loc" or "bbox"
+     ):
+         """
+         Parameters
+@@ -538,6 +553,9 @@ class Legend(Artist):
+ 
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
++        if draggable:
++            self.set_draggable(True, use_blit=draggable_use_blit,
++                               update=draggable_update)
+ 
+         # set the text color
+ 

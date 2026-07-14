@@ -1,0 +1,52 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 6866648d4e..dfe7ab1ae5 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -500,15 +500,20 @@ def atoms(self, *types):
+         {I*pi, 2*sin(y + I*pi)}
+ 
+         """
++        result = set()
+         if types:
+             types = tuple(
+                 [t if isinstance(t, type) else type(t) for t in types])
++            for expr in preorder_traversal(self):
++                if isinstance(expr, types):
++                    result.add(expr)
+         else:
+-            types = (Atom,)
+-        result = set()
+-        for expr in preorder_traversal(self):
+-            if isinstance(expr, types):
+-                result.add(expr)
++            # No explicit types: collect true leaf nodes (nodes with
++            # empty .args) rather than relying on the Atom subclass
++            # marker which may be set on classes that have args.
++            for expr in preorder_traversal(self):
++                if not getattr(expr, 'args', ()):  # expr.args == ()
++                    result.add(expr)
+         return result
+ 
+     @property
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 5b3c244b1c..b9990546a3 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1172,10 +1172,13 @@ def atoms(self, *types):
+         {x}
+         """
+ 
+-        types = tuple(t if isinstance(t, type) else type(t) for t in types)
+-        if not types:
+-            types = (Atom,)
+-        return self._eval_atoms(*types)
++        if types:
++            types = tuple(t if isinstance(t, type) else type(t) for t in types)
++            return self._eval_atoms(*types)
++        else:
++            # No explicit types: delegate to element-level _eval_atoms()
++            # so that Basic.atoms() can determine true leaf nodes
++            return self._eval_atoms()
+ 
+     @property
+     def free_symbols(self):

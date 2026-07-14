@@ -1,0 +1,57 @@
+diff --git a/astropy/wcs/wcs.py b/astropy/wcs/wcs.py
+index d3a06f2b31..8f376d364b 100644
+--- a/astropy/wcs/wcs.py
++++ b/astropy/wcs/wcs.py
+@@ -1220,6 +1220,32 @@ reduce these to 2 dimensions using the naxis kwarg.
+ 
+             xy = np.hstack([x.reshape((x.size, 1)) for x in axes])
+ 
++            # If there are zero input points, avoid calling into wcslib
++            # (which raises for empty inputs) and instead return empty
++            # outputs with the appropriate shape. Preserve any
++            # ra/dec reordering semantics.
++            if xy.shape[0] == 0:
++                # Apply denormalization if requested for input-side
++                # ordering (safe on empty arrays).
++                if ra_dec_order and sky == 'input':
++                    xy = self._denormalize_sky(xy)
++
++                # Construct an empty output array with the expected
++                # number of output coordinates (self.naxis). This is
++                # consistent with wcslib which would return an array
++                # of shape (N, naxis).
++                output = np.empty((0, self.naxis), dtype=float)
++
++                # Apply normalization if requested for output-side
++                # ordering (safe on empty arrays) and return in the
++                # same form as the non-empty path.
++                if ra_dec_order and sky == 'output':
++                    output = self._normalize_sky(output)
++                    return (output[:, 0].reshape(axes[0].shape),
++                            output[:, 1].reshape(axes[0].shape))
++                return [output[:, i].reshape(axes[0].shape)
++                        for i in range(output.shape[1])]
++
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
+             output = func(xy, origin)
+@@ -1235,8 +1261,19 @@ reduce these to 2 dimensions using the naxis kwarg.
+                 raise ValueError(
+                     "When providing two arguments, the array must be "
+                     "of shape (N, {0})".format(self.naxis))
++            # When provided a single (N, naxis) array, handle empty
++            # inputs without calling into wcslib. Also preserve
++            # ra/dec normalization behavior.
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
++
++            if xy.shape[0] == 0:
++                # Return an empty array with shape (0, naxis)
++                result = np.empty((0, self.naxis), dtype=float)
++                if ra_dec_order and sky == 'output':
++                    result = self._normalize_sky(result)
++                return result
++
+             result = func(xy, origin)
+             if ra_dec_order and sky == 'output':
+                 result = self._normalize_sky(result)

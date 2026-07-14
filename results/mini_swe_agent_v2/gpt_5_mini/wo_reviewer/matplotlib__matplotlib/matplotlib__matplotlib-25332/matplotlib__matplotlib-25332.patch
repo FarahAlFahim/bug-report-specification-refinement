@@ -1,0 +1,39 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..0b1281ec3b 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -788,6 +788,34 @@ class Grouper:
+     def __init__(self, init=()):
+         self._mapping = {weakref.ref(x): [weakref.ref(x)] for x in init}
+ 
++    def __getstate__(self):
++        """Return a picklable state for the Grouper.
++
++        The internal representation uses weakref.ReferenceType objects,
++        which are not picklable.  We convert to a list of groups where
++        each group is a list of the referenced objects (or None for dead
++        references).  On restore, we rebuild the weakref-based mapping.
++        """
++        # materialize the groups as lists of live objects
++        self.clean()
++        groups = []
++        unique_groups = {id(group): group for group in self._mapping.values()}
++        for group in unique_groups.values():
++            groups.append([ref() for ref in group])
++        return {"_groups": groups}
++
++    def __setstate__(self, state):
++        """Rebuild the internal weakref mapping from the pickled groups."""
++        groups = state.get("_groups", [])
++        mapping = {}
++        for group in groups:
++            # build a list of weakrefs for live objects only
++            wrefs = [weakref.ref(obj) for obj in group if obj is not None]
++            for w in wrefs:
++                mapping[w] = wrefs
++        self._mapping = mapping
++
++
+     def __contains__(self, item):
+         return weakref.ref(item) in self._mapping
+ 

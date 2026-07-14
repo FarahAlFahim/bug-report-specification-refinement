@@ -1,0 +1,110 @@
+diff --git a/sphinx/ext/autodoc/typehints.py b/sphinx/ext/autodoc/typehints.py
+index d912cd7d5..7338168f7 100644
+--- a/sphinx/ext/autodoc/typehints.py
++++ b/sphinx/ext/autodoc/typehints.py
+@@ -88,6 +88,10 @@ def insert_field_list(node: Element) -> nodes.field_list:
+ 
+ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+                       suppress_rtype: bool = False) -> None:
++    # arguments maps normalized param name (no leading stars) to a dict of
++    # flags and the raw name as found in the docstring (may include '*' or
++    # '**'). This allows lookup using annotation keys while preserving the
++    # original starred form for display.
+     arguments: Dict[str, Dict[str, bool]] = {}
+     fields = cast(Iterable[nodes.field], node)
+     for field in fields:
+@@ -96,17 +100,25 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                arg = arguments.setdefault(parts[1], {})
++                raw = parts[1]
++                name = raw.lstrip('*')
++                arg = arguments.setdefault(name, {})
++                # remember raw name for display
++                arg.setdefault('raw', raw)
+                 arg['param'] = True
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+-                name = ' '.join(parts[2:])
++                raw = ' '.join(parts[2:])
++                name = raw.lstrip('*')
+                 arg = arguments.setdefault(name, {})
++                arg.setdefault('raw', raw)
+                 arg['param'] = True
+                 arg['type'] = True
+         elif parts[0] == 'type':
+-            name = ' '.join(parts[1:])
++            raw = ' '.join(parts[1:])
++            name = raw.lstrip('*')
+             arg = arguments.setdefault(name, {})
++            arg.setdefault('raw', raw)
+             arg['type'] = True
+         elif parts[0] == 'rtype':
+             arguments['return'] = {'type': True}
+@@ -118,12 +130,16 @@ def modify_field_list(node: nodes.field_list, annotations: Dict[str, str],
+         arg = arguments.get(name, {})
+         if not arg.get('type'):
+             field = nodes.field()
+-            field += nodes.field_name('', 'type ' + name)
++            # prefer the raw (possibly starred) name from the docstring for
++            # display; fall back to the annotation key
++            display = arg.get('raw', name)
++            field += nodes.field_name('', 'type ' + display)
+             field += nodes.field_body('', nodes.paragraph('', annotation))
+             node += field
+         if not arg.get('param'):
+             field = nodes.field()
+-            field += nodes.field_name('', 'param ' + name)
++            display = arg.get('raw', name)
++            field += nodes.field_name('', 'param ' + display)
+             field += nodes.field_body('', nodes.paragraph('', ''))
+             node += field
+ 
+@@ -144,23 +160,33 @@ def augment_descriptions_with_types(
+     force_rtype: bool
+ ) -> None:
+     fields = cast(Iterable[nodes.field], node)
++    # Track presence by normalized names (no leading '*'), but remember the
++    # raw names for display if needed.
+     has_description = set()  # type: Set[str]
+     has_type = set()  # type: Set[str]
++    raw_names = {}  # type: Dict[str, str]
+     for field in fields:
+         field_name = field[0].astext()
+         parts = re.split(' +', field_name)
+         if parts[0] == 'param':
+             if len(parts) == 2:
+                 # :param xxx:
+-                has_description.add(parts[1])
++                raw = parts[1]
++                name = raw.lstrip('*')
++                has_description.add(name)
++                raw_names.setdefault(name, raw)
+             elif len(parts) > 2:
+                 # :param xxx yyy:
+-                name = ' '.join(parts[2:])
++                raw = ' '.join(parts[2:])
++                name = raw.lstrip('*')
+                 has_description.add(name)
+                 has_type.add(name)
++                raw_names.setdefault(name, raw)
+         elif parts[0] == 'type':
+-            name = ' '.join(parts[1:])
++            raw = ' '.join(parts[1:])
++            name = raw.lstrip('*')
+             has_type.add(name)
++            raw_names.setdefault(name, raw)
+         elif parts[0] in ('return', 'returns'):
+             has_description.add('return')
+         elif parts[0] == 'rtype':
+@@ -172,7 +198,8 @@ def augment_descriptions_with_types(
+             continue
+         if name in has_description and name not in has_type:
+             field = nodes.field()
+-            field += nodes.field_name('', 'type ' + name)
++            display = raw_names.get(name, name)
++            field += nodes.field_name('', 'type ' + display)
+             field += nodes.field_body('', nodes.paragraph('', annotations[name]))
+             node += field
+ 

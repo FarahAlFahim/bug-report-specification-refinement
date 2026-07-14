@@ -1,0 +1,20 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 7bc96e68eb..e596f53e98 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1041,8 +1041,14 @@ def __new__(cls, num, dps=None, prec=None, precision=None):
+             if type(num[1]) is str:
+                 # it's a hexadecimal (coming from a pickled object)
+                 # assume that it is in standard form
++                # Python 2 pickle uses 'L' suffix for long integers (e.g., '1L')
++                # which is decimal representation with suffix, not hexadecimal
+                 num = list(num)
+-                num[1] = long(num[1], 16)
++                if num[1].endswith('L'):
++                    # Python 2 long integer pickle
++                    num[1] = long(num[1][:-1], 10)
++                else:
++                    num[1] = long(num[1], 16)
+                 _mpf_ = tuple(num)
+             else:
+                 if len(num) == 4:

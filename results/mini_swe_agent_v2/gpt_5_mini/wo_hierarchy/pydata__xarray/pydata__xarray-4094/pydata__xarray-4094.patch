@@ -1,0 +1,26 @@
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..c1d21760 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -1958,10 +1958,19 @@ class DataArray(AbstractArray, DataWithCoords):
+         variables = idx.levels[level_number]
+         variable_dim = idx.names[level_number]
+ 
+-        # pull variables out of datarray
++        # pull variables out of datarray. Ensure the stacked coordinate named by
++        # ``dim`` does not persist on each per-variable DataArray, otherwise
++        # Dataset(...) will attempt to merge those same-named coordinates and
++        # raise MergeError when their underlying Index objects differ.
+         data_dict = {}
+         for k in variables:
+-            data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
++            da = self.sel({variable_dim: k}).squeeze(drop=True)
++            # if the stacked coordinate is present as a coordinate (but not a
++            # dimension) on the per-variable DataArray, drop it to avoid merge
++            # conflicts when constructing the Dataset. See GH PR description.
++            if dim in da.coords and dim not in da.dims:
++                da = da.drop_vars(dim)
++            data_dict[k] = da
+ 
+         # unstacked dataset
+         return Dataset(data_dict)

@@ -1,0 +1,59 @@
+diff --git a/django/utils/functional.py b/django/utils/functional.py
+index 9e1be0fe0f..b9c51d32f2 100644
+--- a/django/utils/functional.py
++++ b/django/utils/functional.py
+@@ -373,6 +373,54 @@ class LazyObject:
+     __len__ = new_method_proxy(len)
+     __contains__ = new_method_proxy(operator.contains)
+ 
++    # Binary, reflected and in-place arithmetic/operator methods.
++    # These proxies ensure the wrapped object is initialized before
++    # delegating the operation. Reflected methods need to perform the
++    # operation in the opposite direction (other <op> wrapped).
++    __add__ = new_method_proxy(operator.add)
++    __sub__ = new_method_proxy(operator.sub)
++    __mul__ = new_method_proxy(operator.mul)
++    __matmul__ = new_method_proxy(operator.matmul)
++    __truediv__ = new_method_proxy(operator.truediv)
++    __floordiv__ = new_method_proxy(operator.floordiv)
++    __mod__ = new_method_proxy(operator.mod)
++    __divmod__ = new_method_proxy(divmod)
++    __pow__ = new_method_proxy(pow)
++    __lshift__ = new_method_proxy(operator.lshift)
++    __rshift__ = new_method_proxy(operator.rshift)
++    __and__ = new_method_proxy(operator.and_)
++    __xor__ = new_method_proxy(operator.xor)
++    __or__ = new_method_proxy(operator.or_)
++
++    __radd__ = new_method_proxy(lambda other, wrapped: other + wrapped)
++    __rsub__ = new_method_proxy(lambda other, wrapped: other - wrapped)
++    __rmul__ = new_method_proxy(lambda other, wrapped: other * wrapped)
++    __rmatmul__ = new_method_proxy(lambda other, wrapped: other @ wrapped)
++    __rtruediv__ = new_method_proxy(lambda other, wrapped: other / wrapped)
++    __rfloordiv__ = new_method_proxy(lambda other, wrapped: other // wrapped)
++    __rmod__ = new_method_proxy(lambda other, wrapped: other % wrapped)
++    __rdivmod__ = new_method_proxy(lambda other, wrapped: divmod(other, wrapped))
++    __rpow__ = new_method_proxy(lambda other, wrapped: pow(other, wrapped))
++    __rlshift__ = new_method_proxy(lambda other, wrapped: other << wrapped)
++    __rrshift__ = new_method_proxy(lambda other, wrapped: other >> wrapped)
++    __rand__ = new_method_proxy(lambda other, wrapped: other & wrapped)
++    __rxor__ = new_method_proxy(lambda other, wrapped: other ^ wrapped)
++    __ror__ = new_method_proxy(lambda other, wrapped: other | wrapped)
++
++    __iadd__ = new_method_proxy(operator.iadd)
++    __isub__ = new_method_proxy(operator.isub)
++    __imul__ = new_method_proxy(operator.imul)
++    __imatmul__ = new_method_proxy(operator.imatmul)
++    __itruediv__ = new_method_proxy(operator.itruediv)
++    __ifloordiv__ = new_method_proxy(operator.ifloordiv)
++    __imod__ = new_method_proxy(operator.imod)
++    __ipow__ = new_method_proxy(operator.ipow)
++    __ilshift__ = new_method_proxy(operator.ilshift)
++    __irshift__ = new_method_proxy(operator.irshift)
++    __iand__ = new_method_proxy(operator.iand)
++    __ixor__ = new_method_proxy(operator.ixor)
++    __ior__ = new_method_proxy(operator.ior)
++
+ 
+ def unpickle_lazyobject(wrapped):
+     """

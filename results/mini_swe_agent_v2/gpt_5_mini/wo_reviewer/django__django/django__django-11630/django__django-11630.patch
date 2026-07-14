@@ -1,0 +1,182 @@
+diff --git a/django/core/checks/model_checks.py b/django/core/checks/model_checks.py
+index 5c2266ca1d..a2d68f9a8d 100644
+--- a/django/core/checks/model_checks.py
++++ b/django/core/checks/model_checks.py
+@@ -5,13 +5,14 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.core.checks import Error, Tags, register
++from django.db import connections, router, DEFAULT_DB_ALIAS
+ 
+ 
+ @register(Tags.models)
+ def check_all_models(app_configs=None, **kwargs):
+-    db_table_models = defaultdict(list)
+-    indexes = defaultdict(list)
+-    constraints = defaultdict(list)
++    db_table_models = defaultdict(lambda: defaultdict(list))
++    indexes = defaultdict(lambda: defaultdict(list))
++    constraints = defaultdict(lambda: defaultdict(list))
+     errors = []
+     if app_configs is None:
+         models = apps.get_models()
+@@ -19,7 +20,13 @@ def check_all_models(app_configs=None, **kwargs):
+         models = chain.from_iterable(app_config.get_models() for app_config in app_configs)
+     for model in models:
+         if model._meta.managed and not model._meta.proxy:
+-            db_table_models[model._meta.db_table].append(model._meta.label)
++            for db_alias in connections:
++                try:
++                    allow = router.allow_migrate_model(db_alias, model)
++                except Exception:
++                    allow = False
++                if allow:
++                    db_table_models[model._meta.db_table][db_alias].append(model._meta.label)
+         if not inspect.ismethod(model.check):
+             errors.append(
+                 Error(
+@@ -32,45 +39,109 @@ def check_all_models(app_configs=None, **kwargs):
+         else:
+             errors.extend(model.check(**kwargs))
+         for model_index in model._meta.indexes:
+-            indexes[model_index.name].append(model._meta.label)
++            for db_alias in connections:
++                try:
++                    allow = router.allow_migrate_model(db_alias, model)
++                except Exception:
++                    allow = False
++                if allow:
++                    indexes[model_index.name][db_alias].append(model._meta.label)
+         for model_constraint in model._meta.constraints:
+-            constraints[model_constraint.name].append(model._meta.label)
+-    for db_table, model_labels in db_table_models.items():
+-        if len(model_labels) != 1:
+-            errors.append(
+-                Error(
+-                    "db_table '%s' is used by multiple models: %s."
+-                    % (db_table, ', '.join(db_table_models[db_table])),
+-                    obj=db_table,
+-                    id='models.E028',
++            for db_alias in connections:
++                try:
++                    allow = router.allow_migrate_model(db_alias, model)
++                except Exception:
++                    allow = False
++                if allow:
++                    constraints[model_constraint.name][db_alias].append(model._meta.label)
++    for db_table, per_db in db_table_models.items():
++        # If the name collides only on the default database, keep the
++        # original message format for backwards compatibility. Otherwise
++        # include the database alias in the message to make the error
++        # explicit in multi-db setups.
++        if len(per_db) == 1 and DEFAULT_DB_ALIAS in per_db:
++            model_labels = per_db[DEFAULT_DB_ALIAS]
++            if len(model_labels) != 1:
++                errors.append(
++                    Error(
++                        "db_table '%s' is used by multiple models: %s." % (
++                            db_table, ', '.join(model_labels)
++                        ),
++                        obj=db_table,
++                        id='models.E028',
++                    )
+                 )
+-            )
+-    for index_name, model_labels in indexes.items():
+-        if len(model_labels) > 1:
+-            model_labels = set(model_labels)
+-            errors.append(
+-                Error(
+-                    "index name '%s' is not unique %s %s." % (
+-                        index_name,
+-                        'for model' if len(model_labels) == 1 else 'amongst models:',
+-                        ', '.join(sorted(model_labels)),
++        else:
++            for db_alias, model_labels in per_db.items():
++                if len(model_labels) != 1:
++                    errors.append(
++                        Error(
++                            "db_table '%s' is used by multiple models on database '%s': %s."
++                            % (db_table, db_alias, ', '.join(model_labels)),
++                            obj=db_table,
++                            id='models.E028',
++                        )
++                    )
++    for index_name, per_db in indexes.items():
++        if len(per_db) == 1 and DEFAULT_DB_ALIAS in per_db:
++            model_labels = per_db[DEFAULT_DB_ALIAS]
++            if len(model_labels) > 1:
++                model_labels = set(model_labels)
++                errors.append(
++                    Error(
++                        "index name '%s' is not unique %s %s." % (
++                            index_name,
++                            'for model' if len(model_labels) == 1 else 'amongst models:',
++                            ', '.join(sorted(model_labels)),
++                        ),
++                        id='models.E029' if len(model_labels) == 1 else 'models.E030',
+                     ),
+-                    id='models.E029' if len(model_labels) == 1 else 'models.E030',
+-                ),
+-            )
+-    for constraint_name, model_labels in constraints.items():
+-        if len(model_labels) > 1:
+-            model_labels = set(model_labels)
+-            errors.append(
+-                Error(
+-                    "constraint name '%s' is not unique %s %s." % (
+-                        constraint_name,
+-                        'for model' if len(model_labels) == 1 else 'amongst models:',
+-                        ', '.join(sorted(model_labels)),
++                )
++        else:
++            for db_alias, model_labels in per_db.items():
++                if len(model_labels) > 1:
++                    unique_labels = set(model_labels)
++                    errors.append(
++                        Error(
++                            "index name '%s' is not unique on database '%s' %s %s." % (
++                                index_name,
++                                db_alias,
++                                'for model' if len(unique_labels) == 1 else 'amongst models:',
++                                ', '.join(sorted(unique_labels)),
++                            ),
++                            id='models.E029' if len(unique_labels) == 1 else 'models.E030',
++                        ),
++                    )
++    for constraint_name, per_db in constraints.items():
++        if len(per_db) == 1 and DEFAULT_DB_ALIAS in per_db:
++            model_labels = per_db[DEFAULT_DB_ALIAS]
++            if len(model_labels) > 1:
++                model_labels = set(model_labels)
++                errors.append(
++                    Error(
++                        "constraint name '%s' is not unique %s %s." % (
++                            constraint_name,
++                            'for model' if len(model_labels) == 1 else 'amongst models:',
++                            ', '.join(sorted(model_labels)),
++                        ),
++                        id='models.E031' if len(model_labels) == 1 else 'models.E032',
+                     ),
+-                    id='models.E031' if len(model_labels) == 1 else 'models.E032',
+-                ),
+-            )
++                )
++        else:
++            for db_alias, model_labels in per_db.items():
++                if len(model_labels) > 1:
++                    unique_labels = set(model_labels)
++                    errors.append(
++                        Error(
++                            "constraint name '%s' is not unique on database '%s' %s %s." % (
++                                constraint_name,
++                                db_alias,
++                                'for model' if len(unique_labels) == 1 else 'amongst models:',
++                                ', '.join(sorted(unique_labels)),
++                            ),
++                            id='models.E031' if len(unique_labels) == 1 else 'models.E032',
++                        ),
++                    )
+     return errors
+ 
+ 

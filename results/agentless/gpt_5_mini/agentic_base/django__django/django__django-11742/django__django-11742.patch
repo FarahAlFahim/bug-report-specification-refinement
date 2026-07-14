@@ -1,0 +1,72 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 16823e9..ab91388 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,6 +955,7 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_choices_max_length(**kwargs),
+         ]
+ 
+     def _check_max_length_attribute(self, **kwargs):
+@@ -986,6 +987,59 @@ class CharField(Field):
+     def get_internal_type(self):
+         return "CharField"
+ 
++    def _check_choices_max_length(self, **kwargs):
++        """
++        Ensure that for character fields the declared max_length is large enough
++        to hold any stored choice value. Skip lazy translations (Promise) and
++        non-string choice values.
++        """
++        # Only relevant when a max_length is set.
++        if self.max_length is None:
++            return []
++
++        choices = getattr(self, 'choices', None)
++        if not choices:
++            return []
++
++        from django.utils.functional import Promise
++
++        def _iter_choice_values(choices_iter):
++            for choice in choices_iter:
++                # Grouped choices are of the form: (group_name, subgroup_list)
++                if (
++                    isinstance(choice, (list, tuple))
++                    and len(choice) == 2
++                    and isinstance(choice[1], (list, tuple))
++                ):
++                    for subchoice in choice[1]:
++                        # subchoice is expected to be a (value, label) pair
++                        yield subchoice[0]
++                else:
++                    # Regular (value, label) pair
++                    yield choice[0]
++
++        too_long = []
++        for value in _iter_choice_values(choices):
++            # Skip lazy translations and non-string values.
++            if isinstance(value, Promise):
++                continue
++            if not isinstance(value, str):
++                continue
++            if len(value) > self.max_length:
++                too_long.append(value)
++
++        if too_long:
++            return [
++                checks.Error(
++                    "Some choices have a value longer than 'max_length' (%d): %r."
++                    % (self.max_length, too_long),
++                    hint="Increase 'max_length' or shorten the choice values.",
++                    obj=self,
++                    id='fields.E122',
++                )
++            ]
++        return []
++
+     def to_python(self, value):
+         if isinstance(value, str) or value is None:
+             return value

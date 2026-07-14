@@ -1,0 +1,37 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..a3fb38c484 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -30,8 +30,30 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     camat = Matrix([[dimension_system.get_dimensional_dependencies(i, mark_dimensionless=True).get(j, 0) for i in target_dims] for j in canon_dim_units])
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+-    res_exponents = camat.solve_least_squares(exprmat, method=None)
+-    return res_exponents
++    # Attempt an exact solution for the dimensional-exponent linear system.
++    # Using a least-squares solve here can return an approximate solution
++    # when the system is inconsistent which leads to spurious fractional
++    # powers for units (see issue where convert_to(joule*second, joule)
++    # returned joule**(7/9)).  Unit conversion requires an exact match of
++    # dimensional exponents; if no exact solution exists we should signal
++    # that conversion into the requested target units is not possible by
++    # returning None.
++    try:
++        # gauss_jordan_solve raises ValueError when the system has no
++        # solution (inconsistent). For consistent systems it returns a
++        # (solution, params) pair; if there are free parameters they will
++        # appear as symbols in the solution. Choose a particular solution
++        # by setting any such free parameters to zero.
++        sol, params = camat.gauss_jordan_solve(exprmat)
++    except ValueError:
++        return None
++
++    # If the solution contains free symbolic parameters, pick the
++    # particular solution with those parameters equal to zero.
++    if sol.free_symbols:
++        sol = sol.xreplace({s: 0 for s in sol.free_symbols})
++
++    return sol
+ 
+ 
+ def convert_to(expr, target_units, unit_system="SI"):

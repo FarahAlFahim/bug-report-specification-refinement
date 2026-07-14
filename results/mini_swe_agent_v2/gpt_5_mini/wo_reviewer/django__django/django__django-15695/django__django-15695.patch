@@ -1,0 +1,23 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index d17232e4ec..d6113c83d0 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -963,6 +963,18 @@ class RenameIndex(IndexOperation):
+ 
+         to_model_state = to_state.models[app_label, self.model_name_lower]
+         new_index = to_model_state.get_index_by_name(self.new_name)
++
++        # If the resolved old index already has the desired new name, do
++        # nothing. This can happen when the migration was run forwards,
++        # then backwards (a no-op for unnamed indexes), leaving the DB
++        # index with the explicit new name. Re-applying the forward
++        # migration should be idempotent and not attempt to rename/create
++        # the index again.
++        old_name = getattr(old_index, "name", None)
++        new_name = getattr(new_index, "name", None)
++        if old_name and new_name and old_name == new_name:
++            return
++
+         schema_editor.rename_index(model, old_index, new_index)
+ 
+     def database_backwards(self, app_label, schema_editor, from_state, to_state):

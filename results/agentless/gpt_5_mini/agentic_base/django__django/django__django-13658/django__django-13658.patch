@@ -1,0 +1,50 @@
+diff --git a/django/core/management/__init__.py b/django/core/management/__init__.py
+index 7e30832..dc6c92e 100644
+--- a/django/core/management/__init__.py
++++ b/django/core/management/__init__.py
+@@ -344,7 +344,15 @@ class ManagementUtility:
+         # Preprocess options to extract --settings and --pythonpath.
+         # These options could affect the commands that are available, so they
+         # must be processed early.
+-        parser = CommandParser(usage='%(prog)s subcommand [options] [args]', add_help=False, allow_abbrev=False)
++        # Ensure the CommandParser uses the same program name derived from the
++        # argv passed to ManagementUtility so usage/help text shows the
++        # expected program name (rather than os.sys.argv[0]).
++        parser = CommandParser(
++            usage='%(prog)s subcommand [options] [args]',
++            prog=self.prog_name,
++            add_help=False,
++            allow_abbrev=False,
++        )
+         parser.add_argument('--settings')
+         parser.add_argument('--pythonpath')
+         parser.add_argument('args', nargs='*')  # catch-all
+@@ -411,4 +419,4 @@ class ManagementUtility:
+ def execute_from_command_line(argv=None):
+     """Run a ManagementUtility."""
+     utility = ManagementUtility(argv)
+-    utility.execute()
++    utility.execute()
+diff --git a/django/core/management/utils.py b/django/core/management/utils.py
+index 40bed7d..1ae5663 100644
+--- a/django/core/management/utils.py
++++ b/django/core/management/utils.py
+@@ -115,7 +115,17 @@ def get_command_line_option(argv, option):
+     dashes, e.g. '--testrunner') from an argument list. Return None if the
+     option wasn't passed or if the argument list couldn't be parsed.
+     """
+-    parser = CommandParser(add_help=False, allow_abbrev=False)
++    # When an argv is provided, ensure the parser's prog matches the argv[0]
++    # (basename) so any usage/help text reflects the provided program name
++    # instead of defaulting to sys.argv[0].
++    prog = None
++    if argv:
++        try:
++            prog = os.path.basename(argv[0]) if argv[0] else None
++        except Exception:
++            prog = None
++
++    parser = CommandParser(prog=prog, add_help=False, allow_abbrev=False)
+     parser.add_argument(option, dest='value')
+     try:
+         options, _ = parser.parse_known_args(argv[2:])

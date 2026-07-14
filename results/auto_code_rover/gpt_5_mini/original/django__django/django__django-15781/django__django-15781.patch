@@ -1,0 +1,68 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index d37d43d5c5..1286647e9c 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -130,6 +130,63 @@ class DjangoHelpFormatter(HelpFormatter):
+     def add_arguments(self, actions):
+         super().add_arguments(self._reordered_actions(actions))
+ 
++    def format_description(self, description):
++        """
++        Format the command description for help output.
++
++        Behavior:
++        - Dedent triple-quoted help strings so source indentation doesn't appear.
++        - Preserve explicit single-line breaks inserted by the author.
++        - Preserve paragraph breaks (blank lines).
++        - Wrap long lines to the formatter width, taking leading indentation into account.
++        - Return a trailing newline when non-empty (consistent with argparse.HelpFormatter).
++        """
++        import re
++        import textwrap
++
++        if not description:
++            return ""
++
++        # Remove common leading indentation from triple-quoted strings and strip
++        # leading/trailing newlines so we can control paragraph handling.
++        description = textwrap.dedent(description).strip("\n")
++        if not description:
++            return ""
++
++        # Determine available width. Prefer commonly-used attributes but fall back to 79.
++        width = getattr(self, "width", None) or getattr(self, "_width", None) or 79
++
++        # Split into paragraphs separated by one or more blank lines.
++        paragraphs = re.split(r"\n\s*\n", description)
++
++        formatted_paragraphs = []
++        for para in paragraphs:
++            # Preserve explicit single-line breaks by treating each input line
++            # inside the paragraph separately and wrapping each while preserving
++            # its leading indentation.
++            lines = para.splitlines()
++            wrapped_lines = []
++            for line in lines:
++                if not line.strip():
++                    wrapped_lines.append("")
++                    continue
++                m = re.match(r"^(\s*)(.*)$", line)
++                indent, content = m.groups()
++                # Compute fill width available for the content after indent.
++                fill_width = max(width - len(indent), 1)
++                wrapped = textwrap.fill(
++                    content,
++                    width=fill_width,
++                    initial_indent=indent,
++                    subsequent_indent=indent,
++                )
++                wrapped_lines.append(wrapped)
++            formatted_paragraphs.append("\n".join(wrapped_lines))
++
++        # Join paragraphs with a blank line and include a trailing newline as
++        # argparse.HelpFormatter.format_description would.
++        return "\n\n".join(formatted_paragraphs) + "\n"
++
+ 
+ class OutputWrapper(TextIOBase):
+     """

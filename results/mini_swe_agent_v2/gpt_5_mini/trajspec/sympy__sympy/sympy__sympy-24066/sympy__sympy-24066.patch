@@ -1,0 +1,35 @@
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index 3daf84c108..a2b6f63da4 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -190,10 +190,26 @@ def _collect_factor_and_dimension(self, expr):
+                 dim /= idim**count
+             return factor, dim
+         elif isinstance(expr, Function):
+-            fds = [self._collect_factor_and_dimension(
+-                arg) for arg in expr.args]
+-            return (expr.func(*(f[0] for f in fds)),
+-                    *(d[1] for d in fds))
++            # Collect factor/dimension for each argument
++            fds = [self._collect_factor_and_dimension(arg) for arg in expr.args]
++            # The factor for the function is the function applied to the
++            # collected argument factors.
++            factor = expr.func(*(f[0] for f in fds))
++            # The resulting dimension should be dimensionless when all
++            # argument dimensions are dimensionless; otherwise it should be
++            # the function applied to the argument Dimension objects so that
++            # DimensionSystem can analyze it.
++            arg_dims = [d[1] for d in fds]
++            if all(self.get_dimension_system().is_dimensionless(d) for d in arg_dims):
++                return factor, Dimension(1)
++            # Build a Dimension based on the function of argument dimensions.
++            dim_expr = expr.func(*arg_dims)
++            # If the function application already returned a Dimension,
++            # use it directly; otherwise wrap it into a Dimension so the
++            # rest of the code sees a Dimension instance.
++            if isinstance(dim_expr, Dimension):
++                return factor, dim_expr
++            return factor, Dimension(dim_expr)
+         elif isinstance(expr, Dimension):
+             return S.One, expr
+         else:

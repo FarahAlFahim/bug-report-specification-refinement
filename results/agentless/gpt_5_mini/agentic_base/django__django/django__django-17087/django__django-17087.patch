@@ -1,0 +1,16 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 941a5ed..8d0e9d4 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -168,7 +168,10 @@ class FunctionTypeSerializer(BaseSerializer):
+         ):
+             klass = self.value.__self__
+             module = klass.__module__
+-            return "%s.%s.%s" % (module, klass.__name__, self.value.__name__), {
++            # Use the class' qualified name so nested classes are referenced
++            # with their outer class(es) (e.g. Outer.Inner) rather than only
++            # the inner class' __name__, which would drop the outer context.
++            return "%s.%s.%s" % (module, klass.__qualname__, self.value.__name__), {
+                 "import %s" % module
+             }
+         # Further error checking

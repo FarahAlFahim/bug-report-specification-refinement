@@ -1,0 +1,25 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 13debe8..50efc79 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -677,10 +677,16 @@ class AssertionRewriter(ast.NodeVisitor):
+                 and isinstance(item, ast.Expr)
+                 and isinstance(item.value, ast.Constant)
+             ):
+-                doc = item.value.value
+-                if self.is_rewrite_disabled(doc):
+-                    return
+-                expect_docstring = False
++                # Only treat the first Expr/Constant as a docstring if it's a string.
++                if isinstance(item.value.value, str):
++                    doc = item.value.value
++                    if self.is_rewrite_disabled(doc):
++                        return
++                    expect_docstring = False
++                else:
++                    # The first Expr is a non-string constant (e.g. a number),
++                    # so it's not a docstring — stop looking for a docstring.
++                    break
+             elif (
+                 isinstance(item, ast.ImportFrom)
+                 and item.level == 0

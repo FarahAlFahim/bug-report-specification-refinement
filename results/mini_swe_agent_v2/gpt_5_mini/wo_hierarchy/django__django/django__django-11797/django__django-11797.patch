@@ -1,0 +1,18 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 2b59dd301a..b9eb1506fa 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1028,7 +1028,12 @@ class Subquery(Expression):
+     contains_aggregate = False
+ 
+     def __init__(self, queryset, output_field=None, **extra):
+-        self.query = queryset.query
++        # Keep an independent copy of the underlying Query object so that
++        # in-place mutations performed by callers (for example preparing a
++        # Query for use as a subquery) don't affect the original Query used
++        # elsewhere. See related issue where forcing select columns on the
++        # original Query mutated group_by state unexpectedly.
++        self.query = queryset.query.clone()
+         self.extra = extra
+         super().__init__(output_field)
+ 

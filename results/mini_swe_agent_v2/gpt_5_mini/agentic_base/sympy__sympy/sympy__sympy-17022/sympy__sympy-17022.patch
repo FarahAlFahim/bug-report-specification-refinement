@@ -1,0 +1,15 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index c1439ee397..a11ae73f4c 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -494,6 +494,10 @@ class NumPyPrinter(PythonCodePrinter):
+     """
+     printmethod = "_numpycode"
+ 
++    def _print_Identity(self, expr):
++        """Print Identity(n) using numpy.eye(n) for NumPy backend."""
++        return "{0}({1})".format(self._module_format('numpy.eye'), self._print(expr.args[0]))
++
+     _kf = dict(chain(
+         PythonCodePrinter._kf.items(),
+         [(k, 'numpy.' + v) for k, v in _known_functions_numpy.items()]

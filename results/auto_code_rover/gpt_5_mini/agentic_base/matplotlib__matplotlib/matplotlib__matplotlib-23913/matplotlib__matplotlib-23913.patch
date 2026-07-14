@@ -1,0 +1,79 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..a9ed40557a 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -286,6 +286,21 @@ handler_map : dict or None
+     The custom dictionary mapping instances or types to a legend
+     handler. This *handler_map* updates the default handler map
+     found at `matplotlib.legend.Legend.get_legend_handler_map`.
++
++draggable : bool, default: False
++    Enable interactive mouse dragging for the legend upon creation. If
++    ``True``, the legend is made draggable immediately and can be moved
++    with the mouse.
++
++use_blit : bool, default: False
++    Use blitting for faster redraws while dragging. This is passed to the
++    underlying `.DraggableLegend` helper.
++
++update : {'loc', 'bbox'}, default: 'loc'
++    Which legend parameter to update when dragging is finalized:
++
++    - 'loc': update the *loc* parameter of the legend.
++    - 'bbox': update the *bbox_to_anchor* parameter of the legend.
+ """)
+ 
+ 
+@@ -314,7 +329,7 @@ class Legend(Artist):
+         prop=None,           # properties for the legend texts
+         fontsize=None,       # keyword to set font size directly
+         labelcolor=None,     # keyword to set the text color
+-
++    
+         # spacing & pad defined as a fraction of the font-size
+         borderpad=None,      # whitespace inside the legend border
+         labelspacing=None,   # vertical space between the legend entries
+@@ -323,10 +338,10 @@ class Legend(Artist):
+         handletextpad=None,  # pad between the legend handle and text
+         borderaxespad=None,  # pad between the axes and legend border
+         columnspacing=None,  # spacing between columns
+-
++    
+         ncols=1,     # number of columns
+         mode=None,  # horizontal distribution of columns: None or "expand"
+-
++    
+         fancybox=None,  # True: fancy box, False: rounded box, None: rcParam
+         shadow=None,
+         title=None,           # legend title
+@@ -334,13 +349,17 @@ class Legend(Artist):
+         framealpha=None,      # set frame alpha
+         edgecolor=None,       # frame patch edgecolor
+         facecolor=None,       # frame patch facecolor
+-
++    
+         bbox_to_anchor=None,  # bbox to which the legend will be anchored
+         bbox_transform=None,  # transform for the bbox
+         frameon=None,         # draw frame
+         handler_map=None,
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
++        # New keyword-only parameters to configure draggable behavior at creation.
++        draggable=False,          # Whether the legend is draggable upon creation.
++        use_blit=False,           # Whether to use blitting when dragging.
++        update="loc",             # What to update when dragging is finished.
+         *,
+         ncol=1  # synonym for ncols (backward compatibility)
+     ):
+@@ -539,6 +558,11 @@ class Legend(Artist):
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
+ 
++        # If requested, enable draggable behavior immediately after
++        # construction. This uses the existing public API.
++        if draggable:
++            self.set_draggable(True, use_blit=use_blit, update=update)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

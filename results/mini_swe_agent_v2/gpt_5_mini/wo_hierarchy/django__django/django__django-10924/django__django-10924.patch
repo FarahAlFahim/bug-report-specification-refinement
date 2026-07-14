@@ -1,0 +1,89 @@
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index a977256525..5ee1dbf484 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -1078,6 +1078,9 @@ class MultiValueField(Field):
+ class FilePathField(ChoiceField):
+     def __init__(self, path, *, match=None, recursive=False, allow_files=True,
+                  allow_folders=False, **kwargs):
++        # Store the original path argument; it may be a callable that needs
++        # to be resolved at runtime (e.g. when the field was reconstructed
++        # from a migration that serialized a top-level callable reference).
+         self.path, self.match, self.recursive = path, match, recursive
+         self.allow_files, self.allow_folders = allow_files, allow_folders
+         super().__init__(choices=(), **kwargs)
+@@ -1090,31 +1093,51 @@ class FilePathField(ChoiceField):
+         if self.match is not None:
+             self.match_re = re.compile(self.match)
+ 
+-        if recursive:
+-            for root, dirs, files in sorted(os.walk(self.path)):
+-                if self.allow_files:
+-                    for f in sorted(files):
+-                        if self.match is None or self.match_re.search(f):
+-                            f = os.path.join(root, f)
+-                            self.choices.append((f, f.replace(path, "", 1)))
+-                if self.allow_folders:
+-                    for f in sorted(dirs):
+-                        if f == '__pycache__':
+-                            continue
+-                        if self.match is None or self.match_re.search(f):
+-                            f = os.path.join(root, f)
+-                            self.choices.append((f, f.replace(path, "", 1)))
++        # Resolve the path if it's a callable. We deliberately resolve the
++        # callable at form instantiation time so that importable top-level
++        # callables (which are preserved in migrations) will be evaluated on
++        # the target machine, avoiding machine-specific absolute paths being
++        # embedded in migrations.
++        resolved_path = self.path() if callable(self.path) else self.path
++        if resolved_path is None:
++            resolved_path = ''
++
++        if self.recursive:
++            try:
++                for root, dirs, files in sorted(os.walk(resolved_path)):
++                    if self.allow_files:
++                        for f in sorted(files):
++                            if self.match is None or self.match_re.search(f):
++                                full_path = os.path.join(root, f)
++                                # Produce a label relative to the provided path.
++                                label = full_path.replace(resolved_path, "", 1)
++                                self.choices.append((full_path, label))
++                    if self.allow_folders:
++                        for f in sorted(dirs):
++                            if f == '__pycache__':
++                                continue
++                            if self.match is None or self.match_re.search(f):
++                                full_path = os.path.join(root, f)
++                                label = full_path.replace(resolved_path, "", 1)
++                                self.choices.append((full_path, label))
++            except (OSError, FileNotFoundError):
++                # If the path cannot be accessed, leave choices as-is.
++                pass
+         else:
+             choices = []
+-            for f in os.scandir(self.path):
+-                if f.name == '__pycache__':
+-                    continue
+-                if (((self.allow_files and f.is_file()) or
+-                        (self.allow_folders and f.is_dir())) and
+-                        (self.match is None or self.match_re.search(f.name))):
+-                    choices.append((f.path, f.name))
+-            choices.sort(key=operator.itemgetter(1))
+-            self.choices.extend(choices)
++            try:
++                for f in os.scandir(resolved_path):
++                    if f.name == '__pycache__':
++                        continue
++                    if (((self.allow_files and f.is_file()) or
++                            (self.allow_folders and f.is_dir())) and
++                            (self.match is None or self.match_re.search(f.name))):
++                        choices.append((f.path, f.name))
++                choices.sort(key=operator.itemgetter(1))
++                self.choices.extend(choices)
++            except (OSError, FileNotFoundError):
++                # If the path cannot be accessed, leave choices as-is.
++                pass
+ 
+         self.widget.choices = self.choices
+ 

@@ -1,0 +1,28 @@
+diff --git a/src/_pytest/config/__init__.py b/src/_pytest/config/__init__.py
+index bb5034ab1..052a2179a 100644
+--- a/src/_pytest/config/__init__.py
++++ b/src/_pytest/config/__init__.py
+@@ -897,7 +897,10 @@ class Config:
+         else:
+             style = "native"
+         excrepr = excinfo.getrepr(
+-            funcargs=True, showlocals=getattr(option, "showlocals", False), style=style
++            funcargs=True,
++            showlocals=getattr(option, "showlocals", False),
++            style=style,
++            startpath=getattr(self, "invocation_dir", None),
+         )
+         res = self.hook.pytest_internalerror(excrepr=excrepr, excinfo=excinfo)
+         if not any(res):
+diff --git a/src/_pytest/nodes.py b/src/_pytest/nodes.py
+index 4a79bc861..9b0515231 100644
+--- a/src/_pytest/nodes.py
++++ b/src/_pytest/nodes.py
+@@ -374,6 +374,7 @@ class Node(metaclass=NodeMeta):
+             style=style,
+             tbfilter=False,  # pruned already, or in --fulltrace mode.
+             truncate_locals=truncate_locals,
++            startpath=self.session.startdir,
+         )
+ 
+     def repr_failure(

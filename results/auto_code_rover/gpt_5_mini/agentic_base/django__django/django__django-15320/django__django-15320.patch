@@ -1,0 +1,70 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..c7fe8924bd 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1150,6 +1150,14 @@ class Subquery(BaseExpression, Combinable):
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+         self.query = getattr(queryset, 'query', queryset)
++        # Ensure the inner Query is rendered as a subquery (parenthesized).
++        # Use setattr in case the provided object isn't a full Query subclass.
++        try:
++            setattr(self.query, 'subquery', True)
++        except Exception:
++            # Be defensive: if the object doesn't support attribute setting,
++            # don't break construction.
++            pass
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1165,6 +1173,12 @@ class Subquery(BaseExpression, Combinable):
+     def copy(self):
+         clone = super().copy()
+         clone.query = clone.query.clone()
++        # Ensure the cloned inner Query is marked as a subquery so that it
++        # will be parenthesized by Query.as_sql().
++        try:
++            setattr(clone.query, 'subquery', True)
++        except Exception:
++            pass
+         return clone
+ 
+     @property
+@@ -1177,8 +1191,35 @@ class Subquery(BaseExpression, Combinable):
+     def as_sql(self, compiler, connection, template=None, query=None, **extra_context):
+         connection.ops.check_expression_support(self)
+         template_params = {**self.extra, **extra_context}
+-        query = query or self.query
+-        subquery_sql, sql_params = query.as_sql(compiler, connection)
++        # Use the provided query or the stored inner query.
++        target_query = query or self.query
++
++        # If the caller provided a Query object (not the stored self.query),
++        # temporarily ensure its subquery flag is True while rendering so
++        # Query.as_sql() will add parentheses. Restore the original state
++        # afterward to avoid mutating external objects.
++        if target_query is self.query:
++            subquery_sql, sql_params = target_query.as_sql(compiler, connection)
++        else:
++            had_flag = hasattr(target_query, 'subquery')
++            original_flag = getattr(target_query, 'subquery', None)
++            try:
++                # Temporarily mark as subquery.
++                setattr(target_query, 'subquery', True)
++                subquery_sql, sql_params = target_query.as_sql(compiler, connection)
++            finally:
++                # Restore original flag or remove the attribute if it wasn't present.
++                if had_flag:
++                    try:
++                        setattr(target_query, 'subquery', original_flag)
++                    except Exception:
++                        pass
++                else:
++                    try:
++                        delattr(target_query, 'subquery')
++                    except Exception:
++                        pass
++
+         template_params['subquery'] = subquery_sql[1:-1]
+ 
+         template = template or template_params.get('template', self.template)

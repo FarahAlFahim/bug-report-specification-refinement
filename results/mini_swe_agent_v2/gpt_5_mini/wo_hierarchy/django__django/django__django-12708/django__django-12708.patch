@@ -1,0 +1,78 @@
+diff --git a/django/db/backends/base/schema.py b/django/db/backends/base/schema.py
+index 61f88401ab..94a1aa1061 100644
+--- a/django/db/backends/base/schema.py
++++ b/django/db/backends/base/schema.py
+@@ -397,23 +397,62 @@ class BaseDatabaseSchemaEditor:
+         # Created indexes
+         for field_names in news.difference(olds):
+             fields = [model._meta.get_field(field) for field in field_names]
++            # Don't create an index if the database already has an index-like
++            # object (an index or a unique constraint) covering the same
++            # columns. Introspection may report both unique constraints and
++            # plain indexes for the same columns; creating an index in that
++            # situation would be unnecessary and may cause name collisions.
++            columns = [f.column for f in fields]
++            existing = self._constraint_names(
++                model, columns, exclude={c.name for c in model._meta.constraints} | {i.name for i in model._meta.indexes}
++            )
++            if existing:
++                # There's already something covering these columns; skip creation.
++                continue
+             self.execute(self._create_index_sql(model, fields, suffix="_idx"))
+ 
+     def _delete_composed_index(self, model, fields, constraint_kwargs, sql):
+         meta_constraint_names = {constraint.name for constraint in model._meta.constraints}
+         meta_index_names = {constraint.name for constraint in model._meta.indexes}
+         columns = [model._meta.get_field(field).column for field in fields]
+-        constraint_names = self._constraint_names(
+-            model, columns, exclude=meta_constraint_names | meta_index_names,
+-            **constraint_kwargs
+-        )
+-        if len(constraint_names) != 1:
+-            raise ValueError("Found wrong number (%s) of constraints for %s(%s)" % (
+-                len(constraint_names),
+-                model._meta.db_table,
+-                ", ".join(columns),
+-            ))
+-        self.execute(self._delete_constraint_sql(sql, model, constraint_names[0]))
++        # When introspection reports multiple DB objects covering the same
++        # columns (for example a unique constraint and a plain index), be
++        # careful about which object to remove. For dropping an index_together
++        # entry we should prefer removing a plain index if one exists, and
++        # otherwise do nothing (don't attempt to drop a unique constraint's
++        # backing index). For dropping a unique constraint, remove the unique
++        # constraint itself.
++        #
++        # constraint_kwargs will typically be {'index': True} or
++        # {'unique': True}.
++        if constraint_kwargs.get('index'):
++            # Prefer plain indexes (index=True and unique=False).
++            plain_indexes = self._constraint_names(
++                model, columns, exclude=meta_constraint_names | meta_index_names,
++                index=True, unique=False
++            )
++            if len(plain_indexes) == 1:
++                self.execute(self._delete_constraint_sql(sql, model, plain_indexes[0]))
++                return
++            if len(plain_indexes) > 1:
++                raise ValueError("Found wrong number (%s) of plain indexes for %s(%s)" % (
++                    len(plain_indexes), model._meta.db_table, ", ".join(columns),
++                ))
++            # No plain index exists. If only a unique constraint (and its
++            # backing index) exists, removing an index_together should be a
++            # no-op at the DB level.
++            return
++        else:
++            # Deleting a unique constraint: find the unique constraint name(s).
++            unique_names = self._constraint_names(
++                model, columns, exclude=meta_constraint_names | meta_index_names,
++                unique=True
++            )
++            if len(unique_names) != 1:
++                raise ValueError("Found wrong number (%s) of unique constraints for %s(%s)" % (
++                    len(unique_names), model._meta.db_table, ", ".join(columns),
++                ))
++            self.execute(self._delete_constraint_sql(sql, model, unique_names[0]))
+ 
+     def alter_db_table(self, model, old_db_table, new_db_table):
+         """Rename the table a model points to."""

@@ -1,0 +1,80 @@
+diff --git a/sympy/concrete/summations.py b/sympy/concrete/summations.py
+index 372487664..d76c5d98a 100644
+--- a/sympy/concrete/summations.py
++++ b/sympy/concrete/summations.py
+@@ -196,11 +196,17 @@ def doit(self, **hints):
+             f = newf
+ 
+         if hints.get('deep', True):
+-            # eval_sum could return partially unevaluated
+-            # result with Piecewise.  In this case we won't
+-            # doit() recursively.
+-            if not isinstance(f, Piecewise):
+-                return f.doit(**hints)
++            # Try to recursively doit() the result.  Previously the
++            # code avoided calling doit() when the result was a
++            # Piecewise to prevent unintended recursive evaluation.
++            # However, in cases such as nested summation over
++            # KroneckerDelta where eval_sum returns a Piecewise
++            # representing membership in the summation limits, a
++            # further doit() can complete the evaluation (e.g.
++            # summing Identity entries to get `n`).  We therefore
++            # attempt to doit() unconditionally here; if that leads
++            # to unevaluated expressions they will be returned as-is.
++            return f.doit(**hints)
+ 
+         return f
+ 
+@@ -876,6 +882,21 @@ def eval_sum(f, limits):
+     if definite and (dif < 100):
+         return eval_sum_direct(f, (i, a, b))
+     if isinstance(f, Piecewise):
++        # Try to handle the common case where the Piecewise represents
++        # membership in the summation limits, e.g.
++        #   Piecewise((c, (i >= a) & (i <= b)), (0, True))
++        # In that case the sum is simply c*(b - a + 1) when `c` does
++        # not depend on the summation variable.
++        from sympy.sets import Interval
++        if len(f.args) == 2 and f.args[-1].cond == True:
++            expr0, cond0 = f.args[0].expr, f.args[0].cond
++            # expr0 must not depend on the summation index
++            if i not in expr0.free_symbols:
++                try:
++                    if cond0 == Interval(a, b).as_relational(i):
++                        return expr0*(b - a + 1)
++                except Exception:
++                    pass
+         return None
+     # Try to do it symbolically. Even when the number of terms is known,
+     # this can save time when b-a is big.
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..862275033 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,22 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
+-            return S.One
+-        else:
+-            return S.Zero
++        # An Identity matrix entry represents the Kronecker delta         # delta(i, j). When the indices are the same object or
++        # provably equal, return 1; when they are both concrete
++        # integers and different return 0; otherwise return a
++        # KroneckerDelta so that the summation machinery can simplify
++        # sums involving identity entries correctly (see issue where
++        # nested sums over Identity entries evaluated to 0).
++        from sympy import KroneckerDelta, Integer
++
++        # When both indices are concrete integers we can return a
++        # plain integer 0/1 result. For symbolic indices return a
++        # KroneckerDelta so the summation machinery can act on it.
++        if isinstance(i, (int, Integer)) and isinstance(j, (int, Integer)):
++            return S.One if i == j else S.Zero
++
++        # represent entry as KroneckerDelta(i, j)
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One

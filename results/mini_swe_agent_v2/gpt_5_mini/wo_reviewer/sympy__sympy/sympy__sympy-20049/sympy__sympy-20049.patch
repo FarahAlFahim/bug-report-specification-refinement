@@ -1,0 +1,88 @@
+commit 70bf968e33ad7b2dbc63fa6a9489ebbe86177f44
+Author: tester <test@example.com>
+Date:   Fri May 29 00:58:12 2026 +0000
+
+    Derive Point.vel from positions when possible; make Point.acc robust to missing vel/acc entries
+
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..3247154018 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -241,13 +241,27 @@ def acc(self, frame):
+         """
+ 
+         _check_frame(frame)
+-        if not (frame in self._acc_dict):
+-            if self._vel_dict[frame] != 0:
+-                return (self._vel_dict[frame]).dt(frame)
+-            else:
++        # If acceleration explicitly stored, return it
++        if frame in self._acc_dict:
++            return self._acc_dict[frame]
++
++        # If a velocity for this frame is explicitly stored, return its time
++        # derivative. If the stored velocity is zero return a zero Vector.
++        if frame in self._vel_dict:
++            vel = self._vel_dict[frame]
++            if vel == 0:
+                 return Vector(0)
+-        return self._acc_dict[frame]
+-
++            return vel.dt(frame)
++
++        # Try to derive a velocity (and hence acceleration) from known
++        # positional relationships. If that fails, assume zero acceleration.
++        try:
++            vel = self.vel(frame)
++        except ValueError:
++            return Vector(0)
++        if vel == 0:
++            return Vector(0)
++        return vel.dt(frame)
+     def locatenew(self, name, value):
+         """Creates a new point with a position defined from this point.
+ 
+@@ -518,11 +532,38 @@ def vel(self, frame):
+         """
+ 
+         _check_frame(frame)
+-        if not (frame in self._vel_dict):
+-            raise ValueError('Velocity of point ' + self.name + ' has not been'
+-                             ' defined in ReferenceFrame ' + frame.name)
+-        return self._vel_dict[frame]
+-
++        # If velocity explicitly stored, return it
++        if frame in self._vel_dict:
++            return self._vel_dict[frame]
++
++        # Try to derive velocity from a connected point with a defined
++        # velocity: v_self = v_other + (pos_from(other)).dt(frame)
++        for other in list(self._pos_dict.keys()):
++            try:
++                v_other = other.vel(frame)
++            except ValueError:
++                v_other = None
++            # distance from other to self
++            try:
++                dist = self.pos_from(other)
++            except ValueError:
++                # Not reachable, skip
++                continue
++            if v_other is not None:
++                return v_other + dist.dt(frame)
++
++        # If no connected point has an explicit velocity, but positional
++        # relationships exist, at least return the time-derivative of a
++        # positional vector to a neighbor: v_self = (pos_from(neighbor)).dt(frame)
++        if len(self._pos_dict) > 0:
++            # pick an arbitrary neighbor
++            neighbor = next(iter(self._pos_dict.keys()))
++            dist = self.pos_from(neighbor)
++            return dist.dt(frame)
++
++        # Nothing to derive from
++        raise ValueError('Velocity of point ' + self.name + ' has not been'
++                         ' defined in ReferenceFrame ' + frame.name)
+     def partial_velocity(self, frame, *gen_speeds):
+         """Returns the partial velocities of the linear velocity vector of this
+         point in the given frame with respect to one or more provided

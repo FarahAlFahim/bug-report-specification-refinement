@@ -1,0 +1,26 @@
+diff --git a/django/core/management/commands/inspectdb.py b/django/core/management/commands/inspectdb.py
+index f33bcbdccf..e4f85b3b5f 100644
+--- a/django/core/management/commands/inspectdb.py
++++ b/django/core/management/commands/inspectdb.py
+@@ -182,6 +182,21 @@ class Command(BaseCommand):
+                             if ref_db_table == table_name
+                             else table2model(ref_db_table)
+                         )
++                        # Provide a deterministic related_name for inspected
++                        # relation fields so that multiple FKs from the same
++                        # source table to the same target (including
++                        # self-referential FKs) do not get identical default
++                        # reverse accessor names (``<model>_set``), which
++                        # would trigger fields.E304 during system checks.
++                        # Use the pattern: "<source_model_lower>_<field_name>".
++                        # ``table2model`` is available in this scope.
++                        try:
++                            source_model_lower = table2model(table_name).lower()
++                        except Exception:
++                            source_model_lower = table_name.lower()
++                        extra_params["related_name"] = (
++                            "%s_%s" % (source_model_lower, att_name)
++                        )
+                         if rel_to in known_models:
+                             field_type = "%s(%s" % (rel_type, rel_to)
+                         else:

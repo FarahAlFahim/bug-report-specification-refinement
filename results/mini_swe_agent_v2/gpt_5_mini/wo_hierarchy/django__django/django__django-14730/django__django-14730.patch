@@ -1,0 +1,50 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..c8eb73477f 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1210,6 +1210,7 @@ class ManyToManyField(RelatedField):
+     def check(self, **kwargs):
+         return [
+             *super().check(**kwargs),
++            *self._check_symmetrical_related_name(**kwargs),
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
+@@ -1453,6 +1454,37 @@ class ManyToManyField(RelatedField):
+ 
+         return errors
+ 
++    def _check_symmetrical_related_name(self, from_model=None, **kwargs):
++        """Warn/error when a symmetrical self-referential M2M sets an explicit related_name.
++
++        This check only runs when the model that owns the field is known (from_model is
++        provided). If the relation points to the same model and is symmetrical, any
++        developer-supplied related_name is meaningless because Django does not create
++        a reverse accessor for symmetrical self many-to-many relationships.
++        """
++        # Only run this check when we know the model the field is attached to.
++        if from_model is None:
++            return []
++        rel = self.remote_field
++        # If the related model is a string, resolve relative names against from_model.
++        try:
++            to_model = resolve_relation(from_model, rel.model)
++        except Exception:
++            return []
++        # Only consider when the relation actually points to the same model class.
++        if to_model == from_model and rel.symmetrical and rel.related_name is not None:
++            return [
++                checks.Error(
++                    "ManyToManyField on model '%s' defines a symmetrical self-referential relationship and sets related_name '%s', which has no effect." % (
++                        from_model._meta.object_name, rel.related_name
++                    ),
++                    hint="Remove the related_name or set symmetrical=False to create a reverse accessor.",
++                    obj=self,
++                    id='fields.E332',
++                )
++            ]
++        return []
++
+     def _check_table_uniqueness(self, **kwargs):
+         if isinstance(self.remote_field.through, str) or not self.remote_field.through._meta.managed:
+             return []

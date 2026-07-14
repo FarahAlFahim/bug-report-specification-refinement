@@ -1,0 +1,48 @@
+diff --git a/pylint/reporters/text.py b/pylint/reporters/text.py
+index 29bd46798..bf4c36a69 100644
+--- a/pylint/reporters/text.py
++++ b/pylint/reporters/text.py
+@@ -12,6 +12,7 @@ from __future__ import annotations
+ 
+ import os
+ import re
++from string import Formatter
+ import sys
+ import warnings
+ from dataclasses import asdict, fields
+@@ -175,15 +176,29 @@ class TextReporter(BaseReporter):
+         self._template = template
+ 
+         # Check to see if all parameters in the template are attributes of the Message
+-        arguments = re.findall(r"\{(.+?)(:.*)?\}", template)
+-        for argument in arguments:
+-            if argument[0] not in MESSAGE_FIELDS:
++        # Use string.Formatter.parse to properly respect escaped braces ("{{"/"}}")
++        # which would otherwise be picked up by a simple regex.
++        new_template_parts: list[str] = []
++        for literal_text, field_name, format_spec, _ in Formatter().parse(template):
++            # Keep the literal text as-is (this preserves any escaped braces)
++            new_template_parts.append(literal_text)
++            # If there's no field here (e.g. a literal brace), skip
++            if field_name is None:
++                continue
++            # If the field is a valid Message attribute, keep it (rebuild with format_spec
++            # if present). Otherwise warn and drop it from the template.
++            if field_name in MESSAGE_FIELDS:
++                if format_spec:
++                    new_template_parts.append("{" + field_name + ":" + format_spec + "}")
++                else:
++                    new_template_parts.append("{" + field_name + "}")
++            else:
+                 warnings.warn(
+-                    f"Don't recognize the argument '{argument[0]}' in the --msg-template. "
++                    f"Don't recognize the argument '{field_name}' in the --msg-template. "
+                     "Are you sure it is supported on the current version of pylint?"
+                 )
+-                template = re.sub(r"\{" + argument[0] + r"(:.*?)?\}", "", template)
+-        self._fixed_template = template
++                # dropping the unrecognized field: do not append anything
++        self._fixed_template = "".join(new_template_parts)
+ 
+     def write_message(self, msg: Message) -> None:
+         """Convenience method to write a formatted message with class default

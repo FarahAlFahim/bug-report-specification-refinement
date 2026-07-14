@@ -1,0 +1,23 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index b1efba3..71eaf6e 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,10 +764,16 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            display_name = 'get_%s_display' % self.name
++            # Only create/override the display method if the class does not
++            # define it explicitly. Check cls.__dict__ (not hasattr) so that
++            # inherited accessor methods created on a parent class are replaced
++            # for subclasses. This ensures the display method is bound to the
++            # Field instance on the subclass (fixes inherited choices).
++            if display_name not in cls.__dict__:
+                 setattr(
+                     cls,
+-                    'get_%s_display' % self.name,
++                    display_name,
+                     partialmethod(cls._get_FIELD_display, field=self),
+                 )
+ 

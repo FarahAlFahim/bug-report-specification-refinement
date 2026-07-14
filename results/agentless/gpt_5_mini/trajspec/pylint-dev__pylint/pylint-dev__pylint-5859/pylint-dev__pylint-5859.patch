@@ -1,0 +1,37 @@
+diff --git a/pylint/checkers/misc.py b/pylint/checkers/misc.py
+index e597487..db664f0 100644
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -121,9 +121,12 @@ class EncodingChecker(BaseChecker):
+ 
+         notes = "|".join(re.escape(note) for note in self.config.notes)
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            # Allow punctuation-only note tags. Use a negative lookahead to ensure
++            # the tag is not followed by a word character (prevents inside-word matches),
++            # rather than a word-boundary which fails on non-word-only tags.
++            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})(?!\w)"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes})(?!\w)"
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)
+ 
+diff --git a/pylint/utils/pragma_parser.py b/pylint/utils/pragma_parser.py
+index 121bb9f..af2ed7e 100644
+--- a/pylint/utils/pragma_parser.py
++++ b/pylint/utils/pragma_parser.py
+@@ -41,7 +41,12 @@ ALL_KEYWORDS = "|".join(
+ 
+ TOKEN_SPECIFICATION = [
+     ("KEYWORD", rf"\b({ALL_KEYWORDS:s})\b"),
+-    ("MESSAGE_STRING", r"[0-9A-Za-z\-\_]{2,}"),  # Identifiers
++    # Accept message strings that are either identifier-like (alphanumeric,
++    # dash, underscore) or punctuation-only tokens. Match any sequence of at
++    # least two characters that are not whitespace, comma, or equals so tokens
++    # like "???" are recognized as message strings while preserving '=' as the
++    # assignment operator and ',' as a separator.
++    ("MESSAGE_STRING", r"[^,\s=]{2,}"),
+     ("ASSIGN", r"="),  # Assignment operator
+     ("MESSAGE_NUMBER", r"[CREIWF]{1}\d*"),
+ ]

@@ -1,0 +1,18 @@
+diff --git a/sympy/tensor/array/ndim_array.py b/sympy/tensor/array/ndim_array.py
+index 6490a655a4..12344fb673 100644
+--- a/sympy/tensor/array/ndim_array.py
++++ b/sympy/tensor/array/ndim_array.py
+@@ -194,6 +194,13 @@ def f(pointer):
+             if not isinstance(pointer, Iterable):
+                 return [pointer], ()
+ 
++            # Convert to list to handle iterators/generators and to allow
++            # checking for emptiness. If the iterable is empty, it should
++            # represent a 1-D empty array with shape (0,).
++            pointer = list(pointer)
++            if len(pointer) == 0:
++                return [], (0,)
++
+             result = []
+             elems, shapes = zip(*[f(i) for i in pointer])
+             if len(set(shapes)) != 1:

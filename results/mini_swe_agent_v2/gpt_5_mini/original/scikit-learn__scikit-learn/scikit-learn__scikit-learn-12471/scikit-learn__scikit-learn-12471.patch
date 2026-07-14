@@ -1,0 +1,30 @@
+diff --git a/sklearn/preprocessing/_encoders.py b/sklearn/preprocessing/_encoders.py
+index 1e05aba59..afdb4d63a 100644
+--- a/sklearn/preprocessing/_encoders.py
++++ b/sklearn/preprocessing/_encoders.py
+@@ -45,7 +45,11 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
+ 
+         """
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        # For string/unicode dtypes we prefer to work with object dtype to
++        # avoid issues with fixed-size numpy string arrays where assigning
++        # longer strings can lead to truncation or memory errors. Convert
++        # such arrays to object dtype so that string operations are safe.
++        if np.issubdtype(X_temp.dtype, np.str_):
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp
+@@ -555,7 +559,11 @@ class OneHotEncoder(_BaseEncoder):
+     def _transform_new(self, X):
+         """New implementation assuming categorical input"""
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        # For string/unicode dtypes we prefer to work with object dtype to
++        # avoid issues with fixed-size numpy string arrays where assigning
++        # longer strings can lead to truncation or memory errors. Convert
++        # such arrays to object dtype so that string operations are safe.
++        if np.issubdtype(X_temp.dtype, np.str_):
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp

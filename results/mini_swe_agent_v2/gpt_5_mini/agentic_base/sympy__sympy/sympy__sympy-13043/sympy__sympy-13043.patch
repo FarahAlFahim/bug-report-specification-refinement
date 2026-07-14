@@ -1,0 +1,21 @@
+diff --git a/sympy/integrals/intpoly.py b/sympy/integrals/intpoly.py
+index fc72bd206f..fb8cdeb5f3 100644
+--- a/sympy/integrals/intpoly.py
++++ b/sympy/integrals/intpoly.py
+@@ -593,7 +593,15 @@ def decompose(expr, separate=False):
+         poly_dict[0] = expr
+ 
+     if separate:
+-        return list(poly_dict.values())
++        # poly_dict maps degree -> polynomial. Returning values in
++        # dict iteration/insertion order can be non-deterministic across
++        # runs/inputs. Ensure a deterministic ordering by degree (ascending).
++        try:
++            # keys are numeric (int or SymPy Integer); normalize via int()
++            return [poly_dict[k] for k in sorted(poly_dict.keys(), key=lambda k: int(k))]
++        except Exception:
++            # Fallback: sort by the keys' default ordering
++            return [poly_dict[k] for k in sorted(poly_dict.keys())]
+     return poly_dict
+ 
+ 

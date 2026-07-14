@@ -1,0 +1,20 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..a339c61168 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5877,6 +5877,15 @@ def sqf_part(f, *gens, **args):
+ def _sorted_factors(factors, method):
+     """Sort a list of ``(expr, exp)`` pairs. """
+     if method == 'sqf':
++        # Combine factors with the same multiplicity
++        combined = {}
++        for poly, exp in factors:
++            if exp in combined:
++                combined[exp] = combined[exp] * poly
++            else:
++                combined[exp] = poly
++        factors = [(poly, exp) for exp, poly in combined.items()]
++
+         def key(obj):
+             poly, exp = obj
+             rep = poly.rep.rep

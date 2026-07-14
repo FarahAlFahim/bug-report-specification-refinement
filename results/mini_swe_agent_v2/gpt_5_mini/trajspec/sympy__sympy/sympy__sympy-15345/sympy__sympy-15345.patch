@@ -1,0 +1,65 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..5747dc15e 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -40,6 +40,7 @@ class MCodePrinter(CodePrinter):
+     strings of the Wolfram's Mathematica code
+     """
+     printmethod = "_mcode"
++    language = "Mathematica"
+ 
+     _default_settings = {
+         'order': None,
+@@ -63,7 +64,22 @@ def __init__(self, settings={}):
+                 userfuncs[k] = [(lambda *x: True, v)]
+                 self.known_functions.update(userfuncs)
+ 
+-    doprint = StrPrinter.doprint
++    # Use CodePrinter.doprint (inherited) instead of binding to
++    # StrPrinter.doprint.  Binding to StrPrinter.doprint causes the
++    # generic StrPrinter dispatch to be used which prints LatticeOp
++    # objects with parentheses and sorted args.  By inheriting
++    # CodePrinter.doprint we ensure that MCodePrinter instance methods
++    # (e.g. _print_LatticeOp) are used for dispatch.
++
++    def doprint(self, expr, assign_to=None):
++        """Use the StrPrinter/Printer simple doprint implementation so that
++        printing dispatch uses this MCodePrinter's _print_* methods.
++
++        We avoid using CodePrinter.doprint here because it requires a
++        number of CodePrinter-specific helper methods (e.g. _get_comment)
++        to be implemented.
++        """
++        return StrPrinter.doprint(self, expr)
+ 
+     def _print_Pow(self, expr):
+         PREC = precedence(expr)
+@@ -101,6 +117,28 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    # Ensure that Expr (the base class for many SymPy objects) is
++    # printed using the Function-style printer in this Mathematica
++    # printer.  CodePrinter defines _print_Expr to use its own
++    # Function-printing behaviour (which emits parentheses and
++    # canonicalizes args); by aliasing _print_Expr to our
++    # _print_Function we ensure consistent Mathematica-style output
++    # (square brackets, preserving argument order) for function-like
++    # expressions including LatticeOp-derived Max/Min.
++    _print_Expr = _print_Function
++
++    def _print_LatticeOp(self, expr):
++        """Print LatticeOp-derived objects (e.g. Max, Min) using
++        Mathematica-style formatting: function name with square brackets
++        and preserving the original argument order.
++
++        The generic StrPrinter implementation sorts arguments and uses
++        parentheses which is not valid Mathematica syntax.  Here we
++        mimic the Function printer behaviour but ensure square
++        brackets and original arg order are used.
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

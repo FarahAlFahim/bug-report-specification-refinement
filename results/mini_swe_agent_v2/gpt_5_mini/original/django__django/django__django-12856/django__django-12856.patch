@@ -1,0 +1,18 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 7bb3fa4706..d32a3c10c0 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1926,6 +1926,13 @@ class Model(metaclass=ModelBase):
+                         id='models.W038',
+                     )
+                 )
++        # Check that fields referenced by UniqueConstraint actually exist.
++        # This mirrors the checks performed for unique_together/indexes.
++        for constraint in cls._meta.constraints:
++            from django.db.models.constraints import UniqueConstraint as _UniqueConstraint
++            if isinstance(constraint, _UniqueConstraint):
++                errors.extend(cls._check_local_fields(constraint.fields, 'constraints'))
++
+         return errors
+ 
+ 

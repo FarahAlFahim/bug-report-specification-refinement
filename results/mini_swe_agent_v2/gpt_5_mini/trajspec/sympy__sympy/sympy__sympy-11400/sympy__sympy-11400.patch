@@ -1,0 +1,35 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..e6452fa427 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -213,6 +213,23 @@ def _print_Piecewise(self, expr):
+             last_line = ": (\n%s\n)" % self._print(expr.args[-1].expr)
+             return ": ".join(ecpairs) + last_line + " ".join([")"*len(ecpairs)])
+ 
++    def _print_sinc(self, expr):
++        """Print sinc(x) as a portable C expression that preserves
++        SymPy's semantics: sin(x)/x for x != 0 and 1 for x == 0.
++
++        This rewrites sinc to a Piecewise expression which the existing
++        Piecewise printer will render as either an inline ternary or
++        conditional statements depending on context.
++        """
++        from sympy import Piecewise, sin
++        from sympy import S
++        from sympy import Ne
++
++        arg = expr.args[0]
++        pw = Piecewise((sin(arg)/arg, Ne(arg, 0)), (S.One, True))
++        return self._print(pw)
++
++
+     def _print_ITE(self, expr):
+         from sympy.functions import Piecewise
+         _piecewise = Piecewise((expr.args[1], expr.args[0]), (expr.args[2], True))
+@@ -398,4 +415,4 @@ def ccode(expr, assign_to=None, **settings):
+ 
+ def print_ccode(expr, **settings):
+     """Prints C representation of the given expression."""
+-    print(ccode(expr, **settings))
++    print(ccode(expr, **settings))
+\ No newline at end of file

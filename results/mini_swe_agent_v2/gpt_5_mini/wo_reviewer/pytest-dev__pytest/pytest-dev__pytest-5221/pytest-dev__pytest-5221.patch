@@ -1,0 +1,41 @@
+diff --git a/src/_pytest/python.py b/src/_pytest/python.py
+index 377357846..3c7bbddce 100644
+--- a/src/_pytest/python.py
++++ b/src/_pytest/python.py
+@@ -1258,11 +1258,16 @@ def _show_fixtures_per_test(config, session):
+         argname = fixture_def.argname
+         if verbose <= 0 and argname.startswith("_"):
+             return
++        scope = getattr(fixture_def, "scope", "") or ""
++        if scope:
++            name_with_scope = "{} ({})".format(argname, scope)
++        else:
++            name_with_scope = argname
+         if verbose > 0:
+             bestrel = get_best_relpath(fixture_def.func)
+-            funcargspec = "{} -- {}".format(argname, bestrel)
++            funcargspec = "{} -- {}".format(name_with_scope, bestrel)
+         else:
+-            funcargspec = argname
++            funcargspec = name_with_scope
+         tw.line(funcargspec, green=True)
+         fixture_doc = fixture_def.func.__doc__
+         if fixture_doc:
+@@ -1342,10 +1347,15 @@ def _showfixtures_main(config, session):
+                 currentmodule = module
+         if verbose <= 0 and argname[0] == "_":
+             continue
++        scope = getattr(fixturedef, "scope", "") or ""
++        if scope:
++            name_with_scope = "%s (%s)" % (argname, scope)
++        else:
++            name_with_scope = argname
+         if verbose > 0:
+-            funcargspec = "%s -- %s" % (argname, bestrel)
++            funcargspec = "%s -- %s" % (name_with_scope, bestrel)
+         else:
+-            funcargspec = argname
++            funcargspec = name_with_scope
+         tw.line(funcargspec, green=True)
+         loc = getlocation(fixturedef.func, curdir)
+         doc = fixturedef.func.__doc__ or ""

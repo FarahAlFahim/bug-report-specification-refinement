@@ -1,0 +1,26 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 13c5c4a15e..17eb09e163 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -847,7 +847,7 @@ def _eval_is_positive(self):
+     def _eval_is_negative(self):
+         finite = self.is_finite
+         if finite is False:
+-            return False
++            return self.is_extended_negative
+         extended_negative = self.is_extended_negative
+         if finite is True:
+             return extended_negative
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 2c50002de3..f20db43ce4 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -2625,7 +2625,7 @@ def __neg__():
+     def _eval_power(self, expt):
+         if expt.is_positive:
+             return self
+-        if expt.is_negative:
++        if expt.is_negative or expt.is_extended_negative:
+             return S.ComplexInfinity
+         if expt.is_extended_real is False:
+             return S.NaN

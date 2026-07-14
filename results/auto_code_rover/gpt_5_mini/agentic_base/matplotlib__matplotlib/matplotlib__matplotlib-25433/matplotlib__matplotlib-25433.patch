@@ -1,0 +1,46 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..82238d25e4 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -941,6 +941,41 @@ default: %(va)s
+         # Break link between any twinned axes
+         _break_share_link(ax, ax._twinned_axes)
+ 
++        # Canvas-level cleanup: if the canvas currently has a mouse grab
++        # or a widgetlock owner bound to this Axes (or a widget attached to it),
++        # release those references so they do not remain stale after the Axes
++        # is removed. Guard all attribute access since not all backends/widgets
++        # expose these attributes.
++        canvas = getattr(self, "canvas", None)
++        if canvas is not None:
++            try:
++                # If the canvas mouse grab is held by this Axes, release it.
++                if getattr(canvas, "mouse_grabber", None) is ax:
++                    release_mouse = getattr(canvas, "release_mouse", None)
++                    if release_mouse is not None:
++                        try:
++                            release_mouse(ax)
++                        except Exception:
++                            # Be defensive: backends may implement differing APIs.
++                            pass
++
++                # If the canvas.widgetlock owner is a widget tied to this Axes,
++                # release the lock.
++                widgetlock = getattr(canvas, "widgetlock", None)
++                if widgetlock is not None:
++                    owner = getattr(widgetlock, "_owner", None)
++                    if owner is not None and getattr(owner, "ax", None) is ax:
++                        release = getattr(widgetlock, "release", None)
++                        if release is not None:
++                            try:
++                                widgetlock.release(owner)
++                            except Exception:
++                                # Be defensive: don't raise from backend/widgetlock.
++                                pass
++            except Exception:
++                # Ensure that nothing here can raise during delaxes.
++                pass
++
+     def clear(self, keep_observers=False):
+         """
+         Clear the figure.

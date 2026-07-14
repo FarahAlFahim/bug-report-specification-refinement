@@ -1,0 +1,34 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index 503f7f56fd..9119e84961 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -101,6 +101,16 @@ class BaseDatabaseCreation:
+         def get_objects():
+             from django.db.migrations.loader import MigrationLoader
+             loader = MigrationLoader(self.connection)
++
++            # Cache existing table names for the test database. This avoids
++            # attempting to query tables that don't exist when migrations are
++            # skipped (TEST.MIGRATE = False) but migration packages exist on
++            # disk. Accessing non-existent tables would raise ProgrammingError
++            # during serialization. Using the introspection API is safer than
++            # assuming migrated_apps implies table existence.
++            with self.connection.cursor() as cursor:
++                existing_tables = set(self.connection.introspection.table_names(cursor))
++
+             for app_config in apps.get_app_configs():
+                 if (
+                     app_config.models_module is not None and
+@@ -108,6 +118,12 @@ class BaseDatabaseCreation:
+                     app_config.name not in settings.TEST_NON_SERIALIZED_APPS
+                 ):
+                     for model in app_config.get_models():
++                        # Only attempt to serialize models whose tables exist
++                        # in the test database. This prevents querying
++                        # non-existent tables when migrations were not
++                        # applied to the test database.
++                        if model._meta.db_table not in existing_tables:
++                            continue
+                         if (
+                             model._meta.can_migrate(self.connection) and
+                             router.allow_migrate_model(self.connection.alias, model)

@@ -1,0 +1,39 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index ff6abdb958..1e2e3e6a59 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -1208,6 +1208,18 @@ class Legend(Artist):
+         """Return ``True`` if the legend is draggable, ``False`` otherwise."""
+         return self._draggable is not None
+ 
++    def __getstate__(self):
++        """Return picklable state for Legend.
++
++        Ensure runtime-only draggable helper is not pickled.
++        """
++        d = super().__getstate__()
++        # _draggable may hold references to the figure.canvas and callbacks
++        # which are backend-specific and not picklable. Clear it for pickling.
++        if "_draggable" in d:
++            d["_draggable"] = None
++        return d
++
+ 
+ # Helper functions to parse legend arguments for both `figure.legend` and
+ # `axes.legend`:
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 0f874ba33d..92ec06bde7 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,11 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++        # Runtime-only draggable helper holds references to the
++        # backend-specific FigureCanvas and callback ids which are
++        # not picklable. Ensure we don't try to pickle it.
++        if '_draggable' in d:
++            d['_draggable'] = None
+         return d
+ 
+     def contains(self, mouseevent):

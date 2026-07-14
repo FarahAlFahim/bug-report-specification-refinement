@@ -1,0 +1,20 @@
+diff --git a/sklearn/linear_model/logistic.py b/sklearn/linear_model/logistic.py
+index 1999f1dae..4ad5d5bb5 100644
+--- a/sklearn/linear_model/logistic.py
++++ b/sklearn/linear_model/logistic.py
+@@ -2170,7 +2170,14 @@ class LogisticRegressionCV(LogisticRegression, BaseEstimator,
+                 # Take the best scores across every fold and the average of
+                 # all coefficients corresponding to the best scores.
+                 best_indices = np.argmax(scores, axis=1)
+-                if self.multi_class == 'ovr':
++                # Use the resolved ``multi_class`` variable (which may have
++                # been converted from 'auto' to 'ovr' or 'multinomial') to
++                # choose the correct aggregation pattern for the
++                # coefs_paths_ produced earlier. Previously the instance
++                # attribute ``self.multi_class`` was used here which could
++                # differ from the resolved local ``multi_class`` leading to
++                # mismatched indexing and IndexError when refit=False.
++                if multi_class == 'ovr':
+                     w = np.mean([coefs_paths[i, best_indices[i], :]
+                                  for i in range(len(folds))], axis=0)
+                 else:

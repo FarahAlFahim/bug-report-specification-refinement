@@ -1,0 +1,65 @@
+diff --git a/sympy/physics/units/__init__.py b/sympy/physics/units/__init__.py
+index 18fee8c601..8f2546f8c8 100644
+--- a/sympy/physics/units/__init__.py
++++ b/sympy/physics/units/__init__.py
+@@ -240,7 +240,8 @@ def find_unit(quantity, unit_system="SI"):
+     ['L', 'l', 'cL', 'cl', 'dL', 'dl', 'mL', 'ml', 'liter']
+     """
+     unit_system = UnitSystem.get_unit_system(unit_system)
+-
++    dimsys = unit_system.get_dimension_system()
++ 
+     import sympy.physics.units as u
+     rv = []
+     if isinstance(quantity, str):
+@@ -254,12 +255,13 @@ def find_unit(quantity, unit_system="SI"):
+             if not isinstance(other, Quantity):
+                 continue
+             if isinstance(quantity, Quantity):
+-                if quantity.dimension == other.dimension:
++                # use the unit system's DimensionSystem to test equivalence
++                if dimsys.equivalent_dims(quantity.dimension, other.dimension):
+                     rv.append(str(i))
+             elif isinstance(quantity, Dimension):
+-                if other.dimension == quantity:
++                if dimsys.equivalent_dims(other.dimension, quantity):
+                     rv.append(str(i))
+-            elif other.dimension == Dimension(unit_system.get_dimensional_expr(quantity)):
++            elif dimsys.equivalent_dims(other.dimension, Dimension(unit_system.get_dimensional_expr(quantity))):
+                 rv.append(str(i))
+     return sorted(set(rv), key=lambda x: (len(x), x))
+ 
+diff --git a/sympy/physics/units/systems/si.py b/sympy/physics/units/systems/si.py
+index 700495ad9d..0ba6e9dda2 100644
+--- a/sympy/physics/units/systems/si.py
++++ b/sympy/physics/units/systems/si.py
+@@ -333,9 +333,8 @@
+ ):
+     dimex = SI.get_dimensional_expr(_scale_factor)
+     if dimex != 1:
+-        # XXX: equivalent_dims is an instance method taking two arguments in
+-        # addition to self so this can not work:
+-        if not DimensionSystem.equivalent_dims(_dimension, Dimension(dimex)):  # type: ignore
++        # Use the SI unit system's DimensionSystem instance to test equivalence
++        if not SI.get_dimension_system().equivalent_dims(_dimension, Dimension(dimex)):
+             raise ValueError("quantity value and dimension mismatch")
+ del _scale_factor, _dimension
+ 
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index a436880c4b..ec4b384cfd 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -175,10 +175,10 @@ def _collect_factor_and_dimension(self, expr):
+             for addend in expr.args[1:]:
+                 addend_factor, addend_dim = \
+                     self._collect_factor_and_dimension(addend)
+-                if dim != addend_dim:
++                # Use the DimensionSystem to determine dimensional equivalence
++                if not self.get_dimension_system().equivalent_dims(dim, addend_dim):
+                     raise ValueError(
+-                        'Dimension of "{}" is {}, '
+-                        'but it should be {}'.format(
++                        'Dimension of "{}" is {}, but it should be {}'.format(
+                             addend, addend_dim, dim))
+                 factor += addend_factor
+             return factor, dim

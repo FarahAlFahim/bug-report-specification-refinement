@@ -1,0 +1,57 @@
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index 1aa0ee01a2..ffd4c1a519 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -391,6 +391,27 @@ def translate(s):
+     _print_MatrixSymbol = _print_Symbol
+     _print_RandomSymbol = _print_Symbol
+ 
++    def _print_Indexed(self, expr):
++        """Print an Indexed object using its base and indices.
++
++        Avoid iterating over the object itself (Indexed is not iterable);
++        access .base and .indices explicitly.
++        """
++        x = self.dom.createElement('apply')
++        # print the base (IndexedBase.label or other)
++        x.appendChild(self._print(expr.base))
++        for idx in expr.indices:
++            x.appendChild(self._print(idx))
++        return x
++
++    def _print_IndexedBase(self, expr):
++        """Print an IndexedBase as an identifier (ci)."""
++        return self._print(expr.label)
++
++    def _print_Idx(self, expr):
++        """Print an index (Idx) using the normal printer for expressions."""
++        return self._print(expr)
++
+     def _print_Pow(self, e):
+         # Here we use root instead of power if the exponent is the reciprocal of an integer
+         if self._settings['root_notation'] and e.exp.is_Rational and e.exp.p == 1:
+@@ -848,6 +869,24 @@ def _print_MatrixSymbol(self, sym):
+ 
+     _print_RandomSymbol = _print_Symbol
+ 
++    def _print_Indexed(self, expr):
++        """Print an Indexed object using its base and indices (presentation)."""
++        # represent the indexed object as the base followed by a fenced list of indices
++        mrow = self.dom.createElement('mrow')
++        mrow.appendChild(self._print(expr.base))
++        if expr.indices:
++            fence = self.dom.createElement('mfenced')
++            for idx in expr.indices:
++                fence.appendChild(self._print(idx))
++            mrow.appendChild(fence)
++        return mrow
++
++    def _print_IndexedBase(self, expr):
++        return self._print(expr.label)
++
++    def _print_Idx(self, expr):
++        return self._print(expr)
++
+     def _print_conjugate(self, expr):
+         enc = self.dom.createElement('menclose')
+         enc.setAttribute('notation', 'top')

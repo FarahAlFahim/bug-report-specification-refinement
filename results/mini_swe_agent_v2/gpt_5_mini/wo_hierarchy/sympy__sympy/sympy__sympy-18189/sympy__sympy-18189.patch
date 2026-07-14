@@ -1,0 +1,32 @@
+diff --git a/sympy/solvers/diophantine.py b/sympy/solvers/diophantine.py
+index b93d37a212..0cd0426a67 100644
+--- a/sympy/solvers/diophantine.py
++++ b/sympy/solvers/diophantine.py
+@@ -185,15 +185,15 @@ def diophantine(eq, param=symbols("t", integer=True), syms=None,
+                 # permutations requested at top-level are respected by
+                 # internal invocations
+                 return {tuple([t[dict_sym_index[i]] for i in var])
+-                        for t in diophantine(eq, param, syms=syms, permute=permute)}
++                        for t in diophantine(eq, param, permute=permute)}
+         n, d = eq.as_numer_denom()
+         if n.is_number:
+             return set()
+         if not d.is_number:
+             # forward permute flag to recursive calls so that numerator/
+             # denominator handling is consistent with the top-level request
+-            dsol = diophantine(d, param, syms, permute=permute)
+-            good = diophantine(n, param, syms, permute=permute) - dsol
++            dsol = diophantine(d, param, syms=syms, permute=permute)
++            good = diophantine(n, param, syms=syms, permute=permute) - dsol
+             return {s for s in good if _mexpand(d.subs(zip(var, s)))}
+         else:
+             eq = n
+@@ -308,7 +308,7 @@ def diophantine(eq, param=symbols("t", integer=True), syms=None,
+         base, _ = term
+         var_t, _, eq_type = classify_diop(base, _dict=False)
+         _, base = signsimp(base, evaluate=False).as_coeff_Mul()
+-        solution = diop_solve(base, param)
++        solution = diop_solve(base, param, permute=permute)
+ 
+         if eq_type in [
+                 "linear",

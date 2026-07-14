@@ -1,0 +1,21 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 4038859cfa..48bd64a464 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1297,8 +1297,15 @@ class Model(metaclass=ModelBase):
+ 
+     @classmethod
+     def _check_default_pk(cls):
++        pk = cls._meta.pk
++        # An auto-created primary key on a model usually means Django added an
++        # implicit 'id' AutoField. However, in multi-table inheritance the
++        # primary key can be an inherited parent-link OneToOneField which is
++        # auto_created==True but represents an inherited PK rather than a
++        # locally auto-created id. Don't warn in that case.
+         if (
+-            cls._meta.pk.auto_created and
++            pk.auto_created and
++            not (getattr(pk, 'remote_field', None) and getattr(pk.remote_field, 'parent_link', False)) and
+             not settings.is_overridden('DEFAULT_AUTO_FIELD') and
+             not cls._meta.app_config._is_default_auto_field_overridden
+         ):

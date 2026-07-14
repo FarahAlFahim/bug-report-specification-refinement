@@ -1,0 +1,27 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 9e67bb6..711e33a 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -730,6 +730,22 @@ class Documenter:
+ 
+             has_doc = bool(doc)
+ 
++            # Treat annotation-only attributes (those without runtime __doc__)
++            # as "documented" for the purposes of autodoc filtering if they are
++            # declared in any class's __annotations__ in the MRO.  This allows
++            # annotation-only members defined in superclasses to be shown when
++            # :inherited-members: is used (they otherwise look undocumented).
++            if not has_doc and inspect.isclass(self.object):
++                try:
++                    for cls in self.object.__mro__:
++                        anns = self.get_attr(cls, '__annotations__', {})
++                        if membername in anns:
++                            has_doc = True
++                            break
++                except Exception:
++                    # if anything goes wrong, do not treat as documented
++                    pass
++
+             metadata = extract_metadata(doc)
+             if 'private' in metadata:
+                 # consider a member private if docstring has "private" metadata

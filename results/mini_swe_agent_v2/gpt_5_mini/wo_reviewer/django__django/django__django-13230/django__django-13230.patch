@@ -1,0 +1,41 @@
+diff --git a/django/contrib/syndication/views.py b/django/contrib/syndication/views.py
+index 68ffb0bfe0..b51116adf1 100644
+--- a/django/contrib/syndication/views.py
++++ b/django/contrib/syndication/views.py
+@@ -199,6 +199,27 @@ class Feed:
+             if updateddate and is_naive(updateddate):
+                 updateddate = make_aware(updateddate, tz)
+ 
++            # Determine comments: prefer item_comments if provided, else fall back to item_extra_kwargs['comments']
++            comments_val = self._get_dynamic_attr('item_comments', item)
++            # Preserve additional extras (e.g., geo 'geometry'), but prevent them from
++            # overriding standard item fields.  Standard keys:
++            _standard_keys = {
++                'title', 'link', 'description', 'unique_id', 'unique_id_is_permalink',
++                'enclosures', 'pubdate', 'updateddate', 'author_name', 'author_email',
++                'author_link', 'categories', 'item_copyright', 'comments'
++            }
++            extras = dict(self.item_extra_kwargs(item) or {})
++            # If comments not provided via item_comments, allow extras to supply it.
++            if comments_val is None:
++                comments_val = extras.pop('comments', None)
++            else:
++                # Ensure 'comments' in extras won't conflict
++                extras.pop('comments', None)
++            # Remove any keys that would override standard fields
++            for k in list(extras.keys()):
++                if k in _standard_keys:
++                    extras.pop(k)
++
+             feed.add_item(
+                 title=title,
+                 link=link,
+@@ -214,6 +235,7 @@ class Feed:
+                 author_link=author_link,
+                 categories=self._get_dynamic_attr('item_categories', item),
+                 item_copyright=self._get_dynamic_attr('item_copyright', item),
+-                **self.item_extra_kwargs(item)
++                comments=comments_val,
++                **extras
+             )
+         return feed

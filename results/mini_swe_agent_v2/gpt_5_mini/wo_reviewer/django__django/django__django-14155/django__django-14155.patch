@@ -1,0 +1,58 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..1f6bcb87fa 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -45,13 +45,32 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # Special-case functools.partial for nicer display. We must not
++        # mutate self.args/self.kwargs here because ResolverMatch must
++        # continue to yield (func, args, kwargs) suitable for runtime
++        # invocation (the func may be a partial itself).
++        if isinstance(func, functools.partial):
++            # Unwrap the underlying callable for display purposes and
++            # record any pre-bound args/kwargs separately.
++            unwrapped = func.func
++            self._partial_args = tuple(getattr(func, 'args', ()) or ())
++            self._partial_kwargs = dict(getattr(func, 'keywords', {}) or {})
++            if not hasattr(unwrapped, '__name__'):
++                # A class-based view wrapped in partial
++                self._func_path = unwrapped.__class__.__module__ + '.' + unwrapped.__class__.__name__
++            else:
++                # A function-based view wrapped in partial
++                self._func_path = unwrapped.__module__ + '.' + unwrapped.__name__
+         else:
+-            # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
+-
++            # No partial: ensure partial attrs are empty for consistent access
++            self._partial_args = ()
++            self._partial_kwargs = {}
++            if not hasattr(func, '__name__'):
++                # A class-based view
++                self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++            else:
++                # A function-based view
++                self._func_path = func.__module__ + '.' + func.__name__
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])
+ 
+@@ -59,8 +78,13 @@ class ResolverMatch:
+         return (self.func, self.args, self.kwargs)[index]
+ 
+     def __repr__(self):
++        # For display, include any pre-bound partial args/kwargs merged
++        # with the URL-resolved args/kwargs, but do not mutate the
++        # runtime self.args/self.kwargs.
++        display_args = getattr(self, '_partial_args', ()) + tuple(self.args)
++        display_kwargs = {**getattr(self, '_partial_kwargs', {}), **self.kwargs}
+         return "ResolverMatch(func=%s, args=%s, kwargs=%s, url_name=%s, app_names=%s, namespaces=%s, route=%s)" % (
+-            self._func_path, self.args, self.kwargs, self.url_name,
++            self._func_path, display_args, display_kwargs, self.url_name,
+             self.app_names, self.namespaces, self.route,
+         )
+ 

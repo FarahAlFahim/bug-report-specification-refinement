@@ -1,0 +1,21 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..7cb157a1d3 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -239,8 +239,14 @@ def _solve_reduced_system(system, gens, entry=False):
+                 return None
+ 
+         univariate = list(filter(_is_univariate, basis))
+-
+-        if len(univariate) == 1:
++ 
++        # Only treat a single univariate polynomial as the elimination of
++        # the last variable when the current system is actually univariate
++        # (i.e. there's only one generator). If there are multiple
++        # generators, a univariate polynomial in the basis indicates free
++        # variables (not a zero-dimensional system) and should be treated
++        # as unsupported here.
++        if len(univariate) == 1 and len(gens) == 1:
+             f = univariate.pop()
+         else:
+             raise NotImplementedError(filldedent('''

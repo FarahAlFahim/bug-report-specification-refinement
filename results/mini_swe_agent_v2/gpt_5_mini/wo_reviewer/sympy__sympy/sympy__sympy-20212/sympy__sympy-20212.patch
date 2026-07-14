@@ -1,0 +1,55 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 2c50002de3..4f0f1ade2c 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1359,9 +1359,14 @@ def _eval_power(self, expt):
+                   -> p**r*(sin(Pi*r) + cos(Pi*r)*I)
+         """
+         if self == 0:
++            # handle extended negative (e.g. -oo) as well as finite negative
+             if expt.is_positive:
+                 return S.Zero
++            # -oo should give ComplexInfinity even for Float(0)
++            if expt.is_extended_negative and expt.is_infinite:
++                return S.ComplexInfinity
+             if expt.is_negative:
++                # finite negative exponents give +Infinity for floats
+                 return S.Infinity
+         if isinstance(expt, Number):
+             if isinstance(expt, Integer):
+@@ -2625,7 +2630,8 @@ def __neg__():
+     def _eval_power(self, expt):
+         if expt.is_positive:
+             return self
+-        if expt.is_negative:
++        # treat extended negative infinite exponents (like -oo) as negative
++        if expt.is_negative or (expt.is_extended_negative and expt.is_infinite):
+             return S.ComplexInfinity
+         if expt.is_extended_real is False:
+             return S.NaN
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index 984398c760..6225adee66 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -297,7 +297,7 @@ def __new__(cls, b, e, evaluate=None):
+                 return S.One
+             elif e is S.One:
+                 return b
+-            elif e == -1 and not b:
++            elif e == -1 and b is S.Zero:
+                 return S.ComplexInfinity
+             # Only perform autosimplification if exponent or base is a Symbol or number
+             elif (b.is_Symbol or b.is_number) and (e.is_Symbol or e.is_number) and\
+@@ -395,6 +395,12 @@ def _n2(e):
+                 # handle -1 as special case
+                 if e == -1:
+                     # floor arg. is 1/2 + arg(b)/2/pi
++                    # Historically this case returned ComplexInfinity when
++                    # the base evaluated as false (e.g. Float(0)).  That made
++                    # Float(0)**(-1) -> zoo.  We only want to return
++                    # ComplexInfinity for the exact integer zero S.Zero;
++                    # for floating zero the base-specific _eval_power should
++                    # determine the correct infinity semantics.
+                     if _half(other):
+                         if b.is_negative is True:
+                             return S.NegativeOne**other*Pow(-b, e*other)

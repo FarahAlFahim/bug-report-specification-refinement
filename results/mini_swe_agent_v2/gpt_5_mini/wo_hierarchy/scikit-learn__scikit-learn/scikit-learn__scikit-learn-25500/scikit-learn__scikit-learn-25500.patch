@@ -1,0 +1,42 @@
+diff --git a/sklearn/calibration.py b/sklearn/calibration.py
+index 2c4a33616..965e2a7bf 100644
+--- a/sklearn/calibration.py
++++ b/sklearn/calibration.py
+@@ -760,7 +760,36 @@ class _CalibratedClassifier:
+                 # When binary, `predictions` consists only of predictions for
+                 # clf.classes_[1] but `pos_class_indices` = 0
+                 class_idx += 1
+-            proba[:, class_idx] = calibrator.predict(this_pred)
++
++            # Some calibrators (e.g. IsotonicRegression) may be wrapped by
++            # sklearn's _set_output machinery and return pandas objects
++            # (DataFrame/Series) when set_config(transform_output="pandas") is
++            # enabled. Historically, calibrator.predict(...) is expected to
++            # return a 1-D numpy ndarray. Coerce the output to a 1-D numpy
++            # array to avoid broadcasting/shape errors when assigning into the
++            # proba slice.
++            pred = calibrator.predict(this_pred)
++
++            # If pandas objects are returned, convert to numpy array first.
++            # Use duck-typing to avoid importing pandas here.
++            if hasattr(pred, "to_numpy"):
++                pred = pred.to_numpy()
++
++            pred = np.asarray(pred)
++
++            # Accept shapes (n_samples,) or (n_samples, 1). Squeeze the
++            # latter to produce a 1-D array. Any other shape is considered
++            # invalid and reported to the user.
++            if pred.ndim == 2 and pred.shape[1] == 1:
++                pred = pred.ravel()
++            elif pred.ndim != 1:
++                raise ValueError(
++                    f"Calibrator {type(calibrator).__name__}.predict returned "
++                    f"an array with shape {pred.shape}; expected a 1-D array of "
++                    "length n_samples"
++                )
++
++            proba[:, class_idx] = pred
+ 
+         # Normalize the probabilities
+         if n_classes == 2:

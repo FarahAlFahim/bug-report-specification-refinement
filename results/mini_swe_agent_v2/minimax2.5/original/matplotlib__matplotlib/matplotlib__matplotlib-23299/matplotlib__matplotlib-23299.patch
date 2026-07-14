@@ -1,0 +1,43 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..568f9b26ee 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -1088,6 +1088,29 @@ def rc_context(rc=None, fname=None):
+ 
+     """
+     orig = rcParams.copy()
++    # If the backend was the auto-backend sentinel before entering the context,
++    # check if it has been resolved during the context. If so, we should not
++    # restore it to the sentinel when exiting.
++    # We need to check this in the finally block because the resolution happens
++    # during the context body.
++    sentinel = rcsetup._auto_backend_sentinel
++    if orig.get('backend') is sentinel:
++        # Before entering the context, the backend was the sentinel.
++        # We will check in the finally block if it has been resolved.
++        def restore_backend():
++            # Check the current backend in the underlying dict (not via rcParams[]
++            # to avoid triggering another resolution).
++            current_backend = dict.__getitem__(rcParams, 'backend')
++            if current_backend is not sentinel:
++                # The backend has been resolved during the context.
++                # Don't restore it to the sentinel; keep the resolved value.
++                pass
++            else:
++                # The backend was not resolved, restore normally.
++                dict.update(rcParams, orig)
++    else:
++        def restore_backend():
++            dict.update(rcParams, orig)
+     try:
+         if fname:
+             rc_file(fname)
+@@ -1095,7 +1118,7 @@ def rc_context(rc=None, fname=None):
+             rcParams.update(rc)
+         yield
+     finally:
+-        dict.update(rcParams, orig)  # Revert to the original rcs.
++        restore_backend()
+ 
+ 
+ def use(backend, *, force=True):

@@ -1,0 +1,43 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index 503f7f56fd..e029ba6094 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -99,8 +99,24 @@ class BaseDatabaseCreation:
+         """
+         # Iteratively return every object for all models to serialize.
+         def get_objects():
++            """
++            Iterate over objects to serialize. Only include models whose
++            database table actually exists in the current database. This
++            avoids attempting to SELECT from tables that weren't created
++            (for example when tests are run with TEST['MIGRATE'] = False).
++            """
+             from django.db.migrations.loader import MigrationLoader
+             loader = MigrationLoader(self.connection)
++
++            # Determine which table names actually exist in the database so
++            # we don't try to query non-existent tables (which would raise
++            # ProgrammingError and can leave server-side cursors invalid).
++            with self.connection.cursor() as cursor:
++                existing_table_names = {
++                    name.lower() for name in
++                    self.connection.introspection.table_names(cursor)
++                }
++
+             for app_config in apps.get_app_configs():
+                 if (
+                     app_config.models_module is not None and
+@@ -108,9 +124,12 @@ class BaseDatabaseCreation:
+                     app_config.name not in settings.TEST_NON_SERIALIZED_APPS
+                 ):
+                     for model in app_config.get_models():
++                        # Only attempt to serialize models that can migrate and
++                        # whose table is present in the DB for this connection.
+                         if (
+                             model._meta.can_migrate(self.connection) and
+-                            router.allow_migrate_model(self.connection.alias, model)
++                            router.allow_migrate_model(self.connection.alias, model) and
++                            model._meta.db_table.lower() in existing_table_names
+                         ):
+                             queryset = model._default_manager.using(
+                                 self.connection.alias,

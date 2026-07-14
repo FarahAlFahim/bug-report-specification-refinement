@@ -1,0 +1,61 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index c50fc90171..0029d0634a 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -5,7 +5,7 @@ from io import StringIO
+ from django.apps import apps
+ from django.conf import settings
+ from django.core import serializers
+-from django.db import router
++from django.db import router, transaction
+ 
+ # The prefix to put on the default database name when creating
+ # the test database.
+@@ -126,8 +126,45 @@ class BaseDatabaseCreation:
+         the serialize_db_to_string() method.
+         """
+         data = StringIO(data)
+-        for obj in serializers.deserialize("json", data, using=self.connection.alias):
+-            obj.save()
++        connection = self.connection
++
++        # Wrap the whole restore in a transaction so either everything is
++        # restored or nothing is. Also temporarily disable constraint checks
++        # to allow out-of-order inserts; forward references will be handled
++        # via the deserialization framework.
++        objs_with_deferred_fields = []
++        models = set()
++        with transaction.atomic(using=connection.alias):
++            with connection.constraint_checks_disabled():
++                for obj in serializers.deserialize(
++                    "json",
++                    data,
++                    using=connection.alias,
++                    handle_forward_references=True,
++                ):
++                    # Track models for later constraint checking/sequences.
++                    models.add(obj.object.__class__)
++                    try:
++                        obj.save(using=connection.alias)
++                    except Exception:
++                        # Re-raise so callers get the original exception.
++                        raise
++                    if obj.deferred_fields:
++                        objs_with_deferred_fields.append(obj)
++
++                # Save any deferred (forward-referenced) fields.
++                for obj in objs_with_deferred_fields:
++                    obj.save_deferred_fields(using=connection.alias)
++
++        # Since we disabled constraint checks, explicitly verify constraints
++        # on the tables we touched.
++        try:
++            table_names = [m._meta.db_table for m in models]
++            if table_names:
++                connection.check_constraints(table_names=table_names)
++        except Exception as e:
++            e.args = ("Problem installing serialized data: %s" % e,)
++            raise
+ 
+     def _get_database_display_str(self, verbosity, database_name):
+         """

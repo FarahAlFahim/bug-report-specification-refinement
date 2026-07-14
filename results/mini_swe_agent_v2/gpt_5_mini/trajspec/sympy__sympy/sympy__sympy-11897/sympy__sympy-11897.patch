@@ -1,0 +1,13 @@
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index eb7e006cad..a13b156e44 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -91,7 +91,7 @@ def _print_Mul(self, expr):
+             return x
+ 
+         from sympy.simplify import fraction
+-        numer, denom = fraction(expr)
++        numer, denom = fraction(expr, exact=True)
+ 
+         if denom is not S.One:
+             x = self.dom.createElement('apply')

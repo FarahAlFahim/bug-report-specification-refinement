@@ -1,0 +1,22 @@
+diff --git a/astropy/io/fits/fitsrec.py b/astropy/io/fits/fitsrec.py
+index 574b4073b1..a0f2ba58c2 100644
+--- a/astropy/io/fits/fitsrec.py
++++ b/astropy/io/fits/fitsrec.py
+@@ -1260,8 +1260,16 @@ class FITS_rec(np.recarray):
+             output_field[jdx] = value
+ 
+         # Replace exponent separator in floating point numbers
++        # Note: numpy.char.replace / numpy.chararray.replace do not modify
++        # arrays in-place; they return a new array. Use the returned array
++        # to update the output_field so the E->D conversion actually takes
++        # effect (see issue: return value was previously discarded).
+         if 'D' in format:
+-            output_field.replace(encode_ascii('E'), encode_ascii('D'))
++            replaced = np.char.replace(output_field,
++                                      encode_ascii('E'),
++                                      encode_ascii('D'))
++            # Write the replaced values back into the output buffer
++            output_field[...] = replaced
+ 
+ 
+ def _get_recarray_field(array, key):

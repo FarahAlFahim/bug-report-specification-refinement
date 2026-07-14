@@ -1,0 +1,36 @@
+diff --git a/sklearn/utils/metaestimators.py b/sklearn/utils/metaestimators.py
+index d3aba4f49..7d581fa26 100644
+--- a/sklearn/utils/metaestimators.py
++++ b/sklearn/utils/metaestimators.py
+@@ -73,6 +73,31 @@ class _BaseComposition(BaseEstimator, metaclass=ABCMeta):
+                              '{0!r}'.format(invalid_names))
+ 
+ 
++
++    def __len__(self):
++        """Return the length of the first non-None required-parameter
++        attribute.
++
++        Many composition estimators expose the list of sub-estimators via a
++        class attribute ``_required_parameters`` (for example, ``steps`` for
++        ``Pipeline``, ``transformer_list`` for ``FeatureUnion``, etc.). The
++        Python sizing protocol (len(obj)) should return the length of that
++        underlying sequence. If none of the required-parameter attributes are
++        present or all are ``None``, a ``TypeError`` is raised to match the
++        behaviour of builtins for objects without a well-defined length.
++        """
++        for attr in getattr(self, '_required_parameters', []):
++            items = getattr(self, attr, None)
++            if items is not None:
++                try:
++                    return len(items)
++                except TypeError:
++                    # If the attribute exists but does not support len(),
++                    # fall through and raise a TypeError below to indicate
++                    # that the object has no length.
++                    break
++        raise TypeError("object of type '{}' has no len()".format(
++            type(self).__name__))
+ class _IffHasAttrDescriptor:
+     """Implements a conditional property using the descriptor protocol.
+ 

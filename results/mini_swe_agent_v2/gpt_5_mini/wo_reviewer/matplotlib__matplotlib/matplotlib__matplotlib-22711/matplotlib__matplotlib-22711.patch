@@ -1,0 +1,57 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index da5b40a5ef..8274c7b0fa 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -898,18 +898,42 @@ class RangeSlider(SliderBase):
+         val[0] = self._min_in_bounds(val[0])
+         val[1] = self._max_in_bounds(val[1])
+         xy = self.poly.xy
++        # Polygon objects created by axvspan/axhspan sometimes omit the
++        # duplicated closing vertex if the first and last vertices are
++        # identical (e.g. zero-width spans).  Do not assume xy has 5
++        # vertices; update only the vertices that exist, and recreate the
++        # vertex array if it is unexpectedly short.
++        n = xy.shape[0]
+         if self.orientation == "vertical":
+-            xy[0] = .25, val[0]
+-            xy[1] = .25, val[1]
+-            xy[2] = .75, val[1]
+-            xy[3] = .75, val[0]
+-            xy[4] = .25, val[0]
++            new_coords = [(.25, val[0]), (.25, val[1]), (.75, val[1]), (.75, val[0])]
+         else:
+-            xy[0] = val[0], .25
+-            xy[1] = val[0], .75
+-            xy[2] = val[1], .75
+-            xy[3] = val[1], .25
+-            xy[4] = val[0], .25
++            new_coords = [(val[0], .25), (val[0], .75), (val[1], .75), (val[1], .25)]
++
++        if n >= 5:
++            # typical case: polygon has explicit closing vertex
++            if self.orientation == "vertical":
++                xy[0] = new_coords[0]
++                xy[1] = new_coords[1]
++                xy[2] = new_coords[2]
++                xy[3] = new_coords[3]
++                xy[4] = new_coords[0]
++            else:
++                xy[0] = new_coords[0]
++                xy[1] = new_coords[1]
++                xy[2] = new_coords[2]
++                xy[3] = new_coords[3]
++                xy[4] = new_coords[0]
++        elif n == 4:
++            # no duplicated closing vertex: update the four existing verts
++            xy[0] = new_coords[0]
++            xy[1] = new_coords[1]
++            xy[2] = new_coords[2]
++            xy[3] = new_coords[3]
++        else:
++            # Unexpectedly short polygon: rebuild a proper vertex array
++            # prefer a closed polygon with duplicated first vertex
++            xy = np.array(new_coords + [new_coords[0]], float)
++
+         self.poly.xy = xy
+         self.valtext.set_text(self._format(val))
+         if self.drawon:

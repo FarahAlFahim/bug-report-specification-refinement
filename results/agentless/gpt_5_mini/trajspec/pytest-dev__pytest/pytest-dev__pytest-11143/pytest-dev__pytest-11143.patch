@@ -1,0 +1,40 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 13debe8..09a74aa 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -677,10 +677,17 @@ class AssertionRewriter(ast.NodeVisitor):
+                 and isinstance(item, ast.Expr)
+                 and isinstance(item.value, ast.Constant)
+             ):
+-                doc = item.value.value
+-                if self.is_rewrite_disabled(doc):
+-                    return
+-                expect_docstring = False
++                # Only treat a Constant as a docstring when its value is a string.
++                value = item.value.value
++                if isinstance(value, str):
++                    doc = value
++                    if self.is_rewrite_disabled(doc):
++                        return
++                    expect_docstring = False
++                else:
++                    # Non-string Constant is not a docstring; stop looking for a
++                    # docstring and do not consume this node as the docstring.
++                    break
+             elif (
+                 isinstance(item, ast.ImportFrom)
+                 and item.level == 0
+@@ -743,7 +750,12 @@ class AssertionRewriter(ast.NodeVisitor):
+ 
+     @staticmethod
+     def is_rewrite_disabled(docstring: str) -> bool:
+-        return "PYTEST_DONT_REWRITE" in docstring
++        # Only look for the sentinel in actual string docstrings; if a
++        # non-string (e.g. int) is passed, treat it as not disabling rewrite.
++        try:
++            return "PYTEST_DONT_REWRITE" in docstring
++        except TypeError:
++            return False
+ 
+     def variable(self) -> str:
+         """Get a new variable."""

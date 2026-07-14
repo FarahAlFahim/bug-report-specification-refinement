@@ -1,0 +1,64 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..fd608501de 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,6 +955,7 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_max_length_against_choices(**kwargs),
+         ]
+ 
+     def _check_max_length_attribute(self, **kwargs):
+@@ -978,6 +979,51 @@ class CharField(Field):
+         else:
+             return []
+ 
++    def _check_max_length_against_choices(self, **kwargs):
++        if self.max_length is None or not self.choices:
++            return []
++
++        # Check if choices is in the valid format (list of tuples)
++        if not isinstance(self.choices, list):
++            return []
++
++        max_choice_length = 0
++        for choice_group in self.choices:
++            # Handle grouped choices: (group_name, [(value, display), ...])
++            # In grouped choices, the second element is a list/tuple of choices
++            if isinstance(choice_group, (list, tuple)) and len(choice_group) == 2:
++                group_name, group_choices = choice_group
++                # Check if this is a group (second element is a list/tuple of choices)
++                if isinstance(group_choices, (list, tuple)) and group_choices:
++                    try:
++                        # Check if first item is a tuple/list (indicating grouped choices)
++                        if isinstance(group_choices[0], (list, tuple)):
++                            for value, _ in group_choices:
++                                if isinstance(value, str):
++                                    max_choice_length = max(max_choice_length, len(value))
++                    except (ValueError, TypeError):
++                        # Invalid choice structure - let _check_choices handle this
++                        pass
++                # Simple choice: (value, display) - second element is a string (human-readable name)
++                elif isinstance(group_name, str):
++                    max_choice_length = max(max_choice_length, len(group_name))
++
++        if max_choice_length > self.max_length:
++            return [
++                checks.Error(
++                    "CharField max_length is too small to store the longest choice value. "
++                    "max_length is %(max_length)d but the longest choice value is "
++                    "%(choice_length)d characters long." % {
++                        'max_length': self.max_length,
++                        'choice_length': max_choice_length,
++                    },
++                    obj=self,
++                    id='fields.E122',
++                )
++            ]
++        return []
++
++
+     def cast_db_type(self, connection):
+         if self.max_length is None:
+             return connection.ops.cast_char_field_without_max_length

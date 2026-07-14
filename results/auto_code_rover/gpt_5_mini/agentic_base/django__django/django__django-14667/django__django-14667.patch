@@ -1,0 +1,41 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..4297b47d9e 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -297,6 +297,11 @@ class Query(BaseExpression):
+         obj.__class__ = self.__class__
+         # Copy references to everything.
+         obj.__dict__ = self.__dict__.copy()
++        # Ensure any cached loaded-field mapping is not propagated to the clone.
++        try:
++            del obj._loaded_field_names_cache
++        except AttributeError:
++            pass
+         # Clone attributes that can't use shallow copy.
+         obj.alias_refcount = self.alias_refcount.copy()
+         obj.alias_map = self.alias_map.copy()
+@@ -2067,6 +2072,12 @@ class Query(BaseExpression):
+     def clear_deferred_loading(self):
+         """Remove any fields from the deferred loading set."""
+         self.deferred_loading = (frozenset(), True)
++        # Invalidate cached mapping of loaded field names so subsequent calls to
++        # get_loaded_field_names() recompute based on the new deferred state.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_deferred_loading(self, field_names):
+         """
+@@ -2111,6 +2122,11 @@ class Query(BaseExpression):
+         else:
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
++        # Invalidate cached mapping so it will be rebuilt on next access.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def get_loaded_field_names(self):
+         """

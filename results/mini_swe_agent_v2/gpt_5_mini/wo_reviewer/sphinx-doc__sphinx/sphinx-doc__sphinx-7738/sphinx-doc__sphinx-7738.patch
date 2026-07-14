@@ -1,0 +1,35 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index 11409e6f6..457b9faf1 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -585,7 +585,17 @@ class GoogleDocstring:
+                 if _type:
+                     lines.append(':vartype %s: %s' % (_name, _type))
+             else:
+-                lines.append('.. attribute:: ' + _name)
++                # Directive argument values (like the target of
++                # ``.. attribute::`` and ``.. method::``) should not contain
++                # the escape sequence for a trailing underscore ("\_").
++                # ``_escape_args_and_kwargs`` intentionally escapes
++                # trailing underscores for inline-field contexts (e.g.
++                # ":ivar arg\_:") so those tests keep expecting the
++                # escape there.  However, when emitting directive headers we
++                # must present the plain name with the actual trailing
++                # underscore so that generated HTML does not show a backslash.
++                _dir_name = _name[:-2] + '_' if _name.endswith(r'\_') else _name
++                lines.append('.. attribute:: ' + _dir_name)
+                 if self._opt and 'noindex' in self._opt:
+                     lines.append('   :noindex:')
+                 if _type:
+@@ -645,7 +655,10 @@ class GoogleDocstring:
+     def _parse_methods_section(self, section: str) -> List[str]:
+         lines = []  # type: List[str]
+         for _name, _type, _desc in self._consume_fields(parse_type=False):
+-            lines.append('.. method:: %s' % _name)
++            # See comment in _parse_attributes_section: undo only the
++            # trailing-underscore escape for directive headers.
++            _dir_name = _name[:-2] + '_' if _name.endswith(r'\_') else _name
++            lines.append('.. method:: %s' % _dir_name)
+             if self._opt and 'noindex' in self._opt:
+                 lines.append('   :noindex:')
+             if _desc:

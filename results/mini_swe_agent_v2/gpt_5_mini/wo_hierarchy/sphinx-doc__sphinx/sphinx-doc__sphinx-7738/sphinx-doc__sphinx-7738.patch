@@ -1,0 +1,34 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index 11409e6f6..7a1600409 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -585,7 +585,16 @@ class GoogleDocstring:
+                 if _type:
+                     lines.append(':vartype %s: %s' % (_name, _type))
+             else:
+-                lines.append('.. attribute:: ' + _name)
++                # Directive argument text (the string following ".. attribute::")
++                # must not contain backslash-escaped underscores ("\_") because
++                # those backslashes are rendered literally in some builders
++                # (e.g. HTML). _escape_args_and_kwargs inserts such escapes
++                # for inline contexts. Undo that escaping for directive
++                # headers so the trailing underscore displays correctly.
++                _directive_name = _name
++                if _directive_name.endswith(r'\_'):
++                    _directive_name = _directive_name[:-2] + '_'
++                lines.append('.. attribute:: ' + _directive_name)
+                 if self._opt and 'noindex' in self._opt:
+                     lines.append('   :noindex:')
+                 if _type:
+@@ -645,7 +654,10 @@ class GoogleDocstring:
+     def _parse_methods_section(self, section: str) -> List[str]:
+         lines = []  # type: List[str]
+         for _name, _type, _desc in self._consume_fields(parse_type=False):
+-            lines.append('.. method:: %s' % _name)
++            _directive_name = _name
++            if _directive_name.endswith(r'\_'):
++                _directive_name = _directive_name[:-2] + '_'
++            lines.append('.. method:: %s' % _directive_name)
+             if self._opt and 'noindex' in self._opt:
+                 lines.append('   :noindex:')
+             if _desc:

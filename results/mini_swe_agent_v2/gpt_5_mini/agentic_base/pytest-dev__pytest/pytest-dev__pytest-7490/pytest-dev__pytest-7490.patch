@@ -1,0 +1,32 @@
+diff --git a/src/_pytest/skipping.py b/src/_pytest/skipping.py
+index 335e10996..7d0e3732e 100644
+--- a/src/_pytest/skipping.py
++++ b/src/_pytest/skipping.py
+@@ -247,6 +247,9 @@ def pytest_runtest_setup(item: Item) -> None:
+ @hookimpl(hookwrapper=True)
+ def pytest_runtest_call(item: Item) -> Generator[None, None, None]:
+     xfailed = item._store.get(xfailed_key, None)
++    # If no xfail evaluation was cached earlier, evaluate it now so that
++    # markers added during the call phase (e.g. dynamically via
++    # request.node.add_marker) are taken into account.
+     if xfailed is None:
+         item._store[xfailed_key] = xfailed = evaluate_xfail_marks(item)
+ 
+@@ -256,12 +259,16 @@ def pytest_runtest_call(item: Item) -> Generator[None, None, None]:
+ 
+     yield
+ 
+-
+ @hookimpl(hookwrapper=True)
+ def pytest_runtest_makereport(item: Item, call: CallInfo[None]):
+     outcome = yield
+     rep = outcome.get_result()
+     xfailed = item._store.get(xfailed_key, None)
++    # If the xfail evaluation was not cached earlier (for example an xfail
++    # marker was added dynamically during the call phase), evaluate it now
++    # so markers added during the test body affect the final report.
++    if xfailed is None and not item.config.option.runxfail:
++        item._store[xfailed_key] = xfailed = evaluate_xfail_marks(item)
+     # unittest special case, see setting of unexpectedsuccess_key
+     if unexpectedsuccess_key in item._store and rep.when == "call":
+         reason = item._store[unexpectedsuccess_key]

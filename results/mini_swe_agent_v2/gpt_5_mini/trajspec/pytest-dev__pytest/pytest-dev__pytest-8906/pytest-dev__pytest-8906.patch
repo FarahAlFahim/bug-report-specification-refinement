@@ -1,0 +1,53 @@
+diff --git a/src/_pytest/outcomes.py b/src/_pytest/outcomes.py
+index 2addf5572..d45343a1d 100644
+--- a/src/_pytest/outcomes.py
++++ b/src/_pytest/outcomes.py
+@@ -143,6 +143,17 @@ def skip(msg: str = "", *, allow_module_level: bool = False) -> "NoReturn":
+     __tracebackhide__ = True
+     raise Skipped(msg=msg, allow_module_level=allow_module_level)
+ 
++@_with_exception(Skipped)
++def skip_module(msg: str = "") -> "NoReturn":
++    """Skip the rest of the importing module.
++
++    This is a convenience helper that is equivalent to calling
++    ``pytest.skip(msg, allow_module_level=True)`` and is intended to make
++    module-level skipping discoverable.
++    """
++    __tracebackhide__ = True
++    raise Skipped(msg=msg, allow_module_level=True)
++
+ 
+ @_with_exception(Failed)
+ def fail(msg: str = "", pytrace: bool = True) -> "NoReturn":
+diff --git a/src/_pytest/python.py b/src/_pytest/python.py
+index 79dfb7320..96fd255d8 100644
+--- a/src/_pytest/python.py
++++ b/src/_pytest/python.py
+@@ -605,13 +605,24 @@ class Module(nodes.File, PyCollector):
+                 "{traceback}".format(path=self.path, traceback=formatted_tb)
+             ) from e
+         except skip.Exception as e:
++            # If the Skipped exception was raised with allow_module_level=True
++            # the module-level skip is supported and the exception should
++            # be re-raised so collection can record the module as skipped.
+             if e.allow_module_level:
+                 raise
++            # Otherwise, provide actionable guidance to the user.  Historically
++            # the message discouraged module-level use of pytest.skip but the
++            # outcomes API does support an explicit escape hatch
++            # (pytest.skip(..., allow_module_level=True)).  Also point users to
++            # the pytest.importorskip helper and the convenience
++            # pytest.skip_module helper.
+             raise self.CollectError(
+                 "Using pytest.skip outside of a test is not allowed. "
+                 "To decorate a test function, use the @pytest.mark.skip "
+-                "or @pytest.mark.skipif decorators instead, and to skip a "
+-                "module use `pytestmark = pytest.mark.{skip,skipif}."
++                "or @pytest.mark.skipif decorators instead. "
++                "To skip a whole module during import, use ``pytest.skip(\n"
++                "    'reason', allow_module_level=True)`` or the helper "
++                "``pytest.importorskip(...)`` or ``pytest.skip_module(...)``."
+             ) from e
+         self.config.pluginmanager.consider_module(mod)
+         return mod

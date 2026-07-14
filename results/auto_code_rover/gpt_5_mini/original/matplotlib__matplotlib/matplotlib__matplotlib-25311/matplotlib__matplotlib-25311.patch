@@ -1,0 +1,66 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index ff6abdb958..09d467682c 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -1170,10 +1170,19 @@ class Legend(Artist):
+             return inside, info
+         return self.legendPatch.contains(event)
+ 
++    def __getstate__(self):
++        # Ensure transient interactive helper is not pickled.  The
++        # DraggableLegend helper references the FigureCanvas / backend and
++        # is not picklable; clear it from the state to allow pickling
++        # the Legend object safely.
++        d = super().__getstate__()
++        d['_draggable'] = None
++        return d
++    
+     def set_draggable(self, state, use_blit=False, update='loc'):
+         """
+         Enable or disable mouse dragging support of the legend.
+-
++    
+         Parameters
+         ----------
+         state : bool
+@@ -1183,10 +1192,10 @@ class Legend(Artist):
+             :ref:`func-animation`.
+         update : {'loc', 'bbox'}, optional
+             The legend parameter to be changed when dragged:
+-
++    
+             - 'loc': update the *loc* parameter of the legend
+             - 'bbox': update the *bbox_to_anchor* parameter of the legend
+-
++    
+         Returns
+         -------
+         `.DraggableLegend` or *None*
+@@ -1203,7 +1212,7 @@ class Legend(Artist):
+                 self._draggable.disconnect()
+             self._draggable = None
+         return self._draggable
+-
++    
+     def get_draggable(self):
+         """Return ``True`` if the legend is draggable, ``False`` otherwise."""
+         return self._draggable is not None
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 0f874ba33d..61a56ad032 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,14 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++        # remove transient draggable helper so pickling does not capture
++        # GUI/backend objects from DraggableAnnotation / DraggableBase.
++        if '_draggable' in d:
++            d['_draggable'] = None
++        else:
++            # In case subclasses expect the key to exist after unpickling,
++            # ensure it's absent or None; setting to None is safe.
++            d['_draggable'] = None
+         return d
+ 
+     def contains(self, mouseevent):

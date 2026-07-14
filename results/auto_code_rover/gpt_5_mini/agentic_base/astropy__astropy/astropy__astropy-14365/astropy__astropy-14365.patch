@@ -1,0 +1,25 @@
+diff --git a/astropy/io/ascii/qdp.py b/astropy/io/ascii/qdp.py
+index 83a4f004aa..f8333136be 100644
+--- a/astropy/io/ascii/qdp.py
++++ b/astropy/io/ascii/qdp.py
+@@ -306,14 +306,17 @@ def _get_tables_from_qdp_file(qdp_file, input_colnames=None, delimiter=None):
+ 
+             values = []
+             for v in line.split(delimiter):
+-                if v == "NO":
++                # Normalize token by stripping surrounding whitespace and
++                # comparing case-insensitively to the missing-value marker.
++                vs = v.strip()
++                if vs.upper() == "NO":
+                     values.append(np.ma.masked)
+                 else:
+                     # Understand if number is int or float
+                     try:
+-                        values.append(int(v))
++                        values.append(int(vs))
+                     except ValueError:
+-                        values.append(float(v))
++                        values.append(float(vs))
+             current_rows.append(values)
+             continue
+ 

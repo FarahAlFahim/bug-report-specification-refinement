@@ -1,0 +1,169 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..3e7699fee 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -57,6 +57,29 @@ TitleGetter = Callable[[nodes.Node], str]
+ Inventory = Dict[str, Dict[str, Tuple[str, str, str, str]]]
+ 
+ 
++# module alias for C extension modules
++# some classes in stdlib are implemented in C modules with different names
++# than their public counterpart. For example, struct.Struct is implemented
++# in _struct module, but the public module is struct.
++MODULE_ALIASES = {
++    '_struct': 'struct',
++    '_io': 'io',
++    '_pickle': 'pickle',
++}  # type: Dict[str, str]
++
++
++def get_module_alias(module: str) -> str:
++    """Return the public module name for a given module.
++
++    Some classes in stdlib are implemented in C modules with different names
++    than their public counterpart. For example, struct.Struct is implemented
++    in _struct module, but the public module is struct.
++    """
++    return MODULE_ALIASES.get(module, module)
++
++
++
++
+ def get_type_hints(obj: Any, globalns: Dict = None, localns: Dict = None) -> Dict[str, Any]:
+     """Return a dictionary containing type hints for a function, method, module or class object.
+ 
+@@ -100,17 +123,20 @@ def restify(cls: Optional["Type"]) -> str:
+         return ':class:`%s`' % cls.__name__
+     else:
+         if sys.version_info >= (3, 7):  # py37+
+-            return _restify_py37(cls)
++            return _restify_py37(cls, get_module_alias(cls.__module__))
+         else:
+-            return _restify_py36(cls)
++            return _restify_py36(cls, get_module_alias(cls.__module__))
+ 
+ 
+-def _restify_py37(cls: Optional["Type"]) -> str:
++def _restify_py37(cls: Optional["Type"], module: str = None) -> str:
+     """Convert python class to a reST reference."""
+     from sphinx.util import inspect  # lazy loading
+ 
++    if module is None:
++        module = cls.__module__
++
+     if (inspect.isgenericalias(cls) and
+-            cls.__module__ == 'typing' and cls.__origin__ is Union):
++            module == 'typing' and cls.__origin__ is Union):
+         # Union
+         if len(cls.__args__) > 1 and cls.__args__[-1] is NoneType:
+             if len(cls.__args__) > 2:
+@@ -123,10 +149,10 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+             return ':obj:`Union`\\ [%s]' % args
+     elif inspect.isgenericalias(cls):
+         if getattr(cls, '_name', None):
+-            if cls.__module__ == 'typing':
++            if module == 'typing':
+                 text = ':class:`%s`' % cls._name
+             else:
+-                text = ':class:`%s.%s`' % (cls.__module__, cls._name)
++                text = ':class:`%s.%s`' % (module, cls._name)
+         else:
+             text = restify(cls.__origin__)
+ 
+@@ -135,7 +161,7 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+         elif all(is_system_TypeVar(a) for a in cls.__args__):
+             # Suppress arguments if all system defined TypeVars (ex. Dict[KT, VT])
+             pass
+-        elif cls.__module__ == 'typing' and cls._name == 'Callable':
++        elif module == 'typing' and cls._name == 'Callable':
+             args = ', '.join(restify(a) for a in cls.__args__[:-1])
+             text += r"\ [[%s], %s]" % (args, restify(cls.__args__[-1]))
+         elif cls.__args__:
+@@ -143,25 +169,26 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+ 
+         return text
+     elif hasattr(cls, '__qualname__'):
+-        if cls.__module__ == 'typing':
++        if module == 'typing':
+             return ':class:`%s`' % cls.__qualname__
+         else:
+-            return ':class:`%s.%s`' % (cls.__module__, cls.__qualname__)
++            return ':class:`%s.%s`' % (module, cls.__qualname__)
+     elif hasattr(cls, '_name'):
+         # SpecialForm
+-        if cls.__module__ == 'typing':
++        if module == 'typing':
+             return ':obj:`%s`' % cls._name
+         else:
+-            return ':obj:`%s.%s`' % (cls.__module__, cls._name)
++            return ':obj:`%s.%s`' % (module, cls._name)
+     elif isinstance(cls, ForwardRef):
+         return ':class:`%s`' % cls.__forward_arg__
+     else:
+         # not a class (ex. TypeVar)
+-        return ':obj:`%s.%s`' % (cls.__module__, cls.__name__)
++        return ':obj:`%s.%s`' % (module, cls.__name__)
+ 
+ 
+-def _restify_py36(cls: Optional["Type"]) -> str:
+-    module = getattr(cls, '__module__', None)
++def _restify_py36(cls: Optional["Type"], module: str = None) -> str:
++    if module is None:
++        module = getattr(cls, '__module__', None)
+     if module == 'typing':
+         if getattr(cls, '_name', None):
+             qualname = cls._name
+@@ -260,16 +287,16 @@ def _restify_py36(cls: Optional["Type"]) -> str:
+         else:
+             return ':class:`%s`' % qualname
+     elif hasattr(cls, '__qualname__'):
+-        if cls.__module__ == 'typing':
++        if module == 'typing':
+             return ':class:`%s`' % cls.__qualname__
+         else:
+-            return ':class:`%s.%s`' % (cls.__module__, cls.__qualname__)
++            return ':class:`%s.%s`' % (module, cls.__qualname__)
+     elif hasattr(cls, '_name'):
+         # SpecialForm
+-        if cls.__module__ == 'typing':
++        if module == 'typing':
+             return ':obj:`%s`' % cls._name
+         else:
+-            return ':obj:`%s.%s`' % (cls.__module__, cls._name)
++            return ':obj:`%s.%s`' % (module, cls._name)
+     elif hasattr(cls, '__name__'):
+         # not a class (ex. TypeVar)
+         return ':obj:`%s.%s`' % (cls.__module__, cls.__name__)
+@@ -307,14 +334,15 @@ def stringify(annotation: Any) -> str:
+         return '...'
+ 
+     if sys.version_info >= (3, 7):  # py37+
+-        return _stringify_py37(annotation)
++        return _stringify_py37(annotation, get_module_alias(getattr(annotation, '__module__', None)))
+     else:
+-        return _stringify_py36(annotation)
++        return _stringify_py36(annotation, get_module_alias(getattr(annotation, '__module__', None)))
+ 
+ 
+-def _stringify_py37(annotation: Any) -> str:
++def _stringify_py37(annotation: Any, module: str = None) -> str:
+     """stringify() for py37+."""
+-    module = getattr(annotation, '__module__', None)
++    if module is None:
++        module = getattr(annotation, '__module__', None)
+     if module == 'typing':
+         if getattr(annotation, '_name', None):
+             qualname = annotation._name
+@@ -364,9 +392,10 @@ def _stringify_py37(annotation: Any) -> str:
+     return qualname
+ 
+ 
+-def _stringify_py36(annotation: Any) -> str:
++def _stringify_py36(annotation: Any, module: str = None) -> str:
+     """stringify() for py35 and py36."""
+-    module = getattr(annotation, '__module__', None)
++    if module is None:
++        module = getattr(annotation, '__module__', None)
+     if module == 'typing':
+         if getattr(annotation, '_name', None):
+             qualname = annotation._name

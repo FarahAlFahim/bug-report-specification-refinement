@@ -1,0 +1,32 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 7ef51bc84..85f82c6cd 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -377,8 +377,12 @@ def hstack(cls, *args):
+         if len(args) == 0:
+             return cls._new()
+ 
+-        kls = type(args[0])
+-        return reduce(kls.row_join, args)
++        # Use the caller class for dispatch when reducing joins.
++        # Previously the runtime type of the first argument was used
++        # which could cause incorrect shape aggregation for zero
++        # dimension matrices (see # issue). Using cls ensures the
++        # reduction uses the correct row_join implementation.
++        return reduce(cls.row_join, args)
+ 
+     def reshape(self, rows, cols):
+         """Reshape the matrix. Total number of elements must remain the same.
+@@ -600,8 +604,10 @@ def vstack(cls, *args):
+         if len(args) == 0:
+             return cls._new()
+ 
+-        kls = type(args[0])
+-        return reduce(kls.col_join, args)
++        # See comment in hstack: dispatch reduction via the caller
++        # class so that shape arithmetic is handled correctly even
++        # when the first argument is a zero-dimension matrix.
++        return reduce(cls.col_join, args)
+ 
+ 
+ class MatrixSpecial(MatrixRequired):

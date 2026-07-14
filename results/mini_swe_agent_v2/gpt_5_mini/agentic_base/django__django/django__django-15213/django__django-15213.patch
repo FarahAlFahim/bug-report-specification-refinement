@@ -1,0 +1,35 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 69a2d9298f..68f20a5269 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -280,6 +280,16 @@ class SQLCompiler:
+                 else:
+                     sql, params = self.compile(Value(empty_result_set_value))
+             else:
++                # Some expressions (for example, the negation of an empty
++                # IN lookup) compile to an empty SQL string ''. In WHERE
++                # generation an empty string means "matches everything" and
++                # the caller can omit the predicate. In a SELECT/annotation
++                # context, however, an empty fragment would produce invalid
++                # SQL (e.g. "SELECT AS foo"). Map an empty SQL fragment to
++                # a portable always-true literal ('1') so that the SELECT
++                # list contains a valid expression.
++                if sql == '':
++                    sql, params = '1', ()
+                 sql, params = col.select_format(self, sql, params)
+             ret.append((col, (sql, params), alias))
+         return ret, klass_info, annotations
+@@ -1663,6 +1673,13 @@ class SQLAggregateCompiler(SQLCompiler):
+         sql, params = [], []
+         for annotation in self.query.annotation_select.values():
+             ann_sql, ann_params = self.compile(annotation)
++            # As with SELECT items, a compiled annotation may produce an
++            # empty SQL string to mean "matches everything". In the
++            # aggregate/annotation context we must render a valid SQL
++            # expression, so map empty SQL to the portable true literal
++            # '1'.
++            if ann_sql == '':
++                ann_sql, ann_params = '1', ()
+             ann_sql, ann_params = annotation.select_format(self, ann_sql, ann_params)
+             sql.append(ann_sql)
+             params.extend(ann_params)

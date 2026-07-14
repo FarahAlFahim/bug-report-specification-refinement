@@ -1,0 +1,37 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afce..cfacc7146 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -91,7 +91,12 @@ def expand_modules(
+             except ImportError:
+                 modname = os.path.splitext(basename)[0]
+             if os.path.isdir(something):
+-                filepath = os.path.join(something, "__init__.py")
++                # Check if __init__.py exists, otherwise treat as namespace package
++                init_path = os.path.join(something, "__init__.py")
++                if os.path.exists(init_path):
++                    filepath = init_path
++                else:
++                    filepath = something
+             else:
+                 filepath = something
+         else:
+@@ -131,13 +136,13 @@ def expand_modules(
+                     "basename": modname,
+                 }
+             )
+-        has_init = (
+-            not (modname.endswith(".__init__") or modname == "__init__")
+-            and os.path.basename(filepath) == "__init__.py"
+-        )
++        has_init = os.path.exists(filepath) and os.path.basename(filepath) == "__init__.py"
+         if has_init or is_namespace or is_directory:
++            # For namespace packages (directories without __init__.py), use the directory itself
++            # Otherwise, use os.path.dirname to get the directory containing __init__.py
++            search_path = filepath if os.path.isdir(filepath) else os.path.dirname(filepath)
+             for subfilepath in modutils.get_module_files(
+-                os.path.dirname(filepath), ignore_list, list_all=is_namespace
++                search_path, ignore_list, list_all=is_namespace
+             ):
+                 if filepath == subfilepath:
+                     continue

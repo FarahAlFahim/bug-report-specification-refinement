@@ -1,0 +1,28 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index 966eb0760b..bd6261d559 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -1102,7 +1102,22 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
++            if hasattr(self.norm, '_scale') and self.norm._scale is not None:
++                # For norms with a scale (like LogNorm), check if the scale
++                # can handle zero before setting default values
++                # Transform 0 and 1 to check if the result is finite
++                try:
++                    t_vmin, t_vmax = self.norm._scale._transform.transform([0, 1])
++                except Exception:
++                    # If transform fails, assume we can't use 0
++                    self.norm.vmin = 1e-300
++                else:
++                    if np.isfinite(t_vmin):
++                        self.norm.vmin = 0
++                    else:
++                        self.norm.vmin = 1e-300
++            else:
++                self.norm.vmin = 0
+             self.norm.vmax = 1
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)

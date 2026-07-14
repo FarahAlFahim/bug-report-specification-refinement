@@ -1,0 +1,95 @@
+diff --git a/django/core/checks/model_checks.py b/django/core/checks/model_checks.py
+index 5c2266ca1d..654210bf29 100644
+--- a/django/core/checks/model_checks.py
++++ b/django/core/checks/model_checks.py
+@@ -5,6 +5,7 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.core.checks import Error, Tags, register
++from django.db import connections, router
+ 
+ 
+ @register(Tags.models)
+@@ -17,14 +18,30 @@ def check_all_models(app_configs=None, **kwargs):
+         models = apps.get_models()
+     else:
+         models = chain.from_iterable(app_config.get_models() for app_config in app_configs)
++
++    # Determine which database aliases each model will be migrated to using
++    # the project's database routers. Table/index/constraint name uniqueness
++    # is a database-scoped property, so we only consider collisions among
++    # models that will be migrated to the same database alias. If a model
++    # isn't allowed to be migrated to any connection, fall back to a
++    # special None alias so that such models are still checked against each
++    # other (preserving previous conservative behavior).
++    aliases = list(connections)
+     for model in models:
+         if model._meta.managed and not model._meta.proxy:
+-            db_table_models[model._meta.db_table].append(model._meta.label)
++            # Find the set of aliases this model will be migrated on.
++            allowed_aliases = [alias for alias in aliases if router.allow_migrate_model(alias, model)]
++            if not allowed_aliases:
++                # Model won't be migrated anywhere; use a sentinel to keep
++                # previous behavior of still checking for collisions.
++                db_table_models[(None, model._meta.db_table)].append(model._meta.label)
++            else:
++                for alias in allowed_aliases:
++                    db_table_models[(alias, model._meta.db_table)].append(model._meta.label)
+         if not inspect.ismethod(model.check):
+             errors.append(
+                 Error(
+-                    "The '%s.check()' class method is currently overridden by %r."
+-                    % (model.__name__, model.check),
++                    "The '%s.check()' class method is currently overridden by %r." % (model.__name__, model.check),
+                     obj=model,
+                     id='models.E020'
+                 )
+@@ -32,20 +49,33 @@ def check_all_models(app_configs=None, **kwargs):
+         else:
+             errors.extend(model.check(**kwargs))
+         for model_index in model._meta.indexes:
+-            indexes[model_index.name].append(model._meta.label)
++            # Index names must be unique per-database migration target as
++            # well. Group by (alias, index_name) similar to db_table above.
++            allowed_aliases = [alias for alias in aliases if router.allow_migrate_model(alias, model)]
++            if not allowed_aliases:
++                indexes[(None, model_index.name)].append(model._meta.label)
++            else:
++                for alias in allowed_aliases:
++                    indexes[(alias, model_index.name)].append(model._meta.label)
+         for model_constraint in model._meta.constraints:
+-            constraints[model_constraint.name].append(model._meta.label)
+-    for db_table, model_labels in db_table_models.items():
++            allowed_aliases = [alias for alias in aliases if router.allow_migrate_model(alias, model)]
++            if not allowed_aliases:
++                constraints[(None, model_constraint.name)].append(model._meta.label)
++            else:
++                for alias in allowed_aliases:
++                    constraints[(alias, model_constraint.name)].append(model._meta.label)
++    # db_table_models keys are (alias, db_table) tuples. Report collisions
++    # only for models that will be migrated to the same alias.
++    for (alias, db_table), model_labels in db_table_models.items():
+         if len(model_labels) != 1:
+             errors.append(
+                 Error(
+-                    "db_table '%s' is used by multiple models: %s."
+-                    % (db_table, ', '.join(db_table_models[db_table])),
++                    "db_table '%s' is used by multiple models: %s." % (db_table, ', '.join(model_labels)),
+                     obj=db_table,
+                     id='models.E028',
+                 )
+             )
+-    for index_name, model_labels in indexes.items():
++    for (alias, index_name), model_labels in indexes.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)
+             errors.append(
+@@ -58,7 +88,7 @@ def check_all_models(app_configs=None, **kwargs):
+                     id='models.E029' if len(model_labels) == 1 else 'models.E030',
+                 ),
+             )
+-    for constraint_name, model_labels in constraints.items():
++    for (alias, constraint_name), model_labels in constraints.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)
+             errors.append(

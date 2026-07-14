@@ -1,0 +1,13 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7c433b3f06..7aaa3a8da2 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1269,7 +1269,7 @@ class SQLCompiler:
+                 )
+                 get_related_klass_infos(klass_info, next_klass_infos)
+ 
+-            def local_setter(final_field, obj, from_obj):
++            def local_setter(final_field, from_obj, obj):
+                 # Set a reverse fk object when relation is non-empty.
+                 if from_obj:
+                     final_field.remote_field.set_cached_value(from_obj, obj)

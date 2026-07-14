@@ -1,0 +1,78 @@
+diff --git a/requests/utils.py b/requests/utils.py
+index 8d17b6b2..58626e14 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -22,6 +22,7 @@ import warnings
+ from . import __version__
+ from . import certs
+ from .compat import parse_http_list as _parse_list_header
++from .compat import chardet
+ from .compat import (quote, urlparse, bytes, str, OrderedDict, unquote, is_py2,
+                      builtin_str, getproxies, proxy_bypass, urlunparse,
+                      basestring)
+@@ -359,16 +360,61 @@ def get_encoding_from_headers(headers):
+ def stream_decode_response_unicode(iterator, r):
+     """Stream decodes a iterator."""
+ 
+-    if r.encoding is None:
+-        for item in iterator:
+-            yield item
++    # If we have a known encoding, use an incremental decoder.
++    if r.encoding is not None:
++        decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
++        for chunk in iterator:
++            rv = decoder.decode(chunk)
++            if rv:
++                yield rv
++        rv = decoder.decode(b'', final=True)
++        if rv:
++            yield rv
+         return
+ 
+-    decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
++    # No encoding set on the response. Attempt to detect encoding from the
++    # initial bytes of the stream so that decode_unicode=True yields text
++    # rather than raw bytes, consistent with Response.text which uses
++    # chardet to guess encoding for the full content.
++    buffered = []
++    buf_len = 0
++    # Read a small portion to allow chardet to guess. 1KB is a reasonable
++    # compromise between accuracy and memory usage.
++    DETECT_BYTES = 1024
++
++    try:
++        while buf_len < DETECT_BYTES:
++            chunk = next(iterator)
++            buffered.append(chunk)
++            buf_len += len(chunk)
++    except StopIteration:
++        # Stream exhausted before detection threshold; fall through.
++        pass
++
++    sample = b''.join(buffered)
++    enc = None
++    if sample:
++        enc = chardet.detect(sample).get('encoding')
++
++    # Fall back to utf-8 if detection failed; this mirrors the forgiving
++    # behavior used elsewhere (errors='replace') and ensures we yield text.
++    if not enc:
++        enc = 'utf-8'
++
++    decoder = codecs.getincrementaldecoder(enc)(errors='replace')
++
++    # Yield decoded text for buffered chunks.
++    for chunk in buffered:
++        rv = decoder.decode(chunk)
++        if rv:
++            yield rv
++
++    # Continue decoding the rest of the iterator.
+     for chunk in iterator:
+         rv = decoder.decode(chunk)
+         if rv:
+             yield rv
++
+     rv = decoder.decode(b'', final=True)
+     if rv:
+         yield rv

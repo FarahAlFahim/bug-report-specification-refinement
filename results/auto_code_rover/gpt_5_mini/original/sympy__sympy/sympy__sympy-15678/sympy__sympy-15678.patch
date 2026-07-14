@@ -1,0 +1,143 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..a8cd7ca497 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -12,7 +12,8 @@
+ """
+ from __future__ import division, print_function
+ 
+-from sympy import Function, Symbol, solve
++from sympy import Function, Symbol, solve, Relational
++from sympy.core.function import AppliedUndef
+ from sympy.core.compatibility import (
+     is_sequence, range, string_types, ordered)
+ from sympy.core.containers import OrderedSet
+@@ -530,14 +531,14 @@ def idiff(eq, y, x, n=1):
+ 
+     Parameters
+     ==========
+-
++ 
+     y : the dependent variable or a list of dependent variables (with y first)
+     x : the variable that the derivative is being taken with respect to
+     n : the order of the derivative (default is 1)
+ 
+     Examples
+     ========
+-
++ 
+     >>> from sympy.abc import x, y, a
+     >>> from sympy.geometry.util import idiff
+ 
+@@ -560,28 +561,100 @@ def idiff(eq, y, x, n=1):
+ 
+     See Also
+     ========
+-
++ 
+     sympy.core.function.Derivative: represents unevaluated derivatives
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # If eq is a Relational (like Eq), convert it to an expression
++    if isinstance(eq, Relational):
++        eq = eq.lhs - eq.rhs
++
++    # Normalize y to a list/sequence and determine dependent items
+     if is_sequence(y):
+-        dep = set(y)
+-        y = y[0]
+-    elif isinstance(y, Symbol):
+-        dep = {y}
++        y_seq = list(y)
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        y_seq = [y]
++
++    dep_syms = set()
++    dep_func_names = set()
++    # collect dependencies from the provided y specification
++    for yi in y_seq:
++        if isinstance(yi, Symbol):
++            dep_syms.add(yi)
++        else:
++            # collect applied undefined function atoms (e.g., f(x))
++            applied = set()
++            try:
++                applied = set(yi.atoms(AppliedUndef))
++            except Exception:
++                applied = set()
++            if applied:
++                for a in applied:
++                    # a.func typically has a 'name' attribute
++                    name = getattr(a.func, 'name', None) or getattr(a.func, '__name__', None)
++                    if name:
++                        dep_func_names.add(name)
++            else:
++                # If yi contains symbols (e.g., an expression), treat those symbols as dependent
++                syms = yi.free_symbols - {x}
++                if syms:
++                    dep_syms.update(syms)
++                else:
++                    # Not a symbol, not an applied function, not an expression with symbols:
++                    raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++
++    # Build substitution mapping: map dependent symbols and applied functions in eq
++    f_map = {}
++
++    # Map dependent symbols found in eq.free_symbols to Function(name)(x)
++    for s in eq.free_symbols:
++        if s == x:
++            continue
++        if s in dep_syms:
++            f_map[s] = Function(s.name)(x)
+ 
+-    f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+-    dydx = Function(y.name)(x).diff(x)
+-    eq = eq.subs(f)
++    # Map applied undefined functions in eq (e.g., f(x)) if they match dependency names
++    applied_in_eq = set()
++    try:
++        applied_in_eq = set(eq.atoms(AppliedUndef))
++    except Exception:
++        applied_in_eq = set()
++    for a in applied_in_eq:
++        name = getattr(a.func, 'name', None) or getattr(a.func, '__name__', None)
++        if name and (name in dep_func_names or (not dep_func_names and any(
++                # if user specified y as an applied function directly (single), use that
++                (hasattr(y_seq[0], 'func') and getattr(y_seq[0].func, 'name', None) == name)
++        ))):
++            f_map[a] = Function(name)(x)
++
++    # Determine the dependent function name to form dydx
++    # Prefer first element of y_seq (y_seq[0])
++    y0 = y_seq[0]
++    if isinstance(y0, Symbol):
++        dydx = Function(y0.name)(x).diff(x)
++    else:
++        # Try to get function name from applied function or expression
++        fn_name = None
++        if hasattr(y0, 'func'):
++            fn_name = getattr(y0.func, 'name', None) or getattr(y0.func, '__name__', None)
++        if not fn_name:
++            # As a fallback, if the expression has applied atoms, take the first one's name
++            if applied_in_eq:
++                a = next(iter(applied_in_eq))
++                fn_name = getattr(a.func, 'name', None) or getattr(a.func, '__name__', None)
++        if not fn_name:
++            raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        dydx = Function(fn_name)(x).diff(x)
++
++    # Substitute dependent quantities in the equation
++    eq = eq.subs(f_map)
+     derivs = {}
+     for i in range(n):
+         yp = solve(eq.diff(x), dydx)[0].subs(derivs)
+         if i == n - 1:
+-            return yp.subs([(v, k) for k, v in f.items()])
++            # invert f_map to substitute internal functions back to original symbols/expressions
++            return yp.subs([(v, k) for k, v in f_map.items()])
+         derivs[dydx] = yp
+         eq = dydx - yp
+         dydx = dydx.diff(x)

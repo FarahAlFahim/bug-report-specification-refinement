@@ -1,0 +1,22 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 92213a4e67..e2e371cf48 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -726,8 +726,16 @@ class SQLCompiler:
+                 if isinstance(item, OrderBy):
+                     results.append((item, False))
+                     continue
++                # Pass the original default_order into the recursive call
++                # so that any explicit sign prefixes in the related model's
++                # Meta.ordering are interpreted independently of the outer
++                # ordering direction. Passing the "order" (the resolved
++                # direction for the outer name) here caused signs like '-'
++                # to be flipped when resolving related ordering (see
++                # issue where Parent.Meta.ordering = ['-pk'] produced ASC
++                # when applied through an inherited child).
+                 results.extend(self.find_ordering_name(item, opts, alias,
+-                                                       order, already_seen))
++                                                       default_order, already_seen))
+             return results
+         targets, alias, _ = self.query.trim_joins(targets, joins, path)
+         return [(OrderBy(transform_function(t, alias), descending=descending), False) for t in targets]

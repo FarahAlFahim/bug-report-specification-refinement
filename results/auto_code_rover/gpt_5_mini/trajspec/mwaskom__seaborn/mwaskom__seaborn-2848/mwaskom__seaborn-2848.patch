@@ -1,0 +1,38 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c9218c1f..b0a81191 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -149,19 +149,23 @@ class HueMapping(SemanticMapping):
+             # Use a value that's in the original data vector
+             value = self.lookup_table[key]
+         except KeyError:
+-            # Use the colormap to interpolate between existing datapoints
+-            # (e.g. in the context of making a continuous legend)
+-            try:
+-                normed = self.norm(key)
+-            except TypeError as err:
+-                if np.isnan(key):
++            # If this mapping is numeric (has norm and cmap) try to
++            # interpolate; otherwise treat missing categorical keys
++            # as omitted and return the transparent sentinel.
++            if getattr(self, "map_type", None) == "numeric" and self.norm is not None and self.cmap is not None:
++                try:
++                    normed = self.norm(key)
++                except Exception:
++                    # Could not normalize the key (e.g. non-numeric key)
++                    # -> treat as missing/omitted
+                     value = (0, 0, 0, 0)
+                 else:
+-                    raise err
++                    if np.ma.is_masked(normed):
++                        normed = np.nan
++                    value = self.cmap(normed)
+             else:
+-                if np.ma.is_masked(normed):
+-                    normed = np.nan
+-                value = self.cmap(normed)
++                # Categorical mapping and key not found: omit/transparent
++                value = (0, 0, 0, 0)
+         return value
+ 
+     def infer_map_type(self, palette, norm, input_format, var_type):

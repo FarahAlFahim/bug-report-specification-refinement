@@ -1,0 +1,45 @@
+diff --git a/sphinx/ext/autosummary/__init__.py b/sphinx/ext/autosummary/__init__.py
+index a777a88..a9d8c6c 100644
+--- a/sphinx/ext/autosummary/__init__.py
++++ b/sphinx/ext/autosummary/__init__.py
+@@ -779,6 +779,7 @@ def setup(app: Sphinx) -> Dict[str, Any]:
+     app.add_config_value('autosummary_generate_overwrite', True, False)
+     app.add_config_value('autosummary_mock_imports',
+                          lambda config: config.autodoc_mock_imports, 'env')
+-    app.add_config_value('autosummary_imported_members', [], False, [bool])
++    # default should be a boolean False (do not include imported members by default)
++    app.add_config_value('autosummary_imported_members', False, False, [bool])
+ 
+-    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
++    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index 9925546..c4bd2a0 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -246,7 +246,25 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        # Respect the imported_members flag when exposing the 'members' list
++        # to templates. If imported_members is True, expose dir(obj) as before.
++        # Otherwise, expose only names whose attribute value appears to be
++        # defined in the module (value.__module__ == obj.__name__), accessing
++        # attributes safely (skip those raising AttributeError).
++        if imported_members:
++            ns['members'] = dir(obj)
++        else:
++            members = []  # type: List[str]
++            for name in dir(obj):
++                try:
++                    value = safe_getattr(obj, name)
++                except AttributeError:
++                    # skip attributes that raise on access (mirrors get_members)
++                    continue
++                if getattr(value, '__module__', None) == getattr(obj, '__name__', None):
++                    members.append(name)
++            ns['members'] = members
++
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \

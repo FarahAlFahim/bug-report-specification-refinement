@@ -1,0 +1,41 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 2510c51..8415671 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -580,9 +580,35 @@ def run_with_reloader(main_func, *args, **kwargs):
+         if os.environ.get(DJANGO_AUTORELOAD_ENV) == 'true':
+             reloader = get_reloader()
+             logger.info('Watching for file changes with %s', reloader.__class__.__name__)
++
++            # If the reloader is running in the child process, ensure that the
++            # calling script (for example manage.py) is watched. Scripts executed
++            # as __main__ are not present in sys.modules, so they won't be
++            # discovered by iterating modules; add sys.argv[0] explicitly when it
++            # refers to an existing file and is not the django -m entrypoint.
++            try:
++                from pathlib import Path
++                import django as _django
++
++                script_arg = sys.argv[0] if sys.argv else ''
++                if script_arg:
++                    script_path = Path(script_arg)
++                    if script_path.exists():
++                        script_resolved = script_path.resolve()
++                        try:
++                            django_main_file = Path(_django.__main__.__file__).resolve()
++                        except Exception:
++                            django_main_file = None
++                        if django_main_file is None or script_resolved != django_main_file:
++                            # BaseReloader.watch_file expects an absolute Path.
++                            reloader.watch_file(script_resolved)
++            except Exception:
++                # Never fail startup due to inability to watch the calling script.
++                pass
++
+             start_django(reloader, main_func, *args, **kwargs)
+         else:
+             exit_code = restart_with_reloader()
+             sys.exit(exit_code)
+     except KeyboardInterrupt:
+-        pass
++        pass

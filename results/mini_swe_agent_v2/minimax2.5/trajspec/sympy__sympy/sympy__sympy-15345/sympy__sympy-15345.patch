@@ -1,0 +1,14 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..eb4b9e79b 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -117,6 +117,9 @@ def _print_Derivative(self, expr):
+         return "Hold[D[" + ', '.join(self.doprint(a) for a in [dexpr] + dvars) + "]]"
+ 
+ 
++    def _print_MinMaxBase(self, expr):
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code
+ 

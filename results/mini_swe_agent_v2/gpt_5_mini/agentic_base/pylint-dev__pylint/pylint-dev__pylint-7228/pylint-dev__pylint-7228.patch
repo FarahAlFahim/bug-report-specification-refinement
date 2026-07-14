@@ -1,0 +1,51 @@
+--- /tmp/original_argument.py	2026-06-05 15:32:13.822646013 +0000
++++ pylint/config/argument.py	2026-06-05 15:31:25.186920004 +0000
+@@ -42,6 +42,14 @@
+ """List of possible argument types."""
+ 
+ 
++
++def _safe_re_compile(pattern: str) -> Pattern[str]:
++    """Compile a regex pattern and raise argparse.ArgumentTypeError on failure."""
++    try:
++        return re.compile(pattern)
++    except re.error as exc:  # pragma: no cover - depends on regex engine
++        raise argparse.ArgumentTypeError(f"Invalid regular expression {pattern!r}: {exc}") from None
++
+ def _confidence_transformer(value: str) -> Sequence[str]:
+     """Transforms a comma separated string of confidence values."""
+     if not value:
+@@ -103,7 +111,7 @@
+     """Transforms a comma separated list of regular expressions."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(re.compile(pattern))
++        patterns.append(_safe_re_compile(pattern))
+     return patterns
+ 
+ 
+@@ -111,13 +119,11 @@
+     """Transforms a comma separated list of regular expressions paths."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(
+-            re.compile(
++        patterns.append(_safe_re_compile(
+                 str(pathlib.PureWindowsPath(pattern)).replace("\\", "\\\\")
+                 + "|"
+                 + pathlib.PureWindowsPath(pattern).as_posix()
+-            )
+-        )
++            ))
+     return patterns
+ 
+ 
+@@ -130,7 +136,7 @@
+     "non_empty_string": _non_empty_string_transformer,
+     "path": _path_transformer,
+     "py_version": _py_version_transformer,
+-    "regexp": re.compile,
++    "regexp": _safe_re_compile,
+     "regexp_csv": _regexp_csv_transfomer,
+     "regexp_paths_csv": _regexp_paths_csv_transfomer,
+     "string": pylint_utils._unquote,

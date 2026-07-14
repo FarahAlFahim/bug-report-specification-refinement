@@ -1,0 +1,76 @@
+diff --git a/sympy/polys/polyoptions.py b/sympy/polys/polyoptions.py
+index 6e504a3057..14d166c85c 100644
+--- a/sympy/polys/polyoptions.py
++++ b/sympy/polys/polyoptions.py
+@@ -405,8 +405,8 @@ class Domain(with_metaclass(OptionType, Option)):
+     _re_realfield = re.compile(r"^(R|RR)(_(\d+))?$")
+     _re_complexfield = re.compile(r"^(C|CC)(_(\d+))?$")
+     _re_finitefield = re.compile(r"^(FF|GF)\((\d+)\)$")
+-    _re_polynomial = re.compile(r"^(Z|ZZ|Q|QQ)\[(.+)\]$")
+-    _re_fraction = re.compile(r"^(Z|ZZ|Q|QQ)\((.+)\)$")
++    _re_polynomial = re.compile(r"^(Z|ZZ|Q|QQ|R|RR(_(\d+))?|C|CC(_(\d+))?)\[(.+)\]$")
++    _re_fraction = re.compile(r"^(Z|ZZ|Q|QQ|R|RR(_(\d+))?|C|CC(_(\d+))?)\((.+)\)$")
+     _re_algebraic = re.compile(r"^(Q|QQ)\<(.+)\>$")
+ 
+     @classmethod
+@@ -453,26 +453,54 @@ def preprocess(cls, domain):
+             r = cls._re_polynomial.match(domain)
+ 
+             if r is not None:
+-                ground, gens = r.groups()
++                groups = r.groups()
++                ground = groups[0]
++                gens = groups[-1]
+ 
+                 gens = list(map(sympify, gens.split(',')))
+ 
+-                if ground in ['Z', 'ZZ']:
++                if ground in ('Z', 'ZZ'):
+                     return sympy.polys.domains.ZZ.poly_ring(*gens)
+-                else:
++                elif ground in ('Q', 'QQ'):
+                     return sympy.polys.domains.QQ.poly_ring(*gens)
++                elif ground.startswith('R'):
++                    # Check for precision (e.g., RR_100) - groups[1] is '_100', groups[2] is '100'
++                    if groups[1] is not None:
++                        prec = int(groups[2])
++                        return sympy.polys.domains.RealField(prec).poly_ring(*gens)
++                    return sympy.polys.domains.RR.poly_ring(*gens)
++                elif ground.startswith('C'):
++                    # Check for precision (e.g., CC_100) - groups[3] is '_100', groups[4] is '100'
++                    if groups[3] is not None:
++                        prec = int(groups[4])
++                        return sympy.polys.domains.ComplexField(prec).poly_ring(*gens)
++                    return sympy.polys.domains.CC.poly_ring(*gens)
+ 
+             r = cls._re_fraction.match(domain)
+ 
+             if r is not None:
+-                ground, gens = r.groups()
++                groups = r.groups()
++                ground = groups[0]
++                gens = groups[-1]
+ 
+                 gens = list(map(sympify, gens.split(',')))
+ 
+-                if ground in ['Z', 'ZZ']:
++                if ground in ('Z', 'ZZ'):
+                     return sympy.polys.domains.ZZ.frac_field(*gens)
+-                else:
++                elif ground in ('Q', 'QQ'):
+                     return sympy.polys.domains.QQ.frac_field(*gens)
++                elif ground.startswith('R'):
++                    # Check for precision (e.g., RR_100) - groups[1] is '_100', groups[2] is '100'
++                    if groups[1] is not None:
++                        prec = int(groups[2])
++                        return sympy.polys.domains.RealField(prec).frac_field(*gens)
++                    return sympy.polys.domains.RR.frac_field(*gens)
++                elif ground.startswith('C'):
++                    # Check for precision (e.g., CC_100) - groups[3] is '_100', groups[4] is '100'
++                    if groups[3] is not None:
++                        prec = int(groups[4])
++                        return sympy.polys.domains.ComplexField(prec).frac_field(*gens)
++                    return sympy.polys.domains.CC.frac_field(*gens)
+ 
+             r = cls._re_algebraic.match(domain)
+ 

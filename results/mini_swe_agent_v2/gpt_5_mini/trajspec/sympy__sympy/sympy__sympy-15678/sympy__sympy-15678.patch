@@ -1,0 +1,92 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..bc41c89dc3 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -565,22 +565,79 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # Canonicalize relational inputs (Eq(lhs, rhs)) to plain expressions
++    # by treating equality as lhs - rhs == 0. This allows differentiation
++    # and solving to work on an Expr rather than a Relational.
++    try:
++        is_rel = getattr(eq, 'is_Relational', False)
++    except Exception:
++        is_rel = False
++    if is_rel:
++        eq = eq.lhs - eq.rhs
++
++    # Accept either a single dependent variable or a sequence of them.
++    # The dependent variable may be a Symbol (y) or an applied function (f(x)).
+     if is_sequence(y):
+-        dep = set(y)
+-        y = y[0]
+-    elif isinstance(y, Symbol):
+-        dep = {y}
++        dep = list(y)
++        y0 = dep[0]
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        # single dependent variable: could be a Symbol or an applied function
++        dep = [y]
++        y0 = y
++
++    # Validate dependent variables: they should be expressions that depend on x
++    for d in dep:
++        # allow Symbol or any Expr that depends on x (like f(x))
++        if not (hasattr(d, 'free_symbols') or hasattr(d, 'func')):
++            raise ValueError("expecting x-dependent symbol(s) but got: %s" % (y,))
++
++    # Build internal substitution mapping from the dependent variables that
++    # actually appear in the equation. Use placeholders Function(name)(x)
++    # so that derivatives can be taken symbolically. We base presence on
++    # eq.has(d) rather than eq.free_symbols so applied functions are
++    # detected as well.
++    f = {}
++    for d in dep:
++        if d == x:
++            continue
++        try:
++            present = eq.has(d)
++        except Exception:
++            # If eq.has fails for some exotic type, fall back to membership in free_symbols
++            present = d in getattr(eq, 'free_symbols', [])
++        if not present:
++            continue
++        # derive a name for the placeholder Function
++        if isinstance(d, Symbol):
++            name = d.name
++        else:
++            # for applied functions like f(x), try to get the underlying function name
++            try:
++                name = getattr(d.func, 'name', None) or getattr(d.func, '__name__', str(d.func))
++            except Exception:
++                name = str(d)
++        f[d] = Function(name)(x)
++
++    # The primary dydx symbol is the derivative of the placeholder for y0
++    if y0 in f:
++        dydx = f[y0].diff(x)
++    else:
++        # If the dependent var did not appear in eq, still create a placeholder
++        if isinstance(y0, Symbol):
++            dydx = Function(y0.name)(x).diff(x)
++        else:
++            try:
++                name = getattr(y0.func, 'name', None) or getattr(y0.func, '__name__', str(y0.func))
++            except Exception:
++                name = str(y0)
++            dydx = Function(name)(x).diff(x)
+ 
+-    f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+-    dydx = Function(y.name)(x).diff(x)
+     eq = eq.subs(f)
+     derivs = {}
+     for i in range(n):
+         yp = solve(eq.diff(x), dydx)[0].subs(derivs)
+         if i == n - 1:
++            # restore original dependent variable forms in the result
+             return yp.subs([(v, k) for k, v in f.items()])
+         derivs[dydx] = yp
+         eq = dydx - yp

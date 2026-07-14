@@ -1,0 +1,22 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..caabd2bf39 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -394,6 +394,17 @@ def _eval_rewrite_as_Heaviside(self, arg, **kwargs):
+         if arg.is_extended_real:
+             return Heaviside(arg, H0=S(1)/2) * 2 - 1
+ 
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        """Rewrite sign(z) in terms of Abs as z/Abs(z).
++
++        Note: this rewrite does not attempt to handle the singular case
++        arg == 0 (where z/Abs(z) would be undefined). The rewrite is
++        intended to be a formal transformation; evaluation or further
++        simplification can address the zero case if needed.
++        """
++        from sympy.functions.elementary.complexes import Abs
++        return arg / Abs(arg)
++
+     def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 

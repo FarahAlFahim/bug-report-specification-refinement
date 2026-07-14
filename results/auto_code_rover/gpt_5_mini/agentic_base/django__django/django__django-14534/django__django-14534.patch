@@ -1,0 +1,35 @@
+diff --git a/django/forms/boundfield.py b/django/forms/boundfield.py
+index 2ff8b0ee26..759157a71e 100644
+--- a/django/forms/boundfield.py
++++ b/django/forms/boundfield.py
+@@ -277,7 +277,29 @@ class BoundWidget:
+ 
+     @property
+     def id_for_label(self):
+-        return 'id_%s_%s' % (self.data['name'], self.data['index'])
++        """
++        Return the id value to use in a label's for attribute for this subwidget.
++
++        If this option's attrs include an explicit 'id' (as created by
++        ChoiceWidget.create_option when a parent widget has an id or auto_id),
++        return that id. Otherwise, fall back to the legacy constructed id
++        'id_<name>_<index>' if both name and index are available. If neither
++        source is available, return an empty string.
++        """
++        # Prefer a per-option explicit id when provided.
++        attrs = self.data.get('attrs', {}) if isinstance(self.data, dict) else {}
++        opt_id = attrs.get('id') if isinstance(attrs, dict) else None
++        if opt_id:
++            return opt_id
++
++        # Fall back to the legacy constructed id when possible.
++        name = self.data.get('name') if isinstance(self.data, dict) else None
++        index = self.data.get('index') if isinstance(self.data, dict) else None
++        if name is not None and index is not None:
++            return 'id_%s_%s' % (name, index)
++
++        # No id available.
++        return ''
+ 
+     @property
+     def choice_label(self):

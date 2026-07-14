@@ -1,0 +1,140 @@
+diff --git a/sympy/polys/partfrac.py b/sympy/polys/partfrac.py
+index 612b8f4607..c070e68302 100644
+--- a/sympy/polys/partfrac.py
++++ b/sympy/polys/partfrac.py
+@@ -79,6 +79,19 @@ def apart(f, x=None, full=False, **options):
+ 
+     _options = options.copy()
+     options = set_defaults(options, extension=True)
++    # If the expression can be simplified by cancelling common factors at
++    # the expression level (for example a symbolic multiplier that shouldn't
++    # be treated as a ground-domain coefficient), do that first. This avoids
++    # losing fractional remainder terms when parallel_poly_from_expr treats
++    # symbolic multipliers as domain coefficients and domain-level cancel
++    # removes them.
++    try:
++        fc = f.cancel()
++    except Exception:
++        fc = f
++
++    if fc != f:
++        return apart(fc, x=x, full=full, **_options)
+     try:
+         (P, Q), opt = parallel_poly_from_expr((P, Q), x, **options)
+     except PolynomialError as msg:
+@@ -125,10 +138,55 @@ def apart(f, x=None, full=False, **options):
+         raise NotImplementedError(
+             "multivariate partial fraction decomposition")
+ 
+-    common, P, Q = P.cancel(Q)
++    # Extract and preserve ground (coefficient) content as a SymPy expression
++    # so that symbolic multipliers (like 'a' in the issue) are treated as an
++    # outer multiplicative factor and reapplied to the full decomposition.
++    contP, P = P.primitive()
++    contQ, Q = Q.primitive()
+ 
+-    poly, P = P.div(Q, auto=True)
++    # Start with the ground content ratio as the common factor
++    try:
++        common = contP.as_expr()/contQ.as_expr()
++    except Exception:
++        # fallback if contP/contQ are not Poly-like
++        common = contP/contQ
++
++    # Now cancel remaining polynomial common factors (if any). Use include=False
++    # to get domain-level cofactors; reattach them to the common factor.
++    try:
++        cF, cG, P, Q = P.cancel(Q, include=False)
++        try:
++            common = common * cF.as_expr() / cG.as_expr()
++        except Exception:
++            common = common * cF / cG
++    except Exception:
++        # Some Poly.cancel implementations may return (common, P, Q)
++        # in that case fall back to the old behaviour but try to coerce
++        # the common factor to an expression.
++        tmp = P.cancel(Q)
++        if len(tmp) == 3:
++            ctmp, P, Q = tmp
++            try:
++                common = common * ctmp.as_expr()
++            except Exception:
++                common = common * ctmp
++        else:
++            # unexpected shape -- just use what cancel returned
++            common = tmp[0]
++
++    # Make sure coefficients are in a field so that polynomial division
++    # produces the correct polynomial part and fractional remainder
++    # (e.g. allow rational coefficients like 1/2).
+     P, Q = P.rat_clear_denoms(Q)
++    # Convert to a field (e.g. QQ) so that polynomial division produces
++    # rational coefficients (like 1/2) when necessary.
++    try:
++        P = P.to_field()
++        Q = Q.to_field()
++    except Exception:
++        pass
++
++    poly, P = P.div(Q, auto=True)
+ 
+     if Q.degree() <= 1:
+         partial = P/Q
+@@ -331,10 +389,55 @@ def apart_list(f, x=None, dummies=None, **options):
+         raise NotImplementedError(
+             "multivariate partial fraction decomposition")
+ 
+-    common, P, Q = P.cancel(Q)
++    # Extract and preserve ground (coefficient) content as a SymPy expression
++    # so that symbolic multipliers (like 'a' in the issue) are treated as an
++    # outer multiplicative factor and reapplied to the full decomposition.
++    contP, P = P.primitive()
++    contQ, Q = Q.primitive()
+ 
+-    poly, P = P.div(Q, auto=True)
++    # Start with the ground content ratio as the common factor
++    try:
++        common = contP.as_expr()/contQ.as_expr()
++    except Exception:
++        # fallback if contP/contQ are not Poly-like
++        common = contP/contQ
++
++    # Now cancel remaining polynomial common factors (if any). Use include=False
++    # to get domain-level cofactors; reattach them to the common factor.
++    try:
++        cF, cG, P, Q = P.cancel(Q, include=False)
++        try:
++            common = common * cF.as_expr() / cG.as_expr()
++        except Exception:
++            common = common * cF / cG
++    except Exception:
++        # Some Poly.cancel implementations may return (common, P, Q)
++        # in that case fall back to the old behaviour but try to coerce
++        # the common factor to an expression.
++        tmp = P.cancel(Q)
++        if len(tmp) == 3:
++            ctmp, P, Q = tmp
++            try:
++                common = common * ctmp.as_expr()
++            except Exception:
++                common = common * ctmp
++        else:
++            # unexpected shape -- just use what cancel returned
++            common = tmp[0]
++
++    # Make sure coefficients are in a field so that polynomial division
++    # produces the correct polynomial part and fractional remainder
++    # (e.g. allow rational coefficients like 1/2).
+     P, Q = P.rat_clear_denoms(Q)
++    # Convert to a field (e.g. QQ) so that polynomial division produces
++    # rational coefficients (like 1/2) when necessary.
++    try:
++        P = P.to_field()
++        Q = Q.to_field()
++    except Exception:
++        pass
++
++    poly, P = P.div(Q, auto=True)
+ 
+     polypart = poly
+ 

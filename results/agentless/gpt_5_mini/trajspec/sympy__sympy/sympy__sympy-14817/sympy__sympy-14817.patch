@@ -1,0 +1,28 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0ddba33..df830d1 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,7 +825,22 @@ class PrettyPrinter(Printer):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine negativity by extracting the scalar coefficient
++                # structurally (as_coeff_mmul) instead of sympifying internal
++                # args (which for MatrixSymbol can be raw strings and may
++                # raise SympifyError). as_coeff_mmul returns
++                # (coeff, mats) where coeff is a SymPy scalar.
++                neg = False
++                try:
++                    coeff = item.as_coeff_mmul()[0]
++                    neg = bool(getattr(coeff, 'is_negative', False))
++                except Exception:
++                    # If structural extraction fails for any reason, fall back
++                    # to treating the term as non-negative to avoid sympifying
++                    # raw internals and crashing the printer.
++                    neg = False
++
++                if neg:
+                     s = prettyForm(*stringPict.next(s, ' '))
+                     pform = self._print(item)
+                 else:

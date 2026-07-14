@@ -1,0 +1,51 @@
+diff --git a/src/_pytest/skipping.py b/src/_pytest/skipping.py
+index 335e10996..53f96f7b4 100644
+--- a/src/_pytest/skipping.py
++++ b/src/_pytest/skipping.py
+@@ -246,22 +246,39 @@ def pytest_runtest_setup(item: Item) -> None:
+ 
+ @hookimpl(hookwrapper=True)
+ def pytest_runtest_call(item: Item) -> Generator[None, None, None]:
+-    xfailed = item._store.get(xfailed_key, None)
+-    if xfailed is None:
+-        item._store[xfailed_key] = xfailed = evaluate_xfail_marks(item)
+-
+-    if not item.config.option.runxfail:
+-        if xfailed and not xfailed.run:
+-            xfail("[NOTRUN] " + xfailed.reason)
++    # If an xfail evaluation has been stored (e.g. during setup/collection),
++    # observe it before running the call so that run=False can prevent the
++    # call from executing. If there is no stored evaluation, defer
++    # evaluation until after the test call so that marks added dynamically
++    # during the test body are observed.
++    pre_xfailed = item._store.get(xfailed_key, None)
++    if pre_xfailed is not None:
++        if not item.config.option.runxfail:
++            if pre_xfailed and not pre_xfailed.run:
++                xfail("[NOTRUN] " + pre_xfailed.reason)
+ 
+     yield
+ 
++    # Evaluate xfail marks after the call if no evaluation was stored.
++    # This allows marks added during the call stage (via
++    # request.node.add_marker) to be detected and reflected in reports.
++    post_xfailed = item._store.get(xfailed_key, None)
++    if post_xfailed is None:
++        item._store[xfailed_key] = evaluate_xfail_marks(item)
+ 
+ @hookimpl(hookwrapper=True)
+ def pytest_runtest_makereport(item: Item, call: CallInfo[None]):
+     outcome = yield
+     rep = outcome.get_result()
++    # Ensure we evaluate xfail marks here if no stored evaluation exists.
++    # This covers the case where markers were added during the test body
++    # and ensures the TestReport will reflect an xfail instead of a fail.
+     xfailed = item._store.get(xfailed_key, None)
++    if xfailed is None:
++        xfailed = evaluate_xfail_marks(item)
++        # don't overwrite any explicit stored value, but store the
++        # evaluated result so subsequent hooks can observe it
++        item._store[xfailed_key] = xfailed
+     # unittest special case, see setting of unexpectedsuccess_key
+     if unexpectedsuccess_key in item._store and rep.when == "call":
+         reason = item._store[unexpectedsuccess_key]

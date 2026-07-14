@@ -1,0 +1,53 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 8ba346adbe..385beb3521 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -510,7 +510,21 @@ def traverse(e):
+         'old': lambda x: trigsimp_old(x, **opts),
+                    }[method]
+ 
+-    return trigsimpfunc(expr)
++    result = trigsimpfunc(expr)
++    # The newer 'matching' pipeline (futrig) applies many Fu-like
++    # transformations but can miss Add-level pattern matches that are
++    # handled by the older matcher in __trigsimp. To ensure identities
++    # like cos(a - b) are found for numeric Rational arguments (e.g.
++    # Matrix.dot results), run the older matching pass as a final step
++    # when using the 'matching' method.
++    if method == 'matching':
++        try:
++            # _trigsimp wraps __trigsimp and guards by trig content
++            result = _trigsimp(result, recursive if recursive is not None else False)
++        except Exception:
++            # If anything goes wrong, fall back to the original result
++            pass
++    return result
+ 
+ 
+ def exptrigsimp(expr):
+@@ -1003,12 +1017,23 @@ def __trigsimp(expr, deep=False):
+                 if not _dotrig(expr, pattern):
+                     continue
+                 expr = TR10i(expr)
+-                if expr.has(HyperbolicFunction):
++                # TR10i exposes sin/cos product forms that make the
++                # Add-level trig patterns matchable. Only gate matching on
++                # presence of hyperbolic functions prevents trig-only
++                # expressions from being matched (see issue).  Match when
++                # the expression contains either trig or hyperbolic funcs.
++                if expr.has(TrigonometricFunction, HyperbolicFunction):
+                     res = expr.match(pattern)
+                     # if "d" contains any trig or hyperbolic funcs with
+                     # argument "a" or "b" then skip the simplification;
+                     # this isn't perfect -- see tests
+-                    if res is None or not (a in res and b in res) or any(
++                    if res is None or not (a in res and b in res):
++                        continue
++                    # only perform the atoms-based check if the match
++                    # produced a 'd' key; otherwise proceed with the
++                    # simplification. This avoids assuming 'd' is present
++                    # in all match results.
++                    if d in res and any(
+                         w.args[0] in (res[a], res[b]) for w in res[d].atoms(
+                             TrigonometricFunction, HyperbolicFunction)):
+                         continue

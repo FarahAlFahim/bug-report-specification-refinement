@@ -1,0 +1,25 @@
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index 0f256be9e..abc5a491d 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -225,14 +225,14 @@ class Cmdoption(ObjectDescription):
+         firstname = ''
+         for potential_option in sig.split(', '):
+             potential_option = potential_option.strip()
+-            m = option_desc_re.match(potential_option)
+-            if not m:
+-                logger.warning(__('Malformed option description %r, should '
+-                                  'look like "opt", "-opt args", "--opt args", '
+-                                  '"/opt args" or "+opt args"'), potential_option,
++            # Use a more permissive splitter that accepts constructs like
++            # "[enable=]PATTERN" where '=' appears inside brackets.
++            res = _split_option_token(potential_option)
++            if not res:
++                logger.warning(__('Malformed option description %r'), potential_option,
+                                location=signode)
+                 continue
+-            optname, args = m.groups()
++            optname, args = res
+             if count:
+                 signode += addnodes.desc_addname(', ', ', ')
+             signode += addnodes.desc_name(optname, optname)

@@ -1,0 +1,20 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..bc04b10ecb 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -397,6 +397,15 @@ def _eval_rewrite_as_Heaviside(self, arg, **kwargs):
+     def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        """Rewrite sign(z) in terms of Abs as z/Abs(z).
++
++        Note: the algebraic identity sign(z) = z/Abs(z) holds for z != 0.
++        The rewrite returns the symbolic form; evaluation at z=0 is handled
++        by the usual evaluation rules of the resulting expression.
++        """
++        return arg/Abs(arg)
++
+ 
+ class Abs(Function):
+     """

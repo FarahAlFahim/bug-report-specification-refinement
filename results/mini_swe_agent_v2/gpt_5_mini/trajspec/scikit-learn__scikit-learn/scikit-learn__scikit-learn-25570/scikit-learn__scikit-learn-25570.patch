@@ -1,0 +1,55 @@
+diff --git a/sklearn/compose/_column_transformer.py b/sklearn/compose/_column_transformer.py
+index a26145117..1f2b79f7e 100644
+--- a/sklearn/compose/_column_transformer.py
++++ b/sklearn/compose/_column_transformer.py
+@@ -381,18 +381,23 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+         output_config = _get_output_config("transform", self)
+         for name, trans, columns in transformers:
+             if replace_strings:
+-                # replace 'passthrough' with identity transformer and
+-                # skip in case of 'drop'
++                # First skip cases that produce no output: 'drop' or an
++                # explicit empty column selection. This avoids creating a
++                # FunctionTransformer for a 'passthrough' entry that has no
++                # columns selected, which would break the producer/consumer
++                # alignment when the consumer side filters out empty
++                # selections.
++                if trans == "drop":
++                    continue
++                elif _is_empty_column_selection(columns):
++                    continue
++                # replace 'passthrough' with identity transformer
+                 if trans == "passthrough":
+                     trans = FunctionTransformer(
+                         accept_sparse=True,
+                         check_inverse=False,
+                         feature_names_out="one-to-one",
+                     ).set_output(transform=output_config["dense"])
+-                elif trans == "drop":
+-                    continue
+-                elif _is_empty_column_selection(columns):
+-                    continue
+ 
+             if column_as_strings:
+                 # Convert all columns to using their string labels
+@@ -587,6 +592,11 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+         for name, old, column, _ in self._iter():
+             if old == "drop":
+                 trans = "drop"
++            elif _is_empty_column_selection(column):
++                # keep the original (unfitted) transformer for empty
++                # selections; they do not consume an entry from the
++                # fitted_transformers iterator.
++                trans = old
+             elif old == "passthrough":
+                 # FunctionTransformer is present in list of transformers,
+                 # so get next transformer, but save original string
+@@ -596,8 +606,6 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+                 # The fitted FunctionTransformer is saved in another attribute,
+                 # so it can be used during transform for set_output.
+                 self._name_to_fitted_passthrough[name] = func_transformer
+-            elif _is_empty_column_selection(column):
+-                trans = old
+             else:
+                 trans = next(fitted_transformers)
+             transformers_.append((name, trans, column))

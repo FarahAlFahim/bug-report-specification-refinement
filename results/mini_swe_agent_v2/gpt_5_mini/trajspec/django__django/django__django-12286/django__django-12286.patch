@@ -1,0 +1,43 @@
+diff --git a/django/core/checks/translation.py b/django/core/checks/translation.py
+index 138ed07ff8..7b04abdac3 100644
+--- a/django/core/checks/translation.py
++++ b/django/core/checks/translation.py
+@@ -1,4 +1,5 @@
+ from django.conf import settings
++from django.conf.locale import LANG_INFO
+ from django.utils.translation.trans_real import language_code_re
+ 
+ from . import Error, Tags, register
+@@ -56,6 +57,29 @@ def check_setting_languages_bidi(app_configs, **kwargs):
+ def check_language_settings_consistent(app_configs, **kwargs):
+     """Error if language settings are not consistent with each other."""
+     available_tags = {i for i, _ in settings.LANGUAGES} | {'en-us'}
+-    if settings.LANGUAGE_CODE not in available_tags:
+-        return [E004]
+-    return []
++
++    # Build possible language codes similar to the runtime resolution
++    # in get_supported_language_variant(): consider explicit fallbacks
++    # declared in LANG_INFO and the generic/base language.
++    tag = settings.LANGUAGE_CODE
++    possible_codes = [tag]
++    try:
++        possible_codes.extend(LANG_INFO[tag].get('fallback', []))
++    except KeyError:
++        # No explicit LANG_INFO entry for this tag.
++        pass
++    generic = tag.split('-')[0]
++    possible_codes.append(generic)
++
++    # If any of the possible codes is listed in LANGUAGES, accept it.
++    if any(code in available_tags for code in possible_codes):
++        return []
++
++    # As a last resort (mirroring get_supported_language_variant with
++    # strict=False), accept if there's any supported variant of the
++    # generic language (e.g. LANGUAGES contains 'fr-ca' and LANGUAGE_CODE
++    # is 'fr').
++    if any(s.startswith(generic + '-') for s in available_tags):
++        return []
++
++    return [E004]

@@ -1,0 +1,78 @@
+diff --git a/django/db/migrations/autodetector.py b/django/db/migrations/autodetector.py
+index 1c40161c7f..8e9bd2c7ed 100644
+--- a/django/db/migrations/autodetector.py
++++ b/django/db/migrations/autodetector.py
+@@ -912,44 +912,57 @@ class MigrationAutodetector:
+             old_field_name = self.renamed_fields.get((app_label, model_name, field_name), field_name)
+             old_field = self.old_apps.get_model(app_label, old_model_name)._meta.get_field(old_field_name)
+             new_field = self.new_apps.get_model(app_label, model_name)._meta.get_field(field_name)
++            # Make a shallow copy of the new_field (and its remote_field if present)
++            # for the purpose of making temporary, in-place modifications needed for
++            # comparison and dependency generation. Mutating the live Field
++            # instances directly causes stale data to be serialized into
++            # migrations (see #). Using a shallow copy preserves runtime
++            # references (e.g., remote_field.model) while avoiding mutation of
++            # the live model objects.
++            import copy
++            compare_field = copy.copy(new_field)
++            if hasattr(compare_field, 'remote_field') and getattr(compare_field, 'remote_field', None):
++                # copy the remote_field object so mutations don't affect the
++                # original field's remote_field (which could be shared)
++                compare_field.remote_field = copy.copy(compare_field.remote_field)
+             dependencies = []
+             # Implement any model renames on relations; these are handled by RenameModel
+             # so we need to exclude them from the comparison
+-            if hasattr(new_field, "remote_field") and getattr(new_field.remote_field, "model", None):
++            if hasattr(compare_field, "remote_field") and getattr(compare_field.remote_field, "model", None):
+                 rename_key = (
+-                    new_field.remote_field.model._meta.app_label,
+-                    new_field.remote_field.model._meta.model_name,
++                    compare_field.remote_field.model._meta.app_label,
++                    compare_field.remote_field.model._meta.model_name,
+                 )
+                 if rename_key in self.renamed_models:
+-                    new_field.remote_field.model = old_field.remote_field.model
++                    compare_field.remote_field.model = old_field.remote_field.model
+                 # Handle ForeignKey which can only have a single to_field.
+-                remote_field_name = getattr(new_field.remote_field, 'field_name', None)
++                remote_field_name = getattr(compare_field.remote_field, 'field_name', None)
+                 if remote_field_name:
+                     to_field_rename_key = rename_key + (remote_field_name,)
+                     if to_field_rename_key in self.renamed_fields:
+-                        new_field.remote_field.field_name = old_field.remote_field.field_name
++                        compare_field.remote_field.field_name = old_field.remote_field.field_name
+                 # Handle ForeignObjects which can have multiple from_fields/to_fields.
+-                from_fields = getattr(new_field, 'from_fields', None)
++                from_fields = getattr(compare_field, 'from_fields', None)
+                 if from_fields:
+                     from_rename_key = (app_label, model_name)
+-                    new_field.from_fields = tuple([
++                    compare_field.from_fields = tuple([
+                         self.renamed_fields.get(from_rename_key + (from_field,), from_field)
+                         for from_field in from_fields
+                     ])
+-                    new_field.to_fields = tuple([
++                    compare_field.to_fields = tuple([
+                         self.renamed_fields.get(rename_key + (to_field,), to_field)
+-                        for to_field in new_field.to_fields
++                        for to_field in compare_field.to_fields
+                     ])
+-                dependencies.extend(self._get_dependencies_for_foreign_key(new_field))
+-            if hasattr(new_field, "remote_field") and getattr(new_field.remote_field, "through", None):
++                dependencies.extend(self._get_dependencies_for_foreign_key(compare_field))
++            if hasattr(compare_field, "remote_field") and getattr(compare_field.remote_field, "through", None):
+                 rename_key = (
+-                    new_field.remote_field.through._meta.app_label,
+-                    new_field.remote_field.through._meta.model_name,
++                    compare_field.remote_field.through._meta.app_label,
++                    compare_field.remote_field.through._meta.model_name,
+                 )
+                 if rename_key in self.renamed_models:
+-                    new_field.remote_field.through = old_field.remote_field.through
++                    compare_field.remote_field.through = old_field.remote_field.through
+             old_field_dec = self.deep_deconstruct(old_field)
+-            new_field_dec = self.deep_deconstruct(new_field)
++            new_field_dec = self.deep_deconstruct(compare_field)
+             if old_field_dec != new_field_dec:
+                 both_m2m = old_field.many_to_many and new_field.many_to_many
+                 neither_m2m = not old_field.many_to_many and not new_field.many_to_many

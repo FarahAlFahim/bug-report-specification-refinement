@@ -1,0 +1,87 @@
+diff --git a/sympy/parsing/mathematica.py b/sympy/parsing/mathematica.py
+index 7ea14ce33a..5ea36264aa 100644
+--- a/sympy/parsing/mathematica.py
++++ b/sympy/parsing/mathematica.py
+@@ -174,10 +174,10 @@ class MathematicaParser:
+         # a single whitespace to '*'
+         'whitespace': (
+             re.compile(r'''
+-                (?:(?<=[a-zA-Z\d])|(?<=\d\.))     # a letter or a number
++                (?:(?<=[^\W\d_])|(?<=\d\.))     # a letter or a number
+                 \s+                               # any number of whitespaces
+-                (?:(?=[a-zA-Z\d])|(?=\.\d))       # a letter or a number
+-                ''', re.VERBOSE),
++                (?:(?=[^\W\d_])|(?=\.\d))       # a letter or a number
++                ''', re.VERBOSE | re.UNICODE),
+             '*'),
+ 
+         # add omitted '*' character
+@@ -186,13 +186,13 @@ class MathematicaParser:
+                 (?:(?<=[])\d])|(?<=\d\.))       # ], ) or a number
+                                                 # ''
+                 (?=[(a-zA-Z])                   # ( or a single letter
+-                ''', re.VERBOSE),
++                ''', re.VERBOSE | re.UNICODE),
+             '*'),
+ 
+         # add omitted '*' character (variable letter preceding)
+         'add*_2': (
+             re.compile(r'''
+-                (?<=[a-zA-Z])       # a letter
++                (?<=[^\W\d_])       # a letter
+                 \(                  # ( as a character
+                 (?=.)               # any characters
+                 ''', re.VERBOSE),
+@@ -202,10 +202,10 @@ class MathematicaParser:
+         'Pi': (
+             re.compile(r'''
+                 (?:
+-                \A|(?<=[^a-zA-Z])
++                (?:\A|(?<=[^\w]))
+                 )
+                 Pi                  # 'Pi' is 3.14159... in Mathematica
+-                (?=[^a-zA-Z])
++                (?=(?:[^\w]|$))
+                 ''', re.VERBOSE),
+             'pi'),
+     }
+@@ -213,7 +213,7 @@ class MathematicaParser:
+     # Mathematica function name pattern
+     FM_PATTERN = re.compile(r'''
+                 (?:
+-                \A|(?<=[^a-zA-Z])   # at the top or a non-letter
++                (?:\A|(?<=[^\w]))   # at the top or a non-letter
+                 )
+                 [A-Z][a-zA-Z\d]*    # Function
+                 (?=\[)              # [ as a character
+@@ -227,10 +227,10 @@ class MathematicaParser:
+     # regex string for function argument pattern
+     ARGS_PATTERN_TEMPLATE = r'''
+                 (?:
+-                \A|(?<=[^a-zA-Z])
++                (?:\A|(?<=[^\w]))
+                 )
+                 {arguments}         # model argument like x, y,...
+-                (?=[^a-zA-Z])
++                (?=(?:[^\w]|$))
+                 '''
+ 
+     # will contain transformed CORRESPONDENCES dictionary
+@@ -326,7 +326,7 @@ def _compile_dictionary(cls, dic):
+             # string for regex compile
+             patStr = cls.ARGS_PATTERN_TEMPLATE.format(arguments=xyz)
+ 
+-            pat = re.compile(patStr, re.VERBOSE)
++            pat = re.compile(patStr, re.VERBOSE | re.UNICODE)
+ 
+             # update dictionary
+             d[key] = {}
+@@ -586,7 +586,7 @@ def parse(self, s):
+         "##": lambda: ["SlotSequence", "1"],
+     }
+ 
+-    _literal = r"[A-Za-z][A-Za-z0-9]*"
++    _literal = r"[^\W\d_][^\W_]*"
+     _number = r"(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)"
+ 
+     _enclosure_open = ["(", "[", "[[", "{"]

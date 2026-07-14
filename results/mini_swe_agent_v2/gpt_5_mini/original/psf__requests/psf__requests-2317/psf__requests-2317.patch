@@ -1,0 +1,18 @@
+diff --git a/requests/sessions.py b/requests/sessions.py
+index d701ff2..cde04a2 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -425,7 +425,12 @@ class Session(SessionRedirectMixin):
+             If Tuple, ('cert', 'key') pair.
+         """
+ 
+-        method = builtin_str(method)
++        # Ensure the method is a native string. Using builtin_str() here
++        # would call str() on a bytes value (e.g. b'GET') which results in
++        # the literal string "b'GET'". That then becomes the HTTP method
++        # and leads to invalid requests (404s). Use to_native_string to
++        # properly decode bytes to the native str type.
++        method = to_native_string(method)
+ 
+         # Create the Request.
+         req = Request(

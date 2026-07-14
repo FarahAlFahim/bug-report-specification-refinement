@@ -1,0 +1,17 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index fe1f7236e..ca35f043c 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -466,6 +466,12 @@ def check_array(array, accept_sparse=False, accept_large_sparse=True,
+         # not a data type (e.g. a column named dtype in a pandas DataFrame)
+         dtype_orig = None
+ 
++    # For pandas DataFrame and Series, check if any column has object dtype
++    # since they don't have a 'dtype' attribute but have 'dtypes'
++    if dtype_orig is None and hasattr(array, 'dtypes'):
++        if any(dt.kind == 'O' for dt in array.dtypes):
++            dtype_orig = np.dtype('object')
++
+     if dtype_numeric:
+         if dtype_orig is not None and dtype_orig.kind == "O":
+             # if input is object, convert to float.

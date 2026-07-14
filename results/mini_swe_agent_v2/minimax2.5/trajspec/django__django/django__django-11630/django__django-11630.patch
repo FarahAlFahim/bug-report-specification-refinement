@@ -1,0 +1,60 @@
+diff --git a/django/core/checks/model_checks.py b/django/core/checks/model_checks.py
+index 5c2266ca1d..2ca1a00790 100644
+--- a/django/core/checks/model_checks.py
++++ b/django/core/checks/model_checks.py
+@@ -5,6 +5,7 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.core.checks import Error, Tags, register
++from django.db import router
+ 
+ 
+ @register(Tags.models)
+@@ -17,6 +18,8 @@ def check_all_models(app_configs=None, **kwargs):
+         models = apps.get_models()
+     else:
+         models = chain.from_iterable(app_config.get_models() for app_config in app_configs)
++    # Convert to list to allow multiple iterations
++    models = list(models)
+     for model in models:
+         if model._meta.managed and not model._meta.proxy:
+             db_table_models[model._meta.db_table].append(model._meta.label)
+@@ -35,16 +38,30 @@ def check_all_models(app_configs=None, **kwargs):
+             indexes[model_index.name].append(model._meta.label)
+         for model_constraint in model._meta.constraints:
+             constraints[model_constraint.name].append(model._meta.label)
++    # Check for db_table collisions, taking into account the database router
++    # to allow models in different databases to share the same db_table name.
+     for db_table, model_labels in db_table_models.items():
+-        if len(model_labels) != 1:
+-            errors.append(
+-                Error(
+-                    "db_table '%s' is used by multiple models: %s."
+-                    % (db_table, ', '.join(db_table_models[db_table])),
+-                    obj=db_table,
+-                    id='models.E028',
++        # Get the models that share this db_table
++        same_db_table_models = [
++            model for model in models
++            if model._meta.managed and not model._meta.proxy and model._meta.db_table == db_table
++        ]
++        # Group models by their database
++        db_models = defaultdict(list)
++        for model in same_db_table_models:
++            db = router.db_for_read(model) or router.db_for_write(model)
++            db_models[db].append(model._meta.label)
++        # Check for collisions only within the same database
++        for db, labels in db_models.items():
++            if len(labels) != 1:
++                errors.append(
++                    Error(
++                        "db_table '%s' is used by multiple models: %s."
++                        % (db_table, ', '.join(labels)),
++                        obj=db_table,
++                        id='models.E028',
++                    )
+                 )
+-            )
+     for index_name, model_labels in indexes.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)

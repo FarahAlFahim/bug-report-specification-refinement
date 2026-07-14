@@ -1,0 +1,32 @@
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..73596e1a 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -1959,9 +1959,26 @@ class DataArray(AbstractArray, DataWithCoords):
+         variable_dim = idx.names[level_number]
+ 
+         # pull variables out of datarray
++        # When selecting each variable we may still retain the stacked
++        # MultiIndex coordinate (named by the ``dim`` argument) as a
++        # coordinate on the returned DataArray. If that coordinate is left
++        # on each per-variable DataArray, Dataset(...) will try to merge
++        # these same-named coordinates and can raise a MergeError when the
++        # underlying index objects are incompatible (e.g., singleton
++        # levels). To avoid this, drop the stacked coordinate from the
++        # per-variable DataArray objects before constructing the Dataset.
+         data_dict = {}
+         for k in variables:
+-            data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
++            arr = self.sel({variable_dim: k}).squeeze(drop=True)
++            # remove the stacked coordinate (if present) to avoid
++            # conflicting same-named coordinate objects during Dataset
++            # construction
++            if dim in arr.coords:
++                # drop_vars will ignore missing names if requested, but
++                # here we already checked presence so use default behavior
++                # to surface unexpected issues.
++                arr = arr.drop_vars(dim)
++            data_dict[k] = arr
+ 
+         # unstacked dataset
+         return Dataset(data_dict)

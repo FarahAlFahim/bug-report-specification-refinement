@@ -1,0 +1,28 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..dde9838458 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1670,6 +1670,11 @@ def eval(x):
+     def expr(self):
+         return self._args[0]
+ 
++    @property
++    def kind(self):
++        """Forward the kind of the wrapped expression."""
++        return self.expr.kind
++
+     @property
+     def _wrt_variables(self):
+         # return the variables of differentiation without
+@@ -2337,6 +2342,11 @@ def expr(self):
+         """The expression on which the substitution operates"""
+         return self._args[0]
+ 
++    @property
++    def kind(self):
++        """Forward the kind of the wrapped expression."""
++        return self.expr.kind
++
+     @property
+     def point(self):
+         """The values for which the variables are to be substituted"""

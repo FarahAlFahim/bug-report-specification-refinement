@@ -1,0 +1,60 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..8e13e7e3bf 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -45,12 +45,25 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # For display purposes, prefer the wrapped callable when the
++        # resolved view is a functools.partial. This mirrors
++        # URLPattern.lookup_str which unwraps partials for its display
++        # string. We must not change self.func, self.args or self.kwargs
++        # because call sites unpack the ResolverMatch and expect the
++        # original runtime values.
++        display_callable = func
++        if isinstance(func, functools.partial):
++            # Use the underlying callable for the dotted path and for
++            # composing a human-friendly representation of bound args.
++            display_callable = func.func
++
++        if not hasattr(display_callable, '__name__'):
++            # A class-based view or callable object.
++            self._func_path = display_callable.__class__.__module__ + '.' + display_callable.__class__.__name__
+         else:
+-            # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            # A function-based view; prefer qualname when available.
++            qual = getattr(display_callable, '__qualname__', display_callable.__name__)
++            self._func_path = display_callable.__module__ + '.' + qual
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])
+@@ -59,8 +72,23 @@ class ResolverMatch:
+         return (self.func, self.args, self.kwargs)[index]
+ 
+     def __repr__(self):
++        # If the resolved callable is a functools.partial, include its
++        # pre-bound args and keywords in the human-readable representation
++        # so debugging output reflects the actual argument binding.
++        display_args = self.args
++        display_kwargs = self.kwargs
++        if isinstance(self.func, functools.partial):
++            p_args = getattr(self.func, 'args', ()) or ()
++            p_kwargs = getattr(self.func, 'keywords', {}) or {}
++            display_args = tuple(p_args) + tuple(self.args)
++            # Merge partial keywords first so that URL-resolved kwargs take precedence
++            merged = {}
++            merged.update(p_kwargs)
++            merged.update(self.kwargs or {})
++            display_kwargs = merged
++
+         return "ResolverMatch(func=%s, args=%s, kwargs=%s, url_name=%s, app_names=%s, namespaces=%s, route=%s)" % (
+-            self._func_path, self.args, self.kwargs, self.url_name,
++            self._func_path, display_args, display_kwargs, self.url_name,
+             self.app_names, self.namespaces, self.route,
+         )
+ 

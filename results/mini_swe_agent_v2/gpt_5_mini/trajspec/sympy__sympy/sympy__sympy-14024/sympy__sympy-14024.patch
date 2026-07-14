@@ -1,0 +1,63 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index a1bf92bde1..98730efce6 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,12 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    # Python 3.3+: Mapping is in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    # Older Pythons have Mapping in collections
++    from collections import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..81392b6543 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -13,7 +13,13 @@
+ from sympy.core.sympify import sympify, converter
+ from sympy.utilities.iterables import iterable
+ 
+-import collections
++try:
++    # Python 3.3+: abstract collection types are in collections.abc
++    from collections.abc import MutableSet
++    import collections
++except Exception:
++    from collections import MutableSet
++    import collections
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +274,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index 02ec6480cb..234c79de15 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -1144,7 +1144,11 @@ def _eval_evalf(self, prec):
+         base = base._evalf(prec)
+         if not exp.is_Integer:
+             exp = exp._evalf(prec)
+-        if exp.is_negative and base.is_number and base.is_real is False:
++        # If the exponent is negative and the base is a numeric value
++        # that is either non-real or a negative real number, rewrite
++        # (base)**(exp) as (conjugate(base)/(base*conjugate(base)))**(-exp)
++        # so that the inversion can be done in a numerically stable way.
++        if exp.is_negative and base.is_number and (base.is_real is False or base.is_negative):
+             base = base.conjugate() / (base * base.conjugate())._evalf(prec)
+             exp = -exp
+             return self.func(base, exp).expand()

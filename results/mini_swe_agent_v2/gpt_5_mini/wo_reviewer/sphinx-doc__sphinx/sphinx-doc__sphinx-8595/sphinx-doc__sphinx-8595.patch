@@ -1,0 +1,31 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index d85d79617..c249fb67d 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1074,7 +1074,13 @@ class ModuleDocumenter(Documenter):
+     def get_object_members(self, want_all: bool) -> Tuple[bool, ObjectMembers]:
+         members = self.get_module_members()
+         if want_all:
+-            if not self.__all__:
++            # inspect.getall() returns None when a module has no __all__ and
++            # returns a Sequence (possibly empty) when __all__ is defined.
++            # Distinguish between absence (None) and explicit empty sequence
++            # ([]). Treat None as "no __all__ provided" (document implicit
++            # members) and any Sequence (even empty) as an explicit export
++            # list.
++            if self.__all__ is None:
+                 # for implicit module members, check __module__ to avoid
+                 # documenting imported objects
+                 return True, list(members.values())
+@@ -1099,7 +1105,10 @@ class ModuleDocumenter(Documenter):
+ 
+     def sort_members(self, documenters: List[Tuple["Documenter", bool]],
+                      order: str) -> List[Tuple["Documenter", bool]]:
+-        if order == 'bysource' and self.__all__:
++        # Only apply __all__-based ordering when __all__ is present.
++        # An empty __all__ ([]) is a valid explicit declaration of exporting
++        # nothing, so check for is not None instead of truthiness.
++        if order == 'bysource' and self.__all__ is not None:
+             # Sort alphabetically first (for members not listed on the __all__)
+             documenters.sort(key=lambda e: e[0].name)
+ 

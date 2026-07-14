@@ -1,0 +1,37 @@
+diff --git a/django/db/backends/sqlite3/creation.py b/django/db/backends/sqlite3/creation.py
+index d05c87d..08c973d 100644
+--- a/django/db/backends/sqlite3/creation.py
++++ b/django/db/backends/sqlite3/creation.py
+@@ -49,12 +49,23 @@ class DatabaseCreation(BaseDatabaseCreation):
+         return test_database_name
+ 
+     def get_test_db_clone_settings(self, suffix):
++        """
++        Return a settings dict for a cloned test database.
++
++        When a specific TEST.NAME is configured for the connection, use that
++        test database name as the source for cloning. For in-memory databases
++        return the original settings dict unchanged.
++        """
+         orig_settings_dict = self.connection.settings_dict
+-        source_database_name = orig_settings_dict['NAME']
+-        if self.is_in_memory_db(source_database_name):
++        # Use the resolved test database name (which takes TEST['NAME'] into
++        # account and handles in-memory special cases) as the source. This
++        # ensures clones are derived from the actual test database file rather
++        # than the non-test NAME value in the settings dict.
++        source_test_db_name = self._get_test_db_name()
++        if self.is_in_memory_db(source_test_db_name):
+             return orig_settings_dict
+         else:
+-            root, ext = os.path.splitext(orig_settings_dict['NAME'])
++            root, ext = os.path.splitext(source_test_db_name)
+             return {**orig_settings_dict, 'NAME': '{}_{}.{}'.format(root, suffix, ext)}
+ 
+     def _clone_test_db(self, suffix, verbosity, keepdb=False):
+@@ -98,4 +109,4 @@ class DatabaseCreation(BaseDatabaseCreation):
+         sig = [self.connection.settings_dict['NAME']]
+         if self.is_in_memory_db(test_database_name):
+             sig.append(self.connection.alias)
+-        return tuple(sig)
++        return tuple(sig)

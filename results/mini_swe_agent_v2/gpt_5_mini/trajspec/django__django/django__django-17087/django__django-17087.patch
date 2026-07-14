@@ -1,0 +1,30 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index d88cda6e20..56ee6e10b8 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -166,11 +166,22 @@ class FunctionTypeSerializer(BaseSerializer):
+         if getattr(self.value, "__self__", None) and isinstance(
+             self.value.__self__, type
+         ):
++            # Bound classmethod/staticmethod defined on a class. Use the
++            # class's __qualname__ to preserve outer-class qualification for
++            # nested (inner) classes (e.g. Outer.Inner). Also reject local
++            # classes (whose qualname contains '<locals>') to match the
++            # behavior of the free-function branch below.
+             klass = self.value.__self__
+             module = klass.__module__
+-            return "%s.%s.%s" % (module, klass.__name__, self.value.__name__), {
+-                "import %s" % module
+-            }
++            # Qualname can include <locals> for classes defined in local
++            # scopes; treat those as un-serializable.
++            if "<" not in klass.__qualname__:
++                return "%s.%s.%s" % (
++                    module, klass.__qualname__, self.value.__name__
++                ), {"import %s" % module}
++            raise ValueError(
++                "Could not find function %s in %s.\n" % (self.value.__name__, module)
++            )
+         # Further error checking
+         if self.value.__name__ == "<lambda>":
+             raise ValueError("Cannot serialize function: lambda")

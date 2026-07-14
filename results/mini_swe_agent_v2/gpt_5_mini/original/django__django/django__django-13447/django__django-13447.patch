@@ -1,0 +1,42 @@
+diff --git a/django/contrib/admin/sites.py b/django/contrib/admin/sites.py
+index 837dabfea8..33996d0fd4 100644
+--- a/django/contrib/admin/sites.py
++++ b/django/contrib/admin/sites.py
+@@ -434,6 +434,12 @@ class AdminSite:
+         """
+         Build the app dictionary. The optional `label` parameter filters models
+         of a specific app.
++
++        NOTE: This was historically a "private" method (prefixed with an
++        underscore). It is still kept for backwards compatibility, but a
++        public alias `build_app_dict` is provided so callers (including
++        custom admin views) can access the un-serialized model class when
++        manipulating the app list.
+         """
+         app_dict = {}
+ 
+@@ -463,6 +469,10 @@ class AdminSite:
+             model_dict = {
+                 'name': capfirst(model._meta.verbose_name_plural),
+                 'object_name': model._meta.object_name,
++                # expose the model class itself so custom admin views can
++                # operate on the model directly (instead of only the
++                # serialized dict)
++                'model': model,
+                 'perms': perms,
+                 'admin_url': None,
+                 'add_url': None,
+@@ -498,6 +508,13 @@ class AdminSite:
+             return app_dict.get(label)
+         return app_dict
+ 
++    # Public alias for _build_app_dict. Historically the method was private
++    # but external code (and third-party apps) may need access to the
++    # underlying model class in the app list; expose a public API for that.
++    def build_app_dict(self, request, label=None):
++        """Public wrapper for _build_app_dict."""
++        return self._build_app_dict(request, label=label)
++
+     def get_app_list(self, request):
+         """
+         Return a sorted list of all the installed apps that have been

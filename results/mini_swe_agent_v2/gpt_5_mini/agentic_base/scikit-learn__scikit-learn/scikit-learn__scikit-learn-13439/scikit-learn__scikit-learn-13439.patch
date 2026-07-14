@@ -1,0 +1,53 @@
+diff --git a/sklearn/compose/_column_transformer.py b/sklearn/compose/_column_transformer.py
+index 466a88bee..68a17de51 100644
+--- a/sklearn/compose/_column_transformer.py
++++ b/sklearn/compose/_column_transformer.py
+@@ -168,6 +168,14 @@ boolean mask array or callable
+         self.n_jobs = n_jobs
+         self.transformer_weights = transformer_weights
+ 
++    def __len__(self):
++        """Return number of user-specified transformers.
++
++        Note that this counts the configured transformers (self.transformers),
++        not the fitted transformers_.
++        """
++        return len(self.transformers)
++
+     @property
+     def _transformers(self):
+         """
+diff --git a/sklearn/pipeline.py b/sklearn/pipeline.py
+index 7eaf9a46f..858978fdf 100644
+--- a/sklearn/pipeline.py
++++ b/sklearn/pipeline.py
+@@ -131,6 +131,14 @@ class Pipeline(_BaseComposition):
+         self._validate_steps()
+         self.memory = memory
+ 
++    def __len__(self):
++        """Return number of steps in the pipeline.
++
++        This makes Pipeline behave like a container for purposes of len()
++        and slicing.
++        """
++        return len(self.steps)
++
+     def get_params(self, deep=True):
+         """Get parameters for this estimator.
+ 
+@@ -717,6 +725,14 @@ class FeatureUnion(_BaseComposition, TransformerMixin):
+         self.transformer_weights = transformer_weights
+         self._validate_transformers()
+ 
++    def __len__(self):
++        """Return number of transformers in the FeatureUnion.
++
++        This allows len(feature_union) to reflect the configured
++        transformer list.
++        """
++        return len(self.transformer_list)
++
+     def get_params(self, deep=True):
+         """Get parameters for this estimator.
+ 

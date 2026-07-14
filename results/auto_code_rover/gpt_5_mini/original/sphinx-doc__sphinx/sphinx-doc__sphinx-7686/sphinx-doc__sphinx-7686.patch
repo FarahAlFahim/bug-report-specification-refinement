@@ -1,0 +1,39 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..3aba863eb 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -246,7 +246,33 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        raw_members = dir(obj)
++        if imported_members:
++            # keep all members if imported members are allowed
++            ns['members'] = raw_members
++        else:
++            # filter members: only include those that are local to this module,
++            # skip names that raise AttributeError, and respect autodoc's
++            # skip logic (autodoc-skip-member) in the same way as get_members().
++            filtered = []  # type: List[str]
++            for name in raw_members:
++                try:
++                    value = safe_getattr(obj, name)
++                except AttributeError:
++                    # skip attributes that can't be retrieved
++                    continue
++                # only include members defined in this module
++                if getattr(value, '__module__', None) != obj.__name__:
++                    continue
++                # apply autodoc's skip logic
++                documenter = get_documenter(app, value, obj)
++                skipped = skip_member(value, name, documenter.objtype)
++                if skipped is True:
++                    continue
++                # include if skipped is False or None
++                filtered.append(name)
++            ns['members'] = filtered
++
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \

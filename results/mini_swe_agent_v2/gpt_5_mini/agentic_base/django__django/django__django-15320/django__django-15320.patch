@@ -1,0 +1,61 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..d4da2fa071 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1150,6 +1150,18 @@ class Subquery(BaseExpression, Combinable):
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+         self.query = getattr(queryset, 'query', queryset)
++        # Ensure the inner Query-like object is flagged as a subquery so that
++        # its as_sql() returns a parenthesized SQL string. Some callers may
++        # pass a raw Query instance which isn't marked as a subquery yet.
++        try:
++            # Only set the flag on objects that support it.
++            if hasattr(self.query, 'subquery'):
++                self.query.subquery = True
++        except Exception:
++            # Be conservative: if we can't set the flag, continue without
++            # raising so that non-Query-like objects (e.g. RawQuery) still
++            # work.
++            pass
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1165,6 +1177,13 @@ class Subquery(BaseExpression, Combinable):
+     def copy(self):
+         clone = super().copy()
+         clone.query = clone.query.clone()
++        # Ensure cloned inner queries are also marked as subqueries so that
++        # Query.as_sql() will include surrounding parentheses.
++        try:
++            if hasattr(clone.query, 'subquery'):
++                clone.query.subquery = True
++        except Exception:
++            pass
+         return clone
+ 
+     @property
+@@ -1178,8 +1197,22 @@ class Subquery(BaseExpression, Combinable):
+         connection.ops.check_expression_support(self)
+         template_params = {**self.extra, **extra_context}
+         query = query or self.query
++        # Ensure the query is marked as a subquery so that Query.as_sql()
++        # returns a parenthesized SQL string. Mutate the flag if possible.
++        try:
++            if hasattr(query, 'subquery'):
++                query.subquery = True
++        except Exception:
++            pass
++
+         subquery_sql, sql_params = query.as_sql(compiler, connection)
+-        template_params['subquery'] = subquery_sql[1:-1]
++        # Query.as_sql() historically returned a parenthesized SQL string for
++        # subqueries. Be robust: only strip surrounding parentheses if they
++        # are actually present.
++        if subquery_sql.startswith('(') and subquery_sql.endswith(')'):
++            template_params['subquery'] = subquery_sql[1:-1]
++        else:
++            template_params['subquery'] = subquery_sql
+ 
+         template = template or template_params.get('template', self.template)
+         sql = template % template_params

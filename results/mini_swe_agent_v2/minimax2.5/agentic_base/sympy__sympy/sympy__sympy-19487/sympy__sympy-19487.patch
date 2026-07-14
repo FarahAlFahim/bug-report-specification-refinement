@@ -1,0 +1,23 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..661a523305 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -320,7 +320,7 @@ def eval(cls, arg):
+         if arg is S.NaN:
+             return S.NaN
+         if arg.is_zero:  # it may be an Expr that is zero
+-            return S.Zero
++            return S.NaN
+         if arg.is_extended_positive:
+             return S.One
+         if arg.is_extended_negative:
+@@ -394,6 +394,9 @@ def _eval_rewrite_as_Heaviside(self, arg, **kwargs):
+         if arg.is_extended_real:
+             return Heaviside(arg, H0=S(1)/2) * 2 - 1
+ 
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        return arg / Abs(arg)
++
+     def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 

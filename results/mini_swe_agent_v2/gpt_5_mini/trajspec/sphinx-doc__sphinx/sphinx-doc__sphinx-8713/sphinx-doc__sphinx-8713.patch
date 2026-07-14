@@ -1,0 +1,21 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index 755088ca5..da3e85ba4 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -682,7 +682,15 @@ class GoogleDocstring:
+         return self._parse_generic_section(_('Notes'), use_admonition)
+ 
+     def _parse_other_parameters_section(self, section: str) -> List[str]:
+-        return self._format_fields(_('Other Parameters'), self._consume_fields())
++        # Match the behavior of the regular parameters/receives sections and
++        # respect the napoleon_use_param config. When napoleon_use_param is
++        # True we should emit docutils ``:param:`` / ``:type:`` roles for
++        # entries under "Other parameters" as well.
++        if self._config.napoleon_use_param:
++            fields = self._consume_fields(multiple=True)
++            return self._format_docutils_params(fields)
++        else:
++            return self._format_fields(_('Other Parameters'), self._consume_fields())
+ 
+     def _parse_parameters_section(self, section: str) -> List[str]:
+         if self._config.napoleon_use_param:

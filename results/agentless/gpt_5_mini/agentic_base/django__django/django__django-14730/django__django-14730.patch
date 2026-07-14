@@ -1,0 +1,52 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index d685b12..f09f153 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1211,6 +1211,7 @@ class ManyToManyField(RelatedField):
+         return [
+             *super().check(**kwargs),
+             *self._check_unique(**kwargs),
++            *self._check_symmetrical_self_related_name(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
+@@ -1227,6 +1228,39 @@ class ManyToManyField(RelatedField):
+             ]
+         return []
+ 
++    def _check_symmetrical_self_related_name(self, from_model=None, **kwargs):
++        """
++        Check that developers don't specify a related_name on symmetrical
++        self-referential ManyToManyFields, since such relations don't create
++        a reverse accessor and the provided related_name would be ignored.
++        """
++        # If we're not given the model the field is attached to, we can't
++        # reliably resolve the relation here.
++        if from_model is None:
++            return []
++
++        # Only concerned when a related_name was explicitly provided by the user.
++        if self._related_name is None:
++            return []
++
++        # Only apply to symmetrical relations.
++        if not getattr(self.remote_field, 'symmetrical', False):
++            return []
++
++        # Resolve the target model and check for self-referential relation.
++        to_model = resolve_relation(from_model, self.remote_field.model)
++        self_referential = (from_model == to_model)
++        if self_referential:
++            return [
++                checks.Error(
++                    "Field defines a symmetrical many-to-many relation to 'self'; the supplied related_name '%s' will be ignored." % self._related_name,
++                    hint="Remove the related_name argument, or set symmetrical=False.",
++                    obj=self,
++                    id='fields.E341',
++                )
++            ]
++        return []
++
+     def _check_ignored_options(self, **kwargs):
+         warnings = []
+ 

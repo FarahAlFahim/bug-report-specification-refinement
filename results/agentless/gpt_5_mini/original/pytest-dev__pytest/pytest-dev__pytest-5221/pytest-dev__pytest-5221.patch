@@ -1,0 +1,20 @@
+diff --git a/src/_pytest/fixtures.py b/src/_pytest/fixtures.py
+index 8772615..8f80408 100644
+--- a/src/_pytest/fixtures.py
++++ b/src/_pytest/fixtures.py
+@@ -44,6 +44,15 @@ class PseudoFixtureDef(object):
+     cached_result = attr.ib()
+     scope = attr.ib()
+ 
++    def __repr__(self):
++        # Provide a clear representation including the fixture scope so that
++        # any help/listing utilities that display this object (such as
++        # `pytest --fixtures`) will show the scope information.
++        return "<PseudoFixtureDef scope=%r cached_result=%r>" % (
++            self.scope,
++            self.cached_result,
++        )
++
+ 
+ def pytest_sessionstart(session):
+     import _pytest.python

@@ -1,0 +1,43 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 0c64748ccd..d02f5385ef 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1688,7 +1688,13 @@ class FilePathField(Field):
+     def deconstruct(self):
+         name, path, args, kwargs = super().deconstruct()
+         if self.path != '':
+-            kwargs['path'] = self.path
++            # If path is a callable, use Django's migration serializer to serialize it
++            if callable(self.path):
++                from django.db.migrations.serializer import serializer_factory
++                path_import, imports = serializer_factory(self.path).serialize()
++                kwargs['path'] = path_import
++            else:
++                kwargs['path'] = self.path
+         if self.match is not None:
+             kwargs['match'] = self.match
+         if self.recursive is not False:
+@@ -1709,7 +1715,7 @@ class FilePathField(Field):
+ 
+     def formfield(self, **kwargs):
+         return super().formfield(**{
+-            'path': self.path,
++            'path': self._get_path(),
+             'match': self.match,
+             'recursive': self.recursive,
+             'form_class': forms.FilePathField,
+@@ -1721,6 +1727,14 @@ class FilePathField(Field):
+     def get_internal_type(self):
+         return "FilePathField"
+ 
++    def _get_path(self):
++        """
++        Return the path, evaluating callable if needed.
++        """
++        if callable(self.path):
++            return self.path()
++        return self.path
++
+ 
+ class FloatField(Field):
+     empty_strings_allowed = False

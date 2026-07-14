@@ -1,0 +1,50 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..a9481ac2ac 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,7 +825,44 @@ def _print_MatAdd(self, expr):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                negative = False
++
++                # Try to determine negativity structurally without sympifying
++                try:
++                    coeff = None
++                    # Prefer as_coeff_matrices if available (for matrix expressions)
++                    if hasattr(item, 'as_coeff_matrices'):
++                        coeff = item.as_coeff_matrices()[0]
++                    # Fallback to as_coeff_mmul (for MatMul-like structures)
++                    elif hasattr(item, 'as_coeff_mmul'):
++                        coeff = item.as_coeff_mmul()[0]
++                    # If we got a coeff, inspect its is_negative attribute safely
++                    if coeff is not None:
++                        if getattr(coeff, 'is_negative', False):
++                            negative = True
++                except Exception:
++                    # If anything goes wrong during structural inspection,
++                    # we will fall back to textual check below.
++                    negative = False
++
++                # Fallback: inspect the rendered pretty form text for a leading '-'
++                if not negative:
++                    try:
++                        # Render the prettyForm using current settings to get text
++                        text = pform.render(**self._settings)
++                        if text.lstrip().startswith('-'):
++                            negative = True
++                    except Exception:
++                        # As a last resort, use str() on pform
++                        try:
++                            if str(pform).lstrip().startswith('-'):
++                                negative = True
++                        except Exception:
++                            negative = False
++
++                if negative:
++                    # Preserve previous behavior for negative terms:
++                    # insert a space (so the leading '-' of the term remains)
+                     s = prettyForm(*stringPict.next(s, ' '))
+                     pform = self._print(item)
+                 else:

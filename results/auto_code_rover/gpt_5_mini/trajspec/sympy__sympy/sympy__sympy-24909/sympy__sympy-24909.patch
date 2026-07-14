@@ -1,0 +1,96 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..b49a6811e7 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -79,37 +79,80 @@ def __repr__(self):
+                 str(self.name), str(self.abbrev), self._exponent, self.base)
+ 
+     def __mul__(self, other):
+-        from sympy.physics.units import Quantity
++        from sympy.physics.units import Quantity, UnitSystem
+         if not isinstance(other, (Quantity, Prefix)):
+             return super().__mul__(other)
+ 
+-        fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # If combining two prefixes, keep the existing prefix simplification behavior
++        if isinstance(other, Prefix):
++            fact = self.scale_factor * other.scale_factor
++            if fact == 1:
++                return 1
+             # simplify prefix
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # At this point, other is a Quantity. Prefer returning a canonical
++        # prefixed Quantity if one is registered.
++        try:
++            mapping = UnitSystem._quantity_scale_factors_global
++        except Exception:
++            mapping = {}
++
++        for q, val in mapping.items():
++            try:
++                scale, base = val
++            except Exception:
++                continue
++            if scale == self.scale_factor and base == other:
++                return q
++
++        # If the numeric factors cancel to 1, do not return the bare integer 1
++        # (which would drop unit information). Return the original Quantity.
++        fact = self.scale_factor * other.scale_factor
++        if fact == 1:
++            return other
++
+         return self.scale_factor * other
+ 
+     def __truediv__(self, other):
++        from sympy.physics.units import UnitSystem
++        # If 'other' doesn't have a scale_factor, fall back to Expr behavior
+         if not hasattr(other, "scale_factor"):
+             return super().__truediv__(other)
+ 
+-        fact = self.scale_factor / other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # If dividing by another Prefix, keep existing behavior
++        if isinstance(other, Prefix):
++            fact = self.scale_factor / other.scale_factor
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # other is assumed to be a Quantity (or has scale_factor). Prefer a
++        # registered canonical prefixed Quantity if present.
++        try:
++            mapping = UnitSystem._quantity_scale_factors_global
++        except Exception:
++            mapping = {}
++
++        for q, val in mapping.items():
++            try:
++                scale, base = val
++            except Exception:
++                continue
++            if scale == self.scale_factor and base == other:
++                return q
++
++        fact = self.scale_factor / other.scale_factor
++        # If the numeric factors cancel, preserve the unit-bearing Quantity
++        if fact == 1:
++            return other
++
+         return self.scale_factor / other
+ 
+     def __rtruediv__(self, other):

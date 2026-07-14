@@ -1,0 +1,137 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..7224e167c 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -73,8 +73,9 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+ 
+     def __init__(self, n_components, tol, reg_covar,
+                  max_iter, n_init, init_params, random_state, warm_start,
+-                 verbose, verbose_interval):
++                 verbose, verbose_interval, n_clusters=None):
+         self.n_components = n_components
++        self.n_clusters = n_clusters
+         self.tol = tol
+         self.reg_covar = reg_covar
+         self.max_iter = max_iter
+@@ -92,6 +93,12 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         ----------
+         X : array-like, shape (n_samples, n_features)
+         """
++        # Handle n_clusters as an alias for n_components
++        # (for clusterer-compatible interface)
++        if self.n_clusters is not None:
++            self.n_components = self.n_clusters
++
++        # Check n_components (which may have been updated from n_clusters)
+         if self.n_components < 1:
+             raise ValueError("Invalid value for 'n_components': %d "
+                              "Estimation requires at least one component"
+@@ -240,8 +247,34 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # Compute the labels of each sample in the training set
++        # This is for clusterer-compatible interface
++        log_prob_norm, log_resp = self._estimate_log_prob_resp(X)
++        self.labels_ = log_resp.argmax(axis=1)
++
+         return self
+ 
++
++    def fit_predict(self, X, y=None):
++        """Estimate model parameters with the EM algorithm and predict the
++        cluster labels for each sample.
++
++        This method has the same behavior as fit(X).predict(X), but also
++        stores the labels_ attribute.
++
++        Parameters
++        ----------
++        X : array-like, shape (n_samples, n_features)
++            List of n_features-dimensional data points. Each row
++            corresponds to a single data point.
++
++        Returns
++        -------
++        labels : array, shape (n_samples,)
++            Component labels.
++        """
++        return self.fit(X).labels_
++
+     def _e_step(self, X):
+         """E step.
+ 
+diff --git a/sklearn/mixture/bayesian_mixture.py b/sklearn/mixture/bayesian_mixture.py
+index aef6828fa..9c5b80d95 100644
+--- a/sklearn/mixture/bayesian_mixture.py
++++ b/sklearn/mixture/bayesian_mixture.py
+@@ -89,6 +89,10 @@ class BayesianGaussianMixture(BaseMixture):
+         close to zero. The number of effective components is therefore smaller
+         than n_components.
+ 
++    n_clusters : int, defaults to None.
++        The number of clusters. If None, the number of components is used.
++        This parameter is added for compatibility with the clusterer API.
++
+     covariance_type : {'full', 'tied', 'diag', 'spherical'}, defaults to 'full'
+         String describing the type of covariance parameters to use.
+         Must be one of::
+@@ -313,12 +317,13 @@ class BayesianGaussianMixture(BaseMixture):
+                  mean_precision_prior=None, mean_prior=None,
+                  degrees_of_freedom_prior=None, covariance_prior=None,
+                  random_state=None, warm_start=False, verbose=0,
+-                 verbose_interval=10):
++                 verbose_interval=10, n_clusters=None):
+         super(BayesianGaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,
+             random_state=random_state, warm_start=warm_start,
+-            verbose=verbose, verbose_interval=verbose_interval)
++            verbose=verbose, verbose_interval=verbose_interval,
++            n_clusters=n_clusters)
+ 
+         self.covariance_type = covariance_type
+         self.weight_concentration_prior_type = weight_concentration_prior_type
+diff --git a/sklearn/mixture/gaussian_mixture.py b/sklearn/mixture/gaussian_mixture.py
+index d58a9e326..952e1799f 100644
+--- a/sklearn/mixture/gaussian_mixture.py
++++ b/sklearn/mixture/gaussian_mixture.py
+@@ -448,6 +448,10 @@ class GaussianMixture(BaseMixture):
+     n_components : int, defaults to 1.
+         The number of mixture components.
+ 
++    n_clusters : int, defaults to None.
++        The number of clusters. If None, the number of components is used.
++        This parameter is added for compatibility with the clusterer API.
++
+     covariance_type : {'full', 'tied', 'diag', 'spherical'},
+             defaults to 'full'.
+         String describing the type of covariance parameters to use.
+@@ -574,6 +578,11 @@ class GaussianMixture(BaseMixture):
+     lower_bound_ : float
+         Log-likelihood of the best fit of EM.
+ 
++    labels_ : array-like, shape (n_samples,)
++        Component labels. This is the label of each sample in the training
++        set, where each sample is assigned to the component with the highest
++        posterior probability.
++
+     See Also
+     --------
+     BayesianGaussianMixture : Gaussian mixture model fit with a variational
+@@ -584,12 +593,13 @@ class GaussianMixture(BaseMixture):
+                  reg_covar=1e-6, max_iter=100, n_init=1, init_params='kmeans',
+                  weights_init=None, means_init=None, precisions_init=None,
+                  random_state=None, warm_start=False,
+-                 verbose=0, verbose_interval=10):
++                 verbose=0, verbose_interval=10, n_clusters=None):
+         super(GaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,
+             random_state=random_state, warm_start=warm_start,
+-            verbose=verbose, verbose_interval=verbose_interval)
++            verbose=verbose, verbose_interval=verbose_interval,
++            n_clusters=n_clusters)
+ 
+         self.covariance_type = covariance_type
+         self.weights_init = weights_init

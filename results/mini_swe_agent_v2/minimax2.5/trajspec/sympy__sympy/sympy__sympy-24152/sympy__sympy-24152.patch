@@ -1,0 +1,13 @@
+diff --git a/sympy/physics/quantum/tensorproduct.py b/sympy/physics/quantum/tensorproduct.py
+index 78accaf295..4157fb47d0 100644
+--- a/sympy/physics/quantum/tensorproduct.py
++++ b/sympy/physics/quantum/tensorproduct.py
+@@ -248,6 +248,8 @@ def _eval_expand_tensorproduct(self, **hints):
+                     tp = TensorProduct(*args[:i] + (aa,) + args[i + 1:])
+                     if isinstance(tp, TensorProduct):
+                         tp = tp._eval_expand_tensorproduct()
++                    elif tp.has(TensorProduct):
++                        tp = tp.expand(tensorproduct=True)
+                     add_args.append(tp)
+                 break
+ 

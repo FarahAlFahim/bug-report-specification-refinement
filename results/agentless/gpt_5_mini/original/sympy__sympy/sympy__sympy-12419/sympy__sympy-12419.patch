@@ -1,0 +1,20 @@
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index 8f30d0d..0f47bb1 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,11 @@ class Identity(MatrixExpr):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
+-            return S.One
+-        else:
+-            return S.Zero
++        # A MatrixSymbol represents a generic (unknown) matrix. Its entries
++        # must be represented symbolically so operations like symbolic sums
++        # and refinements work correctly (e.g. sums over Kronecker-like
++        # behaviour). Return a MatrixElement rather than concrete 0/1 values.
++        return MatrixElement(self, i, j)
+ 
+     def _eval_determinant(self):
+         return S.One

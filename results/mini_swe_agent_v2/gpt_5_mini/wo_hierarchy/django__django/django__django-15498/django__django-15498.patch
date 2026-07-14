@@ -1,0 +1,42 @@
+diff --git a/django/views/static.py b/django/views/static.py
+index 1c558a53ff..10140f7e05 100644
+--- a/django/views/static.py
++++ b/django/views/static.py
+@@ -125,16 +125,27 @@ def was_modified_since(header=None, mtime=0, size=0):
+     size
+       This is the size of the item we're talking about.
+     """
++    # Treat None or empty/whitespace-only headers as missing.
++    if header is None or not header.strip():
++        return True
++
++    # Match the header against the expected pattern and ensure it matched
++    # before attempting to index match groups. If it doesn't match, treat
++    # the header as missing/invalid.
++    matches = re.match(r"^([^;]+)(; length=([0-9]+))?$", header, re.IGNORECASE)
++    if not matches:
++        return True
++
++    # Parse the date portion. parse_http_date may raise ValueError for
++    # unrecognized formats; treat that as a missing/invalid header.
+     try:
+-        if header is None:
+-            raise ValueError
+-        matches = re.match(r"^([^;]+)(; length=([0-9]+))?$", header, re.IGNORECASE)
+-        header_mtime = parse_http_date(matches[1])
+-        header_len = matches[3]
+-        if header_len and int(header_len) != size:
+-            raise ValueError
+-        if int(mtime) > header_mtime:
+-            raise ValueError
+-    except (AttributeError, ValueError, OverflowError):
++        header_mtime = parse_http_date(matches.group(1))
++    except (ValueError, OverflowError):
++        return True
++
++    header_len = matches.group(3)
++    if header_len and int(header_len) != size:
++        return True
++    if int(mtime) > header_mtime:
+         return True
+     return False

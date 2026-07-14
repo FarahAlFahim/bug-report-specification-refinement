@@ -1,0 +1,49 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..3943f58863 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -1114,9 +1114,20 @@ def _futrig(e, **kwargs):
+         TR8, TR6, TR15, TR16, TR111, TR5, TRmorrie, TR11, TR14, TR22,
+         TR12)
+     from sympy.core.compatibility import _nodes
++    from sympy.functions import sinc
+ 
+     if not e.has(TrigonometricFunction):
+-        return e
++        # Check if the expression has exp(I*x) or exp(-I*x) patterns
++        # that should be converted to trig functions
++        if e.has(exp):
++            # Check if any exp has an imaginary exponent
++            for t in e.atoms(exp):
++                if t.exp.has(I):
++                    # Rewrite in terms of sin/cos and try again
++                    e = e.rewrite(sin)
++                    break
++        if not e.has(TrigonometricFunction):
++            return e
+ 
+     if e.is_Mul:
+         coeff, e = e.as_independent(TrigonometricFunction)
+@@ -1165,7 +1176,21 @@ def _futrig(e, **kwargs):
+         )]
+     e = greedy(tree, objective=Lops)(e)
+ 
+-    return coeff*e
++    # Multiply back the coefficient
++    result = coeff * e
++
++    # Convert sin(x)/x to sinc(x) if applicable
++    # This is done by replacing sin(x)/x with sinc(x) when x is the same in numerator and denominator
++    if result.has(sin):
++        # Look for sin(x)/x pattern
++        if result.is_Mul:
++            for t in result.atoms(sin):
++                x = t.args[0]
++                # Check if there's a factor of 1/x in the expression
++                if S.One/x in result.args:
++                    result = result.replace(t, x*sinc(x))
++
++    return result
+ 
+ 
+ def _is_Expr(e):

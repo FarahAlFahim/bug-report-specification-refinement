@@ -1,0 +1,89 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..bcd012e7ab 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,39 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    try:
++        # Try the AxisDict-style API first (existing behavior).
++        ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
++        ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    except (TypeError, AttributeError, KeyError):
++        # Fallback for Axes where `axis` is a callable (or otherwise not
++        # subscriptable), e.g., cartopy GeoAxes. Use the public API.
++        try:
++            ax.tick_params(labelbottom=bottom_off, bottom=bottom_off)
++            ax.xaxis.label.set_visible(bottom_off)
++            if bottom_off:
++                # When enabling the label, try to ensure its position is
++                # appropriate. Ignore failures for axes that don't support it.
++                try:
++                    ax.xaxis.set_label_position("bottom")
++                except Exception:
++                    pass
++        except Exception:
++            # If tick_params or xaxis fails for some custom Axes, ignore and
++            # continue to attempt the left side.
++            pass
++
++        try:
++            ax.tick_params(labelleft=left_off, left=left_off)
++            ax.yaxis.label.set_visible(left_off)
++            if left_off:
++                try:
++                    ax.yaxis.set_label_position("left")
++                except Exception:
++                    pass
++        except Exception:
++            # Best-effort: if this fails, there's nothing more we can do here.
++            pass
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +59,40 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        """
++        Toggle visibility of ticks/ticklabels and the axis label on the
++        colorbar axes. Maintain AxisDict-style behavior if available,
++        otherwise fall back to the public API.
++        """
++        try:
++            # Try the AxisDict-style API first.
++            axis = self.axis[self.orientation]
++            axis.toggle(ticklabels=b, label=b)
++        except (TypeError, AttributeError, KeyError):
++            # Fallback: use tick_params and show/hide the axis label.
++            orientation = self.orientation
++            if orientation in ("bottom", "top"):
++                try:
++                    self.tick_params(labelbottom=b, bottom=b)
++                    self.xaxis.label.set_visible(b)
++                    if b:
++                        try:
++                            self.xaxis.set_label_position("bottom")
++                        except Exception:
++                            pass
++                except Exception:
++                    pass
++            elif orientation in ("left", "right"):
++                try:
++                    self.tick_params(labelleft=b, left=b)
++                    self.yaxis.label.set_visible(b)
++                    if b:
++                        try:
++                            self.yaxis.set_label_position("left")
++                        except Exception:
++                            pass
++                except Exception:
++                    pass
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

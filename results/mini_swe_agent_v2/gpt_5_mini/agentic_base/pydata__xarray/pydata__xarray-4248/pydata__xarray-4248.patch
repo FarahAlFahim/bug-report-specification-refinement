@@ -1,0 +1,66 @@
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+index 28eaae5f..0e2a2b6a 100644
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -278,7 +278,10 @@ def summarize_variable(
+             raise TypeError(f"`max_width` value of `{max_width}` is not a valid int")
+         else:
+             max_width = max_width_options
+-    first_col = pretty_print(f"  {marker} {name} ", col_width)
++    # include units inline when present in attrs (e.g., attrs['units'])
++    units = getattr(var, "attrs", {}).get("units")
++    display_name = f"{name}, in {units}" if units else f"{name}"
++    first_col = pretty_print(f"  {marker} {display_name} ", col_width)
+     if var.dims:
+         dims_str = "({}) ".format(", ".join(map(str, var.dims)))
+     else:
+@@ -341,18 +344,31 @@ EMPTY_REPR = "    *empty*"
+ 
+ def _get_col_items(mapping):
+     """Get all column items to format, including both keys of `mapping`
+-    and MultiIndex levels if any.
++    and MultiIndex levels if any. When a variable or level has a units
++    attribute, include the name-with-units variant ("{name}, in {units}")
++    so column width calculations account for the inline units display.
+     """
+     from .variable import IndexVariable
+ 
+     col_items = []
+     for k, v in mapping.items():
++        # add bare name
+         col_items.append(k)
+         var = getattr(v, "variable", v)
++        # if the variable has units, also include the display name with units
++        units = getattr(var, "attrs", {}).get("units")
++        if units:
++            col_items.append(f"{k}, in {units}")
+         if isinstance(var, IndexVariable):
+             level_names = var.to_index_variable().level_names
+             if level_names is not None:
+-                col_items += list(level_names)
++                # include bare level names and their possible name-with-units
++                for lname in level_names:
++                    col_items.append(lname)
++                    lvl_var = var.get_level_variable(lname)
++                    lunits = getattr(lvl_var, "attrs", {}).get("units")
++                    if lunits:
++                        col_items.append(f"{lname}, in {lunits}")
+     return col_items
+ 
+ 
+diff --git a/xarray/core/formatting_html.py b/xarray/core/formatting_html.py
+index 5521b33e..c8bb8761 100644
+--- a/xarray/core/formatting_html.py
++++ b/xarray/core/formatting_html.py
+@@ -102,7 +102,10 @@ def summarize_variable(name, var, is_index=False, dtype=None, preview=None):
+ 
+     cssclass_idx = " class='xr-has-index'" if is_index else ""
+     dims_str = f"({', '.join(escape(dim) for dim in var.dims)})"
+-    name = escape(str(name))
++    # include units inline when present in attrs
++    units = getattr(var, "attrs", {}).get("units")
++    display_name = f"{name}, in {units}" if units else str(name)
++    name = escape(display_name)
+     dtype = dtype or escape(str(var.dtype))
+ 
+     # "unique" ids required to expand/collapse subsections

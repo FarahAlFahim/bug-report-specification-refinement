@@ -1,0 +1,26 @@
+diff --git a/django/db/migrations/writer.py b/django/db/migrations/writer.py
+index 79b89b269d..d5f7b2b51e 100644
+--- a/django/db/migrations/writer.py
++++ b/django/db/migrations/writer.py
+@@ -23,6 +23,21 @@ class OperationWriter:
+ 
+     def serialize(self):
+         def _write(_arg_name, _arg_value):
++            # Special-case model options: if both 'indexes' and the
++            # deprecated 'index_together' are present, drop 'index_together'
++            # to avoid emitting deprecated Meta.index_together in generated
++            # migration files (see RemovedInDjango51Warning).
++            if (
++                _arg_name == "options"
++                and isinstance(_arg_value, dict)
++                and "index_together" in _arg_value
++                and "indexes" in _arg_value
++            ):
++                # Make a shallow copy so we don't mutate the operation's
++                # runtime state.
++                _arg_value = dict(_arg_value)
++                _arg_value.pop("index_together", None)
++
+             if _arg_name in self.operation.serialization_expand_args and isinstance(
+                 _arg_value, (list, tuple, dict)
+             ):

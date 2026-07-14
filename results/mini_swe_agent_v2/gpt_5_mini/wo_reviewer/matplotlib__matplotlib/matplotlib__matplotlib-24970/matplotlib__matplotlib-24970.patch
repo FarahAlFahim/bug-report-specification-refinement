@@ -1,0 +1,56 @@
+diff --git a/lib/matplotlib/colors.py b/lib/matplotlib/colors.py
+index 2d3072da04..b855785c92 100644
+--- a/lib/matplotlib/colors.py
++++ b/lib/matplotlib/colors.py
+@@ -714,6 +714,13 @@ class Colormap:
+             mask_bad = np.isnan(xa)
+         if not xa.dtype.isnative:
+             xa = xa.byteswap().newbyteorder()  # Native byteorder is faster.
++
++        # Work on a separate integer index array for sentinel values so that
++        # we never write possibly-out-of-range sentinel integers into the
++        # user-provided array (which might have a small unsigned dtype such
++        # as uint8).  Using a signed platform integer (np.intp) preserves
++        # sentinel values and avoids integer overflow/wrap and numpy
++        # deprecation warnings about out-of-bound int-to-int conversions.
+         if xa.dtype.kind == "f":
+             with np.errstate(invalid="ignore"):
+                 xa *= self.N
+@@ -724,18 +731,30 @@ class Colormap:
+                 xa[xa == self.N] = self.N - 1
+                 # Avoid converting large positive values to negative integers.
+                 np.clip(xa, -1, self.N, out=xa)
+-                xa = xa.astype(int)
+-        # Set the over-range indices before the under-range;
+-        # otherwise the under-range values get converted to over-range.
+-        xa[xa > self.N - 1] = self._i_over
+-        xa[xa < 0] = self._i_under
+-        xa[mask_bad] = self._i_bad
++                # Create a separate index array with a safe signed integer
++                # dtype to hold sentinel indices without overflow.
++                ia = xa.astype(np.intp)
++        else:
++            # Non-float input: create a signed integer index array from xa
++            # without modifying the original xa (so we don't mutate user
++            # data).  Use np.intp which is wide enough for sentinel values
++            # and is natural for indexing.
++            ia = xa.astype(np.intp, copy=True)
++
++        # Set the over-range indices before the under-range; otherwise the
++        # under-range values get converted to over-range.  Write these into
++        # the separate index array (ia) so that we don't alter the original
++        # user array or trigger overflow on narrow unsigned dtypes.
++        ia[ia > self.N - 1] = self._i_over
++        ia[ia < 0] = self._i_under
++        ia[mask_bad] = self._i_bad
+ 
+         lut = self._lut
+         if bytes:
+             lut = (lut * 255).astype(np.uint8)
+ 
+-        rgba = lut.take(xa, axis=0, mode='clip')
++        # Use the safe integer index array for LUT lookup.
++        rgba = lut.take(ia, axis=0, mode='clip')
+ 
+         if alpha is not None:
+             alpha = np.clip(alpha, 0, 1)

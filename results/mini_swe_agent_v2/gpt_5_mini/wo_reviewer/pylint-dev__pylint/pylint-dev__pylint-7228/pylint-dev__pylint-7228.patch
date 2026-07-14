@@ -1,0 +1,161 @@
+diff --git a/doc/exts/pylint_options.py b/doc/exts/pylint_options.py
+index f402125a7..ff8e2100a 100644
+--- a/doc/exts/pylint_options.py
++++ b/doc/exts/pylint_options.py
+@@ -97,12 +97,12 @@ def _create_checker_section(
+             continue
+ 
+         # Tomlkit doesn't support regular expressions
+-        if isinstance(value, re.Pattern):
++        if hasattr(value, 'pattern'):
+             value = value.pattern
+         elif (
+             isinstance(value, (list, tuple))
+             and value
+-            and isinstance(value[0], re.Pattern)
++            and hasattr(value[0], 'pattern')
+         ):
+             value = [i.pattern for i in value]
+ 
+diff --git a/pylint/checkers/base/name_checker/checker.py b/pylint/checkers/base/name_checker/checker.py
+index 3f30fd8f0..c4350a810 100644
+--- a/pylint/checkers/base/name_checker/checker.py
++++ b/pylint/checkers/base/name_checker/checker.py
+@@ -21,6 +21,7 @@ from astroid import nodes
+ 
+ from pylint import constants, interfaces
+ from pylint.checkers import utils
++from pylint.config import utils as config_utils
+ from pylint.checkers.base.basic_checker import _BasicChecker
+ from pylint.checkers.base.name_checker.naming_style import (
+     KNOWN_NAME_TYPES,
+@@ -283,10 +284,10 @@ class NameChecker(_BasicChecker):
+         self._name_regexps = regexps
+         self._name_hints = hints
+         self._good_names_rgxs_compiled = [
+-            re.compile(rgxp) for rgxp in self.linter.config.good_names_rgxs
++            (rgxp if hasattr(rgxp, 'pattern') else config_utils.compile_regex(rgxp)) for rgxp in self.linter.config.good_names_rgxs
+         ]
+         self._bad_names_rgxs_compiled = [
+-            re.compile(rgxp) for rgxp in self.linter.config.bad_names_rgxs
++            (rgxp if hasattr(rgxp, 'pattern') else config_utils.compile_regex(rgxp)) for rgxp in self.linter.config.bad_names_rgxs
+         ]
+ 
+     def _create_naming_rules(self) -> tuple[dict[str, Pattern[str]], dict[str, str]]:
+diff --git a/pylint/config/argument.py b/pylint/config/argument.py
+index 3c2951517..7c1ddce34 100644
+--- a/pylint/config/argument.py
++++ b/pylint/config/argument.py
+@@ -19,6 +19,7 @@ from typing import Any, Pattern, Sequence, Tuple, Union
+ 
+ from pylint import interfaces
+ from pylint import utils as pylint_utils
++from pylint.config import utils as config_utils
+ from pylint.config.callback_actions import _CallbackAction, _ExtendAction
+ from pylint.config.deprecation_actions import _NewNamesAction, _OldNamesAction
+ from pylint.constants import PY38_PLUS
+@@ -103,7 +104,10 @@ def _regexp_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(re.compile(pattern))
++        try:
++            patterns.append(config_utils.compile_regex(pattern))
++        except re.error as exc:
++            raise argparse.ArgumentTypeError(f"Invalid regexp {pattern!r}: {exc}") from exc
+     return patterns
+ 
+ 
+@@ -130,7 +134,7 @@ _TYPE_TRANSFORMERS: dict[str, Callable[[str], _ArgumentTypes]] = {
+     "non_empty_string": _non_empty_string_transformer,
+     "path": _path_transformer,
+     "py_version": _py_version_transformer,
+-    "regexp": re.compile,
++    "regexp": lambda value: (value if hasattr(value, 'pattern') else config_utils.compile_regex(value)),
+     "regexp_csv": _regexp_csv_transfomer,
+     "regexp_paths_csv": _regexp_paths_csv_transfomer,
+     "string": pylint_utils._unquote,
+diff --git a/pylint/config/arguments_manager.py b/pylint/config/arguments_manager.py
+index eda1a583d..58ffb43f3 100644
+--- a/pylint/config/arguments_manager.py
++++ b/pylint/config/arguments_manager.py
+@@ -732,11 +732,13 @@ class _ArgumentsManager:
+                     if "new_names" in optdict["kwargs"]:
+                         continue
+ 
+-                # Tomlkit doesn't support regular expressions
+-                if isinstance(value, re.Pattern):
++                # Tomlkit doesn't support regular expressions. Use duck-typing
++                # to detect compiled regex-like objects (e.g., from 're' or
++                # third-party 'regex' module).
++                if hasattr(value, "pattern"):
+                     value = value.pattern
+-                elif isinstance(value, (list, tuple)) and isinstance(
+-                    value[0], re.Pattern
++                elif isinstance(value, (list, tuple)) and value and hasattr(
++                    value[0], "pattern"
+                 ):
+                     value = [i.pattern for i in value]
+ 
+diff --git a/pylint/config/option.py b/pylint/config/option.py
+index 5043fe765..e83ecbb81 100644
+--- a/pylint/config/option.py
++++ b/pylint/config/option.py
+@@ -12,6 +12,7 @@ import warnings
+ from re import Pattern
+ 
+ from pylint import utils
++from pylint.config import utils as config_utils
+ 
+ 
+ # pylint: disable=unused-argument
+@@ -23,7 +24,10 @@ def _csv_validator(_, name, value):
+ def _regexp_validator(_, name, value):
+     if hasattr(value, "pattern"):
+         return value
+-    return re.compile(value)
++    try:
++        return config_utils.compile_regex(value)
++    except re.error as exc:  # pragma: no cover - fallback error path
++        raise optparse.OptionValueError(f"option {name}: invalid regexp {value!r}: {exc}") from exc
+ 
+ 
+ # pylint: disable=unused-argument
+diff --git a/pylint/config/utils.py b/pylint/config/utils.py
+index bd6146336..32f081672 100644
+--- a/pylint/config/utils.py
++++ b/pylint/config/utils.py
+@@ -150,7 +150,7 @@ def _parse_rich_type_value(value: Any) -> str:
+     """Parse rich (toml) types into strings."""
+     if isinstance(value, (list, tuple)):
+         return ",".join(_parse_rich_type_value(i) for i in value)
+-    if isinstance(value, re.Pattern):
++    if hasattr(value, 'pattern'):
+         return value.pattern
+     if isinstance(value, dict):
+         return ",".join(f"{k}:{v}" for k, v in value.items())
+@@ -272,3 +272,24 @@ def _preprocess_options(run: Run, args: Sequence[str]) -> list[str]:
+         i += 1
+ 
+     return processed_args
++
++
++# Helper to compile regex with fallback to `regex` module
++try:
++    import re as _re
++except Exception:
++    import re as _re
++
++
++def compile_regex(pattern: str):
++    """Compile a regex trying the stdlib re first then the third-party regex module."""
++    try:
++        return _re.compile(pattern)
++    except _re.error:
++        try:
++            import regex as _regex  # type: ignore
++
++            return _regex.compile(pattern)
++        except Exception:
++            # re.error will be re-raised by caller if needed
++            raise

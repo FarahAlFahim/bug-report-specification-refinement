@@ -1,0 +1,62 @@
+diff --git a/django/core/files/storage.py b/django/core/files/storage.py
+index 4c27fce605..5db53bf95d 100644
+--- a/django/core/files/storage.py
++++ b/django/core/files/storage.py
+@@ -213,11 +213,12 @@ class FileSystemStorage(Storage):
+     def location(self):
+         return os.path.abspath(self.base_location)
+ 
+-    @cached_property
++    @property
+     def base_url(self):
++        from django.urls import get_script_prefix
+         if self._base_url is not None and not self._base_url.endswith('/'):
+             self._base_url += '/'
+-        return self._value_or_setting(self._base_url, settings.MEDIA_URL)
++        return get_script_prefix() + self._value_or_setting(self._base_url, settings.MEDIA_URL).lstrip('/')
+ 
+     @cached_property
+     def file_permissions_mode(self):
+diff --git a/django/template/context_processors.py b/django/template/context_processors.py
+index 0e9efb2f69..718ed93f3b 100644
+--- a/django/template/context_processors.py
++++ b/django/template/context_processors.py
+@@ -67,14 +67,16 @@ def static(request):
+     """
+     Add static-related context variables to the context.
+     """
+-    return {'STATIC_URL': settings.STATIC_URL}
++    from django.urls import get_script_prefix
++    return {'STATIC_URL': get_script_prefix() + settings.STATIC_URL.lstrip('/')}
+ 
+ 
+ def media(request):
+     """
+     Add media-related context variables to the context.
+     """
+-    return {'MEDIA_URL': settings.MEDIA_URL}
++    from django.urls import get_script_prefix
++    return {'MEDIA_URL': get_script_prefix() + settings.MEDIA_URL.lstrip('/')}
+ 
+ 
+ def request(request):
+diff --git a/django/templatetags/static.py b/django/templatetags/static.py
+index 39712aaba0..eecd1e8822 100644
+--- a/django/templatetags/static.py
++++ b/django/templatetags/static.py
+@@ -38,13 +38,14 @@ class PrefixNode(template.Node):
+ 
+     @classmethod
+     def handle_simple(cls, name):
++        from django.urls import get_script_prefix
+         try:
+             from django.conf import settings
+         except ImportError:
+             prefix = ''
+         else:
+             prefix = iri_to_uri(getattr(settings, name, ''))
+-        return prefix
++        return get_script_prefix() + prefix.lstrip('/')
+ 
+     def render(self, context):
+         prefix = self.handle_simple(self.name)

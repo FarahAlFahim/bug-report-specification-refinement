@@ -1,0 +1,21 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..2bf87db402 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1264,7 +1264,15 @@ def __new__(cls, *args, **kwargs):
+ 
+         # Reduce sets using known rules
+         if evaluate:
+-            args = list(cls._new_args_filter(args))
++            # Apply the same deduplication semantics as LatticeOp: the
++            # intersection operation is idempotent so duplicate arguments
++            # should not change the result.  _new_args_filter returns a
++            # generator; convert to a frozenset to remove duplicates before
++            # handing the args to the simplifier.  This avoids issues where
++            # simplify_intersection (and in particular
++            # Intersection._handle_finite_sets) behaved differently when the
++            # same FiniteSet appeared multiple times.
++            args = list(frozenset(cls._new_args_filter(args)))
+             return simplify_intersection(args)
+ 
+         args = list(ordered(args, Set._infimum_key))

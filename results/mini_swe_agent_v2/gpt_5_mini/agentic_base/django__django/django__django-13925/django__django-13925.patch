@@ -1,0 +1,30 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 4038859cfa..ba5fe86846 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1297,8 +1297,24 @@ class Model(metaclass=ModelBase):
+ 
+     @classmethod
+     def _check_default_pk(cls):
++        pk = cls._meta.pk
++
++        # In multi-table inheritance the primary key on a child model may be
++        # an auto-created OneToOneField parent-link that references an
++        # explicitly-declared primary key on an ancestor. Treat that case as
++        # an intentional inheritance of the parent's PK rather than as a
++        # missing/auto-generated default AutoField. The parent-link fields
++        # are created with auto_created=True and parent_link=True, so skip
++        # the W042 check for those.
++        is_auto_created_parent_link = (
++            getattr(pk, 'auto_created', False) and
++            getattr(pk, 'remote_field', None) is not None and
++            getattr(pk.remote_field, 'parent_link', False)
++        )
++
+         if (
+-            cls._meta.pk.auto_created and
++            pk.auto_created and
++            not is_auto_created_parent_link and
+             not settings.is_overridden('DEFAULT_AUTO_FIELD') and
+             not cls._meta.app_config._is_default_auto_field_overridden
+         ):

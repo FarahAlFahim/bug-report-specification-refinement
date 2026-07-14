@@ -1,0 +1,57 @@
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index c2623f099f..420a8e8227 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -45,11 +45,16 @@ class Q(tree.Node):
+             raise TypeError(other)
+ 
+         # If the other Q() is empty, ignore it and just use `self`.
++        # Use the Node.copy() implementation which performs a shallow
++        # clone of the tree, cloning child nodes that implement clone()
++        # and leaving raw leaf values as-is. This avoids attempting to
++        # deepcopy/pickle leaf values that aren't deepcopyable (e.g.
++        # dict_keys).
+         if not other:
+-            return copy.deepcopy(self)
++            return self.copy()
+         # Or if this Q is empty, ignore it and just use `other`.
+         elif not self:
+-            return copy.deepcopy(other)
++            return other.copy()
+ 
+         obj = type(self)()
+         obj.connector = conn
+diff --git a/django/utils/tree.py b/django/utils/tree.py
+index 302cd37d5f..f00e79ea6c 100644
+--- a/django/utils/tree.py
++++ b/django/utils/tree.py
+@@ -53,6 +53,29 @@ class Node:
+         obj.children = copy.deepcopy(self.children, memodict)
+         return obj
+ 
++    def clone(self):
++        """
++        Create a shallow clone of this node. By default, child nodes that
++        implement .clone() will be cloned recursively. Raw leaf children are
++        copied by reference (shallow copy) to avoid attempting to deepcopy
++        objects that may not be deepcopy/pickle-able (for example
++        dict_keys()). This mirrors the behaviour used by WhereNode.clone and
++        avoids raising errors when combining Q objects that contain
++        non-deepcopyable leaf values.
++        """
++        clone = self.__class__._new_instance(children=[], connector=self.connector, negated=self.negated)
++        for child in self.children:
++            if hasattr(child, 'clone'):
++                clone.children.append(child.clone())
++            else:
++                clone.children.append(child)
++        return clone
++
++    def copy(self):
++        """Alias for clone(). Kept for API compatibility where callers
++        expect a copy/clone operation without invoking deepcopy."""
++        return self.clone()
++
+     def __len__(self):
+         """Return the number of children this node has."""
+         return len(self.children)

@@ -1,0 +1,79 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..c832ddfeb 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -109,12 +109,23 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+     return {x.strip() for x in arg.split(',') if x.strip()}
+ 
+ 
+-def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++def inherited_members_option(arg: Any) -> Set[str]:
++    """Convert the :inherited-members: option to a set of class names.
++
++    The option may be given as a flag (no argument) which historically
++    used the sentinel string 'object'.  Normalize that to the set
++    {'object'} so callers can consistently treat the option as a
++    collection of class names.  A comma-separated list of names is
++    split and stripped into a set.  If False is given, return an
++    empty set.
++    """
+     if arg in (None, True):
+-        return 'object'
+-    else:
+-        return arg
++        # flag form: use 'object' sentinel as a class name to match
++        return {'object'}
++    if arg is False:
++        return set()
++    # allow comma-separated lists
++    return {x.strip() for x in str(arg).split(',') if x.strip()}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -680,17 +691,34 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
+-                    elif name in cls.__dict__:
+-                        return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
+-                        return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+-                        return False
++            if not inspect.isclass(self.object):
++                return False
++
++            # Normalize the option to a set of class names for flexible
++            # handling: tests and internal callers sometimes provide booleans,
++            # strings, or already-normalized collections.  Treat True/flag as
++            # the historical 'object' sentinel.
++            opt = self.options.inherited_members
++            if opt is True:
++                names = {'object'}
++            elif not opt:
++                names = set()
++            elif isinstance(opt, (set, list, tuple)):
++                names = {str(x) for x in opt}
++            else:
++                # strings (possibly comma-separated)
++                names = {x.strip() for x in str(opt).split(',') if x.strip()}
++
++            for cls in self.object.__mro__:
++                if cls != self.object and cls.__name__ in names:
++                    # given member is a member of specified *super class*
++                    return True
++                elif name in cls.__dict__:
++                    return False
++                elif name in self.get_attr(cls, '__annotations__', {}):
++                    return False
++                elif isinstance(obj, ObjectMember) and obj.class_ is cls:
++                    return False
+ 
+             return False
+ 

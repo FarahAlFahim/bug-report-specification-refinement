@@ -1,0 +1,94 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 53e783e..bf6493c 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -110,11 +110,20 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :inherited-members: option to auto directives.
++
++    Return values:
++    - 'object' (legacy sentinel) when arg is None or True (meaning include inherited members)
++    - False when arg is False (do not include inherited members)
++    - a set of class-name strings parsed from comma-separated arg otherwise
++    """
+     if arg in (None, True):
++        # legacy sentinel meaning: include inherited members
+         return 'object'
+-    else:
+-        return arg
++    elif arg is False:
++        return False
++    # parse comma-separated class names into a set so multiple names are supported
++    return {x.strip() for x in arg.split(',') if x.strip()}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -680,16 +689,57 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
+-                    elif name in cls.__dict__:
++            """Return True if the given member (name,obj) should be filtered
++            because it comes from a base class named in the inherited-members
++            option.
++
++            The option self.options.inherited_members can be:
++            - False/None: do not include inherited members (nothing to filter here)
++            - 'object' (legacy sentinel) or any truthy non-name value: include inherited
++              members but do not filter any specific base classes
++            - a string or a set of strings: names of base classes whose inherited
++              members should be ignored/filtered
++            """
++            if not inspect.isclass(self.object):
++                return False
++
++            ims = self.options.inherited_members
++
++            # walk the MRO and find the class that actually defines the member
++            for cls in self.object.__mro__:
++                # if member is defined on this cls (either as attribute, annotation,
++                # or via ObjectMember marking), treat it as originating here
++                if name in cls.__dict__ or \
++                   name in self.get_attr(cls, '__annotations__', {}) or \
++                   (isinstance(obj, ObjectMember) and obj.class_ is cls):
++                    # if it's defined on the object itself, it's not inherited
++                    if cls is self.object:
+                         return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
++
++                    # cls is a base class that defines the member. Decide whether
++                    # to filter it based on the inherited-members option.
++                    if not ims:
++                        # no inherited-members option -> nothing to filter here
++                        return False
++
++                    if ims == 'object':
++                        # legacy sentinel (include inherited members) -> do not filter
+                         return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
++
++                    # normalize ims to a set of names for membership testing
++                    if isinstance(ims, str):
++                        names = {ims}
++                    else:
++                        try:
++                            names = set(ims)
++                        except Exception:
++                            # unexpected type: do not filter
++                            return False
++
++                    if cls.__name__ in names:
++                        # member comes from a base class listed in the option -> filter it
++                        return True
++                    else:
+                         return False
+ 
+             return False

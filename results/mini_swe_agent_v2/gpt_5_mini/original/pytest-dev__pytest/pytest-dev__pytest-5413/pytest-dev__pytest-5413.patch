@@ -1,0 +1,41 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index c4ed961ac..e0e5c5f1b 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -535,11 +535,33 @@ class ExceptionInfo:
+         return fmt.repr_excinfo(self)
+ 
+     def __str__(self):
++        """Return a user-friendly string for the ExceptionInfo.
++
++        Historically this returned a file/location based representation
++        (including the exception type and the first line of the message).
++        However, users commonly expect str(excinfo) to behave like
++        str(exception) from a caught exception. Return the exception's
++        string representation when an exception is present to match that
++        expectation, falling back to the previous file/location repr when
++        necessary.
++        """
+         if self._excinfo is None:
+             return repr(self)
+-        entry = self.traceback[-1]
+-        loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
+-        return str(loc)
++
++        # Prefer the actual exception string to mimic normal exception
++        # handling (i.e. what you'd get from ``except Exception as e: str(e)``).
++        try:
++            return str(self.value)
++        except Exception:
++            # If anything goes wrong, fall back to the previous
++            # representation which shows file/location and a short
++            # exception description.
++            try:
++                entry = self.traceback[-1]
++                loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
++                return str(loc)
++            except Exception:
++                return repr(self)
+ 
+     def match(self, regexp):
+         """

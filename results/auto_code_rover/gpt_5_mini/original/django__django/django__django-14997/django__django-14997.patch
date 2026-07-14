@@ -1,0 +1,28 @@
+diff --git a/django/db/backends/ddl_references.py b/django/db/backends/ddl_references.py
+index c06386a2fa..85734e4091 100644
+--- a/django/db/backends/ddl_references.py
++++ b/django/db/backends/ddl_references.py
+@@ -233,4 +233,23 @@ class Expressions(TableColumns):
+     def __str__(self):
+         sql, params = self.compiler.compile(self.expressions)
+         params = map(self.quote_value, params)
++
++        # SQLite prohibits the '.' operator in index expressions. When building
++        # CREATE INDEX / CREATE UNIQUE statements, avoid emitting table-qualified
++        # column names like "table"."column" inside the expression. Only perform
++        # this for the sqlite backend.
++        conn = getattr(self.compiler, 'connection', None)
++        if conn is not None and getattr(conn, 'vendor', None) == 'sqlite':
++            ops = conn.ops
++            # Work on a copy of the SQL string, replacing any occurrences of
++            # quoted_table.quoted_column with quoted_column for columns that
++            # belong to this expression list.
++            quoted_sql = sql
++            for col in self.columns:
++                quoted_table = ops.quote_name(self.table)
++                quoted_col = ops.quote_name(col)
++                dotted = quoted_table + '.' + quoted_col
++                quoted_sql = quoted_sql.replace(dotted, quoted_col)
++            return quoted_sql % tuple(params)
++
+         return sql % tuple(params)

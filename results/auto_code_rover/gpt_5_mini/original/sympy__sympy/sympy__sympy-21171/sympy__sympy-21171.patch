@@ -1,0 +1,39 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 43f9e6ad8d..fe2a514b93 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1968,7 +1968,7 @@ def _print_DiracDelta(self, expr, exp=None):
+             tex = r"\left(%s\right)^{%s}" % (tex, exp)
+         return tex
+ 
+-    def _print_SingularityFunction(self, expr):
++    def _print_SingularityFunction(self, expr, **kwargs):
+         shift = self._print(expr.args[0] - expr.args[1])
+         power = self._print(expr.args[2])
+         tex = r"{\left\langle %s \right\rangle}^{%s}" % (shift, power)
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index 04c8bc7230..ace2f3c5a3 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -1656,7 +1656,7 @@ def _print_Naturals0(self, e):
+         sub.appendChild(self._print(S.Zero))
+         return sub
+ 
+-    def _print_SingularityFunction(self, expr):
++    def _print_SingularityFunction(self, expr, **kwargs):
+         shift = expr.args[0] - expr.args[1]
+         power = expr.args[2]
+         sup = self.dom.createElement('msup')
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 3cde1d9fa0..e7d86b9654 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -1630,7 +1630,7 @@ def _print_Order(self, expr):
+         pform = prettyForm(*pform.left("O"))
+         return pform
+ 
+-    def _print_SingularityFunction(self, e):
++    def _print_SingularityFunction(self, e, **kwargs):
+         if self._use_unicode:
+             shift = self._print(e.args[0]-e.args[1])
+             n = self._print(e.args[2])

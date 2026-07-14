@@ -1,0 +1,24 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 84960d77e1..e827d4e6d2 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -817,6 +817,19 @@ class Ref(Expression):
+         return self
+ 
+     def as_sql(self, compiler, connection):
++        # If this Ref references a Subquery (or subclass, e.g. Exists),
++        # compile and emit the underlying subquery expression instead of
++        # the quoted alias. Emitting a quoted alias in GROUP BY can lead
++        # to ambiguous column references when a joined table defines the
++        # same column name. See get_group_by_cols usage in Subquery.
++        try:
++            Subquery
++        except NameError:
++            # Subquery not defined yet (shouldn't happen at runtime),
++            # fall back to quoting the ref name.
++            return connection.ops.quote_name(self.refs), []
++        if isinstance(self.source, Subquery):
++            return self.source.as_sql(compiler, connection)
+         return connection.ops.quote_name(self.refs), []
+ 
+     def get_group_by_cols(self, alias=None):

@@ -1,0 +1,74 @@
+diff --git a/sympy/polys/factortools.py b/sympy/polys/factortools.py
+index 93298f47e6..6130225b5c 100644
+--- a/sympy/polys/factortools.py
++++ b/sympy/polys/factortools.py
+@@ -74,7 +74,7 @@
+ from sympy.ntheory import nextprime, isprime, factorint
+ from sympy.utilities import subsets
+ 
+-from math import ceil as _ceil, log as _log
++from math import ceil as _ceil, log as _log, comb as _comb
+ 
+ 
+ def dup_trial_division(f, factors, K):
+@@ -124,21 +124,42 @@ def dmp_trial_division(f, factors, u, K):
+ 
+ 
+ def dup_zz_mignotte_bound(f, K):
+-    """Mignotte bound for univariate polynomials in `K[x]`. """
+-    a = dup_max_norm(f, K)
+-    b = abs(dup_LC(f, K))
++    """Coefficient bound for univariate polynomials in `K[x]`.
++
++    Historically this returned a Mignotte style bound. Replace the
++    numeric expression with a tighter Knuth-Cohen style bound. For a
++    polynomial of degree ``n`` with max-norm ``a`` and leading
++    coefficient ``b``, we use the combinatorial factor "n choose floor(n/2)"
++    as in Knuth-Cohen style bounds.
++    """
++    a = int(dup_max_norm(f, K))
++    b = int(abs(dup_LC(f, K)))
+     n = dup_degree(f)
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    if n <= 0:
++        return 0
++
++    k = n // 2
++    return _comb(n, k) * a * b
+ 
+ 
+ def dmp_zz_mignotte_bound(f, u, K):
+-    """Mignotte bound for multivariate polynomials in `K[X]`. """
+-    a = dmp_max_norm(f, u, K)
+-    b = abs(dmp_ground_LC(f, u, K))
++    """Coefficient bound for multivariate polynomials in `K[X]`.
++
++    The multivariate extension uses the total degree (sum of
++    individual degrees) and the same combinatorial Knuth-Cohen factor
++    as a conservative but tighter alternative to the previous
++    Mignotte-style expression.
++    """
++    a = int(dmp_max_norm(f, u, K))
++    b = int(abs(dmp_ground_LC(f, u, K)))
+     n = sum(dmp_degree_list(f, u))
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    if n <= 0:
++        return 0
++
++    k = n // 2
++    return _comb(n, k) * a * b
+ 
+ 
+ def dup_zz_hensel_step(m, f, g, h, s, t, K):
+@@ -272,7 +293,8 @@ def dup_zz_zassenhaus(f, K):
+     fc = f[-1]
+     A = dup_max_norm(f, K)
+     b = dup_LC(f, K)
+-    B = int(abs(K.sqrt(K(n + 1))*2**n*A*b))
++    # Use the centralised coefficient bound (Knuth-Cohen style)
++    B = int(abs(dup_zz_mignotte_bound(f, K)))
+     C = int((n + 1)**(2*n)*A**(2*n - 1))
+     gamma = int(_ceil(2*_log(C, 2)))
+     bound = int(2*gamma*_log(gamma))

@@ -1,0 +1,34 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..a6e5f2f646 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -31,6 +31,29 @@ from .utils import get_callable
+ 
+ class ResolverMatch:
+     def __init__(self, func, args, kwargs, url_name=None, app_names=None, namespaces=None, route=None, tried=None):
++        # Handle functools.partial by unwrapping the underlying callable and
++        # merging its provided args/kwargs with those from the resolver.
++        import functools
++        if isinstance(func, functools.partial):
++            # Extract underlying function and partial-supplied arguments.
++            underlying = func.func
++            partial_args = tuple(func.args) if getattr(func, 'args', None) else ()
++            partial_kwargs = dict(func.keywords) if getattr(func, 'keywords', None) else {}
++
++            # Ensure resolver args/kwargs are tuples/dicts
++            resolver_args = tuple(args) if args else ()
++            resolver_kwargs = dict(kwargs) if kwargs else {}
++
++            # Partial positional args come first.
++            args = partial_args + resolver_args
++
++            # Resolver kwargs should override partial keywords.
++            merged_kwargs = dict(partial_kwargs)
++            merged_kwargs.update(resolver_kwargs)
++            kwargs = merged_kwargs
++
++            func = underlying
++
+         self.func = func
+         self.args = args
+         self.kwargs = kwargs

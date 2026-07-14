@@ -1,0 +1,42 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..69e9b7bb 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -631,6 +631,7 @@ class Response(object):
+         available encoding based on the response.
+         """
+         def generate():
++            import socket
+             try:
+                 # Special case for urllib3.
+                 try:
+@@ -647,6 +648,10 @@ class Response(object):
+                     if not chunk:
+                         break
+                     yield chunk
++            except (socket.error, IOError, OSError) as e:
++                # Wrap low-level socket/IO errors in a requests ConnectionError so
++                # callers don't observe raw socket exceptions.
++                raise ConnectionError(e, request=self.request)
+ 
+             self._content_consumed = True
+ 
+@@ -693,6 +698,7 @@ class Response(object):
+ 
+         if self._content is False:
+             # Read the contents.
++            import socket
+             try:
+                 if self._content_consumed:
+                     raise RuntimeError(
+@@ -705,6 +711,10 @@ class Response(object):
+ 
+             except AttributeError:
+                 self._content = None
++            except (socket.error, IOError, OSError) as e:
++                # Wrap low-level socket/IO errors in a requests ConnectionError so
++                # callers don't observe raw socket exceptions.
++                raise ConnectionError(e, request=self.request)
+ 
+         self._content_consumed = True
+         # don't need to release the connection; that's been handled by urllib3

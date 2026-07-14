@@ -1,0 +1,75 @@
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+index 16f59c0..56fd9ce 100644
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -234,10 +234,22 @@ def get_object_members(subject: Any, objpath: List[str], attrgetter: Callable,
+ 
+     if analyzer:
+         # append instance attributes (cf. self.attr1) if analyzer knows
++        # Merge analyzer-discovered attributes into any existing placeholders
++        # so that analyzer-provided information (instance-ness / doc presence)
++        # is not lost when a member was already discovered by another path.
+         namespace = '.'.join(objpath)
+         for (ns, name) in analyzer.find_attr_docs():
+-            if namespace == ns and name not in members:
+-                members[name] = Attribute(name, True, INSTANCEATTR)
++            if namespace == ns:
++                if name in members:
++                    # update the existing Attribute entry to reflect that this is
++                    # an instance attribute known from analyzer. Use setattr to be
++                    # robust against attribute name differences on the Attribute
++                    # object implementation.
++                    attr = members[name]
++                    setattr(attr, 'value', INSTANCEATTR)
++                    setattr(attr, 'directly_defined', True)
++                else:
++                    members[name] = Attribute(name, True, INSTANCEATTR)
+ 
+     return members
+ 
+@@ -297,8 +309,19 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+             # annotation only member (ex. attr: int)
+             for name in getannotations(cls):
+                 name = unmangle(cls, name)
+-                if name and name not in members:
+-                    members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
++                if name:
++                    if name in members:
++                        # Merge information into existing ObjectMember so that
++                        # analyzer/annotation data isn't lost if a placeholder
++                        # was created earlier by another discovery path.
++                        om = members[name]
++                        # mark as instance attribute
++                        setattr(om, 'value', INSTANCEATTR)
++                        # set owning class if not already set
++                        if not getattr(om, 'class_', None):
++                            setattr(om, 'class_', cls)
++                    else:
++                        members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
+ 
+             # append instance attributes (cf. self.attr1) if analyzer knows
+             try:
+@@ -307,9 +330,20 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+                 analyzer = ModuleAnalyzer.for_module(modname)
+                 analyzer.analyze()
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+-                    if ns == qualname and name not in members:
+-                        members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+-                                                     docstring='\n'.join(docstring))
++                    if ns == qualname:
++                        if name in members:
++                            om = members[name]
++                            # ensure this is recorded as an instance attribute
++                            setattr(om, 'value', INSTANCEATTR)
++                            # ensure owning class is set if missing
++                            if not getattr(om, 'class_', None):
++                                setattr(om, 'class_', cls)
++                            # attach analyzer docstring if none is present
++                            if not getattr(om, 'docstring', None):
++                                setattr(om, 'docstring', '\n'.join(docstring))
++                        else:
++                            members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
++                                                         docstring='\n'.join(docstring))
+             except (AttributeError, PycodeError):
+                 pass
+     except AttributeError:

@@ -1,0 +1,27 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 7bc96e68eb..02c56f8dd9 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1041,8 +1041,21 @@ def __new__(cls, num, dps=None, prec=None, precision=None):
+             if type(num[1]) is str:
+                 # it's a hexadecimal (coming from a pickled object)
+                 # assume that it is in standard form
++                # On Python 3 a hex string produced by Python 2's
++                # pickling may include the long literal suffix 'L'.
++                # int(..., 16) will raise in that case, so sanitize
++                # the string by stripping a trailing 'L' or 'l' if
++                # present. Be permissive: try the direct conversion
++                # first, and fall back to stripping the suffix.
+                 num = list(num)
+-                num[1] = long(num[1], 16)
++                s = num[1]
++                try:
++                    num[1] = long(s, 16)
++                except (TypeError, ValueError):
++                    if isinstance(s, string_types) and s.endswith(('L', 'l')):
++                        num[1] = long(s[:-1], 16)
++                    else:
++                        raise
+                 _mpf_ = tuple(num)
+             else:
+                 if len(num) == 4:

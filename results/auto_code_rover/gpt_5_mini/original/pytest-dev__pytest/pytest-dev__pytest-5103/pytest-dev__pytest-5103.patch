@@ -1,0 +1,57 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..f56d01721 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,6 +968,21 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Improve assertion messages for patterns like all(<genexpr>) and any(<genexpr>)
++        # by converting generator expressions into list comprehensions so the
++        # resulting explanation shows the evaluated list (instead of a generator object).
++        # This is a minimal change to improve reporting for the common case.
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        ):
++            gen = call.args[0]
++            # Replace generator expression with an equivalent list comprehension
++            # so the normal visit/assignment machinery will produce a readable list repr.
++            call = ast.Call(call.func, [ast.ListComp(gen.elt, gen.generators)], call.keywords)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1001,6 +1016,17 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
++        # Similar improvement as in visit_Call_35: convert generator expressions
++        # passed to builtin all/any into list comprehensions for better reprs.
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        ):
++            gen = call.args[0]
++            call = ast.Call(call.func, [ast.ListComp(gen.elt, gen.generators)], call.keywords, getattr(call, "starargs", None), getattr(call, "kwargs", None))
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1014,10 +1040,10 @@ warn_explicit(
+             res, expl = self.visit(keyword.value)
+             new_kwargs.append(ast.keyword(keyword.arg, res))
+             arg_expls.append(keyword.arg + "=" + expl)
+-        if call.starargs:
++        if getattr(call, "starargs", None):
+             new_star, expl = self.visit(call.starargs)
+             arg_expls.append("*" + expl)
+-        if call.kwargs:
++        if getattr(call, "kwargs", None):
+             new_kwarg, expl = self.visit(call.kwargs)
+             arg_expls.append("**" + expl)
+         expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))

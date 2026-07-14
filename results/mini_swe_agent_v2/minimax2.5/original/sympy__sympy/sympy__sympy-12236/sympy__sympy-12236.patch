@@ -1,0 +1,24 @@
+diff --git a/sympy/polys/domains/polynomialring.py b/sympy/polys/domains/polynomialring.py
+index 6e60b5e4a3..514fe92cce 100644
+--- a/sympy/polys/domains/polynomialring.py
++++ b/sympy/polys/domains/polynomialring.py
+@@ -107,7 +107,18 @@ def from_FractionField(K1, a, K0):
+         denom = K0.denom(a)
+ 
+         if denom.is_ground:
+-            return K1.from_PolynomialRing(K0.numer(a)/denom, K0.field.ring.to_domain())
++            # Do the division in the fraction field, not the polynomial ring
++            # to avoid incorrect polynomial division (which gives 0)
++            num = K0.numer(a)
++            denom_elt = K0.field(denom)
++            result = num / denom_elt
++            
++            # Check if the result is actually a polynomial (denominator is 1)
++            # We need result.denom to be 1, not just any constant
++            if result.denom == K0.field.ring.one:
++                return K1.from_PolynomialRing(result.numer, K0.field.ring.to_domain())
++            else:
++                return None
+         else:
+             return None
+ 

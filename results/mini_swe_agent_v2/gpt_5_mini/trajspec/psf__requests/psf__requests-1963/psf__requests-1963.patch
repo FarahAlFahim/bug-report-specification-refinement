@@ -1,0 +1,30 @@
+diff --git a/requests/sessions.py b/requests/sessions.py
+index 425db22c..841daa9c 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -88,7 +88,13 @@ class SessionRedirectMixin(object):
+         i = 0
+ 
+         while resp.is_redirect:
+-            prepared_request = req.copy()
++            # Use the request that generated this response as the basis for
++            # the next redirect iteration. This preserves any method
++            # conversions (e.g. POST -> GET for a 303) that were applied
++            # for the request that produced `resp`. Fall back to the
++            # original `req` if for some reason `resp.request` is missing.
++            base_request = getattr(resp, 'request', None) or req
++            prepared_request = base_request.copy()
+ 
+             resp.content  # Consume socket so it can be released
+ 
+@@ -99,7 +105,9 @@ class SessionRedirectMixin(object):
+             resp.close()
+ 
+             url = resp.headers['location']
+-            method = req.method
++            # Start from the method of the request that produced this
++            # response so that intermediate method changes are preserved.
++            method = prepared_request.method
+ 
+             # Handle redirection without scheme (see: RFC 1808 Section 4)
+             if url.startswith('//'):

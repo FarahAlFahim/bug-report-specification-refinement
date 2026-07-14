@@ -1,0 +1,34 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 737e16cc74..d25acbdb1f 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1854,7 +1854,28 @@ def _print_PolynomialRingBase(self, expr):
+ 
+     def _print_Poly(self, poly):
+         cls = poly.__class__.__name__
+-        expr = self._print(poly.as_expr())
++        # Get the terms in the correct order (highest degree first)
++        terms = poly.terms()
++        # Build the expression from the terms in the correct order
++        from sympy import Add, Mul, Pow
++        expr_args = []
++        for monom, coeff in terms:
++            # Build the term from monom and coeff
++            term_parts = [coeff]
++            for i, exp in enumerate(monom):
++                if exp > 0:
++                    gen = poly.gens[i]
++                    if exp == 1:
++                        term_parts.append(gen)
++                    else:
++                        term_parts.append(Pow(gen, exp))
++            if len(term_parts) == 1:
++                expr_args.append(term_parts[0])
++            else:
++                expr_args.append(Mul(*term_parts))
++        expr = Add(*expr_args, evaluate=False)
++        # Use a printer with order='none' to preserve the order of terms
++        expr = LatexPrinter({'order': 'none'}).doprint(expr)
+         gens = list(map(self._print, poly.gens))
+         domain = "domain=%s" % self._print(poly.get_domain())
+ 

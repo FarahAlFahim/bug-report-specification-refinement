@@ -1,0 +1,64 @@
+diff --git a/django/core/checks/translation.py b/django/core/checks/translation.py
+index 138ed07ff8..1d25b4c31e 100644
+--- a/django/core/checks/translation.py
++++ b/django/core/checks/translation.py
+@@ -2,6 +2,7 @@ from django.conf import settings
+ from django.utils.translation.trans_real import language_code_re
+ 
+ from . import Error, Tags, register
++from django.conf.locale import LANG_INFO
+ 
+ E001 = Error(
+     'You have provided an invalid value for the LANGUAGE_CODE setting: {!r}.',
+@@ -55,7 +56,48 @@ def check_setting_languages_bidi(app_configs, **kwargs):
+ @register(Tags.translation)
+ def check_language_settings_consistent(app_configs, **kwargs):
+     """Error if language settings are not consistent with each other."""
+-    available_tags = {i for i, _ in settings.LANGUAGES} | {'en-us'}
+-    if settings.LANGUAGE_CODE not in available_tags:
++    # Build a set of available language tags from settings. Normalize to
++    # lower-case for comparison so that e.g. 'de' and 'DE' are treated the
++    # same. Historically 'en-us' was accepted as a default even when not
++    # listed in LANGUAGES, keep that behaviour.
++    available_tags = {i for i, _ in settings.LANGUAGES}
++    available_lc = {tag.lower() for tag in available_tags}
++
++    lang_code = settings.LANGUAGE_CODE
++    if not isinstance(lang_code, str):
+         return [E004]
+-    return []
++    lang_code_lc = lang_code.lower()
++
++    # Direct match.
++    if lang_code_lc in available_lc:
++        return []
++
++    # Special-case historically accepted default.
++    if lang_code_lc == 'en-us':
++        return []
++
++    # Consider LANG_INFO fallbacks (e.g. zh-cn -> zh-hans) and the generic
++    # base tag (e.g. de-at -> de). If any of those are present in
++    # settings.LANGUAGES accept the LANGUAGE_CODE.
++    possible = [lang_code_lc]
++    try:
++        possible.extend(LANG_INFO[lang_code_lc].get('fallback', []))
++    except KeyError:
++        pass
++    generic = lang_code_lc.split('-')[0]
++    possible.append(generic)
++
++    for code in possible:
++        if code in available_lc:
++            return []
++
++    # If no exact or fallback/base match is found, accept a variant of the
++    # generic language if present in LANGUAGES (e.g. LANGUAGE_CODE='fr' and
++    # LANGUAGES contains 'fr-ca' would be considered acceptable in runtime
++    # resolution). This mirrors get_supported_language_variant's final
++    # attempt to find a supported variant.
++    for avail in available_lc:
++        if avail.startswith(generic + '-'):
++            return []
++
++    return [E004]

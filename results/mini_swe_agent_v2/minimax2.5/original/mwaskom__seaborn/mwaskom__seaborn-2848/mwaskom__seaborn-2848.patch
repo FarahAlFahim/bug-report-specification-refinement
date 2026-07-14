@@ -1,0 +1,23 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 8526f44b..af5b58d4 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1278,11 +1278,18 @@ class PairGrid(Grid):
+             # (and was originally written exclusively that way) but now can delegate
+             # to the axes-level functions, while always handling legend creation.
+             # See GH2307
++            # Save the original hue_order parameter to check if it was explicitly provided
++            _hue_order_given = hue_order is not None
+             hue_names = hue_order = categorical_order(data[hue], hue_order)
+             if dropna:
+                 # Filter NA from the list of unique hue names
+                 hue_names = list(filter(pd.notnull, hue_names))
+             self.hue_names = hue_names
++            # Filter data to include only rows with hue values in hue_order
++            # This is only done when hue_order was explicitly provided
++            if _hue_order_given:
++                data = data[data[hue].isin(hue_order)]
++                self.data = data
+             self.hue_vals = data[hue]
+ 
+         # Additional dict of kwarg -> list of values for mapping the hue var

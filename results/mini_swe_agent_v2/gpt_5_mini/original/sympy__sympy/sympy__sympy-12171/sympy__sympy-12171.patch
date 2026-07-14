@@ -1,0 +1,39 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..342ced9759 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -109,6 +109,27 @@ def _print_Integral(self, expr):
+     def _print_Sum(self, expr):
+         return "Hold[Sum[" + ', '.join(self.doprint(a) for a in expr.args) + "]]"
+ 
++    def _print_Derivative(self, expr):
++        """Print Derivative as Mathematica D[f, x] form.
++
++        Use stringify so that subexpressions are printed with
++        the printer's rules (e.g. functions become f[t]).
++        """
++        return "D[%s]" % (self.stringify(expr.args, ", "))
++
++    def _print_Float(self, expr):
++        """Print floats in Mathematica scientific notation using *^ for exponents.
++
++        Delegate to StrPrinter to get the canonical string for the float and
++        then replace the exponent marker (e or E) with Mathematica's *^.
++        """
++        # Use StrPrinter's float printer to honour settings like full_prec
++        res = StrPrinter._print_Float(self, expr)
++        # Replace only exponent markers (e or E followed by an integer)
++        import re
++        return re.sub(r'[eE]([+-]?\d+)', r'*^\1', res)
++
++
+ 
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code
+@@ -121,4 +142,4 @@ def mathematica_code(expr, **settings):
+     >>> mcode(sin(x).series(x).removeO())
+     '(1/120)*x^5 - 1/6*x^3 + x'
+     """
+-    return MCodePrinter(settings).doprint(expr)
++    return MCodePrinter(settings).doprint(expr)
+\ No newline at end of file

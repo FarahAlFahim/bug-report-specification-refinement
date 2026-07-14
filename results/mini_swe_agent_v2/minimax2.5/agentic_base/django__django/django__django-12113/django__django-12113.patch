@@ -1,0 +1,24 @@
+diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py
+index a3ae1f048e..dcf8047bdb 100644
+--- a/django/db/backends/sqlite3/base.py
++++ b/django/db/backends/sqlite3/base.py
+@@ -171,14 +171,14 @@ class DatabaseWrapper(BaseDatabaseWrapper):
+ 
+     def get_connection_params(self):
+         settings_dict = self.settings_dict
+-        if not settings_dict['NAME']:
+-            raise ImproperlyConfigured(
+-                "settings.DATABASES is improperly configured. "
+-                "Please supply the NAME value.")
++        # If NAME is None (as in the case of _nodb_connection for NO_DB_ALIAS),
++        # use an in-memory database to allow the connection to work.
++        # This is needed for test database creation/deletion operations.
++        name = settings_dict['NAME'] or ':memory:'
+         kwargs = {
+             # TODO: Remove str() when dropping support for PY36.
+             # https://bugs.python.org/issue33496
+-            'database': str(settings_dict['NAME']),
++            'database': str(name),
+             'detect_types': Database.PARSE_DECLTYPES | Database.PARSE_COLNAMES,
+             **settings_dict['OPTIONS'],
+         }

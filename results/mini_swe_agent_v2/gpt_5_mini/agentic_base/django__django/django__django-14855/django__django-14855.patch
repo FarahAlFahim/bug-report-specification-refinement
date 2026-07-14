@@ -1,0 +1,72 @@
+diff --git a/django/contrib/admin/helpers.py b/django/contrib/admin/helpers.py
+index dd154f72ee..cce8ce008b 100644
+--- a/django/contrib/admin/helpers.py
++++ b/django/contrib/admin/helpers.py
+@@ -209,7 +209,19 @@ class AdminReadonlyField:
+             remote_field.model._meta.model_name,
+         )
+         try:
+-            url = reverse(url_name, args=[quote(remote_obj.pk)])
++            # If we have a ModelAdmin (and thus an AdminSite), prefer
++            # reversing with current_app set to the AdminSite.name so the
++            # generated URL uses the correct admin namespace. Fall back to
++            # the legacy behaviour of reversing without current_app if that
++            # fails.
++            if self.model_admin is not None:
++                try:
++                    current_app = self.model_admin.admin_site.name
++                    url = reverse(url_name, args=[quote(remote_obj.pk)], current_app=current_app)
++                except NoReverseMatch:
++                    url = reverse(url_name, args=[quote(remote_obj.pk)])
++            else:
++                url = reverse(url_name, args=[quote(remote_obj.pk)])
+             return format_html('<a href="{}">{}</a>', url, remote_obj)
+         except NoReverseMatch:
+             return str(remote_obj)
+diff --git a/django/contrib/admin/models.py b/django/contrib/admin/models.py
+index a0fbb02afd..de74401153 100644
+--- a/django/contrib/admin/models.py
++++ b/django/contrib/admin/models.py
+@@ -5,6 +5,7 @@ from django.contrib.admin.utils import quote
+ from django.contrib.contenttypes.models import ContentType
+ from django.db import models
+ from django.urls import NoReverseMatch, reverse
++from django.contrib.admin.sites import all_sites
+ from django.utils import timezone
+ from django.utils.text import get_text_list
+ from django.utils.translation import gettext, gettext_lazy as _
+@@ -143,8 +144,33 @@ class LogEntry(models.Model):
+         """
+         if self.content_type and self.object_id:
+             url_name = 'admin:%s_%s_change' % (self.content_type.app_label, self.content_type.model)
++            # Try to find an AdminSite that actually registers this model and
++            # reverse using its name as the current_app so the URL uses the
++            # correct admin namespace. Fall back to the legacy behaviour of
++            # reversing without current_app if no suitable site is found or
++            # reversing with current_app fails.
++            current_app = None
++            model_class = self.content_type.model_class()
++            if model_class is not None:
++                for site in all_sites:
++                    try:
++                        if model_class in site._registry:
++                            current_app = site.name
++                            break
++                    except Exception:
++                        # Be defensive in case a site has unexpected state.
++                        continue
++
+             try:
++                if current_app:
++                    return reverse(url_name, args=(quote(self.object_id),), current_app=current_app)
+                 return reverse(url_name, args=(quote(self.object_id),))
+             except NoReverseMatch:
+-                pass
++                # As a last resort, try the reverse without current_app if
++                # we attempted with one and it failed.
++                if current_app:
++                    try:
++                        return reverse(url_name, args=(quote(self.object_id),))
++                    except NoReverseMatch:
++                        pass
+         return None

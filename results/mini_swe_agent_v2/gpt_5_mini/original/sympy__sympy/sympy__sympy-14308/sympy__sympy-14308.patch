@@ -1,0 +1,21 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 306b4544e5..d03c7f9bf5 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -954,8 +954,7 @@ def _print_BasisDependent(self, expr):
+                     sep = ' + ' if j == 0 else ' ' * 3
+                 out_lines[j] += sep + pic[j]
+ 
+-        res = '\
+-'.join(out_lines)
++        res = '\n'.join(out_lines)
+         pform = prettyForm(res)
+         # center the baseline vertically
+         pform.baseline = pform.height() // 2
+@@ -2360,4 +2359,4 @@ def pager_print(expr, **settings):
+     from locale import getpreferredencoding
+     if 'num_columns' not in settings:
+         settings['num_columns'] = 500000  # disable line wrap
+-    pager(pretty(expr, **settings).encode(getpreferredencoding()))
++    pager(pretty(expr, **settings).encode(getpreferredencoding()))
+\ No newline at end of file

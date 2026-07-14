@@ -1,0 +1,170 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..a1e51b1a71 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -59,22 +59,116 @@ class Media:
+ 
+     @property
+     def _css(self):
+-        css = self._css_lists[0]
+-        # filter(None, ...) avoids calling merge with empty dicts.
+-        for obj in filter(None, self._css_lists[1:]):
+-            css = {
+-                medium: self.merge(css.get(medium, []), obj.get(medium, []))
+-                for medium in css.keys() | obj.keys()
+-            }
++        css = {}
++        # For each medium, collect the lists from all _css_lists and merge
++        # them together in a way that respects the relative ordering
++        # expressed in each list.
++        for obj in filter(None, self._css_lists):
++            for medium, paths in obj.items():
++                css.setdefault(medium, [])
++                css[medium].append(list(paths))
++        # Now perform a multi-list merge per medium. If a medium only had a
++        # single list, keep it as-is.
++        for medium, lists in list(css.items()):
++            if len(lists) == 1:
++                css[medium] = lists[0]
++            else:
++                css[medium] = self.merge_multiple(lists)
+         return css
+ 
+     @property
+     def _js(self):
+-        js = self._js_lists[0]
+-        # filter(None, ...) avoids calling merge() with empty lists.
+-        for obj in filter(None, self._js_lists[1:]):
+-            js = self.merge(js, obj)
+-        return js
++        lists = [list(obj) for obj in filter(None, self._js_lists)]
++        if not lists:
++            return []
++        if len(lists) == 1:
++            return lists[0]
++        return self.merge_multiple(lists)
++
++    @staticmethod
++    def merge_multiple(lists):
++        """
++        Merge multiple lists while trying to keep the relative order of the
++        elements expressed in each list. When explicit contradictory orders
++        between the same two files are found in any pair of input lists,
++        emit MediaOrderConflictWarning.
++        """
++        from collections import defaultdict, deque
++
++        # Deterministic seen order: first appearance scanning lists in
++        # order.
++        seen = []
++        for lst in lists:
++            for item in lst:
++                if item not in seen:
++                    seen.append(item)
++
++        # Build edges from consecutive pairs in each list.
++        edges = defaultdict(set)
++        indegree = {item: 0 for item in seen}
++
++        def add_edge(a, b):
++            if b not in edges[a]:
++                edges[a].add(b)
++                indegree[b] += 1
++
++        for lst in lists:
++            for a, b in zip(lst, lst[1:]):
++                add_edge(a, b)
++
++        # Kahn's algorithm for topological sort. Use 'seen' order to break
++        # ties for deterministic behavior.
++        queue = deque([item for item in seen if indegree[item] == 0])
++        combined = []
++        while queue:
++            item = queue.popleft()
++            combined.append(item)
++            for succ in list(edges[item]):
++                indegree[succ] -= 1
++                if indegree[succ] == 0:
++                    queue.append(succ)
++
++        # Append any remaining items (cycles or isolated items) in seen
++        # order to preserve stability.
++        remaining = [it for it in seen if it not in combined]
++        combined.extend(remaining)
++
++        # Emit a warning if any pair of input lists explicitly contain the
++        # same two items in opposite orders.
++        warned = False
++        n = len(lists)
++        for i in range(n):
++            for j in range(i + 1, n):
++                list_1 = lists[i]
++                list_2 = lists[j]
++                for a in list_1:
++                    for b in list_1:
++                        if a == b:
++                            continue
++                        try:
++                            pos1_a = list_1.index(a)
++                            pos1_b = list_1.index(b)
++                            pos2_a = list_2.index(a)
++                            pos2_b = list_2.index(b)
++                        except ValueError:
++                            continue
++                        if (pos1_a < pos1_b and pos2_a > pos2_b) or (
++                            pos1_a > pos1_b and pos2_a < pos2_b
++                        ):
++                            warnings.warn(
++                                'Detected duplicate Media files in an opposite order:\n%s\n%s' % (b, a),
++                                MediaOrderConflictWarning,
++                            )
++                            warned = True
++                            break
++                    if warned:
++                        break
++                if warned:
++                    break
++            if warned:
++                break
++
++        return combined
+ 
+     def render(self):
+         return mark_safe('\n'.join(chain.from_iterable(getattr(self, 'render_' + name)() for name in MEDIA_TYPES)))
+@@ -139,11 +233,31 @@ class Media:
+                 combined_list.insert(last_insert_index, path)
+             else:
+                 if index > last_insert_index:
+-                    warnings.warn(
+-                        'Detected duplicate Media files in an opposite order:\n'
+-                        '%s\n%s' % (combined_list[last_insert_index], combined_list[index]),
+-                        MediaOrderConflictWarning,
+-                    )
++                    # Only warn if the two files are present in both input
++                    # lists and their relative order is explicitly
++                    # contradictory. Observing the intermediate combined_list
++                    # order is not sufficient evidence of a two-list conflict
++                    # when multiple Media objects are merged sequentially.
++                    a = combined_list[index]
++                    b = combined_list[last_insert_index]
++                    try:
++                        pos1_a = list_1.index(a)
++                        pos1_b = list_1.index(b)
++                        pos2_a = list_2.index(a)
++                        pos2_b = list_2.index(b)
++                    except ValueError:
++                        # One of the entries isn't in both input lists, so
++                        # this is not an explicit conflict between list_1 and
++                        # list_2.
++                        pass
++                    else:
++                        if (pos1_a < pos1_b and pos2_a > pos2_b) or (
++                            pos1_a > pos1_b and pos2_a < pos2_b
++                        ):
++                            warnings.warn(
++                                'Detected duplicate Media files in an opposite order:\n%s\n%s' % (b, a),
++                                MediaOrderConflictWarning,
++                            )
+                 # path already exists in the list. Update last_insert_index so
+                 # that the following elements are inserted in front of this one.
+                 last_insert_index = index

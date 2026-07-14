@@ -1,0 +1,81 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..72cebad8ef 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -152,8 +152,12 @@ class Text3D(mtext.Text):
+ 
+ def text_2d_to_3d(obj, z=0, zdir='z'):
+     """Convert a Text to a Text3D object."""
++    # First configure the 3D-specific properties using the Text3D
++    # implementation. Only after that succeeds do we change the object's
++    # class to avoid leaving the user with a partially-converted object
++    # if an exception is raised during initialization.
++    Text3D.set_3d_properties(obj, z, zdir)
+     obj.__class__ = Text3D
+-    obj.set_3d_properties(z, zdir)
+ 
+ 
+ class Line3D(lines.Line2D):
+@@ -220,9 +224,9 @@ class Line3D(lines.Line2D):
+ 
+ def line_2d_to_3d(line, zs=0, zdir='z'):
+     """Convert a 2D line to 3D."""
+-
++    # Configure 3D state first; only set the class after successful setup
++    Line3D.set_3d_properties(line, zs, zdir)
+     line.__class__ = Line3D
+-    line.set_3d_properties(zs, zdir)
+ 
+ 
+ def _path_to_3d_segment(path, zs=0, zdir='z'):
+@@ -315,8 +319,10 @@ class Line3DCollection(LineCollection):
+ def line_collection_2d_to_3d(col, zs=0, zdir='z'):
+     """Convert a LineCollection to a Line3DCollection object."""
+     segments3d = _paths_to_3d_segments(col.get_paths(), zs, zdir)
++    # Prepare 3D segments first; only mutate the class after successful
++    # preparation to avoid leaving a partially-converted collection.
++    Line3DCollection.set_segments(col, segments3d)
+     col.__class__ = Line3DCollection
+-    col.set_segments(segments3d)
+ 
+ 
+ class Patch3D(Patch):
+@@ -379,8 +385,8 @@ def _get_patch_verts(patch):
+ def patch_2d_to_3d(patch, z=0, zdir='z'):
+     """Convert a Patch to a Patch3D object."""
+     verts = _get_patch_verts(patch)
++    Patch3D.set_3d_properties(patch, verts, z, zdir)
+     patch.__class__ = Patch3D
+-    patch.set_3d_properties(verts, z, zdir)
+ 
+ 
+ def pathpatch_2d_to_3d(pathpatch, z=0, zdir='z'):
+@@ -389,8 +395,8 @@ def pathpatch_2d_to_3d(pathpatch, z=0, zdir='z'):
+     trans = pathpatch.get_patch_transform()
+ 
+     mpath = trans.transform_path(path)
++    PathPatch3D.set_3d_properties(pathpatch, mpath, z, zdir)
+     pathpatch.__class__ = PathPatch3D
+-    pathpatch.set_3d_properties(mpath, z, zdir)
+ 
+ 
+ class Patch3DCollection(PatchCollection):
+@@ -651,13 +657,17 @@ def patch_collection_2d_to_3d(col, zs=0, zdir='z', depthshade=True):
+         Whether to shade the patches to give a sense of depth. Default: *True*.
+ 
+     """
++    # Configure the collection for 3D first; only set the object's
++    # class after successful configuration to avoid leaving a
++    # partially-converted collection in the user's session.
+     if isinstance(col, PathCollection):
++        Path3DCollection.set_3d_properties(col, zs, zdir)
+         col.__class__ = Path3DCollection
+     elif isinstance(col, PatchCollection):
++        Patch3DCollection.set_3d_properties(col, zs, zdir)
+         col.__class__ = Patch3DCollection
+     col._depthshade = depthshade
+     col._in_draw = False
+-    col.set_3d_properties(zs, zdir)
+ 
+ 
+ class Poly3DCollection(PolyCollection):

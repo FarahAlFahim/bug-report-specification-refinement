@@ -1,0 +1,80 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 09e2b00735..e4a2816303 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -917,10 +917,26 @@ def _print_BasisDependent(self, expr):
+                 else:
+                     #We always wrap the measure numbers in
+                     #parentheses
+-                    arg_str = self._print(
+-                        v).parens()[0]
+-
+-                    o1.append(arg_str + ' ' + k._pretty_form)
++                    # Get the pretty form of the scalar part
++                    scalar_pretty = self._print(v)
++                    arg_str = scalar_pretty.parens()[0]
++
++                    # Check if the scalar part has newlines
++                    if '\n' in arg_str:
++                        # For multi-line scalars, we need to add the vector
++                        # to each line separately
++                        scalar_lines = arg_str.split('\n')
++                        vect_str = k._pretty_form
++                        # Pad each line to the same width and add vector
++                        max_width = max(len(line) for line in scalar_lines)
++                        combined_lines = []
++                        for line in scalar_lines:
++                            padding = ' ' * (max_width - len(line))
++                            combined_lines.append(line + padding + ' ' + vect_str)
++                        o1.append('\n'.join(combined_lines))
++                    else:
++                        # For single-line scalars, just append the vector
++                        o1.append(arg_str + ' ' + k._pretty_form)
+                 vectstrs.append(k._pretty_form)
+ 
+         #outstr = u("").join(o1)
+@@ -928,20 +944,12 @@ def _print_BasisDependent(self, expr):
+             o1[0] = o1[0][3:]
+         elif o1[0].startswith(" "):
+             o1[0] = o1[0][1:]
+-        #Fixing the newlines
+-        lengths = []
+-        strs = ['']
+-        for i, partstr in enumerate(o1):
+-            # XXX: What is this hack?
+-            if '\n' in partstr:
+-                tempstr = partstr
+-                tempstr = tempstr.replace(vectstrs[i], '')
+-                tempstr = tempstr.replace(u'\N{RIGHT PARENTHESIS UPPER HOOK}',
+-                                          u'\N{RIGHT PARENTHESIS UPPER HOOK}'
+-                                          + ' ' + vectstrs[i])
+-                o1[i] = tempstr
++
++        # Split into lines and combine
+         o1 = [x.split('\n') for x in o1]
+         n_newlines = max([len(x) for x in o1])
++        lengths = []
++        strs = ['']
+         for parts in o1:
+             lengths.append(len(parts[0]))
+             for j in range(n_newlines):
+@@ -961,8 +969,18 @@ def _print_BasisDependent(self, expr):
+                                            3*(len(lengths)-1)))
+                     strs[j] += ' '*(lengths[-1]+3)
+ 
+-        return prettyForm(u'\n'.join([s[:-3] for s in strs]))
++        # Calculate baseline - use the baseline from the first component's scalar (if it has one)
++        baseline = 0
++        for system, vect in items:
++            inneritems = list(vect.components.items())
++            for k, v in inneritems:
++                if v != 1 and v != -1:
++                    scalar_pretty = self._print(v)
++                    baseline = scalar_pretty.parens()[1]
++                    break
++            break
+ 
++        return prettyForm(u'\n'.join([s[:-3] for s in strs]), baseline=baseline)
+     def _print_NDimArray(self, expr):
+         from sympy import ImmutableMatrix
+ 

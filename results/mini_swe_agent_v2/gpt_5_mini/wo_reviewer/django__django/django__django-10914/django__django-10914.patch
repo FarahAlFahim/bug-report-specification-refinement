@@ -1,0 +1,53 @@
+diff --git a/django/core/files/storage.py b/django/core/files/storage.py
+index cbdab1de47..83b3cf800e 100644
+--- a/django/core/files/storage.py
++++ b/django/core/files/storage.py
+@@ -248,11 +248,13 @@ class FileSystemStorage(Storage):
+         # try to create the file, but if it already exists we have to go back
+         # to get_available_name() and try again.
+ 
++        moved = False
+         while True:
+             try:
+                 # This file has a file path that we can move.
+                 if hasattr(content, 'temporary_file_path'):
+                     file_move_safe(content.temporary_file_path(), full_path)
++                    moved = True
+ 
+                 # This is a normal uploadedfile that we can stream.
+                 else:
+@@ -280,8 +282,34 @@ class FileSystemStorage(Storage):
+                 # OK, the file save worked. Break out of the loop.
+                 break
+ 
++        # If an explicit file_permissions_mode is configured, always apply it.
+         if self.file_permissions_mode is not None:
+             os.chmod(full_path, self.file_permissions_mode)
++        else:
++            # When FILE_UPLOAD_PERMISSIONS is None the streaming-write path
++            # creates files with mode 0o666 masked by the process umask
++            # (via os.open). Files moved from temporary files (via rename)
++            # inherit the temporary file's mode which can be more
++            # restrictive (commonly 0o600). To ensure consistent behavior
++            # between upload handlers, explicitly set the mode of files
++            # that were moved from temporary files to match the mode that
++            # would have been created by the streaming path: 0o666 & ~umask.
++            if moved:
++                # Temporarily set umask to 0 to read the current umask
++                # value for computing the masked mode, restoring it
++                # afterwards. This pattern mirrors the directory creation
++                # behavior above.
++                old_umask = os.umask(0)
++                try:
++                    masked_mode = 0o666 & ~old_umask
++                finally:
++                    os.umask(old_umask)
++                try:
++                    os.chmod(full_path, masked_mode)
++                except OSError:
++                    # If chmod fails (e.g. on non-POSIX platforms), ignore
++                    # and leave the filesystem's mode as-is.
++                    pass
+ 
+         # Store filenames with forward slashes, even on Windows.
+         return name.replace('\\', '/')

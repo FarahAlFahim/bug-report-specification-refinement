@@ -1,0 +1,55 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..4ff992921 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -242,11 +242,37 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+         public = [x for x in items if not x.split('.')[-1].startswith('_')]
+         return public, items
+ 
++    def _filtered_members(obj: Any, imported: bool, is_class: bool = False) -> List[str]:
++        """
++        Return a list of member names from dir(obj), preserving order,
++        filtered according to the imported-members heuristic.
++
++        For modules (is_class=False) a name is included when imported is True
++        or when the attribute's __module__ equals obj.__name__.
++
++        For classes (is_class=True) a name is included when imported is True
++        or when the attribute's __module__ equals obj.__module__.
++        """
++        members = []  # type: List[str]
++        for name in dir(obj):
++            try:
++                value = safe_getattr(obj, name)
++            except AttributeError:
++                continue
++            if imported:
++                members.append(name)
++            else:
++                module_name = getattr(value, '__module__', None)
++                container_name = obj.__module__ if is_class else getattr(obj, '__name__', None)
++                if module_name == container_name:
++                    members.append(name)
++        return members
++
+     ns = {}  # type: Dict[str, Any]
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        ns['members'] = _filtered_members(obj, imported_members, is_class=False)
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \
+@@ -259,9 +285,9 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+         if ispackage and recursive:
+             ns['modules'], ns['all_modules'] = get_modules(obj)
+     elif doc.objtype == 'class':
+-        ns['members'] = dir(obj)
++        ns['members'] = _filtered_members(obj, imported_members, is_class=True)
+         ns['inherited_members'] = \
+-            set(dir(obj)) - set(obj.__dict__.keys())
++            set(ns['members']) - set(obj.__dict__.keys())
+         ns['methods'], ns['all_methods'] = \
+             get_members(obj, {'method'}, ['__init__'])
+         ns['attributes'], ns['all_attributes'] = \

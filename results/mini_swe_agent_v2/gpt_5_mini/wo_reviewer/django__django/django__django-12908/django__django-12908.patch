@@ -1,0 +1,45 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index e0eeccefa6..2748cfeeba 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1138,12 +1138,16 @@ class QuerySet:
+         """
+         Return a new QuerySet instance that will select only distinct results.
+         """
+-        assert not self.query.is_sliced, \
+-            "Cannot create distinct fields once a slice has been taken."
++        assert not self.query.is_sliced,             "Cannot create distinct fields once a slice has been taken."
++        # DISTINCT is not supported after combinator operations (UNION/INTERSECT/EXCEPT).
++        # Ensure callers receive a clear error instead of silently having their
++        # distinct request ignored by the SQL compiler.
++        self._not_support_combined_queries('distinct')
+         obj = self._chain()
+         obj.query.add_distinct_fields(*field_names)
+         return obj
+ 
++
+     def extra(self, select=None, where=None, params=None, tables=None,
+               order_by=None, select_params=None):
+         """Add extra SQL fragments to the query."""
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index bb230647eb..c489507d46 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1841,6 +1841,17 @@ class Query(BaseExpression):
+         """
+         Add and resolve the given fields to the query's "distinct on" clause.
+         """
++        # DISTINCT (or DISTINCT ON) is not supported for combined queries
++        # (UNION / INTERSECT / EXCEPT). Prevent creating an invalid Query
++        # state where both a combinator and distinct fields are set which
++        # would be ignored by the compiler.
++        if self.combinator:
++            from django.db import NotSupportedError
++
++            raise NotSupportedError(
++                'Calling Query.distinct() after %s() is not supported.' % self.combinator
++            )
++
+         self.distinct_fields = field_names
+         self.distinct = True
+ 

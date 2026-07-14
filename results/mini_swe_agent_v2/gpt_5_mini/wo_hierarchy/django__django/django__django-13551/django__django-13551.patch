@@ -1,0 +1,62 @@
+diff --git a/django/contrib/auth/base_user.py b/django/contrib/auth/base_user.py
+index 3a4a64ee19..98ec7bf740 100644
+--- a/django/contrib/auth/base_user.py
++++ b/django/contrib/auth/base_user.py
+@@ -147,6 +147,23 @@ class AbstractBaseUser(models.Model):
+         except AttributeError:
+             return 'email'
+ 
++    def get_email_for_token(self):
++        """
++        Return a canonical email string suitable for inclusion in security
++        tokens. By default this normalizes the email field configured on the
++        model (EMAIL_FIELD or 'email'). Models can override this method to
++        provide a custom canonical representation used when generating
++        password reset tokens.
++        """
++        email_field = getattr(self.__class__, 'EMAIL_FIELD', 'email')
++        email = getattr(self, email_field, '') or ''
++        # Use the manager's normalization (lowercase domain) when available.
++        try:
++            normalize = self.__class__.objects.normalize_email
++        except Exception:
++            return email
++        return normalize(email)
++
+     @classmethod
+     def normalize_username(cls, username):
+         return unicodedata.normalize('NFKC', username) if isinstance(username, str) else username
+diff --git a/django/contrib/auth/tokens.py b/django/contrib/auth/tokens.py
+index 93e2d71af2..fe070245e5 100644
+--- a/django/contrib/auth/tokens.py
++++ b/django/contrib/auth/tokens.py
+@@ -94,7 +94,28 @@ class PasswordResetTokenGenerator:
+         # Truncate microseconds so that tokens are consistent even if the
+         # database doesn't support microseconds.
+         login_timestamp = '' if user.last_login is None else user.last_login.replace(microsecond=0, tzinfo=None)
+-        return str(user.pk) + user.password + str(login_timestamp) + str(timestamp)
++
++        # Include an email-derived value in the hash so that tokens issued
++        # for a particular email address are invalidated if the user's
++        # email changes. Prefer a model-provided hook ``get_email_for_token``
++        # if present, otherwise fall back to the model's EMAIL_FIELD (or
++        # 'email'). This mirrors how session auth hashes are produced via a
++        # model-side hook and ensures token validity reflects the
++        # account-identifying state at issuance.
++        try:
++            email_for_token = user.get_email_for_token()
++        except AttributeError:
++            # Fallback: use the configured email field name.
++            email_field = getattr(user.__class__, 'EMAIL_FIELD', 'email')
++            email_for_token = getattr(user, email_field, '') or ''
++
++        return (
++            str(user.pk)
++            + user.password
++            + str(login_timestamp)
++            + str(email_for_token)
++            + str(timestamp)
++        )
+ 
+     def _num_seconds(self, dt):
+         return int((dt - datetime(2001, 1, 1)).total_seconds())

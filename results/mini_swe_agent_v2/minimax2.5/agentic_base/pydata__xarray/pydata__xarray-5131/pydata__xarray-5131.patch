@@ -1,0 +1,35 @@
+diff --git a/xarray/core/groupby.py b/xarray/core/groupby.py
+index 8a097251..af5abd9a 100644
+--- a/xarray/core/groupby.py
++++ b/xarray/core/groupby.py
+@@ -436,7 +436,7 @@ class GroupBy(SupportsArithmetic):
+         return zip(self._unique_coord.values, self._iter_grouped())
+ 
+     def __repr__(self):
+-        return "{}, grouped over {!r} \n{!r} groups with labels {}.".format(
++        return "{}, grouped over {!r}\n{!r} groups with labels {}.".format(
+             self.__class__.__name__,
+             self._unique_coord.name,
+             self._unique_coord.size,
+diff --git a/xarray/core/resample.py b/xarray/core/resample.py
+index 0a20d918..4dfa5931 100644
+--- a/xarray/core/resample.py
++++ b/xarray/core/resample.py
+@@ -168,7 +168,7 @@ class DataArrayResample(DataArrayGroupBy, Resample):
+             raise ValueError(
+                 "Proxy resampling dimension ('{}') "
+                 "cannot have the same name as actual dimension "
+-                "('{}')! ".format(resample_dim, dim)
++                "('{}')!".format(resample_dim, dim)
+             )
+         self._dim = dim
+         self._resample_dim = resample_dim
+@@ -261,7 +261,7 @@ class DatasetResample(DatasetGroupBy, Resample):
+             raise ValueError(
+                 "Proxy resampling dimension ('{}') "
+                 "cannot have the same name as actual dimension "
+-                "('{}')! ".format(resample_dim, dim)
++                "('{}')!".format(resample_dim, dim)
+             )
+         self._dim = dim
+         self._resample_dim = resample_dim

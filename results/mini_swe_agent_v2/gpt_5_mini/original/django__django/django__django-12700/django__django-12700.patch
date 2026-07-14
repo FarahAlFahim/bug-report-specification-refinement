@@ -1,0 +1,36 @@
+diff --git a/django/views/debug.py b/django/views/debug.py
+index e6b7d4d821..bb6f2d96e4 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -89,7 +89,31 @@ class SafeExceptionReporterFilter:
+             if self.hidden_settings.search(key):
+                 cleansed = self.cleansed_substitute
+             elif isinstance(value, dict):
++                # Recursively cleanse dictionary values using their own keys
+                 cleansed = {k: self.cleanse_setting(k, v) for k, v in value.items()}
++            elif isinstance(value, (list, tuple, set, frozenset)):
++                # Recursively cleanse iterable containers (but not strings/bytes).
++                # Use the same key for elements so that a sensitive parent key
++                # still redacts the whole container. For dict elements, their
++                # own keys are used internally when cleansing.
++                # Preserve the original container type where possible.
++                # Note: sets/frozensets may contain unhashable items after
++                # cleansing (e.g. dicts), so fall back to a list in that case.
++                cleansed_items = [self.cleanse_setting(key, v) for v in value]
++                if isinstance(value, list):
++                    cleansed = cleansed_items
++                elif isinstance(value, tuple):
++                    cleansed = tuple(cleansed_items)
++                elif isinstance(value, set):
++                    try:
++                        cleansed = set(cleansed_items)
++                    except TypeError:
++                        cleansed = cleansed_items
++                else:  # frozenset
++                    try:
++                        cleansed = frozenset(cleansed_items)
++                    except TypeError:
++                        cleansed = cleansed_items
+             else:
+                 cleansed = value
+         except TypeError:

@@ -1,0 +1,30 @@
+diff --git a/src/_pytest/_io/saferepr.py b/src/_pytest/_io/saferepr.py
+index 23af4d0bb..63c77e4c0 100644
+--- a/src/_pytest/_io/saferepr.py
++++ b/src/_pytest/_io/saferepr.py
+@@ -9,7 +9,11 @@ def _try_repr_or_str(obj):
+     except (KeyboardInterrupt, SystemExit):
+         raise
+     except BaseException:
+-        return '{}("{}")'.format(type(obj).__name__, obj)
++        # Avoid touching the object when repr() fails: do not pass the
++        # instance into format strings (which would call obj.__format__ or
++        # str(obj) and may re-enter user code). Use only the type name and
++        # the object's id which are safe operations.
++        return "{} object at 0x{:x}".format(type(obj).__name__, id(obj))
+ 
+ 
+ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+@@ -19,8 +23,11 @@ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+         raise
+     except BaseException as exc:
+         exc_info = "unpresentable exception ({})".format(_try_repr_or_str(exc))
++    # Avoid any instance attribute access (like obj.__class__) which may
++    # invoke user-defined __getattribute__ and raise. Use type(obj) and id()
++    # which do not perform instance attribute lookups.
+     return "<[{} raised in repr()] {} object at 0x{:x}>".format(
+-        exc_info, obj.__class__.__name__, id(obj)
++        exc_info, type(obj).__name__, id(obj)
+     )
+ 
+ 

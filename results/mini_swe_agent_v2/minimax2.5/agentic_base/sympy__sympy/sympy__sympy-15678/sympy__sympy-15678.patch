@@ -1,0 +1,38 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..3deec5af6f 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -565,17 +565,31 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    from sympy.core.relational import Eq
++    from sympy.core.function import AppliedUndef
++
++    if isinstance(eq, Eq):
++        eq = eq.lhs - eq.rhs
++
+     if is_sequence(y):
+         dep = set(y)
+         y = y[0]
++        # Handle the case where y[0] is an AppliedUndef
++        if isinstance(y, AppliedUndef):
++            dep = {s.func if isinstance(s, AppliedUndef) else s for s in dep}
++            y = y.func
+     elif isinstance(y, Symbol):
+         dep = {y}
++    elif isinstance(y, AppliedUndef):
++        dep = {y.func}
++        y = y.func
+     else:
+         raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
+ 
+     f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+-    dydx = Function(y.name)(x).diff(x)
++        s.name if hasattr(s, 'name') else s.__name__)(x)) for s in eq.free_symbols if s != x and s in dep])
++    y_name = y.name if hasattr(y, 'name') else y.__name__
++    dydx = Function(y_name)(x).diff(x)
+     eq = eq.subs(f)
+     derivs = {}
+     for i in range(n):

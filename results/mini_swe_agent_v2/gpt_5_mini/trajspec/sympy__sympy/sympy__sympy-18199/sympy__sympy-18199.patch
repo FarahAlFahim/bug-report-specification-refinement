@@ -1,0 +1,37 @@
+diff --git a/sympy/ntheory/residue_ntheory.py b/sympy/ntheory/residue_ntheory.py
+index 9a3052d4c3..1f60eeb04e 100644
+--- a/sympy/ntheory/residue_ntheory.py
++++ b/sympy/ntheory/residue_ntheory.py
+@@ -692,6 +692,16 @@ def _nthroot_mod2(s, q, p):
+     v = []
+     for b, e in f.items():
+         v.extend([b]*e)
++    # If s is divisible by p then the trivial root x == 0 (mod p) is a
++    # solution. The helpers _nthroot_mod1/_nthroot_mod2 assume s is a unit
++    # in the multiplicative group; detect and short-circuit to preserve the
++    # invariant that 0 is reported as a root when appropriate.
++    if s % p == 0:
++        # propagate the zero residue through repeated extraction steps.
++        # For non-all_roots usage this will be handled by the public API
++        # which returns 0; here we return 0 to indicate the trivial root.
++        return 0
++
+     for qx in v:
+         s = _nthroot_mod1(s, qx, p, False)
+     return s
+@@ -707,6 +717,15 @@ def _nthroot_mod1(s, q, p, all_roots):
+     .. [1] A. M. Johnston "A Generalized qth Root Algorithm"
+ 
+     """
++    # Reduce s modulo p to detect the zero residue early. The routines
++    # implemented here assume s is a unit (s % p != 0). If s % p == 0
++    # then x == 0 (mod p) is always a solution of x**q == s (mod p) and
++    # we return it (or include it among all_roots).
++    if s % p == 0:
++        if all_roots:
++            return [0]
++        return 0
++
+     g = primitive_root(p)
+     if not isprime(q):
+         r = _nthroot_mod2(s, q, p)

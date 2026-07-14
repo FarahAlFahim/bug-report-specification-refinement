@@ -1,0 +1,89 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..9ed0342618 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -8,6 +8,7 @@ import math
+ import re
+ import types
+ import uuid
++import importlib
+ 
+ from django.conf import SettingsReference
+ from django.db import models
+@@ -90,12 +91,43 @@ class DeconstructableSerializer(BaseSerializer):
+ 
+     @staticmethod
+     def _serialize_path(path):
+-        module, name = path.rsplit(".", 1)
+-        if module == "django.db.models":
++        """Return the code name to use for `path` and the imports required.
++
++        For paths pointing to nested classes (module + qualname), the left-hand
++        portion may include class names which are not importable modules (e.g.
++        'test1.models.Thing'). We therefore find the longest importable module
++        prefix and import that. The returned name is left as the original path
++        (or prefixed with 'models.' for django.db.models).
++        """
++        # Find the longest importable module prefix of the path.
++        parts = path.split('.')
++        module_prefix = None
++        # Try progressively shorter prefixes (from full path to first component)
++        # and pick the longest prefix that can be imported.
++        for i in range(len(parts), 0, -1):
++            prefix = '.'.join(parts[:i])
++            try:
++                importlib.import_module(prefix)
++                module_prefix = prefix
++                break
++            except Exception:
++                continue
++        if module_prefix is None:
++            # Fallback to previous behaviour: split off last name.
++            module_prefix, remainder = path.rsplit('.', 1)
++        else:
++            if module_prefix == path:
++                remainder = ''
++            else:
++                remainder = path[len(module_prefix) + 1:]
++        if module_prefix == 'django.db.models':
+             imports = {"from django.db import models"}
+-            name = "models.%s" % name
++            if remainder:
++                name = 'models.' + remainder
++            else:
++                name = 'models'
+         else:
+-            imports = {"import %s" % module}
++            imports = {"import %s" % module_prefix}
+             name = path
+         return name, imports
+ 
+@@ -267,9 +299,9 @@ class TypeSerializer(BaseSerializer):
+         if hasattr(self.value, "__module__"):
+             module = self.value.__module__
+             if module == builtins.__name__:
+-                return self.value.__name__, set()
++                return self.value.__qualname__, set()
+             else:
+-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
++                return "%s.%s" % (module, self.value.__qualname__), {"import %s" % module}
+ 
+ 
+ class UUIDSerializer(BaseSerializer):
+@@ -325,11 +357,13 @@ def serializer_factory(value):
+         return ModelManagerSerializer(value)
+     if isinstance(value, Operation):
+         return OperationSerializer(value)
+-    if isinstance(value, type):
+-        return TypeSerializer(value)
+-    # Anything that knows how to deconstruct itself.
++    # Anything that knows how to deconstruct itself should be handled before
++    # raw types. This ensures nested classes (which are types) that implement
++    # deconstruct are serialized via their deconstruct() output.
+     if hasattr(value, 'deconstruct'):
+         return DeconstructableSerializer(value)
++    if isinstance(value, type):
++        return TypeSerializer(value)
+     for type_, serializer_cls in Serializer._registry.items():
+         if isinstance(value, type_):
+             return serializer_cls(value)

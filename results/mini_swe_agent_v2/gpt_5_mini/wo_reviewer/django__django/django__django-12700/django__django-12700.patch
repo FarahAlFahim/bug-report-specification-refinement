@@ -1,0 +1,78 @@
+diff --git a/django/views/debug.py b/django/views/debug.py
+index e6b7d4d821..7b373834f9 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -82,24 +82,56 @@ class SafeExceptionReporterFilter:
+ 
+     def cleanse_setting(self, key, value):
+         """
+-        Cleanse an individual setting key/value of sensitive content. If the
+-        value is a dictionary, recursively cleanse the keys in that dictionary.
+-        """
+-        try:
+-            if self.hidden_settings.search(key):
+-                cleansed = self.cleansed_substitute
+-            elif isinstance(value, dict):
+-                cleansed = {k: self.cleanse_setting(k, v) for k, v in value.items()}
+-            else:
+-                cleansed = value
+-        except TypeError:
+-            # If the key isn't regex-able, just return as-is.
+-            cleansed = value
++        Cleanse an individual setting key/value of sensitive content.
+ 
+-        if callable(cleansed):
+-            cleansed = CallableSettingWrapper(cleansed)
+-
+-        return cleansed
++        This delegates to a generic value cleaner which knows how to recurse
++        into dicts and common iterable containers (lists, tuples, sets,
++        frozensets) and will wrap callables found anywhere.
++        """
++        def _cleanse_value(val, key_for_val=None):
++            """Recursively cleanse a value. key_for_val is used only when the
++            value is a mapping value whose key name needs to be checked
++            against hidden_settings. If key_for_val is None, the hidden
++            settings pattern won't be applied at this level (e.g. for list
++            elements).
++            """
++            try:
++                if key_for_val is not None and self.hidden_settings.search(key_for_val):
++                    return self.cleansed_substitute
++                # dicts: recurse into items and use their keys for hidden checks
++                if isinstance(val, dict):
++                    return {k: _cleanse_value(v, k) for k, v in val.items()}
++                # common iterable containers (but not strings/bytes)
++                if isinstance(val, (list, tuple, set, frozenset)):
++                    # Recurse into elements. For elements we don't have a key
++                    # name, so pass key_for_val=None.
++                    cleansed_items = [_cleanse_value(v, None) for v in val]
++                    if isinstance(val, tuple):
++                        return tuple(cleansed_items)
++                    if isinstance(val, list):
++                        return cleansed_items
++                    if isinstance(val, set):
++                        try:
++                            return set(cleansed_items)
++                        except TypeError:
++                            # If elements are unhashable (e.g. dicts), fall back
++                            # to returning a list to avoid raising.
++                            return cleansed_items
++                    if isinstance(val, frozenset):
++                        try:
++                            return frozenset(cleansed_items)
++                        except TypeError:
++                            return tuple(cleansed_items)
++                # Anything else: return as-is, but wrap callables
++                if callable(val):
++                    return CallableSettingWrapper(val)
++                return val
++            except TypeError:
++                # If the key isn't regex-able or some operation fails, just
++                # return the original value.
++                return val
++
++        return _cleanse_value(value, key)
+ 
+     def get_safe_settings(self):
+         """

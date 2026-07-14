@@ -1,0 +1,47 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..7308458b2c 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -508,6 +508,20 @@ class Colorbar:
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
++            # Ensure the new norm is initialized from the mappable's data
++            # if possible.  This mirrors the initialization done in
++            # __init__ so that replacing a mappable.norm with a fresh
++            # Normalize subclass (e.g., LogNorm()) gets appropriate
++            # vmin/vmax set before the colorbar uses it.
++            try:
++                if mappable.get_array() is not None:
++                    mappable.autoscale_None()
++            except Exception:
++                # Be conservative: if autoscaling fails for any reason,
++                # fall back to assigning the norm and let later code
++                # handle uninitialized norms.
++                pass
++
+             self.norm = mappable.norm
+             self._reset_locator_formatter_scale()
+ 
+@@ -1100,7 +1114,20 @@ class Colorbar:
+         if self._extend_upper():
+             b = np.hstack((b, b[-1] + 1))
+ 
+-        # transform from 0-1 to vmin-vmax:
++        # transform from 0-1 to vmin-vmax.  If the norm has not been
++        # initialized yet, try to initialize it from the associated
++        # mappable (if any) before falling back to a 0..1 scale.  This
++        # avoids giving invalid values (e.g., vmin==0) to norms that do
++        # not accept them (such as LogNorm).
++        if not self.norm.scaled():
++            m = getattr(self, 'mappable', None)
++            try:
++                if m is not None and m.get_array() is not None:
++                    m.autoscale_None()
++            except Exception:
++                # Ignore failures and fall back below.
++                pass
++
+         if not self.norm.scaled():
+             self.norm.vmin = 0
+             self.norm.vmax = 1

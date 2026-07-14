@@ -1,0 +1,169 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..1befc5785 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,14 +968,33 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Visit the function part first.
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+         new_kwargs = []
++
++        # Detect special-case: unqualified all()/any() with a single GeneratorExp
++        is_unqualified_all_any = (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], ast.GeneratorExp)
++        )
++
+         for arg in call.args:
+-            res, expl = self.visit(arg)
+-            arg_expls.append(expl)
+-            new_args.append(res)
++            if is_unqualified_all_any and isinstance(arg, ast.GeneratorExp):
++                # For execution, keep the original generator expression AST
++                # (do not visit it, which would assign it and display the generator object).
++                new_args.append(arg)
++                # Use a short description in the call's_repr; detailed diagnostics
++                # will be added to the failure branch.
++                arg_expls.append("generator")
++            else:
++                res, expl = self.visit(arg)
++                arg_expls.append(expl)
++                new_args.append(res)
+         for keyword in call.keywords:
+             res, expl = self.visit(keyword.value)
+             new_kwargs.append(ast.keyword(keyword.arg, res))
+@@ -987,8 +1006,57 @@ warn_explicit(
+         expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
+         new_call = ast.Call(new_func, new_args, new_kwargs)
+         res = self.assign(new_call)
++
++        # Normal display for the result
+         res_expl = self.explanation_param(self.display(res))
++
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++
++        # If we detected all()/any() with a generator expr, add diagnostic-only
++        # instrumentation to the failure branch to capture the decisive element.
++        if is_unqualified_all_any:
++            # Create a temp to hold the found decisive element (None if not found).
++            found_var_name = self.variable()
++            # Initialize found_var to None in the failure branch.
++            init_found = ast.Assign([ast.Name(found_var_name, ast.Store())], _NameConstant(None))
++            self.on_failure.append(init_found)
++
++            # Create a loop variable.
++            loop_var_name = self.variable()
++            loop_target = ast.Name(loop_var_name, ast.Store())
++            loop_iter = call.args[0]  # original GeneratorExp
++
++            # Build the condition:
++            # For all(): if not <item>: found = <item>; break
++            # For any(): if <item>: found = <item>; break
++            load_loop_var = ast.Name(loop_var_name, ast.Load())
++            if call.func.id == "all":
++                cond = ast.UnaryOp(ast.Not(), load_loop_var)
++            else:  # "any"
++                cond = load_loop_var
++
++            assign_found = ast.Assign([ast.Name(found_var_name, ast.Store())], load_loop_var)
++            if_body = [assign_found, ast.Break()]
++            loop_if = ast.If(cond, if_body, [])
++            for_loop = ast.For(loop_target, loop_iter, [loop_if], [])
++
++            # Append the for-loop to on_failure so it runs only on assertion failure.
++            self.on_failure.append(for_loop)
++
++            # Register a formatting placeholder for the found value so it appears
++            # in the final assertion message. The expression will be evaluated
++            # when building the message in the failure branch, after the loop ran.
++            found_disp = self.display(ast.Name(found_var_name, ast.Load()))
++            found_placeholder = self.explanation_param(found_disp)
++
++            # Append the found placeholder to the outer explanation.
++            outer_expl = "%s\n{%s = %s\n}\ndecisive element = %s" % (
++                res_expl,
++                res_expl,
++                expl,
++                found_placeholder,
++            )
++
+         return res, outer_expl
+ 
+     def visit_Starred(self, starred):
+@@ -1006,10 +1074,25 @@ warn_explicit(
+         new_args = []
+         new_kwargs = []
+         new_star = new_kwarg = None
++
++        # Detect special-case: unqualified all()/any() with a single GeneratorExp
++        is_unqualified_all_any = (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], ast.GeneratorExp)
++        )
++
+         for arg in call.args:
+-            res, expl = self.visit(arg)
+-            new_args.append(res)
+-            arg_expls.append(expl)
++            if is_unqualified_all_any and isinstance(arg, ast.GeneratorExp):
++                # Keep the original generator expression for execution.
++                new_args.append(arg)
++                arg_expls.append("generator")
++            else:
++                res, expl = self.visit(arg)
++                new_args.append(res)
++                arg_expls.append(expl)
+         for keyword in call.keywords:
+             res, expl = self.visit(keyword.value)
+             new_kwargs.append(ast.keyword(keyword.arg, res))
+@@ -1025,6 +1108,40 @@ warn_explicit(
+         res = self.assign(new_call)
+         res_expl = self.explanation_param(self.display(res))
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++
++        if is_unqualified_all_any:
++            # Diagnostic-only instrumentation executed on failure.
++            found_var_name = self.variable()
++            init_found = ast.Assign([ast.Name(found_var_name, ast.Store())], _NameConstant(None))
++            self.on_failure.append(init_found)
++
++            loop_var_name = self.variable()
++            loop_target = ast.Name(loop_var_name, ast.Store())
++            loop_iter = call.args[0]  # original GeneratorExp
++
++            load_loop_var = ast.Name(loop_var_name, ast.Load())
++            if call.func.id == "all":
++                cond = ast.UnaryOp(ast.Not(), load_loop_var)
++            else:
++                cond = load_loop_var
++
++            assign_found = ast.Assign([ast.Name(found_var_name, ast.Store())], load_loop_var)
++            if_body = [assign_found, ast.Break()]
++            loop_if = ast.If(cond, if_body, [])
++            for_loop = ast.For(loop_target, loop_iter, [loop_if], [])
++
++            self.on_failure.append(for_loop)
++
++            found_disp = self.display(ast.Name(found_var_name, ast.Load()))
++            found_placeholder = self.explanation_param(found_disp)
++
++            outer_expl = "%s\n{%s = %s\n}\ndecisive element = %s" % (
++                res_expl,
++                res_expl,
++                expl,
++                found_placeholder,
++            )
++
+         return res, outer_expl
+ 
+     # ast.Call signature changed on 3.5,

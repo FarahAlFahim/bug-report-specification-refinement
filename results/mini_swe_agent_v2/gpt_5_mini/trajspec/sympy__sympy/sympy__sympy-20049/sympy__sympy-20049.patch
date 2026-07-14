@@ -1,0 +1,89 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..be5373be8e 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -241,12 +241,21 @@ def acc(self, frame):
+         """
+ 
+         _check_frame(frame)
+-        if not (frame in self._acc_dict):
+-            if self._vel_dict[frame] != 0:
+-                return (self._vel_dict[frame]).dt(frame)
+-            else:
+-                return Vector(0)
+-        return self._acc_dict[frame]
++        if frame in self._acc_dict:
++            return self._acc_dict[frame]
++
++        # If acceleration not explicitly set, try to derive it from the
++        # velocity (either explicit or derivable from positions). If no
++        # velocity can be determined, default to zero acceleration.
++        try:
++            vel = self.vel(frame)
++        except ValueError:
++            return Vector(0)
++
++        if vel != 0:
++            return vel.dt(frame)
++        else:
++            return Vector(0)
+ 
+     def locatenew(self, name, value):
+         """Creates a new point with a position defined from this point.
+@@ -518,10 +527,52 @@ def vel(self, frame):
+         """
+ 
+         _check_frame(frame)
+-        if not (frame in self._vel_dict):
+-            raise ValueError('Velocity of point ' + self.name + ' has not been'
+-                             ' defined in ReferenceFrame ' + frame.name)
+-        return self._vel_dict[frame]
++        if frame in self._vel_dict:
++            return self._vel_dict[frame]
++
++        # Try to derive the velocity from positional relationships. The
++        # relationship used is:
++        #   v_self(frame) = v_other(frame) + pos_from(other).dt(frame)
++        # Search the graph of points connected by positions for a point that
++        # has an explicit velocity in the desired frame. If found, use it.
++        # If no connected point has an explicit velocity, but positional
++        # relationships exist, compute the time-derivative of the positional
++        # vector to obtain a computable velocity (Vector.dt handles frame
++        # rotation terms).
++
++        # Breadth-first search of the position graph to find reachable points
++        # and any that have an explicit velocity in the requested frame.
++        visited = {self}
++        queue = [self]
++        reachable = []
++        while queue:
++            p = queue.pop(0)
++            reachable.append(p)
++            for nbr in p._pos_dict.keys():
++                if nbr not in visited:
++                    visited.add(nbr)
++                    queue.append(nbr)
++
++        # Look for any reachable point that has an explicit velocity in
++        # the requested frame. Prefer closer points due to BFS order.
++        for other in reachable:
++            if other is self:
++                continue
++            if frame in other._vel_dict:
++                # v_self = v_other + pos_from(other).dt(frame)
++                return other._vel_dict[frame] + (self.pos_from(other)).dt(frame)
++
++        # No explicit velocities found. If there are positional relations
++        # at all, use the derivative of the position relative to any
++        # connected point to compute velocity. Use the first reachable
++        # point that is not self.
++        for other in reachable:
++            if other is not self:
++                return (self.pos_from(other)).dt(frame)
++
++        # No velocity defined and no positional relationships to derive one.
++        raise ValueError('Velocity of point ' + self.name + ' has not been'
++                         ' defined in ReferenceFrame ' + frame.name)
+ 
+     def partial_velocity(self, frame, *gen_speeds):
+         """Returns the partial velocities of the linear velocity vector of this

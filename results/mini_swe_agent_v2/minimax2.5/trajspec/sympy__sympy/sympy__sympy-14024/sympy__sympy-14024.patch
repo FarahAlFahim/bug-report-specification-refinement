@@ -1,0 +1,24 @@
+diff --git a/sympy/simplify/powsimp.py b/sympy/simplify/powsimp.py
+index a7fd30e118..bf55318df9 100644
+--- a/sympy/simplify/powsimp.py
++++ b/sympy/simplify/powsimp.py
+@@ -387,7 +387,7 @@ def update(b):
+         # e.g., 2**(2*x) => 4**x
+         for i in range(len(c_powers)):
+             b, e = c_powers[i]
+-            if not (all(x.is_nonnegative for x in b.as_numer_denom()) or e.is_integer or force or b.is_polar):
++            if not (all(x.is_nonnegative for x in b.as_numer_denom()) or e.is_integer is True or force or b.is_polar):
+                 continue
+             exp_c, exp_t = e.as_coeff_Mul(rational=True)
+             if exp_c is not S.One and exp_t is not S.One:
+@@ -429,8 +429,9 @@ def update(b):
+                             bi)  # polar can be treated like non-negative
+                     else:
+                         unk.append(bi)
+-                if len(unk) == 1 and not neg or len(neg) == 1 and not unk:
++                if (len(unk) == 1 and not neg or len(neg) == 1 and not unk) and e.is_integer is not None:
+                     # a single neg or a single unk can join the rest
++                    # but only when exponent is known to be an integer
+                     nonneg.extend(unk + neg)
+                     unk = neg = []
+                 elif neg:

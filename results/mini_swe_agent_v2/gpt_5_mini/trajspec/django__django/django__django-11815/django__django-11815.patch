@@ -1,0 +1,49 @@
+commit 7d4a3cc8bad2e53af4edeb5aa7cd7ab06343c57e
+Author: SWE-bench <setup@swebench.config>
+Date:   Mon Jun 8 22:46:12 2026 +0000
+
+    Serialize Enum and Choices members by module-qualified name to avoid materializing gettext_lazy values in migrations
+
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 27b5cbd379..260ab62b34 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -48,7 +48,18 @@ class BaseSimpleSerializer(BaseSerializer):
+ 
+ class ChoicesSerializer(BaseSerializer):
+     def serialize(self):
+-        return serializer_factory(self.value.value).serialize()
++        """Serialize a django.models.Choices member as a module-qualified
++        attribute reference (module.EnumClass.NAME) rather than by its
++        underlying value. Serializing by value can materialize gettext_lazy
++        Promises (via serializer_factory) and embed translated literals in
++        migration files, which makes migrations fragile when translations
++        change. Using the member name is a stable, import-time-safe
++        representation.
++        """
++        enum_class = self.value.__class__
++        module = enum_class.__module__
++        imports = {f"import {module}"}
++        return "%s.%s.%s" % (module, enum_class.__name__, self.value.name), imports
+ 
+ 
+ class DateTimeSerializer(BaseSerializer):
+@@ -118,11 +129,15 @@ class DictionarySerializer(BaseSerializer):
+ 
+ class EnumSerializer(BaseSerializer):
+     def serialize(self):
++        # Prefer a module-qualified attribute reference (module.EnumClass.NAME)
++        # for enum members. Reconstructing enums from their .value assumes the
++        # .value is a stable key, which is not true for gettext_lazy Promises
++        # or other runtime-dependent objects. Using the member name is a
++        # stable representation that can be imported safely.
+         enum_class = self.value.__class__
+         module = enum_class.__module__
+-        v_string, v_imports = serializer_factory(self.value.value).serialize()
+-        imports = {'import %s' % module, *v_imports}
+-        return "%s.%s(%s)" % (module, enum_class.__name__, v_string), imports
++        imports = {f"import {module}"}
++        return "%s.%s.%s" % (module, enum_class.__name__, self.value.name), imports
+ 
+ 
+ class FloatSerializer(BaseSimpleSerializer):

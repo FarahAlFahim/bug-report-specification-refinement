@@ -1,0 +1,15 @@
+diff --git a/lib/matplotlib/axis.py b/lib/matplotlib/axis.py
+index e93ff96..c912ba2 100644
+--- a/lib/matplotlib/axis.py
++++ b/lib/matplotlib/axis.py
+@@ -1244,6 +1244,10 @@ class Axis(martist.Artist):
+                 if other is not self.axes:
+                     other._axis_map[name]._set_lim(
+                         v0, v1, emit=False, auto=auto)
++                    # Also notify callbacks registered on the sibling Axes so
++                    # observers attached to those Axes are informed of the
++                    # limit change.
++                    other.callbacks.process(f"{name}lim_changed", other)
+                     if other.figure != self.figure:
+                         other.figure.canvas.draw_idle()
+ 

@@ -1,0 +1,22 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 2fd9f63..9be603f 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -394,6 +394,17 @@ class sign(Function):
+         if arg.is_extended_real:
+             return Heaviside(arg, H0=S(1)/2) * 2 - 1
+ 
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        # For non-zero arguments sign(z) = z/Abs(z).  Handle zero explicitly
++        # to avoid creating NaN (0/Abs(0)). If the argument is known non-zero
++        # we can safely return arg/Abs(arg). Otherwise return a Piecewise that
++        # gives the same value as sign for all cases.
++        if arg.is_zero:
++            return S.Zero
++        if fuzzy_not(arg.is_zero):
++            return arg / Abs(arg)
++        return Piecewise((arg / Abs(arg), arg != 0), (S.Zero, True))
++
+     def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 

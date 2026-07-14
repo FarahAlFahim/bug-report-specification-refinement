@@ -1,0 +1,22 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 8526f44b..ebcc6e35 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1283,7 +1283,7 @@ class PairGrid(Grid):
+                 # Filter NA from the list of unique hue names
+                 hue_names = list(filter(pd.notnull, hue_names))
+             self.hue_names = hue_names
+-            self.hue_vals = data[hue]
++            self.hue_vals = data[hue][data[hue].isin(hue_order)]
+ 
+         # Additional dict of kwarg -> list of values for mapping the hue var
+         self.hue_kws = hue_kws if hue_kws is not None else {}
+@@ -2105,7 +2105,7 @@ def pairplot(
+             if isinstance(markers, str):
+                 plot_kws["marker"] = markers
+             elif hue is not None:
+-                plot_kws["style"] = data[hue]
++                plot_kws["style"] = grid.hue_vals
+                 plot_kws["markers"] = markers
+ 
+     # Draw the marginal plots on the diagonal

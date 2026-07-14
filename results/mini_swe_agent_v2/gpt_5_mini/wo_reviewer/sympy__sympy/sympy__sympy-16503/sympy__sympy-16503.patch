@@ -1,0 +1,20 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 7a3de33522..cdaedb3736 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -629,7 +629,14 @@ def adjust(s, wid=None, how='<^>'):
+             # put the present prettyF to the right
+             prettyF = prettyForm(*prettySign.right(prettyF))
+ 
+-        prettyF.baseline = max_upper + sign_height//2
++        # If there were no limits processed (first is still True), we need
++        # to set a baseline for the sum sign. If the baseline was already
++        # adjusted when placing the first term (first set to False), do
++        # not overwrite it -- that computed centering is the intended
++        # visual baseline for the summand and overwriting it causes
++        # misalignment when composing with Add and other operators.
++        if first:
++            prettyF.baseline = max_upper + sign_height//2
+         prettyF.binding = prettyForm.MUL
+         return prettyF
+ 

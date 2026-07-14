@@ -1,0 +1,39 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..f9c687eb6f 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -678,7 +678,11 @@ class Query(BaseExpression):
+         "target", and the model and list of fields being added for that model.
+         """
+         field_names, defer = self.deferred_loading
+-        if not field_names:
++        # Only return early when there are truly no restrictions: i.e. empty
++        # field_names and defer=True (meaning "no deferrals"). If field_names is
++        # empty but defer is False, that represents an explicit immediate-only
++        # empty set (e.g. only(...).defer(...)) and must be handled.
++        if not field_names and defer:
+             return
+         orig_opts = self.get_meta()
+         seen = {}
+@@ -2067,6 +2071,10 @@ class Query(BaseExpression):
+     def clear_deferred_loading(self):
+         """Remove any fields from the deferred loading set."""
+         self.deferred_loading = (frozenset(), True)
++        # Invalidate cached loaded-field names so subsequent callers recompute
++        # based on the updated deferred_loading state.
++        if hasattr(self, '_loaded_field_names_cache'):
++            del self._loaded_field_names_cache
+ 
+     def add_deferred_loading(self, field_names):
+         """
+@@ -2111,6 +2119,10 @@ class Query(BaseExpression):
+         else:
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
++        # Invalidate cached loaded-field names so subsequent callers recompute
++        # based on the updated deferred_loading state.
++        if hasattr(self, '_loaded_field_names_cache'):
++            del self._loaded_field_names_cache
+ 
+     def get_loaded_field_names(self):
+         """

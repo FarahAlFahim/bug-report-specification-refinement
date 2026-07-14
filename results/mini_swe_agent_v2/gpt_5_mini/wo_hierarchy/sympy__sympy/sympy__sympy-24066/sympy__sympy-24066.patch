@@ -1,0 +1,38 @@
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index 3daf84c108..c3bbf81e27 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -190,10 +190,29 @@ def _collect_factor_and_dimension(self, expr):
+                 dim /= idim**count
+             return factor, dim
+         elif isinstance(expr, Function):
+-            fds = [self._collect_factor_and_dimension(
+-                arg) for arg in expr.args]
+-            return (expr.func(*(f[0] for f in fds)),
+-                    *(d[1] for d in fds))
++            # Collect factor and dimension for each argument
++            fds = [self._collect_factor_and_dimension(arg) for arg in expr.args]
++            # The function result factor is the function applied to the
++            # argument factors. The result dimension should reflect the
++            # function semantics: if all argument dimensions are
++            # dimensionless, the function result is dimensionless (S.One),
++            # otherwise the function's named Dimension over the argument
++            # dimensional expressions is used. This mirrors
++            # get_dimensional_expr's behavior.
++            result_factor = expr.func(*(f[0] for f in fds))
++            arg_dims = [d[1] for d in fds]
++            # If all argument dimensions are dimensionless, return
++            # Dimension(1) for the function result; otherwise construct
++            # a Dimension node representing the function applied to the
++            # argument dimensions.
++            if all(self.get_dimension_system().is_dimensionless(d) for d in arg_dims):
++                result_dim = Dimension(1)
++            else:
++                # build a dimensional expression analogous to
++                # get_dimensional_expr: use expr.func applied to the
++                # argument dimensional expressions
++                result_dim = Dimension(expr.func(*arg_dims))
++            return result_factor, result_dim
+         elif isinstance(expr, Dimension):
+             return S.One, expr
+         else:

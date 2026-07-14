@@ -1,0 +1,55 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index d610dc86f0..51e19a5770 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1,4 +1,5 @@
+ import collections.abc
++import enum
+ import copy
+ import datetime
+ import decimal
+@@ -786,12 +787,43 @@ class Field(RegisterLookupMixin):
+ 
+     def pre_save(self, model_instance, add):
+         """Return field's value just before saving."""
+-        return getattr(model_instance, self.attname)
++        # Normalize values (e.g. enum.Enum members) prior to saving and
++        # write the normalized value back onto the instance so that the
++        # in-memory state matches what is stored in the database.
++        value = getattr(model_instance, self.attname)
++        try:
++            prepared_value = self.get_prep_value(value)
++        except Exception:
++            # If preparation raises for some reason, fall back to original
++            # behavior and return the attribute without mutating it.
++            return value
++
++        # If get_prep_value returned a different object, write it back to
++        # the model instance. This ensures enum.Enum members are replaced
++        # with their primitive .value (e.g. TextChoices -> str,
++        # IntegerChoices -> int) in-memory after save/create.
++        if prepared_value is not value:
++            try:
++                setattr(model_instance, self.attname, prepared_value)
++            except Exception:
++                # If attribute is read-only for some reason, ignore and
++                # continue returning the prepared value.
++                pass
++        return prepared_value
+ 
+     def get_prep_value(self, value):
+         """Perform preliminary non-db specific value checks and conversions."""
++        # Coerce lazy translation promises first.
+         if isinstance(value, Promise):
+             value = value._proxy____cast()
++
++        # Normalize enum.Enum instances to their underlying primitive
++        # value so that DB preparation and in-memory state are consistent.
++        # This covers TextChoices (str subclass) and IntegerChoices
++        # (int subclass) as they are enum.Enum instances.
++        if isinstance(value, enum.Enum):
++            return value.value
++
+         return value
+ 
+     def get_db_prep_value(self, value, connection, prepared=False):

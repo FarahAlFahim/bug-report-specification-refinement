@@ -1,0 +1,58 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8635bf4..f2d3935 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -337,6 +337,14 @@ class Query(BaseExpression):
+             del obj.base_table
+         except AttributeError:
+             pass
++        # Ensure we don't copy the cached loaded field names into the clone.
++        # The deferred loading state may be mutated after cloning; leaving a
++        # stale _loaded_field_names_cache in the clone causes incorrect SQL
++        # column selection (see issue with only()/defer() chaining).
++        try:
++            del obj._loaded_field_names_cache
++        except AttributeError:
++            pass
+         return obj
+ 
+     def chain(self, klass=None):
+@@ -2067,6 +2075,12 @@ class Query(BaseExpression):
+     def clear_deferred_loading(self):
+         """Remove any fields from the deferred loading set."""
+         self.deferred_loading = (frozenset(), True)
++        # Invalidate cached mapping of loaded field names, since deferred_loading
++        # has changed.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_deferred_loading(self, field_names):
+         """
+@@ -2087,6 +2101,12 @@ class Query(BaseExpression):
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+             self.deferred_loading = existing.difference(field_names), False
++        # Invalidate cached mapping of loaded field names, since deferred_loading
++        # has been updated.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_immediate_loading(self, field_names):
+         """
+@@ -2111,6 +2131,12 @@ class Query(BaseExpression):
+         else:
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
++        # Invalidate cached mapping of loaded field names, since deferred_loading
++        # has been updated.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def get_loaded_field_names(self):
+         """

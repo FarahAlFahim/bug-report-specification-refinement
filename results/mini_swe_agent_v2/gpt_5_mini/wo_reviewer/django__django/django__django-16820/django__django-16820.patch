@@ -1,0 +1,74 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index b89b6b511b..8843810608 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -4,6 +4,7 @@ from django.db.migrations.state import ModelState
+ from django.db.migrations.utils import field_references, resolve_relation
+ from django.db.models.options import normalize_together
+ from django.utils.functional import cached_property
++from django.db.backends.utils import names_digest
+ 
+ from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
+ 
+@@ -187,6 +188,61 @@ class CreateModel(ModelOperation):
+             isinstance(operation, AlterTogetherOptionOperation)
+             and self.name_lower == operation.name_lower
+         ):
++            # Special-case index_together: convert into named models.Index
++            # entries so that the squashed CreateModel.options does not
++            # retain the deprecated "index_together" key. Follow the
++            # established pattern used by RenameIndex.state_forwards which
++            # adds models.Index(...) with a name and removes the
++            # index_together option.
++            if operation.option_name == AlterIndexTogether.option_name:
++                options = dict(self.options)
++                # Remove any lingering index_together entry
++                options.pop("index_together", None)
++
++                # Ensure we have an indexes list to append to
++                indexes = list(options.get("indexes", []))
++
++                # operation.option_value may be None or a set of tuples
++                if operation.option_value:
++                    for fields in operation.option_value:
++                        # fields is a tuple/list of field names; generate a
++                        # deterministic name similar in shape to
++                        # Index.set_name_with_model without having a real
++                        # model (use app_label and model name as a table
++                        # surrogate and field names as column surrogates).
++                        def _generate_index_name(app_label, model_name, fields):
++                            # table part approximates the DB table name
++                            tablepart = f"{app_label}_{model_name}"[:11]
++                            colpart = str(fields[0])[:7]
++                            hash_data = [tablepart, *map(str, fields), models.Index.suffix]
++                            digest = names_digest(*hash_data, length=6)
++                            name = f"{tablepart}_{colpart}_{digest}_{models.Index.suffix}"
++                            # Ensure name doesn't start with '_' or digit
++                            if name[0] == "_" or name[0].isdigit():
++                                name = f"D{name[1:]}"
++                            # Validate length (should fit given the truncation above)
++                            if len(name) > models.Index.max_name_length:
++                                raise ValueError(
++                                    "Generated index name too long for multiple database support."
++                                )
++                            return name
++
++                        name = _generate_index_name(app_label, self.name_lower, fields)
++                        indexes.append(models.Index(fields=list(fields), name=name))
++
++                if indexes:
++                    options["indexes"] = indexes
++
++                return [
++                    CreateModel(
++                        self.name,
++                        fields=self.fields,
++                        options=options,
++                        bases=self.bases,
++                        managers=self.managers,
++                    ),
++                ]
++            # Fallback for other together options (e.g. unique_together)
+             return [
+                 CreateModel(
+                     self.name,

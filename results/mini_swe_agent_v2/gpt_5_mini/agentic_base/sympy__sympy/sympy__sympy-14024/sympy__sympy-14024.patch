@@ -1,0 +1,22 @@
+diff --git a/sympy/simplify/powsimp.py b/sympy/simplify/powsimp.py
+index a7fd30e118..7fcce20508 100644
+--- a/sympy/simplify/powsimp.py
++++ b/sympy/simplify/powsimp.py
+@@ -203,7 +203,16 @@ def recurse(arg, **kwargs):
+         _n = S.NegativeOne
+         for i, (b, e) in enumerate(be):
+             if ((-b).is_Symbol or b.is_Add) and -b in c_powers:
+-                if (b.is_positive in (0, 1) or e.is_integer):
++                # Only combine a base with its negation when it is
++                # branch-safe to do so. Combining a concrete numeric base
++                # with its negation for non-integer exponents can change
++                # the principal branch of the power (numeric result).
++                #
++                # Allow the combination when the exponent is an integer
++                # (branch-safe) or when the base is not a concrete
++                # Number (i.e. symbolic/additive bases), preserving the
++                # previous behavior for symbolic expressions.
++                if e.is_integer or (not b.is_Number and (b.is_positive in (0, 1))):
+                     c_powers[-b] += c_powers.pop(b)
+                     if _n in c_powers:
+                         c_powers[_n] += e

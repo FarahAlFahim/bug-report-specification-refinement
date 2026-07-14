@@ -1,0 +1,35 @@
+diff --git a/sympy/functions/elementary/integers.py b/sympy/functions/elementary/integers.py
+index fe1e71e3f2..fc3ded4f58 100644
+--- a/sympy/functions/elementary/integers.py
++++ b/sympy/functions/elementary/integers.py
+@@ -20,6 +20,17 @@
+ 
+ class RoundFunction(Function):
+     """The base class for rounding functions."""
++    def _eval_expand_mul(self, **hints):
++        """Prevent multiplication expansion from distributing factors
++        into the argument of rounding functions (floor/ceiling).
++
++        The generic Mul expansion machinery may try to distribute
++        multiplicative factors into function arguments. For
++        non-linear functions like rounding this is unsafe as it
++        changes semantics; by intercepting the ``mul`` expansion
++        hint here we avoid that behavior.
++        """
++        return self
+ 
+     @classmethod
+     def eval(cls, arg):
+@@ -359,6 +370,12 @@ def _eval_is_eq(lhs, rhs): # noqa:F811
+ 
+ class frac(Function):
+     r"""Represents the fractional part of x
++    def _eval_expand_mul(self, **hints):
++        """Prevent multiplication expansion from distributing factors into the
++        argument of frac. The fractional-part function is non-linear and moving
++        multipliers into its argument changes semantics.
++        """
++        return self
+ 
+     For real numbers it is defined [1]_ as
+ 

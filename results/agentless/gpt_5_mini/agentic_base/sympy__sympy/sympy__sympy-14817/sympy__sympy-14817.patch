@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0ddba33..f9132b8 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,9 +825,33 @@ class PrettyPrinter(Printer):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine sign from the term's leading coefficient when possible.
++                # Do not attempt to sympify internal storage (like a MatrixSymbol name).
++                is_negative = False
++                acm = getattr(item, "as_coeff_mmul", None)
++                if acm is not None:
++                    try:
++                        coeff, _ = item.as_coeff_mmul()
++                    except Exception:
++                        coeff = None
++                    if coeff is not None:
++                        # coeff may be a SymPy object with .is_negative, or a Python number.
++                        try:
++                            neg_attr = getattr(coeff, "is_negative", None)
++                            if neg_attr is True:
++                                is_negative = True
++                            elif neg_attr is None:
++                                # Fallback for plain Python numbers
++                                try:
++                                    if coeff < 0:
++                                        is_negative = True
++                                except Exception:
++                                    pass
++                        except Exception:
++                            pass
++
++                if is_negative:
+                     s = prettyForm(*stringPict.next(s, ' '))
+-                    pform = self._print(item)
+                 else:
+                     s = prettyForm(*stringPict.next(s, ' + '))
+                 s = prettyForm(*stringPict.next(s, pform))

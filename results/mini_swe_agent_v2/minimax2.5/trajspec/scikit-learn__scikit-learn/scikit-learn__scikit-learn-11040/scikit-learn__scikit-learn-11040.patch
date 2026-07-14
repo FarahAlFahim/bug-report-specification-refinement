@@ -1,0 +1,33 @@
+diff --git a/sklearn/neighbors/base.py b/sklearn/neighbors/base.py
+index 3e5e729c2..0575a8ecd 100644
+--- a/sklearn/neighbors/base.py
++++ b/sklearn/neighbors/base.py
+@@ -253,6 +253,8 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+                              % self.algorithm)
+ 
+         if self.n_neighbors is not None:
++            # Convert to int if float is passed (e.g., 3. -> 3)
++            self.n_neighbors = int(self.n_neighbors)
+             if self.n_neighbors <= 0:
+                 raise ValueError(
+                     "Expected n_neighbors > 0. Got %d" %
+@@ -328,6 +330,9 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Convert to int if float is passed (e.g., 3. -> 3)
++        n_neighbors = int(n_neighbors)
++
+         if X is not None:
+             query_is_train = False
+             X = check_array(X, accept_sparse='csr')
+@@ -467,6 +472,9 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Convert to int if float is passed (e.g., 3. -> 3)
++        n_neighbors = int(n_neighbors)
++
+         # kneighbors does the None handling.
+         if X is not None:
+             X = check_array(X, accept_sparse='csr')

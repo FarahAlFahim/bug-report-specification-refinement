@@ -1,0 +1,48 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index f42b6a4..53fe642 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -2,7 +2,7 @@
+ Several methods to simplify expressions involving unit objects.
+ """
+ 
+-from sympy import Add, Mul, Pow, Tuple, sympify
++from sympy import Add, Mul, Pow, Tuple, sympify, Float
+ from sympy.core.compatibility import reduce, Iterable, ordered
+ from sympy.physics.units.dimensions import Dimension
+ from sympy.physics.units.prefixes import Prefix
+@@ -31,6 +31,34 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
++
++    # Validate that the returned exponent vector exactly satisfies the
++    # dimensional relation camat * res_exponents == exprmat.  solve_least_squares
++    # can return an approximate (least-squares) solution; we must reject such
++    # approximate solutions and treat the conversion as impossible.
++    diff = camat * res_exponents - exprmat
++
++    # tolerance to use for Float entries
++    tol = 1e-12
++
++    valid = True
++    for entry in diff:
++        # exact zero
++        if entry == 0:
++            continue
++        # floating point small residual: accept if within tolerance
++        if isinstance(entry, Float) or getattr(entry, 'is_Float', False):
++            if abs(float(entry)) <= tol:
++                continue
++            valid = False
++            break
++        # non-numeric/nonzero entry -> not an exact solution
++        valid = False
++        break
++
++    if not valid:
++        return None
++
+     return res_exponents
+ 
+ 

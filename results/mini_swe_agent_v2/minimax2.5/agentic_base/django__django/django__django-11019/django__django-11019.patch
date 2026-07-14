@@ -1,0 +1,61 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..438f5caca8 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -128,6 +128,9 @@ class Media:
+         # Start with a copy of list_1.
+         combined_list = list(list_1)
+         last_insert_index = len(list_1)
++        # Track the position of each item in list_2 for determining whether
++        # to insert at position 0 or append.
++        list_2_positions = {path: i for i, path in enumerate(list_2)}
+         # Walk list_2 in reverse, inserting each element into combined_list if
+         # it doesn't already exist.
+         for path in reversed(list_2):
+@@ -136,14 +139,40 @@ class Media:
+                 index = combined_list.index(path)
+             except ValueError:
+                 # Add path to combined_list since it doesn't exist.
+-                combined_list.insert(last_insert_index, path)
++                # When last_insert_index is 0, inserting at position 0 would
++                # create a false constraint. Only insert at position 0 if the
++                # current item comes before its duplicate in list_2's order.
++                if last_insert_index == 0:
++                    # Check if there's a duplicate in combined_list
++                    duplicate_pos = None
++                    for i, p in enumerate(combined_list):
++                        if p in list_2_positions:
++                            duplicate_pos = list_2_positions[p]
++                            break
++                    current_pos = list_2_positions[path]
++                    # Only insert at position 0 if current item comes before
++                    # its duplicate in list_2's order
++                    if duplicate_pos is not None and current_pos < duplicate_pos:
++                        combined_list.insert(0, path)
++                    else:
++                        combined_list.append(path)
++                else:
++                    combined_list.insert(last_insert_index, path)
+             else:
+                 if index > last_insert_index:
+-                    warnings.warn(
+-                        'Detected duplicate Media files in an opposite order:\n'
+-                        '%s\n%s' % (combined_list[last_insert_index], combined_list[index]),
+-                        MediaOrderConflictWarning,
+-                    )
++                    # Find the first file in list_1 that appears before the
++                    # conflicting file to report the actual conflict.
++                    list_1_index = None
++                    for i in range(index):
++                        if combined_list[i] in list_1:
++                            list_1_index = i
++                            break
++                    if list_1_index is not None:
++                        warnings.warn(
++                            'Detected duplicate Media files in an opposite order:\n'
++                            '%s\n%s' % (combined_list[list_1_index], combined_list[index]),
++                            MediaOrderConflictWarning,
++                        )
+                 # path already exists in the list. Update last_insert_index so
+                 # that the following elements are inserted in front of this one.
+                 last_insert_index = index

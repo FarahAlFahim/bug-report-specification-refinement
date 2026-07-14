@@ -1,0 +1,73 @@
+diff --git a/sklearn/utils/multiclass.py b/sklearn/utils/multiclass.py
+index 5eaef2fde..cda680716 100644
+--- a/sklearn/utils/multiclass.py
++++ b/sklearn/utils/multiclass.py
+@@ -23,7 +23,26 @@ from ..utils._array_api import get_namespace
+ def _unique_multiclass(y):
+     xp, is_array_api = get_namespace(y)
+     if hasattr(y, "__array__") or is_array_api:
+-        return xp.unique_values(xp.asarray(y))
++        # Handle pandas nullable extension dtypes (e.g. Int64, Float64,
++        # boolean) which may materialize as object-dtype arrays of
++        # pandas scalars (including pd.NA) when xp.asarray is used. In
++        # that case, try to use check_array to perform the same early
++        # conversion as other sklearn input validation paths so that
++        # pd.NA is mapped to numpy missing values and a numeric/boolean
++        # numpy dtype is produced. If conversion fails, fall back to
++        # xp.asarray behaviour.
++        try:
++            y_conv = check_array(
++                y,
++                ensure_2d=False,
++                dtype=None,
++                input_name="y",
++                force_all_finite=False,
++            )
++        except Exception:
++            return xp.unique_values(xp.asarray(y))
++        else:
++            return xp.unique_values(xp.asarray(y_conv))
+     else:
+         return set(y)
+ 
+@@ -302,6 +321,11 @@ def type_of_target(y, input_name=""):
+     # https://numpy.org/neps/nep-0034-infer-dtype-is-object.html
+     # We therefore catch both deprecation (NumPy < 1.24) warning and
+     # value error (NumPy >= 1.24).
++    # Keep a reference to the original input so that, if needed, we can
++    # reuse sklearn's check_array conversion logic for pandas extension
++    # dtypes (which maps pd.NA to numpy missing values).
++    original_y = y
++
+     with warnings.catch_warnings():
+         warnings.simplefilter("error", np.VisibleDeprecationWarning)
+         if not issparse(y):
+@@ -340,9 +364,26 @@ def type_of_target(y, input_name=""):
+             return "binary"  # []
+         # 2-D empty array: [[]]
+         return "unknown"
+-    if not issparse(y) and y.dtype == object and not isinstance(y.flat[0], str):
++    if not issparse(y) and y.dtype == object:
+         # [obj_1] and not ["label_1"]
+-        return "unknown"
++        # Pandas nullable extension dtypes (e.g. Int64/Float64/boolean) can
++        # appear here as object-dtype arrays of pandas scalars including
++        # pd.NA. Attempt to convert the original input using
++        # check_array so that pd.NA is mapped to numpy missing values and
++        # we get a proper numpy dtype. If conversion fails, fall back to
++        # the original behaviour and treat as unknown.
++        try:
++            y_conv = check_array(
++                original_y,
++                ensure_2d=False,
++                dtype=None,
++                input_name=input_name,
++                force_all_finite=False,
++            )
++        except Exception:
++            return "unknown"
++        else:
++            y = y_conv
+ 
+     # Check if multioutput
+     if y.ndim == 2 and y.shape[1] > 1:

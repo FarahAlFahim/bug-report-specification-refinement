@@ -1,0 +1,63 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..28a5c481b4 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -17,6 +17,7 @@ from django.conf import settings
+ from django.core.checks import Error, Warning
+ from django.core.checks.urls import check_resolver
+ from django.core.exceptions import ImproperlyConfigured, ViewDoesNotExist
++from django.http import Http404
+ from django.utils.datastructures import MultiValueDict
+ from django.utils.functional import cached_property
+ from django.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
+@@ -258,7 +259,11 @@ class RoutePattern(CheckURLMixin):
+                 converter = self.converters[key]
+                 try:
+                     kwargs[key] = converter.to_python(value)
+-                except ValueError:
++                except (ValueError, Http404):
++                    # Converters may raise Http404 to indicate that the
++                    # parameter should be considered a non-match during URL
++                    # resolution. Treat Http404 like ValueError here and
++                    # indicate no match.
+                     return None
+             return path[match.end():], (), kwargs
+         return None
+@@ -540,7 +545,11 @@ class URLResolver:
+             for pattern in self.url_patterns:
+                 try:
+                     sub_match = pattern.resolve(new_path)
+-                except Resolver404 as e:
++                except (Resolver404, Http404) as e:
++                    # If resolving the sub-pattern raised Http404 (for
++                    # example from a converter), treat it like a
++                    # Resolver404 so that resolution can continue and the
++                    # error information is captured in `tried`.
+                     sub_tried = e.args[0].get('tried')
+                     if sub_tried is not None:
+                         tried.extend([pattern] + t for t in sub_tried)
+diff --git a/django/views/debug.py b/django/views/debug.py
+index cb3e8c7ec1..f18dee656d 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -9,6 +9,7 @@ from django.http import HttpResponse, HttpResponseNotFound
+ from django.template import Context, Engine, TemplateDoesNotExist
+ from django.template.defaultfilters import pprint
+ from django.urls import Resolver404, resolve
++from django.http import Http404
+ from django.utils import timezone
+ from django.utils.datastructures import MultiValueDict
+ from django.utils.encoding import force_str
+@@ -483,7 +484,11 @@ def technical_404_response(request, exception):
+     caller = ''
+     try:
+         resolver_match = resolve(request.path)
+-    except Resolver404:
++    except (Resolver404, Http404):
++        # Resolving the request path may raise Http404 (for example, if a
++        # path converter raises Http404). The technical 404 renderer should
++        # be resilient to that and continue building the debug page rather
++        # than erroring out. Treat Http404 the same as Resolver404 here.
+         pass
+     else:
+         obj = resolver_match.func

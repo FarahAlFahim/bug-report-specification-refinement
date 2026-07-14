@@ -1,0 +1,41 @@
+diff --git a/sklearn/utils/metaestimators.py b/sklearn/utils/metaestimators.py
+index d3aba4f49..3e78a294a 100644
+--- a/sklearn/utils/metaestimators.py
++++ b/sklearn/utils/metaestimators.py
+@@ -73,6 +73,36 @@ class _BaseComposition(BaseEstimator, metaclass=ABCMeta):
+                              '{0!r}'.format(invalid_names))
+ 
+ 
++
++    def __len__(self):
++        """Return the length of the main configured collection.
++
++        Subclasses declare the name of their main configured collection via
++        the class attribute ``_required_parameters``, for example
++        ``_required_parameters = ['steps']`` for Pipeline. ``__len__`` will
++        return ``len(self.<name>)`` for the first entry in
++        ``_required_parameters``.
++
++        If ``_required_parameters`` is not declared on the class or the
++        attribute is missing on the instance, raise ``TypeError`` to match
++        the behaviour of objects that do not implement the sizing protocol.
++        """
++        required = getattr(self, '_required_parameters', None)
++        if not required:
++            raise TypeError("object of type '{0}' has no len()".format(
++                self.__class__.__name__))
++
++        attr = required[0]
++        try:
++            collection = getattr(self, attr)
++        except AttributeError:
++            # If the expected attribute isn't present, advertise that the
++            # object has no length (consistent with Python's semantics).
++            raise TypeError("object of type '{0}' has no len()".format(
++                self.__class__.__name__))
++
++        return len(collection)
++
+ class _IffHasAttrDescriptor:
+     """Implements a conditional property using the descriptor protocol.
+ 

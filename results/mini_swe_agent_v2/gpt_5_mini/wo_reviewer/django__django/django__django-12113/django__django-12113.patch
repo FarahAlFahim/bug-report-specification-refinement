@@ -1,0 +1,27 @@
+diff --git a/django/db/backends/sqlite3/creation.py b/django/db/backends/sqlite3/creation.py
+index d97052f52d..ea5f7725bd 100644
+--- a/django/db/backends/sqlite3/creation.py
++++ b/django/db/backends/sqlite3/creation.py
+@@ -94,8 +94,21 @@ class DatabaseCreation(BaseDatabaseCreation):
+         SQLite since the databases will be distinct despite having the same
+         TEST NAME. See https://www.sqlite.org/inmemorydb.html
+         """
++        # The signature should include both the configured production NAME
++        # and the computed test database name. Using only the production
++        # NAME (settings_dict['NAME']) may cause distinct TEST['NAME'] values
++        # to be treated as identical when --keepdb is used, resulting in
++        # multiple aliases pointing at the same physical SQLite file and
++        # causing "database is locked" errors. See BaseDatabaseCreation
++        # for the expected behaviour which uses _get_test_db_name().
+         test_database_name = self._get_test_db_name()
+-        sig = [self.connection.settings_dict['NAME']]
++        sig = [
++            self.connection.settings_dict['NAME'],
++            test_database_name,
++        ]
++        # Preserve the special-case for in-memory databases: different
++        # aliases should be distinct even if they resolve to the same
++        # in-memory identifier.
+         if self.is_in_memory_db(test_database_name):
+             sig.append(self.connection.alias)
+         return tuple(sig)

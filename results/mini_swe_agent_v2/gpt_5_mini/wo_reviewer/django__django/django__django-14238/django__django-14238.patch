@@ -1,0 +1,25 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 0f53d9c30b..2905c4022e 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -2524,7 +2524,19 @@ class AutoFieldMeta(type):
+         return isinstance(instance, self._subclasses) or super().__instancecheck__(instance)
+ 
+     def __subclasscheck__(self, subclass):
+-        return subclass in self._subclasses or super().__subclasscheck__(subclass)
++        # Consider a class to be an AutoField subclass if it is a
++        # transitive subclass of any of the canonical auto-field base
++        # classes (BigAutoField, SmallAutoField). Using ``in`` here
++        # only performed an identity check, which rejected user-defined
++        # subclasses (e.g. ``class MyBigAutoField(BigAutoField)``).
++        # ``issubclass`` correctly handles transitive subclassing.
++        try:
++            return issubclass(subclass, self._subclasses) or super().__subclasscheck__(subclass)
++        except TypeError:
++            # ``subclass`` may not be a class (mirrors behaviour of
++            # the default implementation), in which case fall back to
++            # the superclass check which will handle it appropriately.
++            return super().__subclasscheck__(subclass)
+ 
+ 
+ class AutoField(AutoFieldMixin, IntegerField, metaclass=AutoFieldMeta):

@@ -1,0 +1,56 @@
+diff --git a/sklearn/cluster/_affinity_propagation.py b/sklearn/cluster/_affinity_propagation.py
+index 0511594..21a39f2 100644
+--- a/sklearn/cluster/_affinity_propagation.py
++++ b/sklearn/cluster/_affinity_propagation.py
+@@ -152,6 +152,7 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+ 
+     ind = np.arange(n_samples)
+ 
++    converged = False
+     for it in range(max_iter):
+         # tmp = A + S; compute responsibilities
+         np.add(A, S, tmp)
+@@ -194,13 +195,29 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+             unconverged = (np.sum((se == convergence_iter) + (se == 0))
+                            != n_samples)
+             if (not unconverged and (K > 0)) or (it == max_iter):
++                converged = True
+                 if verbose:
+                     print("Converged after %d iterations." % it)
+                 break
+     else:
++        # The for loop did not break -> did not converge
+         if verbose:
+             print("Did not converge")
+ 
++    # If the algorithm did not converge, do not return clusters derived from
++    # the last (non-converged) exemplar indicator. Return consistent empty
++    # results and issue a ConvergenceWarning.
++    if not converged:
++        warnings.warn("Affinity propagation did not converge, this model "
++                      "will not have any cluster centers.", ConvergenceWarning)
++        labels = np.full(n_samples, -1, dtype=int)
++        cluster_centers_indices = np.array([], dtype=int)
++        if return_n_iter:
++            return cluster_centers_indices, labels, it + 1
++        else:
++            return cluster_centers_indices, labels
++
++    # At this point the algorithm converged; compute exemplars and labels
+     I = np.flatnonzero(E)
+     K = I.size  # Identify exemplars
+ 
+@@ -220,10 +237,11 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+         cluster_centers_indices = np.unique(labels)
+         labels = np.searchsorted(cluster_centers_indices, labels)
+     else:
++        # This branch is unlikely when converged, but handle gracefully.
+         warnings.warn("Affinity propagation did not converge, this model "
+                       "will not have any cluster centers.", ConvergenceWarning)
+-        labels = np.array([-1] * n_samples)
+-        cluster_centers_indices = []
++        labels = np.full(n_samples, -1, dtype=int)
++        cluster_centers_indices = np.array([], dtype=int)
+ 
+     if return_n_iter:
+         return cluster_centers_indices, labels, it + 1

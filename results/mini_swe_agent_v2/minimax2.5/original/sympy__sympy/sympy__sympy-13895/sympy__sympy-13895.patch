@@ -1,0 +1,47 @@
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index b2832dd264..e2f678f26e 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -1185,6 +1185,27 @@ def as_numer_denom(self):
+         elif dnonpos is None and not int_exp:
+             n = base
+             d = S.One
++        # Also, the numerator and denominator cannot be separated if the
++        # base has a negative sign that would be lost during separation, e.g.
++        # (-(x + 1)/2)**x != (-x - 1)**x/2**x when x is not an integer.
++        # We check if the base is an Add with a negative first term, or a Mul
++        # with a negative factor, which indicates the base has a negative sign.
++        from sympy.core.add import Add
++        from sympy.core.mul import Mul
++        base_has_neg_sign = False
++        if isinstance(base, Add):
++            # Check if the first term is negative
++            if base.args and base.args[0].is_negative:
++                base_has_neg_sign = True
++        elif isinstance(base, Mul):
++            # Check if any factor is negative
++            for arg in base.args:
++                if arg.is_negative:
++                    base_has_neg_sign = True
++                    break
++        if base_has_neg_sign and not int_exp:
++            n = base
++            d = S.One
+         if neg_exp:
+             n, d = d, n
+             exp = -exp
+@@ -1511,7 +1532,13 @@ def as_content_primitive(self, radical=False, clear=True):
+         """
+ 
+         b, e = self.as_base_exp()
+-        b = _keep_coeff(*b.as_content_primitive(radical=radical, clear=clear))
++        # Don't simplify the base if the exponent is not an integer,
++        # because the simplification can change the value of the expression.
++        # For example, (-x/4 - 1/12)**x != ((-3*x - 1)/12)**x for non-integer x.
++        if not e.is_integer:
++            b = _keep_coeff(S.One, b)
++        else:
++            b = _keep_coeff(*b.as_content_primitive(radical=radical, clear=clear))
+         ce, pe = e.as_content_primitive(radical=radical, clear=clear)
+         if b.is_Rational:
+             #e

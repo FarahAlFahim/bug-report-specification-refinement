@@ -1,0 +1,23 @@
+diff --git a/django/template/autoreload.py b/django/template/autoreload.py
+index cf1b20ba95..876af4be26 100644
+--- a/django/template/autoreload.py
++++ b/django/template/autoreload.py
+@@ -48,7 +48,17 @@ def watch_for_template_changes(sender, **kwargs):
+ 
+ @receiver(file_changed, dispatch_uid='template_loaders_file_changed')
+ def template_changed(sender, file_path, **kwargs):
++    # Only treat changes to files that look like templates as template
++    # changes. This prevents non-template files (for example .py files)
++    # that happen to live under a template directory from suppressing the
++    # autoreloader restart.
++    TEMPLATE_SUFFIXES = {'.html', '.htm', '.txt', '.jinja2', '.j2', '.tmpl', '.tpl'}
++    # file_path may be a str or Path; ensure it's a Path for suffix checking.
++    path = Path(file_path)
++    if path.suffix.lower() not in TEMPLATE_SUFFIXES:
++        return
++
+     for template_dir in get_template_directories():
+-        if template_dir in file_path.parents:
++        if template_dir in path.parents:
+             reset_loaders()
+             return True

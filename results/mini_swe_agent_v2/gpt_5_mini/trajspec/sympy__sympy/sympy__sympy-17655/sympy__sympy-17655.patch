@@ -1,0 +1,47 @@
+diff --git a/sympy/geometry/entity.py b/sympy/geometry/entity.py
+index ee5c910268..80356837b1 100644
+--- a/sympy/geometry/entity.py
++++ b/sympy/geometry/entity.py
+@@ -139,7 +139,13 @@ def __repr__(self):
+ 
+     def __rmul__(self, a):
+         """Implementation of reverse multiplication method."""
+-        return a.__mul__(self)
++        # Delegate reversed multiplication to the geometry object's
++        # multiplication implementation. Numeric left-operands (e.g.
++        # Float.__mul__) return a Mul when multiplying a GeometryEntity
++        # which breaks geometry semantics expecting a Point result.
++        # By calling self.__mul__(a) we ensure that Point.__mul__ or the
++        # appropriate geometry class handles scalar*geometry properly.
++        return self.__mul__(a)
+ 
+     def __rsub__(self, a):
+         """Implementation of reverse subtraction method."""
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..ee15c0c5d2 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,6 +213,23 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+ 
+         """
++        # If other is a Mul containing a Point (e.g. 2*Point(...)),
++        # evaluate that multiplication to get a Point so the rest of
++        # the logic can assume `other` is a Point or coordinate seq.
++        from sympy import Mul
++        if isinstance(other, Mul):
++            for a in other.args:
++                if getattr(a, 'is_Point', False):
++                    # other = scalar * Point -> compute Point * scalar
++                    scalar_args = [arg for arg in other.args if arg is not a]
++                    scalar = Mul(*scalar_args) if scalar_args else 1
++                    try:
++                        other = a * scalar
++                    except Exception:
++                        # Fall back to original other if anything goes wrong
++                        other = other
++                    break
++
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:

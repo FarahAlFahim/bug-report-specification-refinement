@@ -1,0 +1,47 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..24f642eddb 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -2086,7 +2086,17 @@ class Query(BaseExpression):
+             self.deferred_loading = existing.union(field_names), True
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+-            self.deferred_loading = existing.difference(field_names), False
++            new_immediate = existing.difference(field_names)
++            # If the resulting immediate set is empty, represent this as the
++            # default (no deferred fields) to avoid ambiguity: an empty set
++            # with defer=False would be ignored by deferred_to_data (which
++            # treats an empty set as "no deferred fields") and thus would
++            # clear previous deferrals unexpectedly. Using (frozenset(), True)
++            # preserves the "no restrictions" semantics.
++            if not new_immediate:
++                self.deferred_loading = (frozenset(), True)
++            else:
++                self.deferred_loading = new_immediate, False
+ 
+     def add_immediate_loading(self, field_names):
+         """
+@@ -2107,10 +2117,21 @@ class Query(BaseExpression):
+         if defer:
+             # Remove any existing deferred names from the current set before
+             # setting the new names.
+-            self.deferred_loading = field_names.difference(existing), False
++            new_immediate = field_names.difference(existing)
++            # If the resulting immediate set is empty, represent this as the
++            # default (no deferred fields) rather than an empty immediate set
++            # (which would be ignored by deferred_to_data). This avoids
++            # inadvertently clearing previously-set deferrals.
++            if not new_immediate:
++                self.deferred_loading = (frozenset(), True)
++            else:
++                self.deferred_loading = frozenset(new_immediate), False
+         else:
+             # Replace any existing "immediate load" field names.
+-            self.deferred_loading = frozenset(field_names), False
++            if not field_names:
++                self.deferred_loading = (frozenset(), True)
++            else:
++                self.deferred_loading = frozenset(field_names), False
+ 
+     def get_loaded_field_names(self):
+         """

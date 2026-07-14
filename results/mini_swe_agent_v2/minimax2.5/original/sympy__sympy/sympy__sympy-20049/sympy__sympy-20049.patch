@@ -1,0 +1,72 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..2261f0e89e 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -242,8 +242,9 @@ def acc(self, frame):
+ 
+         _check_frame(frame)
+         if not (frame in self._acc_dict):
+-            if self._vel_dict[frame] != 0:
+-                return (self._vel_dict[frame]).dt(frame)
++            vel = self.vel(frame)
++            if vel != 0:
++                return vel.dt(frame)
+             else:
+                 return Vector(0)
+         return self._acc_dict[frame]
+@@ -516,11 +517,53 @@ def vel(self, frame):
+         10*N.x
+ 
+         """
++        from sympy.physics.vector.functions import time_derivative
+ 
+         _check_frame(frame)
+         if not (frame in self._vel_dict):
+-            raise ValueError('Velocity of point ' + self.name + ' has not been'
+-                             ' defined in ReferenceFrame ' + frame.name)
++            # Try to compute the velocity from the position
++            # First, find all points in the position tree
++            visited = set()
++            queue = [self]
++            point_with_vel = None
++            while queue:
++                point = queue.pop(0)
++                if point not in visited:
++                    visited.add(point)
++                    # Check if this point has velocity defined in the frame
++                    if frame in point._vel_dict:
++                        point_with_vel = point
++                        break
++                    # Add all connected points to the queue
++                    for other in point._pos_dict.keys():
++                        if other not in visited:
++                            queue.append(other)
++            
++            # Compute the velocity by traversing the path from the point with velocity to self
++            if point_with_vel is not None:
++                path = self._pdict_list(point_with_vel, 0)
++                vel = Vector(0)
++                for i in range(len(path) - 1):
++                    vel += time_derivative(path[i]._pos_dict[path[i + 1]], frame)
++                vel += point_with_vel._vel_dict[frame]
++                return vel
++            else:
++                # No point in the position tree has velocity defined
++                # Compute velocity assuming zero velocity at the reference point
++                # Find a path to any connected point and compute the velocity
++                if len(visited) > 1:
++                    # There are connected points, compute velocity from position
++                    # Start from any connected point (not self) and compute
++                    for other_point in visited:
++                        if other_point != self:
++                            path = self._pdict_list(other_point, 0)
++                            vel = Vector(0)
++                            for i in range(len(path) - 1):
++                                vel += time_derivative(path[i]._pos_dict[path[i + 1]], frame)
++                            return vel
++                # If we couldn't compute the velocity, raise error
++                raise ValueError('Velocity of point ' + self.name + ' has not been'
++                                 ' defined in ReferenceFrame ' + frame.name)
+         return self._vel_dict[frame]
+ 
+     def partial_velocity(self, frame, *gen_speeds):

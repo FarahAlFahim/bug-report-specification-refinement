@@ -1,0 +1,53 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 38da1e6ecc..0066a46af0 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -125,6 +125,48 @@ class EnumSerializer(BaseSerializer):
+     def serialize(self):
+         enum_class = self.value.__class__
+         module = enum_class.__module__
++
++        # For regular Enum members with a name, serialize as Module.Class['NAME']
++        if getattr(self.value, "name", None) is not None:
++            return (
++                "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
++                {"import %s" % module},
++            )
++
++        # Special-case Flag/IntFlag combined values which have no .name.
++        # Decompose into a bitwise-or of named members when possible so the
++        # serialized expression can be evaluated to reconstruct the same
++        # combined value (e.g. Module.Class['A'] | Module.Class['B']).
++        try:
++            is_flag = issubclass(enum_class, enum.Flag)
++        except Exception:
++            is_flag = isinstance(self.value, enum.Flag)
++
++        if is_flag:
++            parts = []
++            for member in enum_class:
++                # Include zero-valued member only when the whole value equals it.
++                if member.value == 0:
++                    if self.value == member:
++                        parts.append(member)
++                else:
++                    # Include non-zero member if all its bits are present.
++                    if (self.value & member) == member:
++                        parts.append(member)
++
++            if parts:
++                parts_strings = [
++                    "%s.%s[%r]" % (module, enum_class.__qualname__, m.name)
++                    for m in parts
++                ]
++                return (" | ".join(parts_strings), {"import %s" % module})
++
++            # If decomposition failed, fall back to constructing from the
++            # integer value which will recreate the Flag at runtime.
++            return ("%s.%s(%r)" % (module, enum_class.__qualname__, int(self.value)), {"import %s" % module})
++
++        # Fallback for other Enums without a name: fall back to the previous
++        # behaviour (which will likely raise elsewhere) but keep the import.
+         return (
+             "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
+             {"import %s" % module},

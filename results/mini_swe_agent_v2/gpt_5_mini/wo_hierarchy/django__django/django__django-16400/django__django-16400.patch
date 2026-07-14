@@ -1,0 +1,75 @@
+diff --git a/django/core/management/sql.py b/django/core/management/sql.py
+index 2375cc23ab..594b413ebb 100644
+--- a/django/core/management/sql.py
++++ b/django/core/management/sql.py
+@@ -1,7 +1,7 @@
+ import sys
+ 
+ from django.apps import apps
+-from django.db import models
++from django.db import models, router
+ 
+ 
+ def sql_flush(style, connection, reset_sequences=True, allow_cascade=False):
+@@ -49,11 +49,20 @@ def emit_post_migrate_signal(verbosity, interactive, db, **kwargs):
+             stdout.write(
+                 "Running post-migrate handlers for application %s" % app_config.label
+             )
+-        models.signals.post_migrate.send(
+-            sender=app_config,
+-            app_config=app_config,
+-            verbosity=verbosity,
+-            interactive=interactive,
+-            using=db,
+-            **kwargs,
+-        )
++        # Force ORM operations that are not explicitly bound to a DB
++        # (i.e. unbound managers/querysets) to use the migrate database
++        # alias while post_migrate handlers run. This prevents database
++        # routers that rely on request-local state from being invoked in
++        # the management process and misrouting operations.
++        router._forced_db = db
++        try:
++            models.signals.post_migrate.send(
++                sender=app_config,
++                app_config=app_config,
++                verbosity=verbosity,
++                interactive=interactive,
++                using=db,
++                **kwargs,
++            )
++        finally:
++            router._forced_db = None
+diff --git a/django/db/utils.py b/django/db/utils.py
+index e45f1db249..2444965d50 100644
+--- a/django/db/utils.py
++++ b/django/db/utils.py
+@@ -200,6 +200,12 @@ class ConnectionRouter:
+         If routers is not specified, default to settings.DATABASE_ROUTERS.
+         """
+         self._routers = routers
++        # An optional override used by management commands (e.g. migrate)
++        # to force DB selection for unbound ORM operations while signal
++        # handlers run. If set to a DB alias, db_for_read/db_for_write
++        # will prefer this alias for lookups that would otherwise consult
++        # routers (i.e. unbound manager/queryset operations).
++        self._forced_db = None
+ 
+     @cached_property
+     def routers(self):
+@@ -216,6 +222,15 @@ class ConnectionRouter:
+ 
+     def _router_func(action):
+         def _route_db(self, model, **hints):
++            # If a management command has requested a forced DB (for
++            # example, migrate --database=alias), prefer that alias for
++            # unbound reads/writes. If an instance is provided via hints
++            # and it has an explicit state.db, prefer that value.
++            instance = hints.get("instance")
++            if self._forced_db is not None:
++                if instance is None or not getattr(instance._state, "db", None):
++                    return self._forced_db
++
+             chosen_db = None
+             for router in self.routers:
+                 try:

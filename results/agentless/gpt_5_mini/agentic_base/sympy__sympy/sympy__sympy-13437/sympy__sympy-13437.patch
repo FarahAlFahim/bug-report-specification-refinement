@@ -1,0 +1,17 @@
+diff --git a/sympy/functions/combinatorial/numbers.py b/sympy/functions/combinatorial/numbers.py
+index 70a655c..2130ae3 100644
+--- a/sympy/functions/combinatorial/numbers.py
++++ b/sympy/functions/combinatorial/numbers.py
+@@ -434,6 +434,12 @@ class bell(Function):
+ 
+     @classmethod
+     def eval(cls, n, k_sym=None, symbols=None):
++        # Handle infinite index: Bell numbers grow without bound.
++        # For the simple bell(n) case return Infinity when n is +oo.
++        if (n is S.Infinity) or (n.is_infinite and n.is_positive):
++            if k_sym is None and symbols is None:
++                return S.Infinity
++
+         if n.is_Integer and n.is_nonnegative:
+             if k_sym is None:
+                 return Integer(cls._bell(int(n)))

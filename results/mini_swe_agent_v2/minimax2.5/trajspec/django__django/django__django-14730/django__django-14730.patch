@@ -1,0 +1,41 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..b26cd7e65e 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1213,6 +1213,7 @@ class ManyToManyField(RelatedField):
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
++            *self._check_symmetrical_self_referential(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
+         ]
+ 
+@@ -1260,6 +1261,28 @@ class ManyToManyField(RelatedField):
+ 
+         return warnings
+ 
++    def _check_symmetrical_self_referential(self, **kwargs):
++        from_model = kwargs.get('from_model')
++        if (
++            self.remote_field.symmetrical and
++            self._related_name and
++            from_model is not None and
++            (
++                self.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT or
++                self.remote_field.model == from_model._meta.object_name
++            )
++        ):
++            return [
++                checks.Error(
++                    "ManyToManyField cannot set a related_name on a "
++                    "symmetrical self-referential relationship.",
++                    obj=self,
++                    id='fields.E341',
++                )
++            ]
++        return []
++
++
+     def _check_relationship_model(self, from_model=None, **kwargs):
+         if hasattr(self.remote_field.through, '_meta'):
+             qualified_model_name = "%s.%s" % (

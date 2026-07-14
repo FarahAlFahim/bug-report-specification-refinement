@@ -1,0 +1,61 @@
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index 1aa0ee01a2..17fd0f8424 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -443,6 +443,27 @@ def _print_Function(self, e):
+             x.appendChild(self._print(arg))
+         return x
+ 
++
++    def _print_IndexedBase(self, expr):
++        """Print an IndexedBase by printing its label (like a Symbol)."""
++        # IndexedBase.label is typically a Symbol; delegate to its printer
++        return self._print(expr.label)
++
++    def _print_Idx(self, expr):
++        """Print an Idx by printing its label (an integer Symbol or Expr)."""
++        return self._print(expr.label)
++
++    def _print_Indexed(self, expr):
++        """Print an Indexed expression as an application of the base to
++        its indices: <apply> base index1 index2 ... </apply>.
++        """
++        x = self.dom.createElement('apply')
++        # Print the base (IndexedBase or array-like) first
++        x.appendChild(self._print(expr.base))
++        # Then print each index
++        for idx in expr.indices:
++            x.appendChild(self._print(idx))
++        return x
+     def _print_Basic(self, e):
+         x = self.dom.createElement(self.mathml_tag(e))
+         for arg in e.args:
+@@ -992,6 +1013,28 @@ def _print_Function(self, e):
+         mrow.appendChild(y)
+         return mrow
+ 
++
++    def _print_IndexedBase(self, expr):
++        """Print an IndexedBase by printing its label (like a Symbol)."""
++        return self._print(expr.label)
++
++    def _print_Idx(self, expr):
++        """Print an Idx by printing its label."""
++        return self._print(expr.label)
++
++    def _print_Indexed(self, expr):
++        """Print an Indexed expression in presentation form as
++        mrow containing the base and a fenced list of indices.
++        e.g. A[i,j] -> <mrow><mi>A</mi><mfenced><mi>i</mi><mi>j</mi></mfenced></mrow>
++        """
++        mrow = self.dom.createElement('mrow')
++        # base (could be a Symbol or other printable)
++        mrow.appendChild(self._print(expr.base))
++        brac = self.dom.createElement('mfenced')
++        for idx in expr.indices:
++            brac.appendChild(self._print(idx))
++        mrow.appendChild(brac)
++        return mrow
+     def _print_polylog(self, expr, exp=None):
+         mrow = self.dom.createElement('mrow')
+         m = self.dom.createElement('msub')

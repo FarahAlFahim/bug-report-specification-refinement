@@ -1,0 +1,22 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..c3c9c1fc2a 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -38,9 +38,15 @@ def doit(p, q):
+ 
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
++            # p == q or p == -q are obvious zero remainders.  If p is a
++            # power of q it is only safe to treat the remainder as zero when
++            # the exponent is a positive integer.  Previously any integer
++            # exponent was treated as making p divisible by q which is
++            # incorrect for non-positive exponents (e.g. q**0 == 1, q**-1
++            # is 1/q).  Also handle the case where p is an integer and q==1.
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
+-                    p.is_integer and q == 1):
++                    (p.is_Pow and p.exp.is_integer and p.exp.is_positive and p.base == q) or
++                    (p.is_integer and q == 1)):
+                 return S.Zero
+ 
+             if q.is_Number:

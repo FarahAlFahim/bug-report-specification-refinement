@@ -1,0 +1,28 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 4648daf395..2508be876a 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1076,11 +1076,20 @@ class Query(BaseExpression):
+             )
+         elif isinstance(value, (list, tuple)):
+             # The items of the iterable may be expressions and therefore need
+-            # to be resolved independently.
+-            return type(value)(
++            # to be resolved independently. Reconstitute the container while
++            # preserving semantics for tuple subclasses (e.g. namedtuple) which
++            # expect positional arguments in their constructor.
++            resolved = [
+                 self.resolve_lookup_value(sub_value, can_reuse, allow_joins)
+                 for sub_value in value
+-            )
++            ]
++            # For tuple subclasses (like namedtuple) reconstruct by
++            # expanding the resolved items as positional arguments. For
++            # builtin tuple/list and other iterable-based constructors,
++            # pass the resolved list as a single iterable argument.
++            if isinstance(value, tuple) and type(value) is not tuple:
++                return type(value)(*resolved)
++            return type(value)(resolved)
+         return value
+ 
+     def solve_lookup_type(self, lookup):

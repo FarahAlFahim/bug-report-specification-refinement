@@ -1,0 +1,35 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..28bcbe25 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -19,10 +19,10 @@ from .cookies import cookiejar_from_dict, get_cookie_header
+ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+-from .packages.urllib3.exceptions import DecodeError
++from .packages.urllib3.exceptions import DecodeError, ProtocolError, ReadTimeoutError, TimeoutError
+ from .exceptions import (
+     HTTPError, RequestException, MissingSchema, InvalidURL,
+-    ChunkedEncodingError, ContentDecodingError)
++    ChunkedEncodingError, ContentDecodingError, ConnectionError, Timeout)
+ from .utils import (
+     guess_filename, get_auth_from_url, requote_uri,
+     stream_decode_response_unicode, to_key_val_list, parse_header_links,
+@@ -640,6 +640,17 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except (ReadTimeoutError, TimeoutError) as e:
++                    # urllib3 signals read timeouts using ReadTimeoutError/TimeoutError
++                    # Map these to requests' Timeout for consistency with send-time
++                    # behavior.
++                    raise Timeout(e, request=self.request)
++                except (ProtocolError, OSError) as e:
++                    # ProtocolError or low-level OSError (socket.error) can bubble up
++                    # from the underlying socket when reading the response body.
++                    # Wrap these in a requests.ConnectionError so callers receive a
++                    # consistent, higher-level exception.
++                    raise ConnectionError(e, request=self.request)
+             except AttributeError:
+                 # Standard file-like object.
+                 while True:

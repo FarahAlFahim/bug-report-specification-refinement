@@ -1,0 +1,37 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index 6151185..cf0affc 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -508,7 +508,31 @@ class Colorbar:
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
+-            self.norm = mappable.norm
++            # Copy the mappable's norm so that modifications performed by the
++            # colorbar (e.g., setting vmin/vmax) do not mutate the mappable's
++            # own norm object. Mutating the mappable's norm can lead to
++            # invalid states (for example setting LogNorm.vmin == 0 would
++            # cause a division-by-zero in LogNorm.inverse).
++            import copy
++            self.norm = copy.copy(mappable.norm)
++
++            # If the copied norm is not yet scaled (vmin/vmax unset), try to
++            # initialize vmin/vmax from the mappable's current clim (if available).
++            # This is important for norms like LogNorm which require positive vmin.
++            try:
++                clim = mappable.get_clim()
++            except Exception:
++                clim = None
++
++            if (not self.norm.scaled()) and (clim is not None):
++                try:
++                    self.norm.vmin, self.norm.vmax = clim
++                except Exception:
++                    # If assignment fails for some norm implementation, fall
++                    # back to leaving the norm as-is; subsequent processing
++                    # will handle making the values nonsingular where possible.
++                    pass
++
+             self._reset_locator_formatter_scale()
+ 
+         self._draw_all()

@@ -1,0 +1,37 @@
+diff --git a/sklearn/utils/_pprint.py b/sklearn/utils/_pprint.py
+index b8686dba5..f46c37d32 100644
+--- a/sklearn/utils/_pprint.py
++++ b/sklearn/utils/_pprint.py
+@@ -95,12 +95,31 @@ def _changed_params(estimator):
+     init_params = signature(init_func).parameters
+     init_params = {name: param.default for name, param in init_params.items()}
+     for k, v in params.items():
+-        if (v != init_params[k] and
++        if (_has_changed(v, init_params[k]) and
+                 not (is_scalar_nan(init_params[k]) and is_scalar_nan(v))):
+             filtered_params[k] = v
+     return filtered_params
+ 
+ 
++def _has_changed(v, init_v):
++    """Check if v has changed from init_v, handling numpy arrays.
++
++    This handles the case where v is a numpy array and init_v is a scalar,
++    or vice versa, where the comparison would return an array instead of
++    a boolean.
++    """
++    try:
++        # This may raise a ValueError when comparing arrays vs scalars
++        diff = (v != init_v)
++        # Check if diff is an array-like object (has 'any' method)
++        if hasattr(diff, 'any'):
++            return diff.any()
++        return diff
++    except ValueError:
++        # Fallback for when comparison returns array
++        return (v != init_v).any()
++
++
+ class _EstimatorPrettyPrinter(pprint.PrettyPrinter):
+     """Pretty Printer class for estimator objects.
+ 

@@ -1,0 +1,25 @@
+diff --git a/sympy/core/add.py b/sympy/core/add.py
+index 2ec4fff073..4914ca052a 100644
+--- a/sympy/core/add.py
++++ b/sympy/core/add.py
+@@ -185,6 +185,20 @@ def flatten(cls, seq):
+             # s is an expression with number factor extracted
+             # let's collect terms with the same s, so e.g.
+             # 2*x**2 + 3*x**2  ->  5*x**2
++
++            # Normalize Pow with Float exponents to ensure consistent hashing
++            # This handles cases where x**2.5 and x**(5/2).evalf() have different
++            # Float representations with different precisions
++            if s.is_Pow:
++                b, e = s.as_base_exp()
++                if e.is_Float:
++                    # Import here to avoid circular import
++                    from .power import Pow
++                    # Normalize the exponent to a common precision using evalf
++                    # This ensures that Float(2.5, 20) and Float(2.5, 53) become
++                    # the same after normalization
++                    s = Pow(b, e.evalf())
++
+             if s in terms:
+                 terms[s] += c
+                 if terms[s] is S.NaN:

@@ -1,0 +1,28 @@
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..e5d8ed74 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -1959,9 +1959,22 @@ class DataArray(AbstractArray, DataWithCoords):
+         variable_dim = idx.names[level_number]
+ 
+         # pull variables out of datarray
++        # NOTE: when the stacked coordinate (``dim``) has a MultiIndex, the
++        # per-variable selections produced by sel(...).squeeze(...) still
++        # retain the stacked coordinate named by ``dim``. Keeping the same
++        # coordinate object on multiple inputs causes Dataset construction to
++        # treat them as conflicting. To avoid this, drop the stacked
++        # coordinate from each per-variable DataArray before constructing the
++        # resulting Dataset.
+         data_dict = {}
+         for k in variables:
+-            data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
++            da = self.sel({variable_dim: k}).squeeze(drop=True)
++            # drop the stacked MultiIndex coordinate if present on the
++            # per-variable DataArray so that Dataset(...) does not see
++            # conflicting coordinate objects across inputs
++            if dim in da.coords:
++                da = da.drop_vars(dim)
++            data_dict[k] = da
+ 
+         # unstacked dataset
+         return Dataset(data_dict)

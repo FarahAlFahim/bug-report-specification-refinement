@@ -1,0 +1,13 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 8ba346adbe..fb02e85c68 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -751,7 +751,7 @@ def _dotrig(a, b):
+ def _trigpats():
+     global _trigpat
+     a, b, c = symbols('a b c', cls=Wild)
+-    d = Wild('d', commutative=False)
++    d = Wild('d')
+ 
+     # for the simplifications like sinh/cosh -> tanh:
+     # DO NOT REORDER THE FIRST 14 since these are assumed to be in this

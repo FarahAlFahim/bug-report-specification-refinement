@@ -1,0 +1,21 @@
+diff --git a/django/views/debug.py b/django/views/debug.py
+index cb3e8c7ec1..684e286924 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -483,8 +483,14 @@ def technical_404_response(request, exception):
+     caller = ''
+     try:
+         resolver_match = resolve(request.path)
+-    except Resolver404:
+-        pass
++    except (Resolver404, Http404):
++        # If resolving the request path raises Http404 (for example,
++        # a path converter's to_python raised Http404), ignore it when
++        # building the technical 404 page. We only care about Resolver404
++        # here; other Http404s are the original exception we're handling.
++        # Allow the technical page to be rendered instead of propagating
++        # the exception and causing a 500.
++        resolver_match = None
+     else:
+         obj = resolver_match.func
+ 

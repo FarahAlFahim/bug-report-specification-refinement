@@ -1,0 +1,54 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..b59001228 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -10,6 +10,7 @@
+ 
+ import sys
+ import typing
++import builtins as _builtins
+ from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, TypeVar, Union
+ 
+ from docutils import nodes
+@@ -96,8 +97,20 @@ def restify(cls: Optional["Type"]) -> str:
+         return '...'
+     elif inspect.isNewType(cls):
+         return ':class:`%s`' % cls.__name__
++    # Historically Sphinx omitted the module prefix for classes whose
++    # __module__ indicated they were builtins ("__builtin__" or
++    # "builtins").  However some types may have __module__ set to
++    # 'builtins' while actually being defined in another module (for
++    # example struct.Struct may report __module__ == 'builtins' on some
++    # Python builds).  Omitting the module in that case produces an
++    # unqualified name (e.g. "Struct") which the python domain cannot
++    # resolve.  To be robust, only drop the module prefix when the
++    # object is truly the one in the builtins module object.
+     elif cls.__module__ in ('__builtin__', 'builtins'):
+-        return ':class:`%s`' % cls.__name__
++        if getattr(_builtins, cls.__name__, None) is cls:
++            return ':class:`%s`' % cls.__name__
++        # fall through and qualify with module name if the object in
++        # builtins under that name is not the same object.
+     else:
+         if sys.version_info >= (3, 7):  # py37+
+             return _restify_py37(cls)
+@@ -300,9 +313,18 @@ def stringify(annotation: Any) -> str:
+         return repr(annotation)
+     elif annotation is NoneType:
+         return 'None'
++    # Similar to restify above, only omit the module prefix for objects
++    # that are genuinely the ones in the builtins module.  Some objects
++    # may report __module__ == 'builtins' while actually being defined
++    # elsewhere; dropping the module in that case yields an
++    # unqualified name that cannot be resolved by the python domain.
+     elif (getattr(annotation, '__module__', None) == 'builtins' and
+           hasattr(annotation, '__qualname__')):
+-        return annotation.__qualname__
++        # Use the object's __name__ to lookup in the builtins module and
++        # ensure identity matches before omitting the module prefix.
++        name = getattr(annotation, '__name__', None)
++        if name and getattr(_builtins, name, None) is annotation:
++            return annotation.__qualname__
+     elif annotation is Ellipsis:
+         return '...'
+ 

@@ -1,0 +1,21 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 84960d77e1..78faa3a8f1 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1050,8 +1050,14 @@ class Subquery(Expression):
+         return sql, sql_params
+ 
+     def get_group_by_cols(self, alias=None):
+-        if alias:
+-            return [Ref(alias, self)]
++        # Historically (see Django 2.2), subqueries used in annotations
++        # were grouped by their SQL expression rather than the output
++        # column alias. Returning a Ref(alias, self) here produces a
++        # GROUP BY on the alias name (for example "status") which can
++        # be ambiguous when a real column with the same name exists in
++        # the query. Use the subquery's external columns (or the
++        # subquery expression itself) for grouping to avoid alias
++        # ambiguity and match previous behavior.
+         external_cols = self.query.get_external_cols()
+         if any(col.possibly_multivalued for col in external_cols):
+             return [self]

@@ -1,0 +1,155 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..951091cb 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -311,16 +311,58 @@ def _dataset_concat(
+     if variables_to_merge:
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++        # Local imports for building placeholders
++        import numpy as np
++        from .variable import Variable
++        try:
++            import dask.array as da
++        except Exception:  # pragma: no cover - dask optional
++            da = None
++
++        # For each variable that should be merged, build a list of per-dataset
++        # Variable objects. If a dataset is missing the variable, synthesize a
++        # placeholder compatible with a reference variable for that name.
++        for var in variables_to_merge:
++            # find a reference variable to determine dims and dtype
++            ref_var = None
++            for ds in datasets:
++                if var in ds.variables:
++                    ref_var = ds.variables[var]
++                    break
++
++            # It should be present in at least one dataset (since variable
++            # names come from coord_names | data_names). If not, skip.
++            if ref_var is None:
++                continue
++
++            for ds in datasets:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # Build placeholder filled with fill_value (or promoted NA)
++                    if fill_value is dtypes.NA:
++                        dtype, filler = dtypes.maybe_promote(ref_var.dtype)
++                    else:
++                        dtype, filler = ref_var.dtype, fill_value
++
++                    # compute shape for placeholder using dims_sizes for each dim
++                    shape = tuple(dims_sizes.get(d, 0) for d in ref_var.dims)
++
++                    # create array (dask-aware)
++                    if da is not None and hasattr(getattr(ref_var, "data", None), "chunks"):
++                        chunks = getattr(ref_var.data, "chunks", None)
++                        # da.full accepts chunks kw
++                        try:
++                            arr = da.full(shape, filler, dtype=dtype, chunks=chunks)
++                        except TypeError:
++                            # older dask versions may not accept chunks kw in full
++                            arr = da.full(shape, filler, dtype=dtype)
++                    else:
++                        arr = np.full(shape, filler, dtype=dtype)
++
++                    # preserve the variable class (IndexVariable subclasses Variable)
++                    placeholder = type(ref_var)(ref_var.dims, arr)
++                    to_merge[var].append(placeholder)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(
+@@ -355,13 +397,75 @@ def _dataset_concat(
+             yield var
+ 
+     # stack up each variable to fill-out the dataset (in order)
+-    # n.b. this loop preserves variable order, needed for groupby.
+-    for k in datasets[0].variables:
++    # Build a deterministic ordered union of variable names: variables from the
++    # first dataset first, then first-seen variables from subsequent datasets.
++    import numpy as _np
++    try:
++        import dask.array as _da
++    except Exception:  # pragma: no cover - dask optional
++        _da = None
++
++    ordered_vars = []
++    seen = set()
++    for ds in datasets:
++        for name in ds.variables:
++            if name not in seen:
++                ordered_vars.append(name)
++                seen.add(name)
++
++    # n.b. this loop preserves variable order (first-seen), needed for groupby.
++    for k in ordered_vars:
+         if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
++            # build list of per-dataset Variable objects, synthesizing placeholders
++            # where necessary
++            vars_list = []
++
++            # find a reference variable to determine dims and dtype
++            ref_var = None
++            for ds in datasets:
++                if k in ds.variables:
++                    ref_var = ds.variables[k]
++                    break
++
++            # If no reference found (shouldn't happen), skip
++            if ref_var is None:
++                continue
++
++            for i, ds in enumerate(datasets):
++                if k in ds.variables:
++                    vars_list.append(ds.variables[k])
++                else:
++                    # compute per-dim shape using dims_sizes, but for the concat
++                    # dimension use the per-dataset concat length
++                    shape = []
++                    for dname in ref_var.dims:
++                        if dname == dim:
++                            slen = concat_dim_lengths[i]
++                        else:
++                            # fall back to dims_sizes; if absent, use 0
++                            slen = dims_sizes.get(dname, 0)
++                        shape.append(slen)
++
++                    # determine dtype and filler
++                    if fill_value is dtypes.NA:
++                        dtype, filler = dtypes.maybe_promote(ref_var.dtype)
++                    else:
++                        dtype, filler = ref_var.dtype, fill_value
++
++                    # create array (dask-aware)
++                    if _da is not None and hasattr(getattr(ref_var, "data", None), "chunks"):
++                        chunks = getattr(ref_var.data, "chunks", None)
++                        try:
++                            arr = _da.full(tuple(shape), filler, dtype=dtype, chunks=chunks)
++                        except TypeError:
++                            arr = _da.full(tuple(shape), filler, dtype=dtype)
++                    else:
++                        arr = _np.full(tuple(shape), filler, dtype=dtype)
++
++                    placeholder = type(ref_var)(ref_var.dims, arr)
++                    vars_list.append(placeholder)
++
++            vars = ensure_common_dims(vars_list)
+             combined = concat_vars(vars, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined

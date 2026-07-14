@@ -1,0 +1,27 @@
+diff --git a/django/template/defaultfilters.py b/django/template/defaultfilters.py
+index 03676533b7..da55498dfa 100644
+--- a/django/template/defaultfilters.py
++++ b/django/template/defaultfilters.py
+@@ -585,9 +585,20 @@ def first(value):
+ def join(value, arg, autoescape=True):
+     """Join a list with a string, like Python's ``str.join(list)``."""
+     try:
++        # Follow the established pattern for autoescaping-aware filters:
++        # choose an escaper based on the autoescape flag and apply it
++        # uniformly to both the list items and the separator. When
++        # autoescaping is disabled, the identity function is used so the
++        # separator is not escaped. This mirrors unordered_list's approach.
+         if autoescape:
+-            value = [conditional_escape(v) for v in value]
+-        data = conditional_escape(arg).join(value)
++            escaper = conditional_escape
++        else:
++            def escaper(x):
++                return x
++
++        if autoescape:
++            value = [escaper(v) for v in value]
++        data = escaper(arg).join(value)
+     except TypeError:  # Fail silently if arg isn't iterable.
+         return value
+     return mark_safe(data)

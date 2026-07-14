@@ -1,0 +1,36 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 7bc96e68eb..07070be3cf 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1038,11 +1038,27 @@ def __new__(cls, num, dps=None, prec=None, precision=None):
+             else:
+                 raise ValueError("unexpected decimal value %s" % str(num))
+         elif isinstance(num, tuple) and len(num) in (3, 4):
+-            if type(num[1]) is str:
+-                # it's a hexadecimal (coming from a pickled object)
+-                # assume that it is in standard form
++            # mpf-tuples coming from pickles (or external libs like mpmath)
++            # may have the mantissa as a bytes object or a Py2-style string
++            # with a trailing long suffix (e.g. '1L'). Be permissive here and
++            # accept any string-like object, decode bytes, strip a trailing
++            # 'L'/'l' and then parse as a hexadecimal integer using the
++            # compatibility.long (which maps to int on Py3).
++            if isinstance(num[1], string_types) or isinstance(num[1], bytes):
++                mant = num[1]
++                # decode bytes to text on Py3
++                if isinstance(mant, bytes):
++                    try:
++                        mant = mant.decode('ascii')
++                    except Exception:
++                        mant = mant.decode('utf-8', 'ignore')
++
++                # strip Py2 long suffix if present
++                if mant and mant[-1] in ('L', 'l'):
++                    mant = mant.rstrip('Ll')
++
+                 num = list(num)
+-                num[1] = long(num[1], 16)
++                num[1] = long(mant, 16)
+                 _mpf_ = tuple(num)
+             else:
+                 if len(num) == 4:

@@ -1,0 +1,41 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..57bc629ac8 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -475,6 +475,18 @@ def trigsimp(expr, **opts):
+ 
+     expr = sympify(expr)
+ 
++    # Ensure exponential representations of trig/hyperbolic functions
++    # are converted to their trig/hyperbolic forms where beneficial.
++    # This allows inputs that are purely exponential (e.g. exp(I*x) combos)
++    # to be recognized and simplified by the rest of the trigsimp logic.
++    try:
++        expr = exptrigsimp(expr)
++    except Exception:
++        # Be conservative: if exptrigsimp fails for any reason, fall back
++        # to the original expression and continue. Do not let a failure
++        # here prevent trigsimp from running.
++        expr = expr
++
+     try:
+         return expr._eval_trigsimp(**opts)
+     except AttributeError:
+@@ -535,8 +547,16 @@ def exp_trig(e):
+         # select the better of e, and e rewritten in terms of exp or trig
+         # functions
+         choices = [e]
+-        if e.has(*_trigs):
++        # Try rewriting to exponential form unconditionally so that
++        # purely-exponential representations (for example combinations
++        # of exp(I*x)) are considered for conversion back to trig forms.
++        # Safety checks later in exptrigsimp prevent introducing I into
++        # originally-real expressions.
++        try:
+             choices.append(e.rewrite(exp))
++        except Exception:
++            # If rewrite to exp fails for some subexpression, ignore it.
++            pass
+         choices.append(e.rewrite(cos))
+         return min(*choices, key=count_ops)
+     newexpr = bottom_up(expr, exp_trig)

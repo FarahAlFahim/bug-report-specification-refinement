@@ -1,0 +1,60 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..642407db 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -19,10 +19,11 @@ from .cookies import cookiejar_from_dict, get_cookie_header
+ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+-from .packages.urllib3.exceptions import DecodeError
++from .packages.urllib3.exceptions import DecodeError, ProtocolError
++import socket
+ from .exceptions import (
+     HTTPError, RequestException, MissingSchema, InvalidURL,
+-    ChunkedEncodingError, ContentDecodingError)
++    ChunkedEncodingError, ContentDecodingError, ConnectionError)
+ from .utils import (
+     guess_filename, get_auth_from_url, requote_uri,
+     stream_decode_response_unicode, to_key_val_list, parse_header_links,
+@@ -640,6 +641,17 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except ProtocolError as e:
++                    # Map urllib3 ProtocolError (which may wrap low-level
++                    # socket errors) to requests' ConnectionError so that
++                    # callers can uniformly catch connection-related issues.
++                    raise ConnectionError(e)
++                except socket.error as e:
++                    # Some socket.errors may bubble up directly from the
++                    # underlying file/socket. Convert these to ConnectionError
++                    # for consistency with errors raised during the connection
++                    # phase.
++                    raise ConnectionError(e)
+             except AttributeError:
+                 # Standard file-like object.
+                 while True:
+diff --git a/requests/packages/urllib3/response.py b/requests/packages/urllib3/response.py
+index 7e0d47fa..0c52a3d8 100644
+--- a/requests/packages/urllib3/response.py
++++ b/requests/packages/urllib3/response.py
+@@ -1,5 +1,6 @@
+ import zlib
+ import io
++import socket
+ from socket import timeout as SocketTimeout
+ 
+ from ._collections import HTTPHeaderDict
+@@ -209,6 +210,12 @@ class HTTPResponse(io.IOBase):
+             except HTTPException as e:
+                 # This includes IncompleteRead.
+                 raise ProtocolError('Connection broken: %r' % e, e)
++            except socket.error as e:
++                # Some low-level socket errors (for example connection reset by peer)
++                # can be raised directly by the underlying socket. Wrap these in a
++                # ProtocolError so callers (urllib3/requests) can handle them
++                # uniformly.
++                raise ProtocolError('Connection broken: %r' % e, e)
+ 
+             self._fp_bytes_read += len(data)
+ 

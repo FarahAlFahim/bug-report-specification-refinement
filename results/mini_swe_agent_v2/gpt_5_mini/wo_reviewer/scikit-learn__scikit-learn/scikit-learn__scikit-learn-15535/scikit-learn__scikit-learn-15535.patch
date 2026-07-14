@@ -1,0 +1,25 @@
+diff --git a/sklearn/metrics/cluster/_supervised.py b/sklearn/metrics/cluster/_supervised.py
+index 4bddae35c..277893f76 100644
+--- a/sklearn/metrics/cluster/_supervised.py
++++ b/sklearn/metrics/cluster/_supervised.py
+@@ -42,11 +42,18 @@ def check_clusterings(labels_true, labels_pred):
+     labels_pred : array-like of shape (n_samples,)
+         The predicted labels.
+     """
++    # Labels for clustering can be arbitrary hashable values (strings,
++    # objects, etc.). They are later mapped to integer indices via
++    # ``np.unique(..., return_inverse=True)`` so requiring a numeric dtype
++    # is unnecessary and causes object-dtype string arrays to be coerced to
++    # float (raising ValueError). Explicitly set dtype=None to preserve
++    # non-numeric dtypes while still benefiting from other validation
++    # performed by check_array (shape, length checks, etc.).
+     labels_true = check_array(
+-        labels_true, ensure_2d=False, ensure_min_samples=0
++        labels_true, ensure_2d=False, ensure_min_samples=0, dtype=None
+     )
+     labels_pred = check_array(
+-        labels_pred, ensure_2d=False, ensure_min_samples=0
++        labels_pred, ensure_2d=False, ensure_min_samples=0, dtype=None
+     )
+ 
+     # input checks

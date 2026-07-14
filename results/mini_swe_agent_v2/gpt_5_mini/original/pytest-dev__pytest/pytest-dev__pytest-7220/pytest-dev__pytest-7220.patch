@@ -1,0 +1,29 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index 7b17d7612..1730e2591 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -790,10 +790,21 @@ class FormattedExcinfo:
+ 
+     def _makepath(self, path):
+         if not self.abspath:
++            # Try to make the path relative to the original pytest invocation
++            # directory (invocation_dir) so that reporting remains stable even
++            # if the test changes the current working directory during
++            # fixtures. Fall back to the current working directory behavior
++            # if no config is available or an error occurs.
+             try:
+-                np = py.path.local().bestrelpath(path)
+-            except OSError:
+-                return path
++                from _pytest.config import get_config
++
++                cfg = get_config()
++                np = cfg.invocation_dir.bestrelpath(path)
++            except Exception:
++                try:
++                    np = py.path.local().bestrelpath(path)
++                except OSError:
++                    return path
+             if len(np) < len(str(path)):
+                 path = np
+         return path

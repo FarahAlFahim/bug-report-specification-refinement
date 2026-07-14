@@ -1,0 +1,32 @@
+diff --git a/requests/models.py b/requests/models.py
+index d8456375..c7149299 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -463,6 +463,27 @@ class Request(object):
+     def register_hook(self, event, hook):
+         """Properly register a hook."""
+ 
++        # If a single callable is provided, append it. If an iterable of
++        # callables is provided (e.g. a list or tuple), register each
++        # callable individually so that the internal per-event hook list is
++        # always a flat list of callables. Avoid treating strings/bytes as
++        # iterables of callables.
++        if hasattr(hook, '__call__'):
++            self.hooks[event].append(hook)
++            return
++
++        # Treat non-string iterables as collections of hooks.
++        if hasattr(hook, '__iter__') and not isinstance(hook, (str, bytes)):
++            for h in hook:
++                # Only register callables; ignore None or non-callables to
++                # match the expectations of dispatch_hook which will call
++                # each registered hook.
++                if hasattr(h, '__call__'):
++                    self.hooks[event].append(h)
++            return
++
++        # Fallback: append whatever was provided. This mirrors the previous
++        # permissive behavior for odd inputs.
+         self.hooks[event].append(hook)
+ 
+     def deregister_hook(self, event, hook):

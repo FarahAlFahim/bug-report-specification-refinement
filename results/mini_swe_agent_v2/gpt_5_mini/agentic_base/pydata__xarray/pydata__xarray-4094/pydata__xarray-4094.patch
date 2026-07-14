@@ -1,0 +1,27 @@
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..e9c8205f 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -1959,9 +1959,21 @@ class DataArray(AbstractArray, DataWithCoords):
+         variable_dim = idx.names[level_number]
+ 
+         # pull variables out of datarray
++        # When squeezing out the stacked dimension, a leftover 0-d (scalar)
++        # coordinate whose name equals the stacked-dimension can remain on
++        # the result. Treat such coordinates as non-index coordinates and
++        # drop them to avoid spurious conflicts when constructing the
++        # resulting Dataset (see GH: to_unstacked_dataset MergeError).
+         data_dict = {}
+         for k in variables:
+-            data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
++            da = self.sel({variable_dim: k}).squeeze(drop=True)
++            # If the squeezed DataArray has a coordinate named like the
++            # stacked dimension but that coordinate is not a dimension of
++            # the DataArray, it is a leftover 0-d coordinate and should be
++            # removed before building the Dataset.
++            if variable_dim in da.coords and variable_dim not in da.dims:
++                da = da.drop_vars(variable_dim)
++            data_dict[k] = da
+ 
+         # unstacked dataset
+         return Dataset(data_dict)

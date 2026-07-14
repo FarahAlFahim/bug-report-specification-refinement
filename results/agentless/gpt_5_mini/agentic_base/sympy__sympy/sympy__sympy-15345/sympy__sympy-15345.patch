@@ -1,0 +1,21 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 7ecda40..880687c 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -101,6 +101,16 @@ class MCodePrinter(CodePrinter):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_LatticeOp(self, expr):
++        """Print lattice operations (e.g. Max/Min) using Mathematica-style
++        square brackets and preserve SymPy's argument ordering.
++
++        StrPrinter._print_LatticeOp prints lattice ops as Name(args) with
++        parentheses and may reorder arguments. Mathematica syntax uses
++        square brackets Name[arg1, arg2], so override that here.
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

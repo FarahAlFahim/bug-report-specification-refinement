@@ -1,0 +1,40 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..5d970ef64b 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -398,8 +398,33 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
+-    else:
+-        return display_for_value(value, empty_value_display)
++
++    # Special-case JSON-like fields: use the model field's formfield.prepare_value()
++    # so JSON is displayed correctly (honoring encoders/decoders and InvalidJSONInput).
++    try:
++        formfield_callable = getattr(field, 'formfield', None)
++        if callable(formfield_callable):
++            form_field = formfield_callable()
++            # Try to detect Django's forms.JSONField first.
++            try:
++                from django import forms as django_forms
++                json_field_cls = getattr(django_forms, 'JSONField', None)
++            except Exception:
++                json_field_cls = None
++            if json_field_cls is not None and isinstance(form_field, json_field_cls):
++                prepared = form_field.prepare_value(value)
++                return display_for_value(prepared, empty_value_display)
++            # Fallback detection for JSON-like form fields (e.g., contrib/postgres
++            # implementations that may not expose the same class).
++            if form_field.__class__.__name__ == 'JSONField' and hasattr(form_field, 'prepare_value'):
++                prepared = form_field.prepare_value(value)
++                return display_for_value(prepared, empty_value_display)
++    except Exception:
++        # Be conservative: if something goes wrong detecting/preparing JSON, fall
++        # back to the default display behavior below.
++        pass
++
++    return display_for_value(value, empty_value_display)
+ 
+ 
+ def display_for_value(value, empty_value_display, boolean=False):

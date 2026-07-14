@@ -1,0 +1,39 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 38da1e6ecc..f45934cf98 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -125,6 +125,34 @@ class EnumSerializer(BaseSerializer):
+     def serialize(self):
+         enum_class = self.value.__class__
+         module = enum_class.__module__
++
++        # Check if this is a Flag (or IntFlag) type
++        if issubclass(enum_class, enum.Flag):
++            # Handle combined flags (e.g., re.UNICODE | re.IGNORECASE)
++            # Decompose the value into individual flags
++            members = []
++            value = self.value
++            # Get the integer value for Flag types
++            if hasattr(value, "value"):
++                value = value.value
++            if enum_class._flag_mask_:
++                value = value & enum_class._flag_mask_
++
++            # Iterate over the bits to find individual flags
++            for val in enum._iter_bits_lsb(value):
++                member = enum_class._value2member_map_.get(val)
++                if member is not None:
++                    members.append(member)
++
++            # If we have multiple members, create an OR expression
++            if len(members) > 1:
++                # Create the OR expression
++                members_str = " | ".join(
++                    "%s.%s" % (module, member.name) for member in members
++                )
++                return members_str, {"import %s" % module}
++
++        # Default behavior for single enum values
+         return (
+             "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
+             {"import %s" % module},

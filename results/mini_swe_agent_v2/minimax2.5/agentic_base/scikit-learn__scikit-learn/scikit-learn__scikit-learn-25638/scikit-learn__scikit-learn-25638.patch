@@ -1,0 +1,42 @@
+diff --git a/sklearn/utils/multiclass.py b/sklearn/utils/multiclass.py
+index 5eaef2fde..f1fd1b939 100644
+--- a/sklearn/utils/multiclass.py
++++ b/sklearn/utils/multiclass.py
+@@ -302,6 +302,17 @@ def type_of_target(y, input_name=""):
+     # https://numpy.org/neps/nep-0034-infer-dtype-is-object.html
+     # We therefore catch both deprecation (NumPy < 1.24) warning and
+     # value error (NumPy >= 1.24).
++    # Save the original dtype for pandas nullable dtypes before conversion
++    # This is needed to correctly identify the type for extension arrays
++    # which get converted to object dtype by xp.asarray
++    _orig_dtype = None
++    try:
++        from pandas.api.types import is_extension_array_dtype
++        if hasattr(y, "dtype") and is_extension_array_dtype(y.dtype):
++            _orig_dtype = y.dtype
++    except ImportError:
++        pass
++
+     with warnings.catch_warnings():
+         warnings.simplefilter("error", np.VisibleDeprecationWarning)
+         if not issparse(y):
+@@ -340,9 +351,17 @@ def type_of_target(y, input_name=""):
+             return "binary"  # []
+         # 2-D empty array: [[]]
+         return "unknown"
++    # Check for object dtype and return "unknown" unless it's from a nullable dtype
++    # Pandas nullable dtypes (Int64, Float64, boolean) are converted to object dtype
++    # by xp.asarray but should not be treated as unknown
+     if not issparse(y) and y.dtype == object and not isinstance(y.flat[0], str):
+-        # [obj_1] and not ["label_1"]
+-        return "unknown"
++        # Check if this is a nullable dtype that was converted to object
++        if _orig_dtype is not None:
++            # It was a pandas extension array, don't return "unknown"
++            pass
++        else:
++            # [obj_1] and not ["label_1"]
++            return "unknown"
+ 
+     # Check if multioutput
+     if y.ndim == 2 and y.shape[1] > 1:

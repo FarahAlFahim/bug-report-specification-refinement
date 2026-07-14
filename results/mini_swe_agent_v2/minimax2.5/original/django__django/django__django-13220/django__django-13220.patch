@@ -1,0 +1,35 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..7c17794b51 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,30 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def __eq__(self, other):
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++        if hasattr(self, 'error_dict'):
++            if not hasattr(other, 'error_dict'):
++                return False
++            if set(self.error_dict.keys()) != set(other.error_dict.keys()):
++                return False
++            for field in self.error_dict:
++                self_errors = set((e.message, e.code, tuple(e.params) if e.params else None) for e in self.error_dict[field])
++                other_errors = set((e.message, e.code, tuple(e.params) if e.params else None) for e in other.error_dict[field])
++                if self_errors != other_errors:
++                    return False
++            return True
++        else:
++            if hasattr(other, 'error_dict'):
++                return False
++            self_errors = set((e.message, e.code, tuple(e.params) if e.params else None) for e in self.error_list)
++            other_errors = set((e.message, e.code, tuple(e.params) if e.params else None) for e in other.error_list)
++            return self_errors == other_errors
++
++    def __hash__(self):
++        raise TypeError("ValidationError instances are not hashable")
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

@@ -1,0 +1,46 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index 11409e6f6..a75c3175a 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -328,6 +328,26 @@ class GoogleDocstring:
+         else:
+             return name
+ 
++    def _unescape_args_and_kwargs(self, name: str) -> str:
++        """Reverse the escaping applied by _escape_args_and_kwargs.
++
++        This is used when emitting literal directive names (e.g. ``.. attribute::``)
++        which expect the real identifier characters rather than backslash-escaped
++        forms that are appropriate in field role contexts (``:ivar:``, etc.).
++        """
++        # Trailing underscore escaped as '\\_'
++        if name.endswith(r'\_'):
++            name = name[:-2] + '_'
++
++        # Leading '**' escaped as '\\*\\''
++        if name.startswith(r'\*\*'):
++            name = '**' + name[4:]
++        # Leading '*' escaped as '\\*'
++        elif name.startswith(r'\*'):
++            name = '*' + name[2:]
++
++        return name
++
+     def _fix_field_desc(self, desc: List[str]) -> List[str]:
+         if self._is_list(desc):
+             desc = [''] + desc
+@@ -585,7 +605,13 @@ class GoogleDocstring:
+                 if _type:
+                     lines.append(':vartype %s: %s' % (_name, _type))
+             else:
+-                lines.append('.. attribute:: ' + _name)
++                # The parser stores field names with escapes suitable for
++                # docutils field roles (e.g. ':ivar:`arg\_`').  When emitting
++                # a literal attribute directive the real identifier should be
++                # used (without the backslash escapes).  Undo the escaping
++                # for that purpose.
++                _literal_name = self._unescape_args_and_kwargs(_name)
++                lines.append('.. attribute:: ' + _literal_name)
+                 if self._opt and 'noindex' in self._opt:
+                     lines.append('   :noindex:')
+                 if _type:

@@ -1,0 +1,22 @@
+diff --git a/django/contrib/auth/forms.py b/django/contrib/auth/forms.py
+index 20d8922799..dd083ff426 100644
+--- a/django/contrib/auth/forms.py
++++ b/django/contrib/auth/forms.py
+@@ -34,6 +34,17 @@ class ReadOnlyPasswordHashWidget(forms.Widget):
+     template_name = 'auth/widgets/read_only_password_hash.html'
+     read_only = True
+ 
++    def id_for_label(self, id_):
++        """
++        This widget doesn't render a labelable form control (input/select/textarea),
++        so return None to indicate there is no id for a <label> to point to.
++        BoundField.label_tag calls widget.id_for_label(id_) and only emits a
++        for="..." attribute when a truthy value is returned. Returning None
++        prevents creating an invalid label that references a non-labelable
++        element (the widget renders a <div>).
++        """
++        return None
++
+     def get_context(self, name, value, attrs):
+         context = super().get_context(name, value, attrs)
+         summary = []

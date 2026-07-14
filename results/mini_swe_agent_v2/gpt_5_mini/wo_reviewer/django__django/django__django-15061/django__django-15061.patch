@@ -1,0 +1,38 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..458e92fada 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -849,9 +849,30 @@ class MultiWidget(Widget):
+         return context
+ 
+     def id_for_label(self, id_):
+-        if id_:
+-            id_ += '_0'
+-        return id_
++        """
++        Return an id appropriate for labeling this MultiWidget.
++
++        Rather than unconditionally appending "_0" to the base id (which
++        forces the label to target the first subwidget regardless of the
++        subwidget's own semantics), delegate to the first subwidget's
++        id_for_label implementation. Some widgets (for example choice
++        widgets) accept an additional "index" argument; try to call with an
++        index of 0 and fall back to the single-argument form if necessary.
++        """
++        if not id_:
++            return id_
++        if not self.widgets:
++            return id_
++
++        first = self.widgets[0]
++        # Prefer to ask the subwidget how it wants the id for its own label.
++        # Some widget.id_for_label implementations accept an index argument
++        # (e.g. ChoiceWidget.id_for_label(self, id_, index='0')). Try the
++        # two-argument form first and fall back to the one-argument form.
++        try:
++            return first.id_for_label(id_, 0)
++        except TypeError:
++            return first.id_for_label(id_)
+ 
+     def value_from_datadict(self, data, files, name):
+         return [

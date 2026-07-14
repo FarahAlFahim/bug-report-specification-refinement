@@ -1,0 +1,43 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f2..6b9ccceef0 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -85,6 +85,16 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self.verbose = verbose
+         self.verbose_interval = verbose_interval
+ 
++    @property
++    def n_clusters(self):
++        """Alias for n_components for clusterer compatibility."""
++        return self.n_components
++
++    @n_clusters.setter
++    def n_clusters(self, value):
++        # Keep n_components as the canonical attribute; n_clusters is an alias.
++        self.n_components = value
++
+     def _check_initial_parameters(self, X):
+         """Check values of the basic parameters.
+ 
+@@ -240,8 +250,21 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # Store hard labels for the training data to provide a clusterer-like
++        # API consistent with sklearn.cluster estimators.
++        # This will make self.labels_ available after fit.
++        self.labels_ = self.predict(X)
++
+         return self
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the model and return labels for X (clusterer-compatible).
++
++        This mirrors the clusterer API (e.g., KMeans.fit_predict).
++        """
++        self.fit(X, y)
++        return self.labels_
++
+     def _e_step(self, X):
+         """E step.
+ 

@@ -1,0 +1,37 @@
+diff --git a/requests/sessions.py b/requests/sessions.py
+index 425db22c..7568f7a8 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -88,7 +88,10 @@ class SessionRedirectMixin(object):
+         i = 0
+ 
+         while resp.is_redirect:
+-            prepared_request = req.copy()
++            # Base the next request on the request that produced this response
++            # (resp.request) when available; otherwise fall back to the original.
++            base_request = getattr(resp, 'request', None) or req
++            prepared_request = base_request.copy()
+ 
+             resp.content  # Consume socket so it can be released
+ 
+@@ -99,7 +102,7 @@ class SessionRedirectMixin(object):
+             resp.close()
+ 
+             url = resp.headers['location']
+-            method = req.method
++            method = base_request.method
+ 
+             # Handle redirection without scheme (see: RFC 1808 Section 4)
+             if url.startswith('//'):
+@@ -156,8 +159,9 @@ class SessionRedirectMixin(object):
+ 
+             if 'Authorization' in headers:
+                 # If we get redirected to a new host, we should strip out any
+-                # authentication headers.
+-                original_parsed = urlparse(resp.request.url)
++                # authentication headers. Use the request that produced the
++                # response when available; otherwise fall back to base_request.
++                original_parsed = urlparse(getattr(resp, 'request', base_request).url)
+                 redirect_parsed = urlparse(url)
+ 
+                 if (original_parsed.hostname != redirect_parsed.hostname):

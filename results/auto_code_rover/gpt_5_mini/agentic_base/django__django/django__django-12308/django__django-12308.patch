@@ -1,0 +1,25 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..83d3c7bcbb 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -398,6 +398,20 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    elif isinstance(field, models.JSONField):
++        # Use the model field's form field to obtain the textual representation
++        # (the form field's prepare_value returns JSON text or leaves
++        # InvalidJSONInput unchanged). If prepare_value returns None, show the
++        # empty_value_display.
++        form_field = field.formfield()
++        try:
++            prepared = form_field.prepare_value(value)
++        except Exception:
++            # On unexpected errors, fall back to the generic display.
++            return display_for_value(value, empty_value_display)
++        if prepared is None:
++            return empty_value_display
++        return prepared
+     else:
+         return display_for_value(value, empty_value_display)
+ 

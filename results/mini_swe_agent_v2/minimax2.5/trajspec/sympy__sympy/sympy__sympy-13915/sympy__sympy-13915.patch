@@ -1,0 +1,15 @@
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 4f01eeedbd..a04ad6f907 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -423,6 +423,10 @@ def _gather(c_powers):
+             changed = False
+             for b, e in c_powers:
+                 if e.is_zero:
++                    # If the base contains ComplexInfinity and the exponent is zero,
++                    # the result should be NaN (e.g., zoo/zoo = NaN)
++                    if b.has(S.ComplexInfinity):
++                        return [S.NaN], [], None
+                     continue
+                 if e is S.One:
+                     if b.is_Number:

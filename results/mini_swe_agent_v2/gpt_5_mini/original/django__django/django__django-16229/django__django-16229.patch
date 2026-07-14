@@ -1,0 +1,35 @@
+--- /tmp/orig_boundfield.py	2026-05-26 03:43:33.056440010 +0000
++++ django/forms/boundfield.py	2026-05-26 03:43:11.781440000 +0000
+@@ -98,7 +98,7 @@
+             )
+         return widget.render(
+             name=self.html_initial_name if only_initial else self.html_name,
+-            value=self.value(),
++            value=self.value(only_initial=only_initial),
+             attrs=attrs,
+             renderer=self.form.renderer,
+         )
+@@ -126,13 +126,19 @@
+         """
+         return self.form._widget_data_value(self.field.widget, self.html_name)
+ 
+-    def value(self):
++    def value(self, only_initial=False):
+         """
+-        Return the value for this BoundField, using the initial value if
+-        the form is not bound or the data otherwise.
++        Return the value for this BoundField.
++
++        By default, for bound forms the submitted data is used. If
++        only_initial is True, the initial value is returned even for bound
++        forms. This is necessary when rendering the "initial-" hidden
++        inputs for fields with callable defaults so that the hidden input
++        always contains the original initial value rather than the
++        user-submitted data.
+         """
+         data = self.initial
+-        if self.form.is_bound:
++        if self.form.is_bound and not only_initial:
+             data = self.field.bound_data(self.data, data)
+         return self.field.prepare_value(data)
+ 

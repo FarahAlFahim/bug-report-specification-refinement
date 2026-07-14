@@ -1,0 +1,27 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..100f7a15c 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -21,13 +21,20 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+     default = {}  # type: Dict[str, object]
+     evalcache = config._store.setdefault(evalcache_key, default)
++    # Use a cache key that includes the expression text and a stable
++    # discriminator for the module-global context that influences
++    # evaluation (module filename and module name). This prevents
++    # reusing a result evaluated in a different module where globals
++    # such as ``skip``/``xfail`` variables may differ.
++    key = (expr, d.get("__file__"), d.get("__name__"))
+     try:
+-        return evalcache[expr]
++        return evalcache[key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        x = eval(exprcode, d)
++        evalcache[key] = x
+         return x
+ 
+ 

@@ -1,0 +1,62 @@
+diff --git a/pylint/__init__.py b/pylint/__init__.py
+index 3aa4b7f9d..c9f3c5b0c 100644
+--- a/pylint/__init__.py
++++ b/pylint/__init__.py
+@@ -25,6 +25,15 @@ def run_pylint(argv: Sequence[str] | None = None) -> None:
+         PylintRun(argv or sys.argv[1:])
+     except KeyboardInterrupt:
+         sys.exit(1)
++    except Exception as exc:  # pragma: no cover - defensive top-level handling
++        # Avoid importing pylint.config.exceptions here because importing
++        # pylint.config pulls additional optional dependencies. Instead
++        # detect the config-layer sentinel by exception class name and
++        # exit with the conventional usage error code. Re-raise other
++        # unexpected exceptions so programmatic callers can observe them.
++        if exc.__class__.__name__ == "_UnrecognizedOptionError":
++            sys.exit(32)
++        raise
+ 
+ 
+ def run_epylint(argv: Sequence[str] | None = None) -> NoReturn:
+@@ -34,7 +43,12 @@ def run_epylint(argv: Sequence[str] | None = None) -> NoReturn:
+     """
+     from pylint.epylint import Run as EpylintRun
+ 
+-    EpylintRun(argv)
++    try:
++        EpylintRun(argv)
++    except Exception as exc:  # pragma: no cover - defensive top-level handling
++        if exc.__class__.__name__ == "_UnrecognizedOptionError":
++            sys.exit(32)
++        raise
+ 
+ 
+ def run_pyreverse(argv: Sequence[str] | None = None) -> NoReturn:  # type: ignore[misc]
+@@ -44,7 +58,12 @@ def run_pyreverse(argv: Sequence[str] | None = None) -> NoReturn:  # type: ignor
+     """
+     from pylint.pyreverse.main import Run as PyreverseRun
+ 
+-    PyreverseRun(argv or sys.argv[1:])
++    try:
++        PyreverseRun(argv or sys.argv[1:])
++    except Exception as exc:  # pragma: no cover - defensive top-level handling
++        if exc.__class__.__name__ == "_UnrecognizedOptionError":
++            sys.exit(32)
++        raise
+ 
+ 
+ def run_symilar(argv: Sequence[str] | None = None) -> NoReturn:
+@@ -54,7 +73,12 @@ def run_symilar(argv: Sequence[str] | None = None) -> NoReturn:
+     """
+     from pylint.checkers.similar import Run as SimilarRun
+ 
+-    SimilarRun(argv or sys.argv[1:])
++    try:
++        SimilarRun(argv or sys.argv[1:])
++    except Exception as exc:  # pragma: no cover - defensive top-level handling
++        if exc.__class__.__name__ == "_UnrecognizedOptionError":
++            sys.exit(32)
++        raise
+ 
+ 
+ def modify_sys_path() -> None:

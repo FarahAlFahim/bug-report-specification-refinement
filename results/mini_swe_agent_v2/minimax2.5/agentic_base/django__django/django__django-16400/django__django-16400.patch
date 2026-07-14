@@ -1,0 +1,148 @@
+diff --git a/django/contrib/auth/management/__init__.py b/django/contrib/auth/management/__init__.py
+index 0b5a982617..835b047195 100644
+--- a/django/contrib/auth/management/__init__.py
++++ b/django/contrib/auth/management/__init__.py
+@@ -76,8 +76,8 @@ def create_permissions(
+     for klass in app_config.get_models():
+         # Force looking up the content types in the current database
+         # before creating foreign keys to them.
+-        ctype = ContentType.objects.db_manager(using).get_for_model(
+-            klass, for_concrete_model=False
++        ctype = ContentType.objects.get_for_model(
++            klass, for_concrete_model=False, db=using
+         )
+ 
+         ctypes.add(ctype)
+diff --git a/django/contrib/contenttypes/models.py b/django/contrib/contenttypes/models.py
+index 759a53ce67..16fc5515e1 100644
+--- a/django/contrib/contenttypes/models.py
++++ b/django/contrib/contenttypes/models.py
+@@ -1,7 +1,7 @@
+ from collections import defaultdict
+ 
+ from django.apps import apps
+-from django.db import models
++from django.db import DEFAULT_DB_ALIAS, models, router
+ from django.db.models import Q
+ from django.utils.translation import gettext_lazy as _
+ 
+@@ -28,19 +28,43 @@ class ContentTypeManager(models.Manager):
+             model = model._meta.concrete_model
+         return model._meta
+ 
+-    def _get_from_cache(self, opts):
++    def _get_from_cache(self, opts, db):
+         key = (opts.app_label, opts.model_name)
+-        return self._cache[self.db][key]
++        return self._cache[db][key]
+ 
+-    def get_for_model(self, model, for_concrete_model=True):
++    def _get_db(self):
++        """
++        Determine the database to use for this manager.
++        Priority:
++        1. If the manager has _db set (via db_manager), use that
++        2. If db parameter is DEFAULT_DB_ALIAS, use the router
++        3. Otherwise, use the explicitly provided db parameter
++        """
++        # Check if the manager has _db set (from db_manager())
++        if self._db is not None:
++            return self._db
++        # Otherwise, use the router (this is handled by the caller)
++        return DEFAULT_DB_ALIAS
++
++    def get_for_model(self, model, for_concrete_model=True, db=DEFAULT_DB_ALIAS):
+         """
+         Return the ContentType object for a given model, creating the
+         ContentType if necessary. Lookups are cached so that subsequent lookups
+         for the same model don't hit the database.
+         """
+         opts = self._get_opts(model, for_concrete_model)
++        # Determine the database to use:
++        # 1. If db is explicitly provided and not DEFAULT_DB_ALIAS, use it
++        # 2. If the manager has _db set (via db_manager), use that
++        # 3. Otherwise, use the router
++        if db != DEFAULT_DB_ALIAS:
++            using = db
++        elif self._db is not None:
++            using = self._db
++        else:
++            using = router.db_for_read(self.model)
+         try:
+-            return self._get_from_cache(opts)
++            return self._get_from_cache(opts, using)
+         except KeyError:
+             pass
+ 
+@@ -49,21 +73,32 @@ class ContentTypeManager(models.Manager):
+         try:
+             # Start with get() and not get_or_create() in order to use
+             # the db_for_read (see #20401).
+-            ct = self.get(app_label=opts.app_label, model=opts.model_name)
++            ct = self.using(using).get(app_label=opts.app_label, model=opts.model_name)
+         except self.model.DoesNotExist:
+             # Not found in the database; we proceed to create it. This time
+             # use get_or_create to take care of any race conditions.
+-            ct, created = self.get_or_create(
++            ct, created = self.using(using).get_or_create(
+                 app_label=opts.app_label,
+                 model=opts.model_name,
+             )
+-        self._add_to_cache(self.db, ct)
++        self._add_to_cache(using, ct)
+         return ct
+ 
+-    def get_for_models(self, *models, for_concrete_models=True):
++    def get_for_models(self, *models, for_concrete_models=True, db=DEFAULT_DB_ALIAS):
+         """
+         Given *models, return a dictionary mapping {model: content_type}.
+         """
++        # Determine the database to use:
++        # 1. If db is explicitly provided and not DEFAULT_DB_ALIAS, use it
++        # 2. If the manager has _db set (via db_manager), use that
++        # 3. Otherwise, use the router
++        if db != DEFAULT_DB_ALIAS:
++            using = db
++        elif self._db is not None:
++            using = self._db
++        else:
++            using = router.db_for_read(self.model)
++        
+         results = {}
+         # Models that aren't already in the cache grouped by app labels.
+         needed_models = defaultdict(set)
+@@ -72,7 +107,7 @@ class ContentTypeManager(models.Manager):
+         for model in models:
+             opts = self._get_opts(model, for_concrete_models)
+             try:
+-                ct = self._get_from_cache(opts)
++                ct = self._get_from_cache(opts, using)
+             except KeyError:
+                 needed_models[opts.app_label].add(opts.model_name)
+                 needed_opts[opts].append(model)
+@@ -87,21 +122,21 @@ class ContentTypeManager(models.Manager):
+                 ),
+                 _connector=Q.OR,
+             )
+-            cts = self.filter(condition)
++            cts = self.using(using).filter(condition)
+             for ct in cts:
+                 opts_models = needed_opts.pop(
+                     ct._meta.apps.get_model(ct.app_label, ct.model)._meta, []
+                 )
+                 for model in opts_models:
+                     results[model] = ct
+-                self._add_to_cache(self.db, ct)
++                self._add_to_cache(using, ct)
+         # Create content types that weren't in the cache or DB.
+         for opts, opts_models in needed_opts.items():
+-            ct = self.create(
++            ct = self.using(using).create(
+                 app_label=opts.app_label,
+                 model=opts.model_name,
+             )
+-            self._add_to_cache(self.db, ct)
++            self._add_to_cache(using, ct)
+             for model in opts_models:
+                 results[model] = ct
+         return results

@@ -1,0 +1,59 @@
+diff --git a/astropy/nddata/mixins/ndarithmetic.py b/astropy/nddata/mixins/ndarithmetic.py
+index 4153dfccb..6a88d79c2 100644
+--- a/astropy/nddata/mixins/ndarithmetic.py
++++ b/astropy/nddata/mixins/ndarithmetic.py
+@@ -486,8 +486,10 @@ class NDArithmeticMixin:
+         """
+         Calculate the resulting mask.
+ 
+-        This is implemented as the piecewise ``or`` operation if both have a
+-        mask.
++        This method ensures that the mask-handling callable is only invoked
++        when both operand masks are non-``None``. If exactly one operand has a
++        mask, that mask is copied to the result. If both are ``None`` or
++        ``handle_mask`` is ``None``, the result has no mask.
+ 
+         Parameters
+         ----------
+@@ -508,23 +510,27 @@ class NDArithmeticMixin:
+         Returns
+         -------
+         result_mask : any type
+-            If only one mask was present this mask is returned.
++            If only one mask was present this mask is returned (deep-copied).
+             If neither had a mask ``None`` is returned. Otherwise
+-            ``handle_mask`` must create (and copy) the returned mask.
++            ``handle_mask`` is called with both masks.
+         """
+-        # If only one mask is present we need not bother about any type checks
+-        if (
+-            self.mask is None and operand is not None and operand.mask is None
+-        ) or handle_mask is None:
++        # Determine the masks from the operands
++        m1 = self.mask
++        m2 = operand.mask if operand is not None else None
++
++        # If the caller requested no mask handling or neither operand has a
++        # mask, the result has no mask.
++        if handle_mask is None or (m1 is None and m2 is None):
+             return None
+-        elif self.mask is None and operand is not None:
+-            # Make a copy so there is no reference in the result.
+-            return deepcopy(operand.mask)
+-        elif operand is None:
+-            return deepcopy(self.mask)
+-        else:
+-            # Now lets calculate the resulting mask (operation enforces copy)
+-            return handle_mask(self.mask, operand.mask, **kwds)
++
++        # If exactly one mask is present, deep-copy and return it.
++        if m1 is None:
++            return deepcopy(m2)
++        if m2 is None:
++            return deepcopy(m1)
++
++        # Both masks are present: delegate to the provided callable.
++        return handle_mask(m1, m2, **kwds)
+ 
+     def _arithmetic_wcs(self, operation, operand, compare_wcs, **kwds):
+         """

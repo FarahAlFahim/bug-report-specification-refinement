@@ -1,0 +1,25 @@
+diff --git a/sympy/parsing/latex/_parse_latex_antlr.py b/sympy/parsing/latex/_parse_latex_antlr.py
+index 2e4a45ad20..ca0cbe7986 100644
+--- a/sympy/parsing/latex/_parse_latex_antlr.py
++++ b/sympy/parsing/latex/_parse_latex_antlr.py
+@@ -382,11 +382,17 @@ def convert_frac(frac):
+ 
+     expr_top = convert_expr(frac.upper)
+     expr_bot = convert_expr(frac.lower)
+-    inverse_denom = sympy.Pow(expr_bot, -1, evaluate=False)
++    # Ensure the denominator is grouped when inverted. If expr_bot is itself
++    # a fraction or a power, directly taking Pow(expr_bot, -1) can lead to
++    # ambiguous flattening when later multiplied, producing expressions like
++    # a/b/1/c**2 instead of a/b/(1/c**2). Wrapping the denominator in a
++    # Mul(1, expr_bot, evaluate=False) before inverting preserves the
++    # intended grouping.
++    denom_grouped = sympy.Mul(1, expr_bot, evaluate=False)
++    inverse_denom = sympy.Pow(denom_grouped, -1, evaluate=False)
+     if expr_top == 1:
+         return inverse_denom
+-    else:
+-        return sympy.Mul(expr_top, inverse_denom, evaluate=False)
++    return sympy.Mul(expr_top, inverse_denom, evaluate=False)
+ 
+ def convert_binom(binom):
+     expr_n = convert_expr(binom.n)

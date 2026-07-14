@@ -1,0 +1,47 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index 320d1a7..9cf768d 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -131,9 +131,9 @@ __bibtex__ = r"""@Article{Hunter:2007,
+ 
+ 
+ def __getattr__(name):
+-    if name == "__version__":
++    if name in ("__version__", "version_info"):
+         import setuptools_scm
+-        global __version__  # cache it.
++        global __version__, version_info  # cache them.
+         # Only shell out to a git subprocess if really needed, and not on a
+         # shallow clone, such as those used by CI, as the latter would trigger
+         # a warning from setuptools_scm.
+@@ -147,7 +147,29 @@ def __getattr__(name):
+             )
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+-        return __version__
++
++        if name == "__version__":
++            return __version__
++
++        # Compute a comparable version_info tuple from the resolved __version__.
++        # Try using packaging if available to robustly parse PEP440 versions;
++        # otherwise fall back to a simple numeric prefix parser.
++        try:
++            from packaging.version import Version
++            v = Version(__version__)
++            # Version.release is a tuple of ints for the release segment.
++            rel = v.release
++            version_info = tuple(rel)
++        except Exception:
++            import re
++            m = re.match(r"^\s*(\d+)(?:\.(\d+))?(?:\.(\d+))?", __version__)
++            if m:
++                groups = [g for g in m.groups() if g is not None]
++                version_info = tuple(int(x) for x in groups)
++            else:
++                # Unknown form: provide an empty tuple rather than raising.
++                version_info = ()
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

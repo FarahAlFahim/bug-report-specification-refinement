@@ -1,0 +1,26 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index 14ae00a7de..6d5c6e23ab 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -56,9 +56,19 @@ def prepare_lookup_value(key, value):
+     # if key ends with __in, split parameter into separate values
+     if key.endswith('__in'):
+         value = value.split(',')
+-    # if key ends with __isnull, special case '' and the string literals 'false' and '0'
++    # if key ends with __isnull, only accept explicit boolean-ish values.
++    # Historically, arbitrary truthy/falsey values were accepted which could
++    # lead to surprising behavior (e.g. promoting joins). Only the empty
++    # string and the string literals 'true'/'false' and '1'/'0' are allowed.
++    # Any other value is considered invalid.
+     elif key.endswith('__isnull'):
+-        value = value.lower() not in ('', 'false', '0')
++        val = value.lower()
++        if val in ('', 'false', '0'):
++            value = False
++        elif val in ('true', '1'):
++            value = True
++        else:
++            raise ValueError("Invalid value for '__isnull' lookup: %r" % (value,))
+     return value
+ 
+ 

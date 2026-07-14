@@ -1,0 +1,14 @@
+diff --git a/django/utils/numberformat.py b/django/utils/numberformat.py
+index 488d6a77cd..12bf125c79 100644
+--- a/django/utils/numberformat.py
++++ b/django/utils/numberformat.py
+@@ -33,6 +33,9 @@ def format(
+     # Make the common case fast
+     if isinstance(number, int) and not use_grouping and not decimal_pos:
+         return mark_safe(number)
++    # Handle None and empty string cases
++    if number is None or number == "":
++        return ""
+     # sign
+     sign = ""
+     # Treat potentially very large/small floats as Decimals.

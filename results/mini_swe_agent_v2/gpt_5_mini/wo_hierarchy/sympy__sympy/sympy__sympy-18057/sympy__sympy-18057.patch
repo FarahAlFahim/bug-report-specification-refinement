@@ -1,0 +1,19 @@
+diff --git a/sympy/core/sympify.py b/sympy/core/sympify.py
+index ed4ea6ce5e..6fd62b87be 100644
+--- a/sympy/core/sympify.py
++++ b/sympy/core/sympify.py
+@@ -362,6 +362,14 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+     # As a last chance, we try to take "a"'s normal form via unicode()
+     # and try to parse it. If it fails, then we have no luck and
+     # return an exception
++    # As a last resort we used to try to parse the object's repr/unicode
++    # which is unsafe: it can cause arbitrary code (via eval in the parser)
++    # to be executed when an object's __repr__ returns something like
++    # 'x.y' or 'x'. Only allow parsing here if the original object is a
++    # string instance. If it's not a string, raise SympifyError instead
++    # of attempting to parse its repr.
++    if not isinstance(a, string_types):
++        raise SympifyError(a)
+     try:
+         from .compatibility import unicode
+         a = unicode(a)

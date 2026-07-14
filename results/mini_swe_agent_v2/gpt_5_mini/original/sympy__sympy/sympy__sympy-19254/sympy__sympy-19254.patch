@@ -1,0 +1,60 @@
+diff --git a/sympy/polys/factortools.py b/sympy/polys/factortools.py
+index 93298f47e6..3f90107a64 100644
+--- a/sympy/polys/factortools.py
++++ b/sympy/polys/factortools.py
+@@ -124,21 +124,51 @@ def dmp_trial_division(f, factors, u, K):
+ 
+ 
+ def dup_zz_mignotte_bound(f, K):
+-    """Mignotte bound for univariate polynomials in `K[x]`. """
++    """Knuth-Cohen style bound for univariate polynomials in `K[x]`.
++
++    For a polynomial f of degree n with maximum coefficient norm a and
++    leading coefficient b, we bound coefficients of any factor by the
++    central binomial coefficient C(n, floor(n/2)) * a * b. This is
++    generally tighter than the classical Mignotte bound while remaining
++    safe for use in factorization routines.
++    """
+     a = dup_max_norm(f, K)
+     b = abs(dup_LC(f, K))
+     n = dup_degree(f)
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    try:
++        from math import comb as _comb
++    except Exception:
++        def _comb(n, k):
++            from math import factorial
++            return factorial(n) // (factorial(k)*factorial(n - k))
++
++    c = _comb(n, n//2) if n >= 0 else 1
++
++    return c*a*b
+ 
+ 
+ def dmp_zz_mignotte_bound(f, u, K):
+-    """Mignotte bound for multivariate polynomials in `K[X]`. """
++    """Knuth-Cohen style bound for multivariate polynomials in `K[X]`.
++
++    Use the total degree (sum of degrees in all variables) as `n` and
++    apply the central binomial coefficient C(n, floor(n/2)) as a
++    combinatorial factor to obtain a tighter bound on factor coefficients.
++    """
+     a = dmp_max_norm(f, u, K)
+     b = abs(dmp_ground_LC(f, u, K))
+     n = sum(dmp_degree_list(f, u))
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    try:
++        from math import comb as _comb
++    except Exception:
++        def _comb(n, k):
++            from math import factorial
++            return factorial(n) // (factorial(k)*factorial(n - k))
++
++    c = _comb(n, n//2) if n >= 0 else 1
++
++    return c*a*b
+ 
+ 
+ def dup_zz_hensel_step(m, f, g, h, s, t, K):

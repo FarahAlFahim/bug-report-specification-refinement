@@ -1,0 +1,22 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index 07cdaa5..1533650 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -398,6 +398,17 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    # JSONField should use the field's prepare_value to render JSON correctly
++    # (avoid displaying Python dict repr with single quotes).
++    elif getattr(models, 'JSONField', None) is not None and isinstance(field, models.JSONField):
++        try:
++            # prepare_value will produce a JSON string suitable for display,
++            # and will respect any decoder/encoder or invalid-input handling
++            # implemented by the field/formfield.
++            return field.prepare_value(value)
++        except Exception:
++            # Fallback to the generic value display in case prepare_value fails.
++            return display_for_value(value, empty_value_display)
+     else:
+         return display_for_value(value, empty_value_display)
+ 

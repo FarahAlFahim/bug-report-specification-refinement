@@ -1,0 +1,54 @@
+diff --git a/sklearn/utils/_pprint.py b/sklearn/utils/_pprint.py
+index b8686dba5..59c4a6543 100644
+--- a/sklearn/utils/_pprint.py
++++ b/sklearn/utils/_pprint.py
+@@ -94,9 +94,47 @@ def _changed_params(estimator):
+                         estimator.__init__)
+     init_params = signature(init_func).parameters
+     init_params = {name: param.default for name, param in init_params.items()}
++
++    # Local import to avoid a hard dependency at module import time
++    try:
++        import numpy as _np
++    except Exception:
++        _np = None
++
+     for k, v in params.items():
+-        if (v != init_params[k] and
+-                not (is_scalar_nan(init_params[k]) and is_scalar_nan(v))):
++        init_val = init_params.get(k)
++
++        # If the init parameter has no default, consider it changed
++        if init_val is getattr(signature(init_func).parameters[k], 'empty', None) or init_val is None and k not in init_params:
++            equal = False
++        else:
++            # Consider scalar NaN defaults equal to scalar NaN values
++            if is_scalar_nan(init_val) and is_scalar_nan(v):
++                equal = True
++            else:
++                if _np is not None:
++                    try:
++                        equal = _np.array_equal(_np.asarray(v), _np.asarray(init_val))
++                    except Exception:
++                        try:
++                            cmp = (v == init_val)
++                            if hasattr(cmp, '__iter__'):
++                                equal = all(cmp)
++                            else:
++                                equal = bool(cmp)
++                        except Exception:
++                            equal = False
++                else:
++                    try:
++                        cmp = (v == init_val)
++                        if hasattr(cmp, '__iter__'):
++                            equal = all(cmp)
++                        else:
++                            equal = bool(cmp)
++                    except Exception:
++                        equal = False
++
++        if not equal:
+             filtered_params[k] = v
+     return filtered_params
+ 

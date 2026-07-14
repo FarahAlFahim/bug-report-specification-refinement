@@ -1,0 +1,58 @@
+diff --git a/sphinx/ext/inheritance_diagram.py b/sphinx/ext/inheritance_diagram.py
+index 9e38041df..940740511 100644
+--- a/sphinx/ext/inheritance_diagram.py
++++ b/sphinx/ext/inheritance_diagram.py
+@@ -225,7 +225,12 @@ class InheritanceGraph:
+         completely general.
+         """
+         module = cls.__module__
+-        if module in ('__builtin__', 'builtins'):
++        # Only treat a class as a builtin if it actually exists in the
++        # builtins module object. Some extension types may report their
++        # __module__ as 'builtins' but are not present in the real
++        # builtins namespace (e.g. struct.Struct). Use the precomputed
++        # py_builtins list for a reliable test.
++        if cls in py_builtins:
+             fullname = cls.__name__
+         else:
+             fullname = '%s.%s' % (module, cls.__qualname__)
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..0b161ee4e 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -96,7 +96,11 @@ def restify(cls: Optional["Type"]) -> str:
+         return '...'
+     elif inspect.isNewType(cls):
+         return ':class:`%s`' % cls.__name__
+-    elif cls.__module__ in ('__builtin__', 'builtins'):
++    # Only omit the module prefix for true builtins. Some extension types
++    # may claim __module__ == 'builtins' but are not actually present in
++    # the builtins module object (e.g. struct.Struct). Use the precomputed
++    # py_builtins list for a reliable test.
++    elif cls.__module__ in ('__builtin__', 'builtins') and cls in __import__('builtins').__dict__.values():
+         return ':class:`%s`' % cls.__name__
+     else:
+         if sys.version_info >= (3, 7):  # py37+
+@@ -300,11 +304,17 @@ def stringify(annotation: Any) -> str:
+         return repr(annotation)
+     elif annotation is NoneType:
+         return 'None'
+-    elif (getattr(annotation, '__module__', None) == 'builtins' and
+-          hasattr(annotation, '__qualname__')):
+-        return annotation.__qualname__
+-    elif annotation is Ellipsis:
+-        return '...'
++    else:
++        import builtins as _builtins
++        # Only shorten annotations that are actually defined in the
++        # builtins module. Some extension types set __module__ to
++        # 'builtins' but are not present in the builtins namespace.
++        if (getattr(annotation, '__module__', None) == 'builtins' and
++                hasattr(annotation, '__qualname__') and
++                annotation in _builtins.__dict__.values()):
++            return annotation.__qualname__
++        elif annotation is Ellipsis:
++            return '...'
+ 
+     if sys.version_info >= (3, 7):  # py37+
+         return _stringify_py37(annotation)

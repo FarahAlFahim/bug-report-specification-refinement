@@ -1,0 +1,106 @@
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 46f310b122..726dcffd34 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -199,7 +199,20 @@ def flatten(cls, seq):
+             if not a.is_zero and a.is_Rational:
+                 r, b = b.as_coeff_Mul()
+                 if b.is_Add:
+-                    if r is not S.One:  # 2-arg hack
++                    # Avoid distributing into Adds that contain rounding-like
++                    # functions (floor, ceiling, frac) since that can lead
++                    # to unsafe rewrites of non-linear functions.
++                    try:
++                        from sympy.functions.elementary.integers import                             floor, ceiling, frac
++                    except Exception:
++                        _contains_round = False
++                    else:
++                        _contains_round = any(
++                            t.func in (floor, ceiling, frac)
++                            for t in Add.make_args(b))
++                    if _contains_round:
++                        _contains_round = None
++                    elif r is not S.One:  # 2-arg hack
+                         # leave the Mul as a Mul?
+                         ar = a*r
+                         if ar is S.One:
+@@ -875,10 +888,29 @@ def _eval_expand_mul(self, **hints):
+                 return expr
+ 
+         plain, sums, rewrite = [], [], False
++        def _add_has_function(add):
++            # Detect if the Add contains any applied Function instances.
++            # If so, treat the Add as atomic to avoid distributing
++            # multiplication into expressions that include Function
++            # applications (this prevents unsafe rewrites of non-linear
++            # functions such as rounding functions).
++            for a in Add.make_args(add):
++                if getattr(a, 'is_Function', False):
++                    return True
++            return False
++
+         for factor in expr.args:
+             if factor.is_Add:
+-                sums.append(factor)
+-                rewrite = True
++                # If this Add contains rounding functions, avoid
++                # distributing into it; treat it as an atomic factor.
++                if _add_has_function(factor):
++                    if factor.is_commutative:
++                        plain.append(factor)
++                    else:
++                        sums.append(Basic(factor))
++                else:
++                    sums.append(factor)
++                    rewrite = True
+             else:
+                 if factor.is_commutative:
+                     plain.append(factor)
+diff --git a/sympy/functions/elementary/integers.py b/sympy/functions/elementary/integers.py
+index fe1e71e3f2..574204ea7f 100644
+--- a/sympy/functions/elementary/integers.py
++++ b/sympy/functions/elementary/integers.py
+@@ -85,6 +85,25 @@ def _eval_is_real(self):
+     def _eval_is_integer(self):
+         return self.args[0].is_real
+ 
++    def _eval_expand_mul(self, **hints):
++        """Prevent distribution of Mul into rounding function arguments.
++
++        When expand(..., mul=True) traverses into Function nodes it may
++        try to distribute multiplication into Add nodes inside the
++        function argument. For non-linear functions like floor/ceiling
++        this is unsafe. This hook expands the inner argument but with
++        mul disabled so that multiplication is not distributed into
++        the rounding function's internals.
++        """
++        arg = self.args[0]
++        deep = hints.get('deep', False)
++        # expand the inner argument but disallow multiply-distribution
++        newarg = arg.expand(deep=deep, mul=False)
++        # Construct the new function without re-evaluation to avoid
++        # triggering eval() which might split the argument into parts
++        # and lead to inconsistent results depending on evaluation path.
++        return self.func(newarg, evaluate=False)
++
+ 
+ class floor(RoundFunction):
+     """
+@@ -465,6 +484,17 @@ def _eval_is_integer(self):
+     def _eval_is_zero(self):
+         return fuzzy_or([self.args[0].is_zero, self.args[0].is_integer])
+ 
++    def _eval_expand_mul(self, **hints):
++        """Prevent distribution of Mul into frac argument.
++
++        See RoundFunction._eval_expand_mul for rationale.
++        """
++        arg = self.args[0]
++        deep = hints.get('deep', False)
++        newarg = arg.expand(deep=deep, mul=False)
++        # See comment in RoundFunction._eval_expand_mul
++        return self.func(newarg, evaluate=False)
++
+     def _eval_is_negative(self):
+         return False
+ 

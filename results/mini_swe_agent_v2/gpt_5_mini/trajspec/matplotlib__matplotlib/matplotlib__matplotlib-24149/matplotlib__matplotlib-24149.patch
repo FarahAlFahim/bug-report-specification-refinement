@@ -1,0 +1,24 @@
+diff --git a/lib/matplotlib/cbook/__init__.py b/lib/matplotlib/cbook/__init__.py
+index 34c6ddb861..496b36e737 100644
+--- a/lib/matplotlib/cbook/__init__.py
++++ b/lib/matplotlib/cbook/__init__.py
+@@ -1746,7 +1746,18 @@ def _safe_first_finite(obj, *, skip_nonfinite=True):
+         raise RuntimeError("matplotlib does not "
+                            "support generators as input")
+     else:
+-        return next(val for val in obj if safe_isfinite(val))
++        # Return the first value that passes `safe_isfinite`, or None if
++        # no such value exists. Previously this used `next(...)` over a
++        # generator which raises StopIteration when no element satisfies
++        # the predicate; that caused StopIteration to propagate to callers
++        # that probe for a "first finite" element. Treating the absence
++        # of a finite element as a valid outcome (None) is safer and
++        # callers already typically tolerate None (or will raise a more
++        # informative error later).
++        for val in obj:
++            if safe_isfinite(val):
++                return val
++        return None
+ 
+ 
+ def sanitize_sequence(data):

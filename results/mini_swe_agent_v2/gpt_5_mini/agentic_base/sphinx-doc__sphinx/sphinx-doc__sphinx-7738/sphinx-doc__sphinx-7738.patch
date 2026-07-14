@@ -1,0 +1,46 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index 329ffb979..2ab696ddb 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -376,16 +376,21 @@ class GoogleDocstring:
+                                 ) -> List[str]:
+         lines = []
+         for _name, _type, _desc in fields:
++            # Escape the name for docutils field labels so trailing
++            # underscores and leading '*' are handled correctly.  We do
++            # not want to have escaped names stored globally since
++            # directive signatures must use the raw name.
++            _ename = self._escape_args_and_kwargs(_name)
+             _desc = self._strip_empty(_desc)
+             if any(_desc):
+                 _desc = self._fix_field_desc(_desc)
+-                field = ':%s %s: ' % (field_role, _name)
++                field = ':%s %s: ' % (field_role, _ename)
+                 lines.extend(self._format_block(field, _desc))
+             else:
+-                lines.append(':%s %s:' % (field_role, _name))
++                lines.append(':%s %s:' % (field_role, _ename))
+ 
+             if _type:
+-                lines.append(':%s %s: %s' % (type_role, _name, _type))
++                lines.append(':%s %s: %s' % (type_role, _ename, _type))
+         return lines + ['']
+ 
+     def _format_field(self, _name: str, _type: str, _desc: List[str]) -> List[str]:
+@@ -583,11 +588,13 @@ class GoogleDocstring:
+         lines = []
+         for _name, _type, _desc in self._consume_fields():
+             if self._config.napoleon_use_ivar:
+-                _name = self._qualify_name(_name, self._obj)
+-                field = ':ivar %s: ' % _name
++                _qname = self._qualify_name(_name, self._obj)
++                # Escape for docutils field label
++                _ename = self._escape_args_and_kwargs(_qname)
++                field = ':ivar %s: ' % _ename
+                 lines.extend(self._format_block(field, _desc))
+                 if _type:
+-                    lines.append(':vartype %s: %s' % (_name, _type))
++                    lines.append(':vartype %s: %s' % (_ename, _type))
+             else:
+                 lines.append('.. attribute:: ' + _name)
+                 if self._opt and 'noindex' in self._opt:

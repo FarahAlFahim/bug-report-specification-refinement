@@ -1,0 +1,24 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 92213a4e67..113477ff89 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -726,8 +726,17 @@ class SQLCompiler:
+                 if isinstance(item, OrderBy):
+                     results.append((item, False))
+                     continue
+-                results.extend(self.find_ordering_name(item, opts, alias,
+-                                                       order, already_seen))
++                # When the related model is a parent model (i.e., the current
++                # model inherits from it), we want to use the original
++                # default_order to correctly handle the '-' prefix.
++                # Otherwise, use the derived order to correctly handle
++                # multi-level ordering (e.g., Cover -> Item -> Note).
++                if issubclass(self.query.get_meta().model, opts.model):
++                    results.extend(self.find_ordering_name(item, opts, alias,
++                                                           default_order, already_seen))
++                else:
++                    results.extend(self.find_ordering_name(item, opts, alias,
++                                                           order, already_seen))
+             return results
+         targets, alias, _ = self.query.trim_joins(targets, joins, path)
+         return [(OrderBy(transform_function(t, alias), descending=descending), False) for t in targets]

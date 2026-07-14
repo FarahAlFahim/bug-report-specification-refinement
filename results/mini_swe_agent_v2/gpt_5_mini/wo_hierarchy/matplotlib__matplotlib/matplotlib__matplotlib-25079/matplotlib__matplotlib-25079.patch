@@ -1,0 +1,42 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index 966eb0760b..654d048429 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -1100,15 +1100,31 @@ class Colorbar:
+         if self._extend_upper():
+             b = np.hstack((b, b[-1] + 1))
+ 
+-        # transform from 0-1 to vmin-vmax:
++        # transform from 0-1 to vmin-vmax.  We must not permanently
++        # assign temporary vmin/vmax values to the shared Norm instance
++        # (e.g., LogNorm) because some Norms delegate to scale transforms
++        # that reject intermediate values like 0.  Use the same safe
++        # temporary-assignment pattern as :meth:`_mesh` instead: temporarily
++        # set attributes while blocking callbacks and call ``inverse`` with
++        # those temporary values.
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
+-        self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+-            self.norm.vmin, self.norm.vmax, expander=0.1)
++            # Temporarily treat the norm as mapping 0->1 so we can compute
++            # a nonsingular interval based on that domain without mutating
++            # the shared norm instance.
++            with self.norm.callbacks.blocked(),                     cbook._setattr_cm(self.norm, vmin=0, vmax=1):
++                tmp_vmin, tmp_vmax = mtransforms.nonsingular(
++                    self.norm.vmin, self.norm.vmax, expander=0.1)
++        else:
++            tmp_vmin, tmp_vmax = mtransforms.nonsingular(
++                self.norm.vmin, self.norm.vmax, expander=0.1)
++
++        # Use the computed (possibly adjusted) endpoints when calling
++        # ``inverse``; do this in a temporary context so we never leave the
++        # norm in a transient, potentially-invalid state.
+         if (not isinstance(self.norm, colors.BoundaryNorm) and
+                 (self.boundaries is None)):
+-            b = self.norm.inverse(b)
++            with self.norm.callbacks.blocked(),                     cbook._setattr_cm(self.norm, vmin=tmp_vmin, vmax=tmp_vmax):
++                b = self.norm.inverse(b)
+ 
+         self._boundaries = np.asarray(b, dtype=float)
+         self._values = 0.5 * (self._boundaries[:-1] + self._boundaries[1:])

@@ -1,0 +1,56 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8efb..298f9769b2 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -27,7 +27,9 @@ class SimpleRSTHeader(FixedWidthHeader):
+ 
+ 
+ class SimpleRSTData(FixedWidthData):
+-    start_line = 3
++    # Do not hardcode a class-level start_line so instances can be configured
++    # based on the number of header rows by the RST writer.
++    start_line = None
+     end_line = -1
+     splitter_class = FixedWidthTwoLineDataSplitter
+ 
+@@ -57,10 +59,37 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, delimiter_pad=None, bookend=False, header_rows=None, **kwargs):
++        # Accept and forward writer-related kwargs (such as header_rows) so that
++        # callers can configure header rows without raising TypeError.
++        super().__init__(delimiter_pad=delimiter_pad, bookend=bookend,
++                         header_rows=header_rows, **kwargs)
++
++        # After initialization, set the data start_line based on the header's
++        # start_line and number of header rows so that the position/border line
++        # and data lines are placed correctly for arbitrary header_rows.
++        try:
++            num_header_rows = len(self.header.header_rows)
++        except Exception:
++            num_header_rows = 0
++
++        # header.start_line may be unset or falsy; default to 1 in that case.
++        header_start = getattr(self.header, 'start_line', 1) or 1
++
++        # data.start_line should be header.start_line + number of header rows + 1
++        # (the +1 accounts for the position/border line).
++        self.data.start_line = header_start + num_header_rows + 1
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
++
++        # Determine the border/position line index based on number of header rows.
++        # FixedWidth writes header_rows first and then the position line, so its
++        # index is len(header_rows). Only add surrounding border lines when there
++        # are header rows (otherwise do not add borders).
++        num_header_rows = len(self.header.header_rows) if hasattr(self.header, 'header_rows') else 0
++        if num_header_rows and num_header_rows < len(lines):
++            border = lines[num_header_rows]
++            lines = [border] + lines + [border]
++
+         return lines

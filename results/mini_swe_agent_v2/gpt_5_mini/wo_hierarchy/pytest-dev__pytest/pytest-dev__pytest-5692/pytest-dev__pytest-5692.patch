@@ -1,0 +1,42 @@
+diff --git a/src/_pytest/junitxml.py b/src/_pytest/junitxml.py
+index 15c630b1d..dc0346f7d 100644
+--- a/src/_pytest/junitxml.py
++++ b/src/_pytest/junitxml.py
+@@ -13,6 +13,7 @@ import os
+ import re
+ import sys
+ import time
++import socket
+ 
+ import py
+ 
+@@ -657,6 +658,20 @@ class LogXML:
+         )
+         logfile.write('<?xml version="1.0" encoding="utf-8"?>')
+ 
++        # Derive an ISO-like timestamp from the recorded suite start time
++        # and include the hostname for better integration with CI systems.
++        try:
++            timestamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(self.suite_start_time))
++        except Exception:
++            # Fall back to current time if something went wrong or suite_start_time
++            # is not present for some reason.
++            timestamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(suite_stop_time))
++
++        try:
++            hostname = socket.gethostname()
++        except Exception:
++            hostname = ""
++
+         suite_node = Junit.testsuite(
+             self._get_global_properties_node(),
+             [x.to_xml() for x in self.node_reporters_ordered],
+@@ -665,6 +680,8 @@ class LogXML:
+             failures=self.stats["failure"],
+             skipped=self.stats["skipped"],
+             tests=numtests,
++            timestamp=timestamp,
++            hostname=hostname,
+             time="%.3f" % suite_time_delta,
+         )
+         logfile.write(Junit.testsuites([suite_node]).unicode(indent=0))

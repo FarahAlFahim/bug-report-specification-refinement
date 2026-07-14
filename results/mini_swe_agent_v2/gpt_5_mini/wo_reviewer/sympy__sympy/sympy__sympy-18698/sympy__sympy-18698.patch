@@ -1,0 +1,24 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..0c371c340c 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5899,6 +5899,19 @@ def _symbolic_factor_list(expr, opt, method):
+     """Helper function for :func:`_symbolic_factor`. """
+     coeff, factors = S.One, []
+ 
++    # First, try to convert the whole expression to a Poly.  If that
++    # succeeds we should use the polynomial's square-free/factor list
++    # routines so that factors that span multiplicative sub-arguments
++    # are detected and grouped correctly (see PR: grouping of factors
++    # for product vs expanded polynomial).
++    try:
++        poly, _opt = _poly_from_expr(expr, opt)
++    except PolificationFailed:
++        pass
++    else:
++        func = getattr(poly, method + '_list')
++        return func()
++
+     args = [i._eval_factor() if hasattr(i, '_eval_factor') else i
+         for i in Mul.make_args(expr)]
+     for arg in args:

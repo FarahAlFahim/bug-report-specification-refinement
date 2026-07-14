@@ -1,0 +1,107 @@
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+index 28eaae5f..c31e81d7 100644
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -278,7 +278,23 @@ def summarize_variable(
+             raise TypeError(f"`max_width` value of `{max_width}` is not a valid int")
+         else:
+             max_width = max_width_options
+-    first_col = pretty_print(f"  {marker} {name} ", col_width)
++    # include units from var.attrs['units'] in the displayed name if present
++    units = getattr(var, "attrs", {}).get("units")
++    if units is None:
++        display_name = str(name)
++    else:
++        # if units is an iterable (per-band), render it as a list-like string
++        try:
++            # treat strings differently from other iterables
++            if isinstance(units, str):
++                units_str = units
++            else:
++                units_str = ", ".join(map(str, units))
++        except Exception:
++            units_str = str(units)
++        display_name = f"{name}, in {units_str}"
++
++    first_col = pretty_print(f"  {marker} {display_name} ", col_width)
+     if var.dims:
+         dims_str = "({}) ".format(", ".join(map(str, var.dims)))
+     else:
+@@ -290,7 +306,6 @@ def summarize_variable(
+ 
+     return front_str + values_str
+ 
+-
+ def _summarize_coord_multiindex(coord, col_width, marker):
+     first_col = pretty_print(f"  {marker} {coord.name} ", col_width)
+     return "{}({}) MultiIndex".format(first_col, str(coord.dims[0]))
+@@ -347,15 +362,43 @@ def _get_col_items(mapping):
+ 
+     col_items = []
+     for k, v in mapping.items():
++        # include the key itself
+         col_items.append(k)
+         var = getattr(v, "variable", v)
++        # if this variable has units, include a name-with-units entry so
++        # column width calculations account for inline units
++        units = getattr(var, "attrs", {}).get("units")
++        if units is not None:
++            try:
++                if isinstance(units, str):
++                    units_str = units
++                else:
++                    units_str = ", ".join(map(str, units))
++            except Exception:
++                units_str = str(units)
++            col_items.append(f"{k}, in {units_str}")
++
++        # if an IndexVariable with level names, include those and their units
+         if isinstance(var, IndexVariable):
+             level_names = var.to_index_variable().level_names
+             if level_names is not None:
+                 col_items += list(level_names)
++                for lname in level_names:
++                    lvl_var = var.get_level_variable(lname)
++                    l_units = getattr(lvl_var, "attrs", {}).get("units")
++                    if l_units is not None:
++                        try:
++                            if isinstance(l_units, str):
++                                l_units_str = l_units
++                            else:
++                                l_units_str = ", ".join(map(str, l_units))
++                        except Exception:
++                            l_units_str = str(l_units)
++                        col_items.append(f"{lname}, in {l_units_str}")
+     return col_items
+ 
+ 
++
+ def _calculate_col_width(col_items):
+     max_name_length = max(len(str(s)) for s in col_items) if col_items else 0
+     col_width = max(max_name_length, 7) + 6
+diff --git a/xarray/core/formatting_html.py b/xarray/core/formatting_html.py
+index 5521b33e..8c5987b2 100644
+--- a/xarray/core/formatting_html.py
++++ b/xarray/core/formatting_html.py
+@@ -102,7 +102,20 @@ def summarize_variable(name, var, is_index=False, dtype=None, preview=None):
+ 
+     cssclass_idx = " class='xr-has-index'" if is_index else ""
+     dims_str = f"({', '.join(escape(dim) for dim in var.dims)})"
+-    name = escape(str(name))
++    # include units inline with the name if present
++    raw_name = str(name)
++    units = getattr(var.variable if hasattr(var, "variable") else var, "attrs", {}).get("units")
++    if units is None:
++        name = escape(raw_name)
++    else:
++        try:
++            if isinstance(units, str):
++                units_str = units
++            else:
++                units_str = ", ".join(map(str, units))
++        except Exception:
++            units_str = str(units)
++        name = escape(f"{raw_name}, in {units_str}")
+     dtype = dtype or escape(str(var.dtype))
+ 
+     # "unique" ids required to expand/collapse subsections

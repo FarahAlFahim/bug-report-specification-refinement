@@ -1,0 +1,65 @@
+diff --git a/sympy/simplify/fu.py b/sympy/simplify/fu.py
+index ad1130ef9..bdfde4ce7 100644
+--- a/sympy/simplify/fu.py
++++ b/sympy/simplify/fu.py
+@@ -501,24 +501,52 @@ def _f(rv):
+         if not (rv.is_Pow and rv.base.func == f):
+             return rv
+ 
+-        if (rv.exp < 0) == True:
++        exp = rv.exp
++
++        # Only attempt this transformation for integer exponents. This
++        # avoids invalid ordered comparisons and integer-only operations
++        # (like %, // and perfect_power) on complex or non-integer exponents
++        # which can raise TypeError (e.g. when exp is I).
++        if exp.is_integer is not True:
++            return rv
++
++        # Negative exponents are not handled by this transform
++        if exp.is_negative is True:
+             return rv
+-        if (rv.exp > max) == True:
++
++        # If the exponent is definitely larger than the allowed max, skip
++        # the transformation. Use the relational check to preserve the
++        # previous semantics in the case of undecidable comparisons.
++        if (exp > max) == True:
+             return rv
+-        if rv.exp == 2:
++
++        # Handle small concrete integer exponents directly
++        if exp == 2:
+             return h(g(rv.base.args[0])**2)
+         else:
+-            if rv.exp == 4:
++            if exp == 4:
+                 e = 2
+             elif not pow:
+-                if rv.exp % 2:
++                # Ensure we only use even/odd checks when they are known.
++                # If we can't decide, be conservative and skip the transform.
++                if exp.is_even is False:
+                     return rv
+-                e = rv.exp//2
++                if exp.is_even is None:
++                    # If it's a concrete Integer, we can decide using
++                    # Python arithmetic; otherwise give up.
++                    if exp.is_Integer:
++                        if int(exp) % 2:
++                            return rv
++                    else:
++                        return rv
++                e = exp//2
+             else:
+-                p = perfect_power(rv.exp)
++                # perfect_power requires a (concrete) integer input; if we
++                # can't determine a perfect power, skip the transform.
++                p = perfect_power(exp) if exp.is_integer else None
+                 if not p:
+                     return rv
+-                e = rv.exp//2
++                e = exp//2
+             return h(g(rv.base.args[0])**2)**e
+ 
+     return bottom_up(rv, _f)

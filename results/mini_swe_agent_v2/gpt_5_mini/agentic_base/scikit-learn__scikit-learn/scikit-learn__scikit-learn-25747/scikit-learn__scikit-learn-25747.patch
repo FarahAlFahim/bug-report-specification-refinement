@@ -1,0 +1,33 @@
+diff --git a/sklearn/utils/_set_output.py b/sklearn/utils/_set_output.py
+index 335773c6a..d1abadf85 100644
+--- a/sklearn/utils/_set_output.py
++++ b/sklearn/utils/_set_output.py
+@@ -55,11 +55,26 @@ def _wrap_in_pandas_container(
+     if isinstance(data_to_wrap, pd.DataFrame):
+         if columns is not None:
+             data_to_wrap.columns = columns
+-        if index is not None:
++        # Only set the index if it has the same length as the original input
++        # index. Some transformers may return aggregated outputs with a
++        # different number of rows (for example groupby aggregations). In
++        # that case we should preserve the transformer's own index so that
++        # concatenation operations (e.g. FeatureUnion) can align on the
++        # transformer's output index instead of forcing the original input
++        # index which would raise a pandas Length mismatch error.
++        if index is not None and len(data_to_wrap) == len(index):
+             data_to_wrap.index = index
+         return data_to_wrap
+ 
+-    return pd.DataFrame(data_to_wrap, index=index, columns=columns)
++    # For non-DataFrame outputs (e.g. ndarray, Series), construct a
++    # DataFrame without forcing the original input index. Only apply the
++    # original index if the lengths match to avoid raising on length
++    # mismatch. Columns are passed through to the constructor as before so
++    # that feature name handling remains consistent.
++    df = pd.DataFrame(data_to_wrap, columns=columns)
++    if index is not None and len(df) == len(index):
++        df.index = index
++    return df
+ 
+ 
+ def _get_output_config(method, estimator=None):

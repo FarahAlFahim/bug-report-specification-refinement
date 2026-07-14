@@ -1,0 +1,37 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 781dfd5499..dcb6e0cc39 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -778,10 +778,29 @@ class Query(BaseExpression):
+         select_mask[opts.pk] = {}
+         # Only include fields mentioned in the mask.
+         for field_name, field_mask in mask.items():
+-            field = opts.get_field(field_name)
+-            field_select_mask = select_mask.setdefault(field, {})
++            # Handle filtered relations first (they are only possible at the
++            # top level). For filtered relations the select_mask key must be
++            # a (name, relation_field) tuple so the compiler can look it up.
++            if filtered_relation := self._filtered_relations.get(field_name):
++                relation = opts.get_field(filtered_relation.relation_name)
++                field_select_mask = select_mask.setdefault((field_name, relation), {})
++                field = relation.field
++            else:
++                field = opts.get_field(field_name)
++                # For reverse relations, opts.get_field returns a reverse
++                # relation object with .field pointing to the forward Field
++                # on the related model. Use the forward Field as the key in
++                # the select_mask so that the SQL compiler can match it when
++                # processing related selections.
++                if hasattr(field, "field"):
++                    # reverse relation descriptor
++                    field_select_mask = select_mask.setdefault(field.field, {})
++                    field = field.field
++                else:
++                    field_select_mask = select_mask.setdefault(field, {})
++
+             if field_mask:
+-                if not field.is_relation:
++                if not getattr(field, "is_relation", False):
+                     raise FieldError(next(iter(field_mask)))
+                 related_model = field.remote_field.model._meta.concrete_model
+                 self._get_only_select_mask(

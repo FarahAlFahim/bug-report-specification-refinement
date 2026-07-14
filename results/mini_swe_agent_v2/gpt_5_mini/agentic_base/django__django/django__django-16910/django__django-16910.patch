@@ -1,0 +1,32 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 781dfd5499..5ba86d5265 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -778,8 +778,25 @@ class Query(BaseExpression):
+         select_mask[opts.pk] = {}
+         # Only include fields mentioned in the mask.
+         for field_name, field_mask in mask.items():
+-            field = opts.get_field(field_name)
+-            field_select_mask = select_mask.setdefault(field, {})
++            # Handle filtered relations (stored as (name, relation) keys)
++            if filtered_relation := self._filtered_relations.get(field_name):
++                relation = opts.get_field(filtered_relation.relation_name)
++                field_select_mask = select_mask.setdefault((field_name, relation), {})
++                field = relation.field
++            else:
++                field_or_reverse = opts.get_field(field_name)
++                # If this is a reverse relation (e.g. ForeignObjectRel), use
++                # the underlying forward Field object for the select_mask key
++                # so downstream code can find the mask. This mirrors
++                # _get_defer_select_mask's behavior.
++                if hasattr(field_or_reverse, "field"):
++                    # reverse relation
++                    field = field_or_reverse.field
++                    field_select_mask = select_mask.setdefault(field, {})
++                else:
++                    field = field_or_reverse
++                    field_select_mask = select_mask.setdefault(field, {})
++
+             if field_mask:
+                 if not field.is_relation:
+                     raise FieldError(next(iter(field_mask)))

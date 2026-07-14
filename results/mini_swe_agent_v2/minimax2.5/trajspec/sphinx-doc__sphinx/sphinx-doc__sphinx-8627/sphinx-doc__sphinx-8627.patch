@@ -1,0 +1,123 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..7eb9fde94 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -123,10 +123,12 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+             return ':obj:`Union`\\ [%s]' % args
+     elif inspect.isgenericalias(cls):
+         if getattr(cls, '_name', None):
+-            if cls.__module__ == 'typing':
++            if getattr(cls, '__module__', None) == 'typing':
+                 text = ':class:`%s`' % cls._name
+-            else:
++            elif getattr(cls, '__module__', None):
+                 text = ':class:`%s.%s`' % (cls.__module__, cls._name)
++            else:
++                text = ':class:`%s`' % cls._name
+         else:
+             text = restify(cls.__origin__)
+ 
+@@ -135,7 +137,7 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+         elif all(is_system_TypeVar(a) for a in cls.__args__):
+             # Suppress arguments if all system defined TypeVars (ex. Dict[KT, VT])
+             pass
+-        elif cls.__module__ == 'typing' and cls._name == 'Callable':
++        elif getattr(cls, '__module__', None) == 'typing' and cls._name == 'Callable':
+             args = ', '.join(restify(a) for a in cls.__args__[:-1])
+             text += r"\ [[%s], %s]" % (args, restify(cls.__args__[-1]))
+         elif cls.__args__:
+@@ -143,21 +145,28 @@ def _restify_py37(cls: Optional["Type"]) -> str:
+ 
+         return text
+     elif hasattr(cls, '__qualname__'):
+-        if cls.__module__ == 'typing':
++        if getattr(cls, '__module__', None) == 'typing':
+             return ':class:`%s`' % cls.__qualname__
+-        else:
++        elif getattr(cls, '__module__', None):
+             return ':class:`%s.%s`' % (cls.__module__, cls.__qualname__)
++        else:
++            return ':class:`%s`' % cls.__qualname__
+     elif hasattr(cls, '_name'):
+         # SpecialForm
+-        if cls.__module__ == 'typing':
++        if getattr(cls, '__module__', None) == 'typing':
+             return ':obj:`%s`' % cls._name
+-        else:
++        elif getattr(cls, '__module__', None):
+             return ':obj:`%s.%s`' % (cls.__module__, cls._name)
++        else:
++            return ':obj:`%s`' % cls._name
+     elif isinstance(cls, ForwardRef):
+         return ':class:`%s`' % cls.__forward_arg__
+     else:
+         # not a class (ex. TypeVar)
+-        return ':obj:`%s.%s`' % (cls.__module__, cls.__name__)
++        if getattr(cls, '__module__', None):
++            return ':obj:`%s.%s`' % (cls.__module__, cls.__name__)
++        else:
++            return ':obj:`%s`' % cls.__name__
+ 
+ 
+ def _restify_py36(cls: Optional["Type"]) -> str:
+@@ -173,8 +182,10 @@ def _restify_py36(cls: Optional["Type"]) -> str:
+             qualname = stringify(cls.__origin__)  # ex. Union
+         else:
+             qualname = repr(cls).replace('typing.', '')
+-    elif hasattr(cls, '__qualname__'):
++    elif module and hasattr(cls, '__qualname__'):
+         qualname = '%s.%s' % (module, cls.__qualname__)
++    elif hasattr(cls, '__qualname__'):
++        qualname = cls.__qualname__
+     else:
+         qualname = repr(cls)
+ 
+@@ -260,16 +271,20 @@ def _restify_py36(cls: Optional["Type"]) -> str:
+         else:
+             return ':class:`%s`' % qualname
+     elif hasattr(cls, '__qualname__'):
+-        if cls.__module__ == 'typing':
++        if getattr(cls, '__module__', None) == 'typing':
+             return ':class:`%s`' % cls.__qualname__
+-        else:
++        elif getattr(cls, '__module__', None):
+             return ':class:`%s.%s`' % (cls.__module__, cls.__qualname__)
++        else:
++            return ':class:`%s`' % cls.__qualname__
+     elif hasattr(cls, '_name'):
+         # SpecialForm
+-        if cls.__module__ == 'typing':
++        if getattr(cls, '__module__', None) == 'typing':
+             return ':obj:`%s`' % cls._name
+-        else:
++        elif getattr(cls, '__module__', None):
+             return ':obj:`%s.%s`' % (cls.__module__, cls._name)
++        else:
++            return ':obj:`%s`' % cls._name
+     elif hasattr(cls, '__name__'):
+         # not a class (ex. TypeVar)
+         return ':obj:`%s.%s`' % (cls.__module__, cls.__name__)
+@@ -324,8 +339,10 @@ def _stringify_py37(annotation: Any) -> str:
+             qualname = annotation.__forward_arg__
+         else:
+             qualname = stringify(annotation.__origin__)  # ex. Union
+-    elif hasattr(annotation, '__qualname__'):
++    elif module and hasattr(annotation, '__qualname__'):
+         qualname = '%s.%s' % (module, annotation.__qualname__)
++    elif hasattr(annotation, '__qualname__'):
++        qualname = annotation.__qualname__
+     elif hasattr(annotation, '__origin__'):
+         # instantiated generic provided by a user
+         qualname = stringify(annotation.__origin__)
+@@ -378,8 +395,10 @@ def _stringify_py36(annotation: Any) -> str:
+             qualname = stringify(annotation.__origin__)  # ex. Union
+         else:
+             qualname = repr(annotation).replace('typing.', '')
+-    elif hasattr(annotation, '__qualname__'):
++    elif module and hasattr(annotation, '__qualname__'):
+         qualname = '%s.%s' % (module, annotation.__qualname__)
++    elif hasattr(annotation, '__qualname__'):
++        qualname = annotation.__qualname__
+     else:
+         qualname = repr(annotation)
+ 

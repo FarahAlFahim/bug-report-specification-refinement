@@ -1,0 +1,46 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..9f0f671a9 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -19,15 +19,38 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    """Evaluate ``expr`` in globals ``d`` with a cache keyed by expression and
++    a stable module identity derived from the globals.
++
++    Previously the cache used only the expression string which caused identical
++    expressions in different modules to share the same cached result. We include
++    the module identity (``__file__``, ``__name__``) in the key to partition
++    cached results per-module. If both are absent we fall back to the id() of
++    the globals dict which at least distinguishes different modules in the
++    same process.
++    """
++    default = {}  # type: Dict[object, object]
+     evalcache = config._store.setdefault(evalcache_key, default)
++
++    # Build a stable context identifier from the evaluation globals. Prefer the
++    # module's __file__ and __name__ when available; if both are missing fall
++    # back to the id() of the globals dict which at least distinguishes
++    # different modules in the same process.
++    file_val = d.get("__file__")
++    name_val = d.get("__name__")
++    if file_val is None and name_val is None:
++        context = ("<globals-id>", id(d))
++    else:
++        context = (file_val, name_val)
++
++    key = (expr, context)
+     try:
+-        return evalcache[expr]
++        return evalcache[key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        evalcache[key] = x = eval(exprcode, d)
+         return x
+ 
+ 

@@ -1,0 +1,17 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7c433b3f06..161303fd7a 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1269,8 +1269,11 @@ class SQLCompiler:
+                 )
+                 get_related_klass_infos(klass_info, next_klass_infos)
+ 
+-            def local_setter(final_field, obj, from_obj):
++            def local_setter(final_field, from_obj, obj):
+                 # Set a reverse fk object when relation is non-empty.
++                # The signature must match RelatedPopulator.populate which calls
++                # local_setter(from_obj, obj). final_field is bound via
++                # functools.partial below.
+                 if from_obj:
+                     final_field.remote_field.set_cached_value(from_obj, obj)
+ 

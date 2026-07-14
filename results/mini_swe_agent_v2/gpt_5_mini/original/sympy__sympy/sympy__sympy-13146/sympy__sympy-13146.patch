@@ -1,0 +1,63 @@
+diff --git a/sympy/core/add.py b/sympy/core/add.py
+index 2ec4fff073..a35fa6f490 100644
+--- a/sympy/core/add.py
++++ b/sympy/core/add.py
+@@ -185,6 +185,23 @@ def flatten(cls, seq):
+             # s is an expression with number factor extracted
+             # let's collect terms with the same s, so e.g.
+             # 2*x**2 + 3*x**2  ->  5*x**2
++            # Normalize Pow exponents that are Floats but exactly equal
++            # to Rationals (e.g. 2.5 == 5/2). If we don't do this, two
++            # powers that are mathematically equal may have different
++            # Python hashes (Float vs Rational) and thus won't be
++            # combined when using a dict keyed by the base/exponent
++            # term. See issue: exponent doesn't fully simplify.
++            if getattr(s, 'is_Pow', False) and getattr(s.exp, 'is_Float', False):
++                try:
++                    from .numbers import Rational
++                    r = Rational(s.exp)
++                except Exception:
++                    r = None
++                else:
++                    if r is not None and s.exp == r:
++                        # recreate the power with the rational exponent
++                        s = s.func(s.base, r, evaluate=False)
++
+             if s in terms:
+                 terms[s] += c
+                 if terms[s] is S.NaN:
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 2ad720d35a..bd21a6d8a4 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,12 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    # Python 3.3+: abstract collection types live in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    # Fallback for older Pythons
++    from collections import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index d5abe84da9..807b097f7d 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,11 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    # Python 3.3+: abstract collection types live in collections.abc
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 

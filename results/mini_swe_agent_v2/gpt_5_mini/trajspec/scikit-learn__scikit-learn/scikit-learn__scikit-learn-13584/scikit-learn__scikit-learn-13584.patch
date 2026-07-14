@@ -1,0 +1,59 @@
+diff --git a/sklearn/utils/_pprint.py b/sklearn/utils/_pprint.py
+index b8686dba5..1253bf0b3 100644
+--- a/sklearn/utils/_pprint.py
++++ b/sklearn/utils/_pprint.py
+@@ -94,9 +94,52 @@ def _changed_params(estimator):
+                         estimator.__init__)
+     init_params = signature(init_func).parameters
+     init_params = {name: param.default for name, param in init_params.items()}
++    def _param_equal(a, b):
++        """Return True if parameters a and b should be considered equal.
++
++        This is robust to array-like parameters: when equality produces an
++        array of booleans we reduce it with all(). NumPy is used when
++        available for array conversions and reduction.
++        """
++        # special-case scalar NaN equality
++        if is_scalar_nan(a) and is_scalar_nan(b):
++            return True
++
++        # Fast path for identical objects
++        if a is b:
++            return True
++
++        try:
++            eq = a == b
++        except Exception:
++            return False
++
++        # If a simple boolean, return it
++        if isinstance(eq, bool):
++            return eq
++
++        # Try to use numpy to reduce array-like equality
++        try:
++            import numpy as _np
++        except Exception:
++            _np = None
++
++        if _np is not None:
++            try:
++                if isinstance(eq, _np.ndarray):
++                    return bool(_np.all(eq))
++            except Exception:
++                # fall through to generic all()
++                pass
++
++        # Fallback: if eq is an iterable of booleans, use all()
++        try:
++            return all(eq)
++        except Exception:
++            return False
++
+     for k, v in params.items():
+-        if (v != init_params[k] and
+-                not (is_scalar_nan(init_params[k]) and is_scalar_nan(v))):
++        if not _param_equal(v, init_params[k]):
+             filtered_params[k] = v
+     return filtered_params
+ 

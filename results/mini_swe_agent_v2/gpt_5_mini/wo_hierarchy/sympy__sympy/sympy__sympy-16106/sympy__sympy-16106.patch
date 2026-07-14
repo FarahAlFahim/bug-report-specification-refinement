@@ -1,0 +1,70 @@
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index 1aa0ee01a2..3eb62b43db 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -443,6 +443,30 @@ def _print_Function(self, e):
+             x.appendChild(self._print(arg))
+         return x
+ 
++    def _print_Indexed(self, expr):
++        """Print an Indexed object as a subscripted expression.
++
++        Content MathML uses the <apply><subscript/>...</apply> pattern to
++        represent subscripting. We emit an <apply> element whose first child
++        is a <subscript> element followed by the printed base and each index.
++        """
++        x = self.dom.createElement('apply')
++        x.appendChild(self.dom.createElement('subscript'))
++        # base
++        x.appendChild(self._print(expr.base))
++        # indices
++        for ind in expr.indices:
++            x.appendChild(self._print(ind))
++        return x
++
++    def _print_IndexedBase(self, expr):
++        # Print the underlying label (usually a Symbol)
++        return self._print(expr.label)
++
++    def _print_Idx(self, expr):
++        # Idx carries its label as args[0]
++        return self._print(expr.label)
++
+     def _print_Basic(self, e):
+         x = self.dom.createElement(self.mathml_tag(e))
+         for arg in e.args:
+@@ -992,6 +1016,34 @@ def _print_Function(self, e):
+         mrow.appendChild(y)
+         return mrow
+ 
++    def _print_Indexed(self, expr):
++        """Print an Indexed object in Presentation MathML.
++
++        We render the base followed by a fenced list of indices (similar to
++        how subscripts are represented in other printers). For single indices
++        a simple mfenced is sufficient; for multiple indices we separate them
++        with comma operators inside the fence.
++        """
++        mrow = self.dom.createElement('mrow')
++        # print base
++        mrow.appendChild(self._print(expr.base))
++        # indices in a single fenced group
++        brac = self.dom.createElement('mfenced')
++        for i, ind in enumerate(expr.indices):
++            if i > 0:
++                comma = self.dom.createElement('mo')
++                comma.appendChild(self.dom.createTextNode(','))
++                brac.appendChild(comma)
++            brac.appendChild(self._print(ind))
++        mrow.appendChild(brac)
++        return mrow
++
++    def _print_IndexedBase(self, expr):
++        return self._print(expr.label)
++
++    def _print_Idx(self, expr):
++        return self._print(expr.label)
++
+     def _print_polylog(self, expr, exp=None):
+         mrow = self.dom.createElement('mrow')
+         m = self.dom.createElement('msub')

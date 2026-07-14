@@ -1,0 +1,32 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 25c3b44250..bc66d426db 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -139,9 +139,11 @@ def iter_modules_and_files(modules, extra_files):
+         path = Path(filename)
+         try:
+             resolved_path = path.resolve(strict=True).absolute()
+-        except FileNotFoundError:
+-            # The module could have been removed, don't fail loudly if this
+-            # is the case.
++        except (FileNotFoundError, ValueError):
++            # The module could have been removed or the path could be
++            # invalid/unresolvable (for example ValueError('embedded null byte')
++            # propagated from os.readlink). Don't fail loudly in these cases.
++            logger.debug('Skipping unresolvable module path %r', path, exc_info=True)
+             continue
+         results.add(resolved_path)
+     return frozenset(results)
+@@ -187,7 +189,11 @@ def sys_path_directories():
+         path = Path(path)
+         try:
+             resolved_path = path.resolve(strict=True).absolute()
+-        except FileNotFoundError:
++        except (FileNotFoundError, ValueError):
++            # Ignore entries that don't exist or cannot be resolved. This
++            # can happen with transient broken mounts or invalid symlink
++            # targets and should not crash the autoreloader.
++            logger.debug('Skipping unresolvable sys.path entry %r', path, exc_info=True)
+             continue
+         # If the path is a file (like a zip file), watch the parent directory.
+         if resolved_path.is_file():

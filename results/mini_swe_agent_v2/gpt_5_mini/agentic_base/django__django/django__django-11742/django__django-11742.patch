@@ -1,0 +1,85 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..f33089a5f9 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,8 +955,80 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_choices_max_length(**kwargs),
+         ]
+ 
++    def _check_choices_max_length(self, **kwargs):
++        """
++        Ensure that any stored choice values (the values saved to the DB)
++        are not longer than this field's max_length. Skip lazy translations
++        (Promise) and non-string values.
++        """
++        errors = []
++        # Nothing to do if there are no choices or no max_length defined.
++        if not self.choices or self.max_length is None:
++            return errors
++
++        def iter_values(choices):
++            """Yield stored choice values from choices, handling optgroups."""
++            for choice in choices:
++                # Special case: a bare string in choices (should be caught by
++                # Field._check_choices, but be defensive).
++                if isinstance(choice, str):
++                    yield choice
++                    continue
++                try:
++                    first, second = choice
++                except Exception:
++                    # Unexpected shape; skip
++                    continue
++                # If second is an iterable of pairs, it's an optgroup
++                if is_iterable(second) and not isinstance(second, (str, bytes, Promise)):
++                    for inner in second:
++                        try:
++                            val, _ = inner
++                        except Exception:
++                            continue
++                        yield val
++                else:
++                    # Normal (value, display) pair
++                    yield first
++
++        offending = []
++        for val in iter_values(self.choices):
++            # Skip lazy translations (Promise) and non-strings
++            if isinstance(val, Promise) or not isinstance(val, str):
++                continue
++            try:
++                length = len(val)
++            except Exception:
++                continue
++            if length > self.max_length:
++                offending.append((val, length))
++
++        if offending:
++            # Show up to a few offending values in the message.
++            display = ', '.join(repr(v) for v, _ in offending[:3])
++            plural = 's' if len(offending) != 1 else ''
++            return [
++                checks.Error(
++                    "Choice value{plural} {display} {are_is} longer than "
++                    "max_length={max_length}.".format(
++                        plural=plural,
++                        display=display,
++                        are_is='are' if len(offending) != 1 else 'is',
++                        max_length=self.max_length,
++                    ),
++                    hint=(
++                        'Either increase the field\'s max_length or shorten the '
++                        'choice value(s).'
++                    ),
++                    obj=self,
++                    id='fields.E122',
++                )
++            ]
++        return []
++
+     def _check_max_length_attribute(self, **kwargs):
+         if self.max_length is None:
+             return [

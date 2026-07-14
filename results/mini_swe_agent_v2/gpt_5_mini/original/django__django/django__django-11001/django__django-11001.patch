@@ -1,0 +1,18 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7649c39262..f124c2e259 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -32,7 +32,12 @@ class SQLCompiler:
+         self.select = None
+         self.annotation_col_map = None
+         self.klass_info = None
+-        self.ordering_parts = re.compile(r'(.*)\s(ASC|DESC)(.*)')
++        # Make the ordering_parts regex DOTALL so that it matches across
++        # multiple lines (e.g. when RawSQL contains newlines). Otherwise
++        # the leading (.*) would stop at a newline and only capture the
++        # last line, causing incorrect duplicate detection of ORDER BY
++        # clauses. See ticket/PR for details.
++        self.ordering_parts = re.compile(r'(.*)\s(ASC|DESC)(.*)', re.DOTALL)
+         self._meta_ordering = None
+ 
+     def setup_query(self):

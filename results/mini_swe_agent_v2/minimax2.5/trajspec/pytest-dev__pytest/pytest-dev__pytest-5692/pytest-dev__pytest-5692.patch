@@ -1,0 +1,29 @@
+diff --git a/src/_pytest/junitxml.py b/src/_pytest/junitxml.py
+index 15c630b1d..9841efee6 100644
+--- a/src/_pytest/junitxml.py
++++ b/src/_pytest/junitxml.py
+@@ -12,6 +12,7 @@ import functools
+ import os
+ import re
+ import sys
++import socket
+ import time
+ 
+ import py
+@@ -639,6 +640,7 @@ class LogXML:
+ 
+     def pytest_sessionstart(self):
+         self.suite_start_time = time.time()
++        self.suite_hostname = socket.getfqdn()
+ 
+     def pytest_sessionfinish(self):
+         dirname = os.path.dirname(os.path.abspath(self.logfile))
+@@ -666,6 +668,8 @@ class LogXML:
+             skipped=self.stats["skipped"],
+             tests=numtests,
+             time="%.3f" % suite_time_delta,
++            hostname=self.suite_hostname,
++            timestamp=time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(self.suite_start_time)),
+         )
+         logfile.write(Junit.testsuites([suite_node]).unicode(indent=0))
+         logfile.close()

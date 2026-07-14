@@ -1,0 +1,13 @@
+diff --git a/sympy/simplify/powsimp.py b/sympy/simplify/powsimp.py
+index a7fd30e118..d83906c3ea 100644
+--- a/sympy/simplify/powsimp.py
++++ b/sympy/simplify/powsimp.py
+@@ -429,7 +429,7 @@ def update(b):
+                             bi)  # polar can be treated like non-negative
+                     else:
+                         unk.append(bi)
+-                if len(unk) == 1 and not neg or len(neg) == 1 and not unk:
++                if e.is_integer and (len(unk) == 1 and not neg or len(neg) == 1 and not unk):
+                     # a single neg or a single unk can join the rest
+                     nonneg.extend(unk + neg)
+                     unk = neg = []

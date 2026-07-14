@@ -1,0 +1,54 @@
+diff --git a/sympy/integrals/intpoly.py b/sympy/integrals/intpoly.py
+index fc72bd206f..fdbd7d96e6 100644
+--- a/sympy/integrals/intpoly.py
++++ b/sympy/integrals/intpoly.py
+@@ -569,7 +569,20 @@ def decompose(expr, separate=False):
+             degrees = [(sum(degree_list(monom, *symbols)), monom)
+                        for monom in expr.args]
+             if separate:
+-                return [monom[1] for monom in degrees]
++                # Return monomials in a deterministic order: primarily by total degree,
++                # secondarily by SymPy's canonical ordering (monom.sort_key()).
++                def _sort_key(m):
++                    # m is a (degree, monom) pair
++                    deg, mon = m
++                    try:
++                        sk = mon.sort_key()
++                    except Exception:
++                        sk = str(mon)
++                    return (int(deg), sk)
++
++                monoms = [(deg, mon) for (deg, mon) in degrees]
++                monoms.sort(key=_sort_key)
++                return [mon for (_d, mon) in monoms]
+             else:
+                 for monom in degrees:
+                     degree, term = monom
+@@ -593,7 +606,26 @@ def decompose(expr, separate=False):
+         poly_dict[0] = expr
+ 
+     if separate:
+-        return list(poly_dict.values())
++        # Flatten poly_dict values into individual monomials and return
++        # them in a deterministic order: (total degree, canonical sort_key).
++        monomials = []
++        for deg, val in poly_dict.items():
++            if isinstance(val, Expr) and getattr(val, 'is_Add', False):
++                for mon in val.args:
++                    monomials.append((deg, mon))
++            else:
++                monomials.append((deg, val))
++
++        def _sort_key(m):
++            deg, mon = m
++            try:
++                sk = mon.sort_key()
++            except Exception:
++                sk = str(mon)
++            return (int(deg), sk)
++
++        monomials.sort(key=_sort_key)
++        return [mon for (_d, mon) in monomials]
+     return poly_dict
+ 
+ 

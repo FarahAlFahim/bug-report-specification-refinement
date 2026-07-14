@@ -1,0 +1,20 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index 11aebbc59f..fe666ddd28 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -343,6 +343,15 @@ def _blockadd(self, other):
+         else:
+             return BlockMatrix._blockadd(self, other)
+ 
++    def _entry(self, i, j, **kwargs):
++        # Handle the case when there's only one block
++        # In this case, self.blocks is a 1x1 ImmutableDenseMatrix, but
++        # accessing self.blocks[0, 0] returns the scalar 1 instead of the
++        # wrapped matrix (behavior introduced in sympy 1.5)
++        if self.blockshape == (1, 1):
++            return self.args[0][i, j]
++        return super(BlockDiagMatrix, self)._entry(i, j, **kwargs)
++
+ 
+ def block_collapse(expr):
+     """Evaluates a block matrix expression

@@ -1,0 +1,39 @@
+diff --git a/lib/matplotlib/axes/_base.py b/lib/matplotlib/axes/_base.py
+index d7820cf..7b7ae5e 100644
+--- a/lib/matplotlib/axes/_base.py
++++ b/lib/matplotlib/axes/_base.py
+@@ -3643,7 +3643,17 @@ class _AxesBase(martist.Artist):
+             if right is not None:
+                 raise TypeError("Cannot pass both 'right' and 'xmax'")
+             right = xmax
+-        return self.xaxis._set_lim(left, right, emit=emit, auto=auto)
++        # Delegate the actual limit setting to the Axis implementation.
++        # If emit is False, this call will not notify callbacks. However,
++        # an axis may be updated with emit=False because it is being updated
++        # as a sibling of a shared axis. In that case, we still want the
++        # Axes-level 'xlim_changed' callbacks to run. Call them here when
++        # emit is False to ensure observers are notified of changes coming
++        # from shared axis propagation.
++        res = self.xaxis._set_lim(left, right, emit=emit, auto=auto)
++        if not emit:
++            self.callbacks.process('xlim_changed', self)
++        return res
+ 
+     get_xscale = _axis_method_wrapper("xaxis", "get_scale")
+     set_xscale = _axis_method_wrapper("xaxis", "_set_axes_scale")
+@@ -3874,7 +3884,14 @@ class _AxesBase(martist.Artist):
+             if top is not None:
+                 raise TypeError("Cannot pass both 'top' and 'ymax'")
+             top = ymax
+-        return self.yaxis._set_lim(bottom, top, emit=emit, auto=auto)
++        # See corresponding note in set_xlim above: if this axis is being
++        # updated as a sibling of a shared axis, the Axis-level call with
++        # emit=False will not notify callbacks. Ensure Axes-level
++        # 'ylim_changed' callbacks are still invoked in that case.
++        res = self.yaxis._set_lim(bottom, top, emit=emit, auto=auto)
++        if not emit:
++            self.callbacks.process('ylim_changed', self)
++        return res
+ 
+     get_yscale = _axis_method_wrapper("yaxis", "get_scale")
+     set_yscale = _axis_method_wrapper("yaxis", "_set_axes_scale")

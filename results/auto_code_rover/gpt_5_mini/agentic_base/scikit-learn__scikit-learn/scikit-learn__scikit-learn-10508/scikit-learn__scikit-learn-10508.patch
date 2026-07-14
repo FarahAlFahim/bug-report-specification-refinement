@@ -1,0 +1,29 @@
+diff --git a/sklearn/preprocessing/label.py b/sklearn/preprocessing/label.py
+index 61b8d4a21a..339cafe4a4 100644
+--- a/sklearn/preprocessing/label.py
++++ b/sklearn/preprocessing/label.py
+@@ -125,6 +125,12 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         y : array-like of shape [n_samples]
+         """
+         check_is_fitted(self, 'classes_')
++
++        # Reject zero-length y explicitly before any dtype-coercing operations
++        from sklearn.utils.validation import _num_samples
++        if _num_samples(y) == 0:
++            raise ValueError('y has 0 samples: %r' % y)
++
+         y = column_or_1d(y, warn=True)
+ 
+         classes = np.unique(y)
+@@ -148,6 +154,11 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         """
+         check_is_fitted(self, 'classes_')
+ 
++        # Reject zero-length y explicitly before any dtype-coercing operations
++        from sklearn.utils.validation import _num_samples
++        if _num_samples(y) == 0:
++            raise ValueError('y has 0 samples: %r' % y)
++
+         diff = np.setdiff1d(y, np.arange(len(self.classes_)))
+         if len(diff):
+             raise ValueError(

@@ -1,0 +1,17 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index b1efba3..357d8ff 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,7 +764,11 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            # Install a get_<field>_display accessor unless the class defines
++            # one itself. Use cls.__dict__ to detect attributes defined on the
++            # class (not inherited) so subclasses receive a fresh accessor
++            # bound to their Field copy when inheriting from abstract bases.
++            if 'get_%s_display' % self.name not in cls.__dict__:
+                 setattr(
+                     cls,
+                     'get_%s_display' % self.name,

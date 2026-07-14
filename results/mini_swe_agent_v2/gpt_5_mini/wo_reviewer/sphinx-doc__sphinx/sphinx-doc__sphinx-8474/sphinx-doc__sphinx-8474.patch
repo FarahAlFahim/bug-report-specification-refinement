@@ -1,0 +1,94 @@
+diff --git a/sphinx/domains/math.py b/sphinx/domains/math.py
+index a2f4bd964..f7e637495 100644
+--- a/sphinx/domains/math.py
++++ b/sphinx/domains/math.py
+@@ -107,11 +107,24 @@ class MathDomain(Domain):
+             # TODO: perhaps use rather a sphinx-core provided prefix here?
+             node_id = make_id('equation-%s' % target)
+             if env.config.math_numfig and env.config.numfig:
++                # env.toc_fignumbers is normally keyed by per-document docname
++                # (env.toc_fignumbers[docname][figtype][id]). However, single-file
++                # builders (like singlehtml) assemble all fignumbers under the
++                # master_doc key using aliases of the form "{docname}/{figtype}".
++                # To be compatible with both shapes, first try the per-doc
++                # lookup and then a fallback to the assembled master_doc map.
+                 if docname in env.toc_fignumbers:
+                     numbers = env.toc_fignumbers[docname]['displaymath'].get(node_id, ())
+                     eqno = '.'.join(map(str, numbers))
+                 else:
+-                    eqno = ''
++                    # fallback: assembled single-file shape
++                    master = getattr(env.config, 'master_doc', None)
++                    if master and master in env.toc_fignumbers:
++                        alias = "%s/%s" % (docname, 'displaymath')
++                        numbers = env.toc_fignumbers[master].get(alias, {}).get(node_id, ())
++                        eqno = '.'.join(map(str, numbers))
++                    else:
++                        eqno = ''
+             else:
+                 eqno = str(number)
+ 
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index 4bde57930..e329261f2 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -1060,23 +1060,50 @@ class StandardDomain(Domain):
+         if figtype == 'section':
+             if builder.name == 'latex':
+                 return tuple()
+-            elif docname not in env.toc_secnumbers:
+-                raise ValueError  # no number assigned
++
++            # Normal builds store section numbers per-document under
++            # env.toc_secnumbers[docname]. Single-file builders assemble
++            # them under the master_doc key with aliases of the form
++            # "{docname}/{refid}". Try the per-doc mapping first and
++            # fall back to the assembled mapping when necessary.
++            if docname in env.toc_secnumbers:
++                secmap = env.toc_secnumbers[docname]
+             else:
+-                anchorname = '#' + target_node['ids'][0]
+-                if anchorname not in env.toc_secnumbers[docname]:
+-                    # try first heading which has no anchor
+-                    return env.toc_secnumbers[docname].get('')
++                master = getattr(env.config, 'master_doc', None)
++                if master and master in env.toc_secnumbers:
++                    alias = "%s/%s" % (docname, '#' + target_node['ids'][0])
++                    # assembled mapping stores keys without the leading '#'
++                    # for the empty anchor as well, so try both forms.
++                    secmap = env.toc_secnumbers[master].get(alias, {})
+                 else:
+-                    return env.toc_secnumbers[docname].get(anchorname)
++                    raise ValueError  # no number assigned
++
++            anchorname = '#' + target_node['ids'][0]
++            if anchorname not in secmap:
++                # try first heading which has no anchor
++                return secmap.get('')
++            else:
++                return secmap.get(anchorname)
+         else:
+             try:
+                 figure_id = target_node['ids'][0]
++                # try per-document mapping first
+                 return env.toc_fignumbers[docname][figtype][figure_id]
+-            except (KeyError, IndexError) as exc:
++            except (KeyError, IndexError):
++                # Fallback for single-file builders: they assemble all
++                # fignumbers under master_doc with alias keys of the
++                # form "{docname}/{figtype}".
++                master = getattr(env.config, 'master_doc', None)
++                if master and master in env.toc_fignumbers:
++                    alias = "%s/%s" % (docname, figtype)
++                    try:
++                        return env.toc_fignumbers[master][alias][figure_id]
++                    except Exception:
++                        pass
++
+                 # target_node is found, but fignumber is not assigned.
+                 # Maybe it is defined in orphaned document.
+-                raise ValueError from exc
++                raise ValueError
+ 
+     def get_full_qualified_name(self, node: Element) -> str:
+         if node.get('reftype') == 'option':

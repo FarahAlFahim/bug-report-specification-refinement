@@ -1,0 +1,24 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 2c50002de3..3854df7112 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1361,7 +1361,8 @@ def _eval_power(self, expt):
+         if self == 0:
+             if expt.is_positive:
+                 return S.Zero
+-            if expt.is_negative:
++            # treat extended negative (including -oo) as negative exponent
++            if expt.is_negative or expt.is_extended_negative:
+                 return S.Infinity
+         if isinstance(expt, Number):
+             if isinstance(expt, Integer):
+@@ -2625,7 +2626,8 @@ def __neg__():
+     def _eval_power(self, expt):
+         if expt.is_positive:
+             return self
+-        if expt.is_negative:
++        # treat extended negative (including -oo) as negative exponent
++        if expt.is_negative or expt.is_extended_negative:
+             return S.ComplexInfinity
+         if expt.is_extended_real is False:
+             return S.NaN

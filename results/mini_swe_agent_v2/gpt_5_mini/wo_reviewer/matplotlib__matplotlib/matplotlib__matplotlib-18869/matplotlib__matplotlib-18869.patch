@@ -1,0 +1,43 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..71daf5e8af 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,9 +148,38 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    if name == "version_info":
++        # Ensure __version__ is computed and cached.
++        ver = getattr(sys.modules[__name__], "__version__", None)
++        if ver is None:
++            ver = __getattr__("__version__")
++        # Compute a comparable version tuple per the repository's logic.
++        parsed = parse_version(ver)
++        release = getattr(parsed, "release", None)
++        if release:
++            vi = tuple(release)
++        else:
++            groups = re.findall(r"\\d+", ver)
++            vi = tuple(map(int, groups)) if groups else ()
++        global version_info
++        version_info = vi
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 
++def __dir__():
++    """Return the list of attributes available on the matplotlib module.
++
++    We include dynamically-provided attributes such as __version__ and
++    version_info so that they appear in dir(matplotlib) even before being
++    accessed.
++    """
++    attrs = set(globals().keys())
++    # Advertise dynamically-provided version attributes.
++    attrs.update({"__version__", "version_info"})
++    return sorted(attrs)
++
++
+ def _check_versions():
+ 
+     # Quickfix to ensure Microsoft Visual C++ redistributable

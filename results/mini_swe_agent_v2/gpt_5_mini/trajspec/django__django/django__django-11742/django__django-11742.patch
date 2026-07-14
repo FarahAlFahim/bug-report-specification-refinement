@@ -1,0 +1,47 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..c96d82e720 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -280,6 +280,42 @@ class Field(RegisterLookupMixin):
+             if isinstance(choices_group, str):
+                 break
+         else:
++            # After validating the shape of choices, ensure that any
++            # string-valued stored choice keys fit within the field's
++            # max_length (when that attribute is an int). We intentionally
++            # ignore lazy translation Promises here to avoid forcing
++            # evaluation of translations at check-time.
++            max_length = getattr(self, 'max_length', None)
++            # Only check when max_length is an int and choices are present.
++            if isinstance(max_length, int):
++                # Use the canonical flattened choices iterator.
++                longest = 0
++                for choice, _label in self.flatchoices:
++                    if isinstance(choice, str):
++                        try:
++                            l = len(choice)
++                        except Exception:
++                            # Be defensive: skip values that cannot be sized.
++                            continue
++                        if l > longest:
++                            longest = l
++                if longest > max_length:
++                    return [
++                        checks.Error(
++                            "Some 'choices' for this field have stored values "
++                            "longer than the field's 'max_length' (%(max_length)s).",
++                            hint=(
++                                "Ensure each stored choice value fits within "
++                                "max_length=%(max_length)s. Longest choice: %(longest)s."
++                            ),
++                            obj=self,
++                            id='fields.E122',
++                            params={
++                                'max_length': max_length,
++                                'longest': longest,
++                            },
++                        )
++                    ]
+             return []
+ 
+         return [

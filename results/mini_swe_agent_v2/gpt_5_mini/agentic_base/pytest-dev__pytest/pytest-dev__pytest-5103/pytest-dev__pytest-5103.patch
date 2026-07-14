@@ -1,0 +1,44 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..cd52c7a69 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,6 +968,22 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Special-case builtin all()/any() calls with a generator
++        # expression: convert the generator expression into a list
++        # comprehension so that its contents are materialized and
++        # reported (rather than showing an opaque generator object).
++        # This is a pragmatic improvement: it avoids the unhelpful
++        # '<generator object ...>' repr in assertion messages.
++        func_node = call.func
++        # Only consider simple builtin name usage (e.g. all(...))
++        if isinstance(func_node, ast.Name) and func_node.id in ("all", "any"):
++            if len(call.args) == 1 and isinstance(call.args[0], ast.GeneratorExp):
++                gen = call.args[0]
++                # Turn generator expression into an equivalent list
++                # comprehension so that the rewriter can show element
++                # values instead of the generator object's repr.
++                call = ast_Call(call.func, [ast.ListComp(gen.elt, gen.generators)], call.keywords)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1001,6 +1017,16 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
++        # Same special-casing as for Python3.5+ calls: convert a
++        # single-generator-argument to a list comprehension for builtins
++        # all()/any() to avoid showing generator object reprs.
++        func_node = call.func
++        if isinstance(func_node, ast.Name) and func_node.id in ("all", "any"):
++            # In the legacy ast.Call, arguments may be in call.args
++            if call.args and len(call.args) == 1 and isinstance(call.args[0], ast.GeneratorExp):
++                gen = call.args[0]
++                call = ast_Call(call.func, [ast.ListComp(gen.elt, gen.generators)], call.keywords, None, None)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []

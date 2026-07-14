@@ -1,0 +1,84 @@
+diff --git a/django/contrib/admin/checks.py b/django/contrib/admin/checks.py
+index 0fefe65e48..7a791a39e4 100644
+--- a/django/contrib/admin/checks.py
++++ b/django/contrib/admin/checks.py
+@@ -3,7 +3,13 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.conf import settings
+-from django.contrib.admin.utils import NotRelationField, flatten, get_fields_from_path
++from django.contrib.admin.utils import (
++    NotRelationField,
++    flatten,
++    get_fields_from_path,
++    label_for_field,
++    _get_non_gfk_field,
++)
+ from django.core import checks
+ from django.core.exceptions import FieldDoesNotExist
+ from django.db import models
+@@ -891,31 +897,41 @@ class ModelAdminChecks(BaseModelAdminChecks):
+             )
+ 
+     def _check_list_display_item(self, obj, item, label):
+-        if callable(item):
+-            return []
+-        elif hasattr(obj, item):
+-            return []
++        # Use the same resolution logic as label_for_field at runtime.
++        # If label_for_field can't resolve the name, treat it as admin.E108.
+         try:
+-            field = obj.model._meta.get_field(item)
++            # label_for_field will raise AttributeError when it cannot be
++            # resolved on the model, the ModelAdmin, or the form.
++            label_for_field(item, obj.model, obj)
++        except AttributeError:
++            return [
++                checks.Error(
++                    "The value of '%s' refers to '%s', which is not a "
++                    "callable, an attribute of '%s', or an attribute or "
++                    "method on '%s'."
++                    % (
++                        label,
++                        item,
++                        obj.__class__.__name__,
++                        obj.model._meta.label,
++                    ),
++                    obj=obj.__class__,
++                    id="admin.E108",
++                )
++            ]
++
++        # If the name corresponds to an actual model field, ensure it's not
++        # a many-to-many field or a reverse foreign key (same as before).
++        try:
++            field = _get_non_gfk_field(obj.model._meta, item)
+         except FieldDoesNotExist:
+-            try:
+-                field = getattr(obj.model, item)
+-            except AttributeError:
+-                return [
+-                    checks.Error(
+-                        "The value of '%s' refers to '%s', which is not a "
+-                        "callable, an attribute of '%s', or an attribute or "
+-                        "method on '%s'."
+-                        % (
+-                            label,
+-                            item,
+-                            obj.__class__.__name__,
+-                            obj.model._meta.label,
+-                        ),
+-                        obj=obj.__class__,
+-                        id="admin.E108",
+-                    )
+-                ]
++            # Not a model field (could be a callable, property, admin attr, or form field).
++            return []
++        except Exception:
++            # Any other unexpected resolution problems: treat as valid here
++            # since label_for_field already succeeded.
++            return []
++
+         if isinstance(field, models.ManyToManyField) or (
+             getattr(field, "rel", None) and field.rel.field.many_to_one
+         ):

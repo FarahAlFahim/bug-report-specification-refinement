@@ -1,0 +1,54 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index 8747844e5..12cd32fb3 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -972,7 +972,48 @@ def check_scalar(x, name, target_type, min_val=None, max_val=None):
+         If the parameter's value violates the given bounds.
+     """
+ 
+-    if not isinstance(x, target_type):
++    def _is_instance_of_target(x, target_type):
++        """Return True if x is considered an instance of target_type.
++
++        This helper relaxes strict isinstance checks to accept NumPy scalar
++        types (e.g. np.int64, np.float64) and allow Python ints where a
++        float is expected. It avoids accepting bools for numeric targets
++        unless bool is explicitly requested.
++        """
++        # If direct isinstance passes, accept immediately
++        try:
++            if isinstance(x, target_type):
++                return True
++        except TypeError:
++            # target_type might be something that isinstance doesn't like
++            pass
++
++        # If target_type is a tuple, check any of the contained types.
++        if isinstance(target_type, tuple):
++            for t in target_type:
++                if _is_instance_of_target(x, t):
++                    return True
++            return False
++
++        # Relax checks for common numeric builtin types to accept numpy
++        # scalar types and compatible Python numeric types.
++        if target_type is float:
++            # Accept real numbers (float, int, numpy scalars) but not bool
++            return isinstance(x, numbers.Real) and not isinstance(x, bool)
++        if target_type is int:
++            # Accept integral numbers (int, numpy integer scalars) but not bool
++            return isinstance(x, numbers.Integral) and not isinstance(x, bool)
++        if target_type is bool:
++            # Accept Python bool and numpy.bool_
++            return isinstance(x, (bool, np.bool_))
++
++        # Fallback to the original behavior
++        try:
++            return isinstance(x, target_type)
++        except Exception:
++            return False
++
++    if not _is_instance_of_target(x, target_type):
+         raise TypeError('`{}` must be an instance of {}, not {}.'
+                         .format(name, target_type, type(x)))
+ 

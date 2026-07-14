@@ -1,0 +1,38 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..8d67414932 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -85,9 +85,13 @@ def __mul__(self, other):
+ 
+         fact = self.scale_factor * other.scale_factor
+ 
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # Only simplify to the bare number 1 when combining two prefixes.
++        # If `other` is a Quantity, returning 1 would lose unit information
++        # (e.g. milli * W where W has a numeric scale_factor). In that case
++        # preserve the Quantity multiplied by the numeric scale factor.
++        if isinstance(other, Prefix):
++            if fact == 1:
++                return 1
+             # simplify prefix
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+@@ -102,9 +106,13 @@ def __truediv__(self, other):
+ 
+         fact = self.scale_factor / other.scale_factor
+ 
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # Only simplify to the bare number 1 when dividing two prefixes.
++        # If `other` is a Quantity, returning 1 would lose unit information
++        # (e.g. kilo / kgram-like constructions). Preserve the Quantity
++        # representation in that case.
++        if isinstance(other, Prefix):
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]

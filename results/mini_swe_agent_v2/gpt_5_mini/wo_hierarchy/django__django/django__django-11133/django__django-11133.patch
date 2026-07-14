@@ -1,0 +1,47 @@
+diff --git a/django/http/response.py b/django/http/response.py
+index 6a84e193ba..6ea424beeb 100644
+--- a/django/http/response.py
++++ b/django/http/response.py
+@@ -233,8 +233,19 @@ class HttpResponseBase:
+             return bytes(value)
+         if isinstance(value, str):
+             return bytes(value.encode(self.charset))
+-        # Handle non-string types.
+-        return str(value).encode(self.charset)
++
++        # Treat buffer-providing objects (memoryview, bytearray, array, etc.)
++        # as bytes-like rather than iterables of chunks. Attempting to create
++        # a memoryview is a reliable way to detect support for the buffer
++        # protocol across Python objects. If that succeeds, return the bytes
++        # representation of the buffer.
++        try:
++            mv = memoryview(value)
++        except Exception:
++            # Handle non-bytes-like, non-string types.
++            return str(value).encode(self.charset)
++        else:
++            return bytes(mv)
+ 
+     # These methods partially implement the file-like object interface.
+     # See https://docs.python.org/library/io.html#io.IOBase
+@@ -309,7 +320,19 @@ class HttpResponse(HttpResponseBase):
+     @content.setter
+     def content(self, value):
+         # Consume iterators upon assignment to allow repeated iteration.
+-        if hasattr(value, '__iter__') and not isinstance(value, (bytes, str)):
++        # If the value provides the buffer protocol (memoryview, bytearray,
++        # etc.), treat it as a single bytes-like object rather than an
++        # iterable of chunks. Detect buffer support by attempting to create
++        # a memoryview.
++        is_buffer = False
++        try:
++            if not isinstance(value, (bytes, str)):
++                memoryview(value)
++                is_buffer = True
++        except Exception:
++            is_buffer = False
++
++        if hasattr(value, '__iter__') and not isinstance(value, (bytes, str)) and not is_buffer:
+             content = b''.join(self.make_bytes(chunk) for chunk in value)
+             if hasattr(value, 'close'):
+                 try:

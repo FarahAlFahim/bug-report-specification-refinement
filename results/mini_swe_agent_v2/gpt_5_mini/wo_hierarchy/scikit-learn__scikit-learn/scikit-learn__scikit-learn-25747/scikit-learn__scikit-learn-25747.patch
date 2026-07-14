@@ -1,0 +1,45 @@
+diff --git a/sklearn/utils/_set_output.py b/sklearn/utils/_set_output.py
+index 335773c6a..1fd66c15e 100644
+--- a/sklearn/utils/_set_output.py
++++ b/sklearn/utils/_set_output.py
+@@ -55,11 +55,38 @@ def _wrap_in_pandas_container(
+     if isinstance(data_to_wrap, pd.DataFrame):
+         if columns is not None:
+             data_to_wrap.columns = columns
++        # Only assign the provided index if its length matches the number of
++        # rows in the transformed output. Some transformers legitimately
++        # reduce or expand the number of rows (e.g., aggregation, groupby,
++        # resample). Forcing the original input index in that case raises
++        # a pandas ValueError (Length mismatch). If lengths differ, preserve
++        # the transformed output's own index.
+         if index is not None:
+-            data_to_wrap.index = index
++            try:
++                if len(index) == data_to_wrap.shape[0]:
++                    data_to_wrap.index = index
++            except Exception:
++                # If we cannot determine lengths for any reason, avoid
++                # forcing the index to prevent unexpected errors.
++                pass
+         return data_to_wrap
+ 
+-    return pd.DataFrame(data_to_wrap, index=index, columns=columns)
++    # For non-DataFrame outputs (e.g., ndarray, Series), only pass the
++    # original input index when its length matches the output's number of
++    # rows. If lengths cannot be determined or differ, let pandas infer or
++    # preserve the output's own index.
++    use_index = None
++    if index is not None:
++        try:
++            # Some array-likes have a length corresponding to the number of
++            # rows (e.g., ndarray, Series). Use that when available.
++            if len(index) == len(data_to_wrap):
++                use_index = index
++        except Exception:
++            # If len() is not supported, fall back to not forcing the index.
++            use_index = None
++
++    return pd.DataFrame(data_to_wrap, index=use_index, columns=columns)
+ 
+ 
+ def _get_output_config(method, estimator=None):

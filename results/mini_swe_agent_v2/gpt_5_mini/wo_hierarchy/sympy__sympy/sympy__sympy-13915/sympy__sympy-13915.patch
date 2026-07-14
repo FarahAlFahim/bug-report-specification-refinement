@@ -1,0 +1,19 @@
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 4f01eeedbd..f796ce37a9 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -1002,6 +1002,14 @@ def _combine_inverse(lhs, rhs):
+         oo/oo return 1, instead of a nan.
+         """
+         if lhs == rhs:
++            # If both sides are the same special singleton that denotes an
++            # indeterminate or undefined quantity (e.g. ComplexInfinity or
++            # Zero) then the ``symbolic'' division lhs/rhs should not be
++            # collapsed to 1. For example zoo/zoo and 0/0 are indeterminate
++            # forms and should evaluate to NaN rather than 1.  Only return 1
++            # for ordinary symbolic equality.
++            if lhs is S.ComplexInfinity or lhs is S.Zero or lhs is S.NaN:
++                return S.NaN
+             return S.One
+ 
+         def check(l, r):

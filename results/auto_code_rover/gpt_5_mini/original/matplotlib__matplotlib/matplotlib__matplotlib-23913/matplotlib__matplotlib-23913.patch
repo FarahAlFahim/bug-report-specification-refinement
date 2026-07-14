@@ -1,0 +1,52 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..b733c3bb90 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -342,6 +342,10 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
++        # New keyword-only parameters to control draggable behavior at creation:
++        draggable=False,            # Whether the legend is draggable on creation.
++        draggable_use_blit=False,   # Whether to use blitting when dragging.
++        draggable_update='loc',     # Which parameter to update when dragged: 'loc' or 'bbox'.
+         ncol=1  # synonym for ncols (backward compatibility)
+     ):
+         """
+@@ -362,6 +366,23 @@ class Legend(Artist):
+         ----------------
+         %(_legend_kw_doc)s
+ 
++        draggable : bool, default False
++            Whether mouse dragging is enabled immediately after creation.
++            If True, the legend will be made draggable via
++            `Legend.set_draggable`.
++
++        draggable_use_blit : bool, default False
++            Passed to `Legend.set_draggable` as the ``use_blit`` argument.
++            When True, blitting will be used for faster dragging updates.
++
++        draggable_update : {'loc', 'bbox'}, default 'loc'
++            Passed to `Legend.set_draggable` as the ``update`` argument.
++            Controls which legend parameter is updated when the legend is
++            dragged:
++
++            - 'loc': update the *loc* parameter of the legend
++            - 'bbox': update the *bbox_to_anchor* parameter of the legend
++
+         Notes
+         -----
+         Users can specify any arbitrary location for the legend using the
+@@ -539,6 +560,12 @@ class Legend(Artist):
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
+ 
++        # If requested, enable draggable behavior immediately using the
++        # existing set_draggable machinery.
++        # Note: set_draggable will validate/create the DraggableLegend helper.
++        self.set_draggable(draggable, use_blit=draggable_use_blit,
++                           update=draggable_update)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

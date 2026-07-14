@@ -1,0 +1,46 @@
+diff --git a/sklearn/preprocessing/_encoders.py b/sklearn/preprocessing/_encoders.py
+index 1e05aba59..d57588952 100644
+--- a/sklearn/preprocessing/_encoders.py
++++ b/sklearn/preprocessing/_encoders.py
+@@ -44,8 +44,19 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
+           not do that)
+ 
+         """
++        # Use check_array to get a consistent ndarray representation first.
++        # If the input is a list-like of strings, force object dtype so that
++        # later in-place assignments cannot be truncated by numpy fixed-length
++        # string/bytes dtypes. Additionally, if the array is a numpy
++        # fixed-length string/bytes dtype (e.g. '<U8' or '|S8'), convert it
++        # to object as well to avoid truncation when replacing values with
++        # longer category strings during transform.
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        dtype = getattr(X_temp, 'dtype', None)
++        if (not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_)) or            (dtype is not None and (np.issubdtype(dtype, np.str_) or
++                                   np.issubdtype(dtype, np.bytes_))):
++            # Force object dtype to safely hold arbitrary-length python
++            # strings/bytes and to allow correct missing value detection.
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp
+@@ -554,8 +565,19 @@ class OneHotEncoder(_BaseEncoder):
+ 
+     def _transform_new(self, X):
+         """New implementation assuming categorical input"""
++        # Use check_array to get a consistent ndarray representation first.
++        # If the input is a list-like of strings, force object dtype so that
++        # later in-place assignments cannot be truncated by numpy fixed-length
++        # string/bytes dtypes. Additionally, if the array is a numpy
++        # fixed-length string/bytes dtype (e.g. '<U8' or '|S8'), convert it
++        # to object as well to avoid truncation when replacing values with
++        # longer category strings during transform.
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        dtype = getattr(X_temp, 'dtype', None)
++        if (not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_)) or            (dtype is not None and (np.issubdtype(dtype, np.str_) or
++                                   np.issubdtype(dtype, np.bytes_))):
++            # Force object dtype to safely hold arbitrary-length python
++            # strings/bytes and to allow correct missing value detection.
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp

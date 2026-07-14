@@ -1,0 +1,59 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..c8cdcd83bc 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -183,6 +183,54 @@ class ValidationError(Exception):
+         return 'ValidationError(%s)' % self
+ 
+ 
++    def __eq__(self, other):
++        """
++        Return equality based on message, code, params, error_dict, or error_list.
++        """
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++        # Check for error_dict first
++        if hasattr(self, 'error_dict'):
++            if not hasattr(other, 'error_dict'):
++                return False
++            return self.error_dict == other.error_dict
++        # Check for simple error (has message attribute)
++        if hasattr(self, 'message'):
++            if not hasattr(other, 'message'):
++                return False
++            return (
++                self.message == other.message and
++                self.code == other.code and
++                self.params == other.params
++            )
++        # List-based error (has error_list but not message or error_dict)
++        if hasattr(self, 'error_list'):
++            if not hasattr(other, 'error_list'):
++                return False
++            return self.error_list == other.error_list
++        return False
++
++    def __hash__(self):
++        """
++        Return hash based on message, code, params, error_dict, or error_list.
++        """
++        if hasattr(self, 'error_dict'):
++            # Convert lists to tuples for hashing
++            items = []
++            for key, value in self.error_dict.items():
++                items.append((key, tuple(value)))
++            return hash(('error_dict', tuple(sorted(items))))
++        if hasattr(self, 'message'):
++            # Convert params to a hashable type if it's a dict
++            params = self.params
++            if isinstance(params, dict):
++                params = tuple(sorted(params.items()))
++            return hash((self.message, self.code, params))
++        # List-based error
++        if hasattr(self, 'error_list'):
++            return hash(('error_list', tuple(self.error_list)))
++        return hash(None)
++
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""
+     pass

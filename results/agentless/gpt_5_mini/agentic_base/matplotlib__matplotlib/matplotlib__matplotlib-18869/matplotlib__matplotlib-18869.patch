@@ -1,0 +1,53 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index 320d1a7..3e49ac5 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -131,7 +131,8 @@ __bibtex__ = r"""@Article{Hunter:2007,
+ 
+ 
+ def __getattr__(name):
+-    if name == "__version__":
++    def _compute_version():
++        # compute and cache __version__ the same way as before
+         import setuptools_scm
+         global __version__  # cache it.
+         # Only shell out to a git subprocess if really needed, and not on a
+@@ -148,6 +149,38 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++
++    if name == "__version__":
++        return _compute_version()
++
++    if name == "version_info":
++        # Ensure we have a cached __version__
++        if "__version__" not in globals():
++            _compute_version()
++        ver = __version__
++
++        # Try to parse with packaging (preferred), fall back to regex parsing.
++        try:
++            from packaging.version import parse as parse_version
++            pv = parse_version(ver)
++            if hasattr(pv, "release") and pv.release:
++                vi = tuple(pv.release)
++            else:
++                # packaging couldn't give a release tuple; fall back to regex.
++                raise TypeError("no release tuple")
++        except Exception:
++            import re
++            m = re.match(r"^(\d+)(?:\.(\d+))?(?:\.(\d+))?", ver)
++            if m:
++                vi = tuple(int(g) for g in m.groups() if g is not None)
++            else:
++                # As a last resort, expose the raw version string in a single-element tuple
++                vi = (ver,)
++
++        global version_info
++        version_info = vi
++        return version_info
++
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

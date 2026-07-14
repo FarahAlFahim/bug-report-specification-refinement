@@ -1,0 +1,34 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index f208067aae..9a7daf292d 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1404,8 +1404,10 @@ class Model(metaclass=ModelBase):
+         # Skip when the relationship model wasn't found.
+         fields = (f for f in fields if isinstance(f.remote_field.through, ModelBase))
+ 
++        from django.utils.functional import make_hashable
+         for f in fields:
+-            signature = (f.remote_field.model, cls, f.remote_field.through, f.remote_field.through_fields)
++            tf = make_hashable(f.remote_field.through_fields)
++            signature = (f.remote_field.model, cls, f.remote_field.through, tf)
+             if signature in seen_intermediary_signatures:
+                 errors.append(
+                     checks.Error(
+diff --git a/django/db/models/fields/reverse_related.py b/django/db/models/fields/reverse_related.py
+index ccc2223a5f..e3a30cf63f 100644
+--- a/django/db/models/fields/reverse_related.py
++++ b/django/db/models/fields/reverse_related.py
+@@ -308,9 +308,12 @@ class ManyToManyRel(ForeignObjectRel):
+ 
+     @property
+     def identity(self):
++        # through_fields may be a list which is unhashable. Normalize it
++        # to a hashable representation for inclusion in the identity tuple.
++        from django.utils.functional import make_hashable
+         return super().identity + (
+             self.through,
+-            self.through_fields,
++            make_hashable(self.through_fields),
+             self.db_constraint,
+         )
+ 

@@ -1,0 +1,105 @@
+diff --git a/sympy/__init__.py b/sympy/__init__.py
+index 21936f61b9..b004aff3a5 100644
+--- a/sympy/__init__.py
++++ b/sympy/__init__.py
+@@ -43,6 +43,24 @@ def enable_warnings():
+ del sys
+ 
+ 
++# Provide compatibility for Python versions where collections abstract
++# base classes have been moved to collections.abc (e.g., Callable,
++# Iterable, Mapping, MutableMapping, MutableSet). Some parts of this
++# codebase import these names from the ``collections`` module. For
++# newer Pythons those live in ``collections.abc``; to avoid editing a
++# large number of files we inject aliases into the ``collections``
++# module here when they are missing.
++try:
++    import collections
++    import collections.abc as _abc
++    for name in ("Callable", "Iterable", "Mapping", "MutableMapping", "MutableSet"):
++        if not hasattr(collections, name) and hasattr(_abc, name):
++            setattr(collections, name, getattr(_abc, name))
++except Exception:
++    # If anything goes wrong, don't block import; older Pythons will
++    # already have the names in collections.
++    pass
++
+ def __sympy_debug():
+     # helper function so we don't import os globally
+     import os
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index d4ca323e0d..b8a9f4c4cb 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,12 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    # Python 3.3+: Mapping lives in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    # older Pythons have Mapping in collections
++    from collections import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+@@ -1004,6 +1010,17 @@ def fallback(self, old, new):
+                 if not hasattr(arg, '_eval_subs'):
+                     continue
+                 arg = arg._subs(old, new, **hints)
++                # If a sub-substitution yields an undefined or infinite
++                # value (e.g. zoo, oo, -oo, NaN) then the whole expression
++                # should be considered undefined under this substitution
++                # rather than attempting to rebuild the parent. This
++                # preserves the semantics that a substitution producing an
++                # undefined subexpression makes the containing expression
++                # undefined as well (see issue in PR description).
++                from .singleton import S as _S
++                if arg in (_S.ComplexInfinity, _S.Infinity,
++                           _S.NegativeInfinity, _S.NaN):
++                    return arg
+                 if not _aresame(arg, args[i]):
+                     hit = True
+                     args[i] = arg
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..812a2f9d93 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,10 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++try:
++    from collections.abc import MutableSet
++except Exception:
++    from collections import MutableSet
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +272,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index b3b0237d19..b65ce4826c 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,10 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 

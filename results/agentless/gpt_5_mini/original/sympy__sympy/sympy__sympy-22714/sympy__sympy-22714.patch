@@ -1,0 +1,80 @@
+diff --git a/sympy/parsing/sympy_parser.py b/sympy/parsing/sympy_parser.py
+index c16ec77..151fd62 100644
+--- a/sympy/parsing/sympy_parser.py
++++ b/sympy/parsing/sympy_parser.py
+@@ -1154,42 +1154,37 @@ class EvaluateFalseTransformer(ast.NodeTransformer):
+             left = self.visit(node.left)
+ 
+             rev = False
++            # Use ast.Constant for literals to be compatible across Python versions
++            one_const = ast.Constant(value=1)
++            false_const = ast.Constant(value=False)
+             if isinstance(node.op, ast.Sub):
+                 right = ast.Call(
+                     func=ast.Name(id='Mul', ctx=ast.Load()),
+-                    args=[ast.UnaryOp(op=ast.USub(), operand=ast.Num(1)), right],
+-                    keywords=[ast.keyword(arg='evaluate', value=ast.NameConstant(value=False, ctx=ast.Load()))],
+-                    starargs=None,
+-                    kwargs=None
++                    args=[ast.UnaryOp(op=ast.USub(), operand=one_const), right],
++                    keywords=[ast.keyword(arg='evaluate', value=false_const)],
+                 )
+             elif isinstance(node.op, ast.Div):
+                 if isinstance(node.left, ast.UnaryOp):
+                     left, right = right, left
+                     rev = True
+                     left = ast.Call(
+-                    func=ast.Name(id='Pow', ctx=ast.Load()),
+-                    args=[left, ast.UnaryOp(op=ast.USub(), operand=ast.Num(1))],
+-                    keywords=[ast.keyword(arg='evaluate', value=ast.NameConstant(value=False, ctx=ast.Load()))],
+-                    starargs=None,
+-                    kwargs=None
+-                )
++                        func=ast.Name(id='Pow', ctx=ast.Load()),
++                        args=[left, ast.UnaryOp(op=ast.USub(), operand=one_const)],
++                        keywords=[ast.keyword(arg='evaluate', value=false_const)],
++                    )
+                 else:
+                     right = ast.Call(
+-                    func=ast.Name(id='Pow', ctx=ast.Load()),
+-                    args=[right, ast.UnaryOp(op=ast.USub(), operand=ast.Num(1))],
+-                    keywords=[ast.keyword(arg='evaluate', value=ast.NameConstant(value=False, ctx=ast.Load()))],
+-                    starargs=None,
+-                    kwargs=None
+-                )
++                        func=ast.Name(id='Pow', ctx=ast.Load()),
++                        args=[right, ast.UnaryOp(op=ast.USub(), operand=one_const)],
++                        keywords=[ast.keyword(arg='evaluate', value=false_const)],
++                    )
+ 
+             if rev:  # undo reversal
+                 left, right = right, left
+             new_node = ast.Call(
+                 func=ast.Name(id=sympy_class, ctx=ast.Load()),
+                 args=[left, right],
+-                keywords=[ast.keyword(arg='evaluate', value=ast.NameConstant(value=False, ctx=ast.Load()))],
+-                starargs=None,
+-                kwargs=None
++                keywords=[ast.keyword(arg='evaluate', value=false_const)],
+             )
+ 
+             if sympy_class in ('Add', 'Mul'):
+@@ -1200,9 +1195,16 @@ class EvaluateFalseTransformer(ast.NodeTransformer):
+         return node
+ 
+     def visit_Call(self, node):
++        # Use the transformed node (which may have a different func after generic_visit)
+         new_node = self.generic_visit(node)
+-        if isinstance(node.func, ast.Name) and node.func.id in self.functions:
+-            new_node.keywords.append(ast.keyword(arg='evaluate', value=ast.NameConstant(value=False, ctx=ast.Load())))
++        func_node = getattr(new_node, 'func', None)
++        # Only add evaluate=False for recognized mathematical functions.
++        # Check the transformed func_node (not the original) and ensure we don't
++        # duplicate the keyword if it's already present.
++        if isinstance(func_node, ast.Name) and getattr(func_node, 'id', None) in self.functions:
++            if not any(getattr(k, 'arg', None) == 'evaluate' for k in new_node.keywords):
++                false_const = ast.Constant(value=False)
++                new_node.keywords.append(ast.keyword(arg='evaluate', value=false_const))
+         return new_node
+ 
+ 

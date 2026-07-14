@@ -1,0 +1,85 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..59550eca82 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -152,8 +152,8 @@ class Text3D(mtext.Text):
+ 
+ def text_2d_to_3d(obj, z=0, zdir='z'):
+     """Convert a Text to a Text3D object."""
++    Text3D.set_3d_properties(obj, z, zdir)
+     obj.__class__ = Text3D
+-    obj.set_3d_properties(z, zdir)
+ 
+ 
+ class Line3D(lines.Line2D):
+@@ -221,8 +221,8 @@ class Line3D(lines.Line2D):
+ def line_2d_to_3d(line, zs=0, zdir='z'):
+     """Convert a 2D line to 3D."""
+ 
++    Line3D.set_3d_properties(line, zs, zdir)
+     line.__class__ = Line3D
+-    line.set_3d_properties(zs, zdir)
+ 
+ 
+ def _path_to_3d_segment(path, zs=0, zdir='z'):
+@@ -315,8 +315,8 @@ class Line3DCollection(LineCollection):
+ def line_collection_2d_to_3d(col, zs=0, zdir='z'):
+     """Convert a LineCollection to a Line3DCollection object."""
+     segments3d = _paths_to_3d_segments(col.get_paths(), zs, zdir)
++    Line3DCollection.set_segments(col, segments3d)
+     col.__class__ = Line3DCollection
+-    col.set_segments(segments3d)
+ 
+ 
+ class Patch3D(Patch):
+@@ -379,8 +379,8 @@ def _get_patch_verts(patch):
+ def patch_2d_to_3d(patch, z=0, zdir='z'):
+     """Convert a Patch to a Patch3D object."""
+     verts = _get_patch_verts(patch)
++    Patch3D.set_3d_properties(patch, verts, z, zdir)
+     patch.__class__ = Patch3D
+-    patch.set_3d_properties(verts, z, zdir)
+ 
+ 
+ def pathpatch_2d_to_3d(pathpatch, z=0, zdir='z'):
+@@ -389,8 +389,8 @@ def pathpatch_2d_to_3d(pathpatch, z=0, zdir='z'):
+     trans = pathpatch.get_patch_transform()
+ 
+     mpath = trans.transform_path(path)
++    PathPatch3D.set_3d_properties(pathpatch, mpath, z, zdir)
+     pathpatch.__class__ = PathPatch3D
+-    pathpatch.set_3d_properties(mpath, z, zdir)
+ 
+ 
+ class Patch3DCollection(PatchCollection):
+@@ -652,12 +652,15 @@ def patch_collection_2d_to_3d(col, zs=0, zdir='z', depthshade=True):
+ 
+     """
+     if isinstance(col, PathCollection):
+-        col.__class__ = Path3DCollection
++        target_cls = Path3DCollection
+     elif isinstance(col, PatchCollection):
+-        col.__class__ = Patch3DCollection
++        target_cls = Patch3DCollection
++    else:
++        return
+     col._depthshade = depthshade
+     col._in_draw = False
+-    col.set_3d_properties(zs, zdir)
++    target_cls.set_3d_properties(col, zs, zdir)
++    col.__class__ = target_cls
+ 
+ 
+ class Poly3DCollection(PolyCollection):
+@@ -877,9 +880,9 @@ def poly_collection_2d_to_3d(col, zs=0, zdir='z'):
+     """Convert a PolyCollection to a Poly3DCollection object."""
+     segments_3d, codes = _paths_to_3d_segments_with_codes(
+             col.get_paths(), zs, zdir)
++    Poly3DCollection.set_verts_and_codes(col, segments_3d, codes)
++    Poly3DCollection.set_3d_properties(col)
+     col.__class__ = Poly3DCollection
+-    col.set_verts_and_codes(segments_3d, codes)
+-    col.set_3d_properties()
+ 
+ 
+ def juggle_axes(xs, ys, zs, zdir):

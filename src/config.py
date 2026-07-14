@@ -76,22 +76,22 @@ Examples:
   python run.py enhance --repo-instances data/by_repo/django__django.json \\
       --repo-codegraph-index data/code_graph/django__django.json \\
       --repo-local-path /path/to/django \\
-      --output data/output/multiagent_enhanced/django__django.json
+      --output data/output/trajspec/django__django.json
 
   python run.py vanilla_baseline --repo-instances data/by_repo/django__django.json \\
       --repo-codegraph-index data/code_graph/django__django.json \\
       --repo-local-path /path/to/django \\
-      --output data/output/vanilla_baseline/django__django.json
+      --output data/output/agentic_base/django__django.json
 
   python run.py raw_traj_ablation \\
-      --repo-instances data/output/enhanced/django__django.json \\
+      --repo-instances data/output/wo_reviewer/django__django.json \\
       --original-instances data/by_repo/django__django.json \\
       --repo-codegraph-index data/code_graph/django__django.json \\
       --repo-local-path /path/to/django \\
-      --output data/output/enhanced_with_raw_traj/django__django.json
+      --output data/output/wo_hierarchy/django__django.json
 
   python run.py merge --merge-original data/by_repo/django__django.json \\
-      --merge-enhanced data/output/multiagent_enhanced/django__django.json \\
+      --merge-enhanced data/output/trajspec/django__django.json \\
       --merge-output data/output/merged/django__django.json
 """
     )

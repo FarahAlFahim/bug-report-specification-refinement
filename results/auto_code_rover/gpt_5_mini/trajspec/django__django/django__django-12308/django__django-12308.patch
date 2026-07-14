@@ -1,0 +1,51 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..91d5983768 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -379,6 +379,7 @@ def help_text_for_field(name, model):
+ 
+ def display_for_field(value, field, empty_value_display):
+     from django.contrib.admin.templatetags.admin_list import _boolean_icon
++    import json
+ 
+     if getattr(field, 'flatchoices', None):
+         return dict(field.flatchoices).get(value, empty_value_display)
+@@ -398,12 +399,25 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    # JSONField and subclasses: render as JSON using the field's encoder if present.
++    elif isinstance(field, getattr(models, 'JSONField', type(None))):
++        if value is None:
++            return empty_value_display
++        try:
++            encoder = getattr(field, 'encoder', None)
++            if encoder:
++                return json.dumps(value, cls=encoder)
++            return json.dumps(value, ensure_ascii=False)
++        except Exception:
++            # Fall back to the safe string representation if JSON serialization fails.
++            return str(value)
+     else:
+         return display_for_value(value, empty_value_display)
+ 
+ 
+ def display_for_value(value, empty_value_display, boolean=False):
+     from django.contrib.admin.templatetags.admin_list import _boolean_icon
++    import json
+ 
+     if boolean:
+         return _boolean_icon(value)
+@@ -419,6 +433,12 @@ def display_for_value(value, empty_value_display, boolean=False):
+         return formats.number_format(value)
+     elif isinstance(value, (list, tuple)):
+         return ', '.join(str(v) for v in value)
++    elif isinstance(value, dict):
++        try:
++            # Render dict values as JSON rather than Python repr.
++            return json.dumps(value, ensure_ascii=False)
++        except Exception:
++            return str(value)
+     else:
+         return str(value)
+ 

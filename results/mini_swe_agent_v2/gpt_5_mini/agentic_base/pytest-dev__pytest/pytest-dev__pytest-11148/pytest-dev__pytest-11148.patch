@@ -1,0 +1,98 @@
+diff --git a/pmxbot/core.py b/pmxbot/core.py
+new file mode 100644
+index 000000000..f996f70f4
+--- /dev/null
++++ b/pmxbot/core.py
+@@ -0,0 +1,24 @@
++"""pmxbot.core initialize function that sets the global logging store."""
++from . import logging as logging_mod
++
++
++def initialize(config: dict):
++    """Initialize core runtime and install a logging store object.
++
++    Historically this assigned to pmxbot.logging.Logger.store = <store>, but
++    that fails when pmxbot.logging is imported into multiple module objects.
++    We now call logging_mod.set_store(...) to install the store into a
++    process-global location.
++    """
++
++    class Store:
++        def __init__(self):
++            self.messages = []
++
++        def message(self, name, text):
++            self.messages.append((name, text))
++
++    store = Store()
++    # Use the provided API to set the global store
++    logging_mod.set_store(store)
++    return store
+diff --git a/pmxbot/logging.py b/pmxbot/logging.py
+new file mode 100644
+index 000000000..fdb7061b7
+--- /dev/null
++++ b/pmxbot/logging.py
+@@ -0,0 +1,62 @@
++"""pmxbot.logging compatibility wrapper for global log store."""
++import builtins
++from typing import Any
++
++_GLOBAL_STORE_NAME = "_pmxbot_logger_store"
++
++
++def get_store() -> Any:
++    """Return the globally registered logging store (or None)."""
++    return getattr(builtins, _GLOBAL_STORE_NAME, None)
++
++
++def set_store(store: Any) -> None:
++    """Set the global logging store in a location that is process-global.
++
++    We store it on the builtins module to avoid issues when the pmxbot.logging
++    module is imported multiple times under different module objects (e.g.
++    due to importlib import-mode or namespace packages). Using builtins ensures
++    a single shared place for the store across all importers.
++    """
++    setattr(builtins, _GLOBAL_STORE_NAME, store)
++
++
++class _GlobalStoreDescriptor:
++    """Descriptor that returns the process-global logging store.
++
++    Accessing Logger.store (on the class or instances) will return whatever
++    object was last set via set_store(). This avoids relying on a mutable
++    class attribute on a specific module object which may not be the same
++    across importers.
++    """
++
++    def __get__(self, instance, owner):
++        return get_store()
++
++
++class Logger:
++    """Minimal Logger class that forwards to the global store.
++
++    Code previously relied on mutating a class attribute on this class to
++    install a process-global 'store'. That broke when the module object
++    was duplicated. The descriptor below provides a consistent accessor
++    regardless of which module object a consumer has.
++    """
++
++    # Descriptor to access the process-global store
++    store = _GlobalStoreDescriptor()
++
++    def __init__(self, name: str):
++        self.name = name
++
++    def message(self, text: str) -> None:
++        """Forward a message to the configured store if present."""
++        store = self.store
++        if store is None:
++            raise RuntimeError("no logging store configured")
++        # If the store exposes a 'message' method, call it; otherwise try call
++        # it as a function/object.
++        if hasattr(store, "message"):
++            store.message(self.name, text)
++        else:
++            store(self.name, text)

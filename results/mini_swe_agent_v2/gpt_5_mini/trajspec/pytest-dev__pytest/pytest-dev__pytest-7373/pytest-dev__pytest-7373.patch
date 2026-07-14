@@ -1,0 +1,47 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..57ef10bc2 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -19,18 +19,38 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    """Evaluate ``expr`` using globals ``d`` and cache the result.
++
++    The cache key must include an identity for the evaluation globals because
++    identical expression strings can evaluate to different results in
++    different module contexts. We use (__name__, __file__) from the globals
++    when available as a stable module identity; if those are absent we fall
++    back to the id() of the globals mapping to avoid cross-context
++    conflation.
++    """
++    default = {}  # type: Dict[object, object]
+     evalcache = config._store.setdefault(evalcache_key, default)
++
++    # derive a stable-ish identity for the evaluation globals
++    mod_name = d.get("__name__") if isinstance(d.get("__name__"), str) else None
++    mod_file = d.get("__file__") if isinstance(d.get("__file__"), str) else None
++    if mod_name is not None or mod_file is not None:
++        gkey = (mod_name, mod_file)
++    else:
++        # fallback: use id(d) to avoid conflating evaluations that lack
++        # module-identifying entries in their globals dict
++        gkey = (None, id(d))
++
++    cache_key = (expr, gkey)
+     try:
+-        return evalcache[expr]
++        return evalcache[cache_key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        evalcache[cache_key] = x = eval(exprcode, d)
+         return x
+ 
+-
+ class MarkEvaluator:
+     def __init__(self, item: Item, name: str) -> None:
+         self.item = item

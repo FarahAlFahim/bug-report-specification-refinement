@@ -1,0 +1,42 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..b34a3073 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -21,15 +21,29 @@ class PolyFit(Stat):
+ 
+     def _fit_predict(self, data):
+ 
+-        x = data["x"]
+-        y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
+-            xx = yy = []
+-        else:
++        # Coerce to numeric and drop missing / non-finite values so that
++        # downstream numpy linear algebra routines do not receive object-
++        # dtype arrays or NaNs which can cause LinAlgError (SVD did not converge)
++        x = pd.to_numeric(data["x"], errors="coerce")
++        y = pd.to_numeric(data["y"], errors="coerce")
++
++        mask = x.notna() & y.notna() & np.isfinite(x) & np.isfinite(y)
++        x = x[mask]
++        y = y[mask]
++
++        # Need more unique x values than the polynomial order to fit
++        if x.nunique() <= self.order or len(x) == 0:
++            # Return an empty DataFrame (no fitted curve) rather than raising
++            return pd.DataFrame({"x": [], "y": []})
++
++        try:
+             p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++        except np.linalg.LinAlgError:
++            # If the fit fails for numerical reasons, return no curve
++            return pd.DataFrame({"x": [], "y": []})
++
++        xx = np.linspace(x.min(), x.max(), self.gridsize)
++        yy = np.polyval(p, xx)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 

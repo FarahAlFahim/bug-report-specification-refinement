@@ -1,0 +1,64 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..4a15dfbea9 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,6 +955,7 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_choices_max_length(**kwargs),
+         ]
+ 
+     def _check_max_length_attribute(self, **kwargs):
+@@ -978,6 +979,51 @@ class CharField(Field):
+         else:
+             return []
+ 
++    def _check_choices_max_length(self, **kwargs):
++        # If there are no choices or max_length is invalid/missing, skip this
++        # check. The _check_max_length_attribute check will report problems
++        # with max_length itself.
++        if not self.choices:
++            return []
++
++        max_length_errors = self._check_max_length_attribute(**kwargs)
++        if max_length_errors:
++            # Defer to the existing errors about max_length.
++            return []
++
++        # Import Promise locally to avoid modifying top-level imports.
++        from django.utils.functional import Promise
++
++        offending_values = []
++        # self.flatchoices yields (value, display) pairs for all choices,
++        # including grouped choices.
++        for value, _ in self.flatchoices:
++            # Skip lazy translations; their length may vary at runtime.
++            if isinstance(value, Promise):
++                continue
++            # Only consider string values (stored values in DB are strings).
++            if not isinstance(value, str):
++                continue
++            if len(value) > self.max_length:
++                # Use repr so that values with spaces or special characters are clear.
++                offending_values.append(repr(value))
++
++        if offending_values:
++            return [
++                checks.Error(
++                    "Some choices for %(field)s exceed the field's max_length (%(max_length)s). "
++                    "Offending choice values: %(values)s." % {
++                        'field': self.name or repr(self),
++                        'max_length': self.max_length,
++                        'values': ', '.join(offending_values),
++                    },
++                    hint="Increase the field's max_length or shorten the choice values.",
++                    obj=self,
++                    id='fields.E122',
++                )
++            ]
++        return []
++
+     def cast_db_type(self, connection):
+         if self.max_length is None:
+             return connection.ops.cast_char_field_without_max_length

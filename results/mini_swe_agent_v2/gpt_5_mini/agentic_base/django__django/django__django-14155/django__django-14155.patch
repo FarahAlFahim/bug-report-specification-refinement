@@ -1,0 +1,55 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..ebf4432784 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -32,8 +32,25 @@ from .utils import get_callable
+ class ResolverMatch:
+     def __init__(self, func, args, kwargs, url_name=None, app_names=None, namespaces=None, route=None, tried=None):
+         self.func = func
+-        self.args = args
+-        self.kwargs = kwargs
++
++        # If the resolved callable is a functools.partial, expose the
++        # underlying callable in the dotted path and merge any pre-specified
++        # partial args/keywords with the URL-captured args/kwargs so that
++        # the representation shows the effective call signature.
++        if isinstance(func, functools.partial):
++            # Merge positional args: partial.args come before URL-captured args.
++            partial_args = tuple(func.args) if getattr(func, 'args', None) else ()
++            self.args = tuple(partial_args) + tuple(args or ())
++
++            # Merge keyword args: partial.keywords are overridden by URL-captured kwargs.
++            partial_kwargs = dict(func.keywords) if getattr(func, 'keywords', None) else {}
++            merged_kwargs = dict(partial_kwargs)
++            if kwargs:
++                merged_kwargs.update(kwargs)
++            self.kwargs = merged_kwargs
++        else:
++            self.args = args
++            self.kwargs = kwargs
+         self.url_name = url_name
+         self.route = route
+         self.tried = tried
+@@ -45,12 +62,18 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # For display purposes, use the underlying callable for partials so
++        # that the dotted path reflects the actual function/class being
++        # invoked rather than 'functools.partial'.
++        display_callable = func.func if isinstance(func, functools.partial) else func
++
++        if not hasattr(display_callable, '__name__'):
++            # A class-based view or callable instance
++            self._func_path = display_callable.__class__.__module__ + '.' + display_callable.__class__.__name__
+         else:
+             # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            # Use __qualname__ when available to better represent nested callables.
++            self._func_path = display_callable.__module__ + '.' + getattr(display_callable, '__qualname__', display_callable.__name__)
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])

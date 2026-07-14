@@ -1,0 +1,24 @@
+diff --git a/sklearn/model_selection/_split.py b/sklearn/model_selection/_split.py
+index 8743303..ab9edad 100644
+--- a/sklearn/model_selection/_split.py
++++ b/sklearn/model_selection/_split.py
+@@ -1164,6 +1164,19 @@ class _RepeatedSplits(metaclass=ABCMeta):
+         return cv.get_n_splits(X, y, groups) * self.n_repeats
+ 
+ 
++    def __repr__(self):
++        # Build a repr that shows the cv constructor arguments (cvargs),
++        # the number of repeats and the random state. This mirrors the
++        # expected representation such as:
++        # RepeatedKFold(n_splits=5, n_repeats=10, random_state=None)
++        params = []
++        for key, value in self.cvargs.items():
++            params.append(f"{key}={value!r}")
++        params.append(f"n_repeats={self.n_repeats!r}")
++        params.append(f"random_state={self.random_state!r}")
++        return f"{self.__class__.__name__}({', '.join(params)})"
++
++
+ class RepeatedKFold(_RepeatedSplits):
+     """Repeated K-Fold cross validator.
+ 

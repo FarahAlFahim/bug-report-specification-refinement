@@ -1,0 +1,85 @@
+diff --git a/sklearn/neighbors/approximate.py b/sklearn/neighbors/approximate.py
+index 6a3fd571b..49f26d7aa 100644
+--- a/sklearn/neighbors/approximate.py
++++ b/sklearn/neighbors/approximate.py
+@@ -431,6 +431,10 @@ class LSHForest(BaseEstimator, KNeighborsMixin, RadiusNeighborsMixin):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        n_neighbors = int(n_neighbors)
++        if n_neighbors < 1:
++            raise ValueError("n_neighbors must be >= 1. Got %s" % n_neighbors)
++
+         X = check_array(X, accept_sparse='csr')
+ 
+         neighbors, distances = [], []
+diff --git a/sklearn/neighbors/base.py b/sklearn/neighbors/base.py
+index 3e5e729c2..75aca8e88 100644
+--- a/sklearn/neighbors/base.py
++++ b/sklearn/neighbors/base.py
+@@ -55,6 +55,33 @@ def _check_weights(weights):
+                          "'distance', or a callable function")
+ 
+ 
++
++def _check_n_neighbors(n_neighbors, n_samples=None):
++    """Check to make sure n_neighbors is valid"""
++    if n_neighbors is None:
++        return n_neighbors
++
++    # Check if n_neighbors is an integer
++    if not isinstance(n_neighbors, (int, np.integer)):
++        # Check if it's a float that is equivalent to an integer
++        if isinstance(n_neighbors, float):
++            if n_neighbors != int(n_neighbors):
++                raise ValueError("n_neighbors must be an integer. Got %s" 
++                                 % n_neighbors)
++            n_neighbors = int(n_neighbors)
++        else:
++            raise ValueError("n_neighbors must be an integer. Got %s" 
++                             % n_neighbors)
++
++    if n_neighbors < 1:
++        raise ValueError("n_neighbors must be >= 1. Got %s" % n_neighbors)
++
++    if n_samples is not None and n_neighbors > n_samples:
++        raise ValueError("n_neighbors must be <= n_samples. Got %s > %s" % 
++                        (n_neighbors, n_samples))
++
++    return n_neighbors
++
+ def _get_weights(dist, weights):
+     """Get the weights from an array of distances and a parameter ``weights``
+ 
+@@ -253,11 +280,8 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+                              % self.algorithm)
+ 
+         if self.n_neighbors is not None:
+-            if self.n_neighbors <= 0:
+-                raise ValueError(
+-                    "Expected n_neighbors > 0. Got %d" %
+-                    self.n_neighbors
+-                )
++            self.n_neighbors = _check_n_neighbors(self.n_neighbors,
++                                                  self._fit_X.shape[0])
+ 
+         return self
+ 
+@@ -328,6 +352,8 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        n_neighbors = _check_n_neighbors(n_neighbors, self._fit_X.shape[0])
++
+         if X is not None:
+             query_is_train = False
+             X = check_array(X, accept_sparse='csr')
+@@ -467,6 +493,8 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        n_neighbors = _check_n_neighbors(n_neighbors, self._fit_X.shape[0])
++
+         # kneighbors does the None handling.
+         if X is not None:
+             X = check_array(X, accept_sparse='csr')

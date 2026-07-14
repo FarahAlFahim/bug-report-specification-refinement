@@ -1,0 +1,61 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..9e8578b5a7 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -1,4 +1,5 @@
+ import builtins
++import importlib
+ import collections.abc
+ import datetime
+ import decimal
+@@ -90,14 +91,29 @@ class DeconstructableSerializer(BaseSerializer):
+ 
+     @staticmethod
+     def _serialize_path(path):
+-        module, name = path.rsplit(".", 1)
+-        if module == "django.db.models":
+-            imports = {"from django.db import models"}
+-            name = "models.%s" % name
+-        else:
+-            imports = {"import %s" % module}
+-            name = path
+-        return name, imports
++        # Attempt to find the longest leading module path that can be
++        # imported. This handles class __qualname__ values that include
++        # dots (for nested/inner classes), e.g. "myapp.models.Outer.Inner".
++        parts = path.split('.')
++        for i in range(len(parts) - 1, 0, -1):
++            module_candidate = '.'.join(parts[:i])
++            try:
++                importlib.import_module(module_candidate)
++            except Exception:
++                continue
++            # Special-case django.db.models to use the models alias
++            if module_candidate == 'django.db.models':
++                rest = '.'.join(parts[i:])
++                return 'models.%s' % rest, {"from django.db import models"}
++            return path, {"import %s" % module_candidate}
++
++        # If we couldn't find an importable module, fall back to previous
++        # behavior but guard against non-importable local objects (which
++        # often contain '<' in their qualname).
++        module, name = path.rsplit('.', 1)
++        if '<' in name or '<' in module:
++            raise ValueError('Could not serialize path %r: the object appears to be local.' % path)
++        return path, {"import %s" % module}
+ 
+     def serialize(self):
+         return self.serialize_deconstructed(*self.value.deconstruct())
+@@ -269,7 +285,11 @@ class TypeSerializer(BaseSerializer):
+             if module == builtins.__name__:
+                 return self.value.__name__, set()
+             else:
+-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
++                # Use __qualname__ to preserve nested class names (e.g. Outer.Inner)
++                qualname = getattr(self.value, '__qualname__', self.value.__name__)
++                if '<' in qualname:
++                    raise ValueError('Could not serialize type %r: the object appears to be local.' % self.value)
++                return "%s.%s" % (module, qualname), {"import %s" % module}
+ 
+ 
+ class UUIDSerializer(BaseSerializer):

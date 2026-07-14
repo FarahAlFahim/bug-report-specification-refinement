@@ -1,0 +1,67 @@
+diff --git a/requests/utils.py b/requests/utils.py
+index 8d17b6b2..6fc3e272 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -359,21 +359,56 @@ def get_encoding_from_headers(headers):
+ def stream_decode_response_unicode(iterator, r):
+     """Stream decodes a iterator."""
+ 
+-    if r.encoding is None:
+-        for item in iterator:
+-            yield item
++    # Determine encoding to use. If r.encoding is set, prefer that.
++    # Otherwise, attempt to determine encoding from headers, JSON BOM/guess
++    # (peeking at the first chunk), and finally fall back to utf-8.
++
++    encoding = r.encoding
++
++    # If encoding is not provided, we need to peek the first chunk to
++    # inspect any potential BOM or JSON encoding hints. We must preserve
++    # the first chunk so that it is decoded and yielded normally.
++    try:
++        first_chunk = next(iterator)
++    except StopIteration:
+         return
+ 
+-    decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
++    # Only attempt header/BOM-based detection when no explicit encoding.
++    if not encoding:
++        # Try charset from content-type header first
++        encoding = get_encoding_from_headers(r.headers)
++
++        # If still unknown, try JSON BOM/guess based on the first chunk
++        if not encoding and first_chunk:
++            try:
++                # guess_json_utf inspects up to the first 4 bytes itself
++                guessed = guess_json_utf(first_chunk)
++            except Exception:
++                guessed = None
++            if guessed is not None:
++                encoding = guessed
++
++        # Final fallback
++        if not encoding:
++            encoding = 'utf-8'
++
++    # Create an incremental decoder for the chosen encoding and decode
++    # the first chunk followed by the rest of the iterator.
++    decoder = codecs.getincrementaldecoder(encoding)(errors='replace')
++
++    # Decode and yield the first chunk (if any)
++    rv = decoder.decode(first_chunk)
++    if rv:
++        yield rv
++
+     for chunk in iterator:
+         rv = decoder.decode(chunk)
+         if rv:
+             yield rv
++
+     rv = decoder.decode(b'', final=True)
+     if rv:
+         yield rv
+-
+-
+ def iter_slices(string, slice_length):
+     """Iterate over slices of a string."""
+     pos = 0

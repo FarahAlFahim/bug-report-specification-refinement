@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..96f7181cbf 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -99,6 +99,35 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_Derivative(self, expr):
++        """Print Derivative using Mathematica's D[...] form.
++
++        The StrPrinter prints Derivative(...) which is not valid
++        Mathematica syntax. Use D[func, vars...] instead.
++        """
++        return "D[%s]" % self.stringify(expr.args, ", ")
++
++    def _print_Float(self, expr):
++        """Print Float using Mathematica's exponent marker '*^'.
++
++        Convert a float printed by the base CodePrinter (which uses
++        'e' notation) to Mathematica's '*^' notation and canonicalize
++        the exponent (e.g. '-04' -> '-4').
++        """
++        printed = CodePrinter._print_Float(self, expr)
++        epos = printed.find('e')
++        if epos == -1:
++            epos = printed.find('E')
++        if epos > -1:
++            mant = printed[:epos]
++            exp = printed[epos + 1:]
++            try:
++                exp_int = int(exp)
++                exp_str = str(exp_int)
++            except Exception:
++                exp_str = exp
++            return mant + '*^' + exp_str
++        return printed
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

@@ -1,0 +1,32 @@
+diff --git a/lib/matplotlib/style/core.py b/lib/matplotlib/style/core.py
+index fb0a5426e6..0aa89bc3dc 100644
+--- a/lib/matplotlib/style/core.py
++++ b/lib/matplotlib/style/core.py
+@@ -255,7 +255,26 @@ def reload_library():
+     """Reload the style library."""
+     global library
+     library = update_user_library(_base_library)
+-    available[:] = sorted(library.keys())
++    # Backwards-compatibility: expose old seaborn style names (e.g.
++    # 'seaborn-colorblind') as aliases for the new 'seaborn-v0_8-...'
++    # style names so code that indexes `plt.style.library[...]`
++    # with the legacy names does not KeyError.  We do not want to
++    # duplicate the alias names in `available` to avoid advertising
++    # deprecated names in the public listing.
++    aliases = {}
++    for name in list(library.keys()):
++        if name.startswith("seaborn-v0_8"):
++            alias = name.replace("seaborn-v0_8", "seaborn", 1)
++            # Only add an alias if it does not already exist (e.g.
++            # user-defined styles take precedence).
++            if alias not in library:
++                aliases[alias] = library[name]
++    library.update(aliases)
++    # Keep the available list to the canonical (non-deprecated)
++    # names. Exclude the generated 'seaborn-...' aliases.
++    available[:] = sorted(k for k in library.keys()
++                          if not (k.startswith("seaborn-") and
++                                  not k.startswith("seaborn-v0_8")))
+ 
+ 
+ reload_library()

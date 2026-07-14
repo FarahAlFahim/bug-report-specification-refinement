@@ -1,0 +1,53 @@
+diff --git a/seaborn/_core/scales.py b/seaborn/_core/scales.py
+index 6c9ecbc9..32a64fb5 100644
+--- a/seaborn/_core/scales.py
++++ b/seaborn/_core/scales.py
+@@ -346,7 +346,21 @@ class ContinuousBase(Scale):
+                 vmin, vmax = data.min(), data.max()
+             else:
+                 vmin, vmax = new.norm
+-            vmin, vmax = axis.convert_units((vmin, vmax))
++
++            # Ensure converted units are numeric. Axis.convert_units may
++            # return booleans or non-numeric types (e.g., when mapping
++            # boolean semantic data). Coerce to numeric floats so that
++            # subsequent transforms (e.g., forward, subtraction) work
++            # correctly and don't raise on boolean arithmetic.
++            _converted = axis.convert_units((vmin, vmax))
++            try:
++                # np.asarray handles scalars, tuples, arrays
++                vmin, vmax = (np.asarray(_converted[0]).astype(float),
++                              np.asarray(_converted[1]).astype(float))
++            except Exception:
++                # Fallback to float conversion of scalars
++                vmin, vmax = float(_converted[0]), float(_converted[1])
++
+             a = forward(vmin)
+             b = forward(vmax) - forward(vmin)
+ 
+@@ -356,11 +370,23 @@ class ContinuousBase(Scale):
+         else:
+             normalize = vmin = vmax = None
+ 
++        # Wrap axis.convert_units to coerce boolean / non-numeric inputs
++        # to floats so transforms later in the pipeline don't error.
++        def _convert_units_numeric(x):
++            out = axis.convert_units(x)
++            # If axis.convert_units returns a sequence, convert elements
++            # to numpy arrays and cast to float; otherwise cast whole value.
++            try:
++                arr = np.asarray(out)
++                return arr.astype(float)
++            except Exception:
++                return float(out)
++
+         new._pipeline = [
+-            axis.convert_units,
++            _convert_units_numeric,
+             forward,
+             normalize,
+-            prop.get_mapping(new, data)
++            prop.get_mapping(new, data),
+         ]
+ 
+         def spacer(x):

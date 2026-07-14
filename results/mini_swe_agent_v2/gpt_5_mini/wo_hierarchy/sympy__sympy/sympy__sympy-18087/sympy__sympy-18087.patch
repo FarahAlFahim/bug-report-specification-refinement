@@ -1,0 +1,47 @@
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index 89e9d96487..00f5054adc 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -323,6 +323,7 @@ def class_key(cls):
+     def _eval_refine(self, assumptions):
+         from sympy.assumptions.ask import ask, Q
+         b, e = self.as_base_exp()
++        orig_b = b
+         if ask(Q.integer(e), assumptions) and _coeff_isneg(b):
+             if ask(Q.even(e), assumptions):
+                 return Pow(-b, e)
+@@ -332,6 +333,7 @@ def _eval_refine(self, assumptions):
+     def _eval_power(self, other):
+         from sympy import Abs, arg, exp, floor, im, log, re, sign
+         b, e = self.as_base_exp()
++        orig_b = b
+         if b is S.NaN:
+             return (b**e)**other  # let __new__ handle it
+ 
+@@ -410,6 +412,18 @@ def _n2(e):
+                     s = None
+ 
+         if s is not None:
++            # Prevent unsound denesting: when taking a half-power of an even
++            # exponent we must ensure the original base is nonnegative. For
++            # example sqrt(sin(x)**2) should not denest to sin(x) when x is an
++            # unconstrained (possibly complex) symbol. Only denest when the
++            # original base is known to be extended_nonnegative.
++            try:
++                is_half = getattr(other, 'q', None) == 2
++            except Exception:
++                is_half = False
++            if is_half and getattr(e, 'is_even', False):
++                if getattr(orig_b, 'is_extended_nonnegative', None) is not True:
++                    return None
+             return s*Pow(b, e*other)
+ 
+     def _eval_Mod(self, q):
+@@ -1679,6 +1693,7 @@ def as_content_primitive(self, radical=False, clear=True):
+         """
+ 
+         b, e = self.as_base_exp()
++        orig_b = b
+         b = _keep_coeff(*b.as_content_primitive(radical=radical, clear=clear))
+         ce, pe = e.as_content_primitive(radical=radical, clear=clear)
+         if b.is_Rational:

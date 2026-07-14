@@ -1,0 +1,53 @@
+diff --git a/sympy/physics/units/systems/si.py b/sympy/physics/units/systems/si.py
+index 700495ad9d..9ab12fb172 100644
+--- a/sympy/physics/units/systems/si.py
++++ b/sympy/physics/units/systems/si.py
+@@ -333,9 +333,11 @@
+ ):
+     dimex = SI.get_dimensional_expr(_scale_factor)
+     if dimex != 1:
+-        # XXX: equivalent_dims is an instance method taking two arguments in
+-        # addition to self so this can not work:
+-        if not DimensionSystem.equivalent_dims(_dimension, Dimension(dimex)):  # type: ignore
++        # Use the DimensionSystem instance associated with the SI unit
++        # system to check dimensional equivalence. Calling the method on
++        # the class does not consult the instance's canonical dependency
++        # mappings and is therefore incorrect.
++        if not SI.get_dimension_system().equivalent_dims(_dimension, Dimension(dimex)):  # type: ignore
+             raise ValueError("quantity value and dimension mismatch")
+ del _scale_factor, _dimension
+ 
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index a436880c4b..c2b8731d19 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -175,11 +175,28 @@ def _collect_factor_and_dimension(self, expr):
+             for addend in expr.args[1:]:
+                 addend_factor, addend_dim = \
+                     self._collect_factor_and_dimension(addend)
+-                if dim != addend_dim:
++                # Use the DimensionSystem's notion of dimensional
++                # equivalence rather than structural equality of
++                # Dimension objects. This allows expressions that are
++                # dimensionally equivalent (eg. acceleration*time and
++                # velocity) to be added.
++                if not self.get_dimension_system().equivalent_dims(dim, addend_dim):
+                     raise ValueError(
+                         'Dimension of "{}" is {}, '
+                         'but it should be {}'.format(
+                             addend, addend_dim, dim))
++                # Normalize to a canonical Dimension expression based on
++                # the dimension system's dimensional dependencies. This
++                # ensures that equivalent dimensions are represented in a
++                # consistent way (for example acceleration*time ->
++                # velocity).
++                try:
++                    deps = self.get_dimension_system().get_dimensional_dependencies(dim)
++                    dim = Dimension._from_dimensional_dependencies(deps)
++                except Exception:
++                    # If for some reason we cannot canonicalize, just keep
++                    # the current representation.
++                    pass
+                 factor += addend_factor
+             return factor, dim
+         elif isinstance(expr, Derivative):

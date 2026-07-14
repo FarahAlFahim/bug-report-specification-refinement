@@ -1,0 +1,26 @@
+diff --git a/django/contrib/admin/options.py b/django/contrib/admin/options.py
+index dadd4acfa1..02b963c7b3 100644
+--- a/django/contrib/admin/options.py
++++ b/django/contrib/admin/options.py
+@@ -2037,10 +2037,20 @@ class InlineModelAdmin(BaseModelAdmin):
+         self.opts = self.model._meta
+         self.has_registered_model = admin_site.is_registered(self.model)
+         super().__init__()
++        # If an inline doesn't set a verbose_name_plural, derive it from
++        # the inline-level verbose_name (if provided) using the same
++        # convention as model Options (a simple "{}s" format). This
++        # ensures that defining verbose_name on the InlineModelAdmin
++        # affects the displayed plural for headings and related labels
++        # (e.g. "Add another ...") instead of always falling back to the
++        # underlying model's verbose_name_plural.
+         if self.verbose_name is None:
+             self.verbose_name = self.model._meta.verbose_name
+         if self.verbose_name_plural is None:
+-            self.verbose_name_plural = self.model._meta.verbose_name_plural
++            # Mirror django.db.models.options.Options behaviour: when the
++            # plural isn't provided, compute it from the singular verbose
++            # name using format_lazy('{}s', verbose_name).
++            self.verbose_name_plural = format_lazy('{}s', self.verbose_name)
+ 
+     @property
+     def media(self):

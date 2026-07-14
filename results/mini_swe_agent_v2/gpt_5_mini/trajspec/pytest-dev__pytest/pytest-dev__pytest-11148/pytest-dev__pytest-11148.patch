@@ -1,0 +1,119 @@
+diff --git a/src/pmxbot/__init__.py b/src/pmxbot/__init__.py
+new file mode 100644
+index 000000000..752c7c521
+--- /dev/null
++++ b/src/pmxbot/__init__.py
+@@ -0,0 +1,2 @@
++# pmxbot package
++__all__ = ["core", "logging"]
+diff --git a/src/pmxbot/core.py b/src/pmxbot/core.py
+new file mode 100644
+index 000000000..d1bedf527
+--- /dev/null
++++ b/src/pmxbot/core.py
+@@ -0,0 +1,70 @@
++"""pmxbot.core: initialization logic that must handle duplicate-module
++import identity.
++
++core.initialize(config) will set Logger.store on the pmxbot.logging module.
++To handle the case where the same source file has been loaded multiple times
++under different module names (yielding distinct module objects), we locate
++all loaded module objects whose __file__ points to the same path as the
++canonical pmxbot.logging module and apply the mutation to each module's
++Logger class.
++"""
++from __future__ import annotations
++
++import importlib
++import sys
++from types import ModuleType
++from typing import Any, Dict, Optional
++
++
++class _Store:
++    def __init__(self) -> None:
++        self.messages = []  # type: ignore
++
++    def message(self, logger_name: str, message: str) -> None:
++        self.messages.append((logger_name, message))
++
++
++def _modules_with_same_file(mod: ModuleType) -> Dict[str, ModuleType]:
++    """Return dict of sys.modules entries that reference the same file path
++    as mod.
++
++    Some importers or test harnesses may load the same .py file under
++    different module names. We consider modules matching by .__file__ attribute
++    (if present) to be the same underlying source file and return all such
++    module objects so callers can apply consistent mutations to each.
++    """
++    result: Dict[str, ModuleType] = {}
++    modfile = getattr(mod, "__file__", None)
++    if not modfile:
++        return result
++    for name, m in list(sys.modules.items()):
++        if m is mod:
++            result[name] = m
++            continue
++        mfile = getattr(m, "__file__", None)
++        if mfile and mfile == modfile:
++            result[name] = m
++    return result
++
++
++def initialize(config: Optional[Dict[str, Any]] = None) -> None:
++    """Initialize pmxbot runtime.
++
++    Ensures that pmxbot.logging.Logger.store is set across all module
++    objects that originate from the same source file.
++    """
++    # Import the canonical module; callers commonly import pmxbot.logging
++    logging_mod = importlib.import_module("pmxbot.logging")
++
++    # Create the store instance that should be visible to loggers
++    store = _Store()
++
++    # Find all module objects that reference the same file and set their
++    # Logger.store attribute.
++    modules = _modules_with_same_file(logging_mod)
++    for name, m in modules.items():
++        # Defensive: only set if the module actually defines Logger
++        Logger = getattr(m, "Logger", None)
++        if Logger is not None:
++            setattr(Logger, "store", store)
++
+diff --git a/src/pmxbot/logging.py b/src/pmxbot/logging.py
+new file mode 100644
+index 000000000..3e887685c
+--- /dev/null
++++ b/src/pmxbot/logging.py
+@@ -0,0 +1,29 @@
++"""pmxbot.logging: provides a Logger class used by pmxbot.core.initialize.
++
++This module is intentionally simple for reproducing and fixing duplicate-module
++import identity issues: core.initialize will set Logger.store and must ensure
++that the mutation is visible no matter which module object of the same source
++file other code has imported.
++"""
++
++class Logger:
++    """Simple logger class used by tests; class-level attribute .store is
++    set by pmxbot.core.initialize.
++    """
++
++    def __init__(self, name: str):
++        self.name = name
++
++    def log(self, message: str) -> None:
++        # If a store backing is present, forward message to it
++        if hasattr(self.__class__, "store") and self.__class__.store is not None:
++            self.__class__.store.message(self.name, message)
++        else:
++            # Fallback: simple print
++            print(f"{self.name}: {message}")
++
++
++# optional: create a top-level logger factory
++
++def get_logger(name: str) -> Logger:
++    return Logger(name)

@@ -1,0 +1,50 @@
+diff --git a/django/contrib/auth/management/__init__.py b/django/contrib/auth/management/__init__.py
+index 0b5a982617..c63a83ccf1 100644
+--- a/django/contrib/auth/management/__init__.py
++++ b/django/contrib/auth/management/__init__.py
+@@ -95,11 +95,15 @@ def create_permissions(
+         .values_list("content_type", "codename")
+     )
+ 
+-    perms = [
+-        Permission(codename=codename, name=name, content_type=ct)
+-        for ct, (codename, name) in searched_perms
+-        if (ct.pk, codename) not in all_perms
+-    ]
++    perms = []
++    for ct, (codename, name) in searched_perms:
++        if (ct.pk, codename) not in all_perms:
++            permission = Permission()
++            permission._state.db = using
++            permission.codename = codename
++            permission.name = name
++            permission.content_type = ct
++            perms.append(permission)
+     Permission.objects.using(using).bulk_create(perms)
+     if verbosity >= 2:
+         for perm in perms:
+diff --git a/django/contrib/contenttypes/management/__init__.py b/django/contrib/contenttypes/management/__init__.py
+index 903b9ab1a0..7ae8224f0a 100644
+--- a/django/contrib/contenttypes/management/__init__.py
++++ b/django/contrib/contenttypes/management/__init__.py
+@@ -131,14 +131,12 @@ def create_contenttypes(
+     if not app_models:
+         return
+ 
+-    cts = [
+-        ContentType(
+-            app_label=app_label,
+-            model=model_name,
+-        )
+-        for (model_name, model) in app_models.items()
+-        if model_name not in content_types
+-    ]
++    cts = []
++    for (model_name, model) in app_models.items():
++        if model_name not in content_types:
++            ct = ContentType(app_label=app_label, model=model_name)
++            ct._state.db = using
++            cts.append(ct)
+     ContentType.objects.using(using).bulk_create(cts)
+     if verbosity >= 2:
+         for ct in cts:

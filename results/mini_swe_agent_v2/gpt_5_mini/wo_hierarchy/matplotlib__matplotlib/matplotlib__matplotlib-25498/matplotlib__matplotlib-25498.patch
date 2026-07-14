@@ -1,0 +1,49 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..4c89df5a4f 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -509,6 +509,16 @@ class Colorbar:
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
+             self.norm = mappable.norm
++            # Ensure the newly attached norm is initialized from the mappable's
++            # data if available. This mirrors the behavior in __init__, which
++            # calls mappable.autoscale_None() when an array is present.
++            try:
++                if getattr(mappable, 'get_array', lambda: None)() is not None:
++                    mappable.autoscale_None()
++            except Exception:
++                # Be robust: if autoscale_None fails for any reason, fall
++                # back to previous behavior and continue.
++                pass
+             self._reset_locator_formatter_scale()
+ 
+         self._draw_all()
+@@ -1102,8 +1112,25 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
++            # Try to initialize vmin/vmax from the attached mappable if it has
++            # data available. This avoids setting invalid defaults for norms
++            # that require specific domains (e.g., LogNorm requires vmin>0).
++            try:
++                m = getattr(self, 'mappable', None)
++                if m is not None and getattr(m, 'get_array', lambda: None)() is not None:
++                    m.autoscale_None()
++                else:
++                    # No data available to autoscale from; fall back to 0..1
++                    self.norm.vmin = 0
++                    self.norm.vmax = 1
++            except Exception:
++                # If autoscaling fails for any reason, fall back to 0..1
++                try:
++                    self.norm.vmin = 0
++                    self.norm.vmax = 1
++                except Exception:
++                    # Give up silently; downstream code will handle errors.
++                    pass
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

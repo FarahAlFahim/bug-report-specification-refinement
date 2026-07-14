@@ -1,0 +1,60 @@
+diff --git a/sklearn/utils/_set_output.py b/sklearn/utils/_set_output.py
+index 335773c6a..606c2ccad 100644
+--- a/sklearn/utils/_set_output.py
++++ b/sklearn/utils/_set_output.py
+@@ -52,14 +52,53 @@ def _wrap_in_pandas_container(
+ 
+     pd = check_pandas_support("Setting output container to 'pandas'")
+ 
++    # If the transformer already returned a pandas DataFrame, only override
++    # its columns or index when it makes sense. In particular, do not force
++    # the original input's index when the transform reduced/expanded the
++    # number of rows (e.g. aggregation), as that would raise a length
++    # mismatch.
+     if isinstance(data_to_wrap, pd.DataFrame):
+         if columns is not None:
+             data_to_wrap.columns = columns
+-        if index is not None:
++        # Only override the index if it has the same length as the original
++        # input. This preserves meaningful indices produced by transformers
++        # that aggregate or otherwise change the row count.
++        if index is not None and len(data_to_wrap) == len(index):
+             data_to_wrap.index = index
+         return data_to_wrap
+ 
+-    return pd.DataFrame(data_to_wrap, index=index, columns=columns)
++    # If we received a pandas Series, convert to DataFrame preserving its
++    # index unless it matches the original input's index length (in which
++    # case we may safely override). This avoids forcing an incompatible
++    # index for aggregated outputs.
++    if isinstance(data_to_wrap, pd.Series):
++        df = data_to_wrap.to_frame()
++        if columns is not None:
++            try:
++                df.columns = columns
++            except Exception:
++                # If the provided columns do not match, leave as-is.
++                pass
++        if index is not None and len(df) == len(index):
++            df.index = index
++        return df
++
++    # For ndarray or other array-likes, only set the index if the length
++    # matches the original input. Otherwise, let pandas infer a suitable
++    # index (or raise if incompatible).
++    if index is not None:
++        try:
++            if hasattr(data_to_wrap, "__len__") and len(data_to_wrap) != len(index):
++                index_arg = None
++            else:
++                index_arg = index
++        except Exception:
++            # If length cannot be determined, do not pass the index.
++            index_arg = None
++    else:
++        index_arg = None
++
++    return pd.DataFrame(data_to_wrap, index=index_arg, columns=columns)
+ 
+ 
+ def _get_output_config(method, estimator=None):

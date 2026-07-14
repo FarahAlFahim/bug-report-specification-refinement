@@ -1,0 +1,56 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 25c3b44250..f66b67654b 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -132,16 +132,30 @@ def iter_modules_and_files(modules, extra_files):
+             origin = spec.loader.archive if isinstance(spec.loader, zipimporter) else spec.origin
+             sys_file_paths.append(origin)
+ 
+-    results = set()
+-    for filename in itertools.chain(sys_file_paths, extra_files):
++    def _safe_resolve(filename):
++        """Resolve a Path, swallowing filesystem errors.
++
++        Path.resolve can raise FileNotFoundError for missing files but may
++        also propagate other exceptions raised by the underlying OS calls
++        (for example ValueError from os.readlink if a symlink target
++        contains an embedded NUL). Don't let these exceptions crash the
++        autoreloader; log them at debug level and skip the offending entry.
++        """
+         if not filename:
+-            continue
++            return None
+         path = Path(filename)
+         try:
+-            resolved_path = path.resolve(strict=True).absolute()
+-        except FileNotFoundError:
+-            # The module could have been removed, don't fail loudly if this
+-            # is the case.
++            return path.resolve(strict=True).absolute()
++        except (OSError, ValueError) as exc:
++            # The module could have been removed or the path may be malformed.
++            # Don't fail loudly if this is the case.
++            logger.debug('Could not resolve path %r: %s', filename, exc)
++            return None
++
++    results = set()
++    for filename in itertools.chain(sys_file_paths, extra_files):
++        resolved_path = _safe_resolve(filename)
++        if resolved_path is None:
+             continue
+         results.add(resolved_path)
+     return frozenset(results)
+@@ -184,10 +198,10 @@ def sys_path_directories():
+     exist.
+     """
+     for path in sys.path:
+-        path = Path(path)
+         try:
+-            resolved_path = path.resolve(strict=True).absolute()
+-        except FileNotFoundError:
++            resolved_path = Path(path).resolve(strict=True).absolute()
++        except (OSError, ValueError) as exc:
++            logger.debug('Could not resolve sys.path entry %r: %s', path, exc)
+             continue
+         # If the path is a file (like a zip file), watch the parent directory.
+         if resolved_path.is_file():

@@ -1,0 +1,73 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..8a8cb33d29 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5995,6 +5995,26 @@ def _generic_factor_list(expr, gens, args, method):
+                     f, _ = _poly_from_expr(f, _opt)
+                     factors[i] = (f, k)
+ 
++        # merge factors that have the same multiplicity by multiplying
++        # their polynomial parts. This handles cases where separate
++        # multiplicative arguments produce different factors with the
++        # same exponent (e.g. (x-2)**3*(x-3)**3 -> ( (x-2)*(x-3), 3 ) ).
++        def _merge_same_exp(factors):
++            if not factors:
++                return factors
++            merged = {}
++            order = []
++            for f, k in factors:
++                if k in merged:
++                    merged[k] = merged[k] * f
++                else:
++                    merged[k] = f
++                    order.append(k)
++            return [(merged[k], k) for k in order]
++
++        fp = _merge_same_exp(fp)
++        fq = _merge_same_exp(fq)
++
+         fp = _sorted_factors(fp, method)
+         fq = _sorted_factors(fq, method)
+ 
+diff --git a/sympy/polys/sqfreetools.py b/sympy/polys/sqfreetools.py
+index 1783a7744a..2a04bac9c9 100644
+--- a/sympy/polys/sqfreetools.py
++++ b/sympy/polys/sqfreetools.py
+@@ -332,6 +332,19 @@ def dup_sqf_list(f, K, all=False):
+ 
+         i += 1
+ 
++
++    # combine consecutive factors with the same multiplicity by multiplying
++    # their polynomial parts. This ensures that factors having the same
++    # exponent are returned as a single factor (their product) with that
++    # exponent (e.g. (x-2,3),(x-3,3) -> ( (x-2)*(x-3), 3 ) ).
++    if result:
++        merged = []
++        for f, k in result:
++            if merged and merged[-1][1] == k:
++                merged[-1] = (dup_mul(merged[-1][0], f, K), k)
++            else:
++                merged.append((f, k))
++        result = merged
+     return coeff, result
+ 
+ 
+@@ -420,6 +433,17 @@ def dmp_sqf_list(f, u, K, all=False):
+ 
+         i += 1
+ 
++
++    # combine consecutive factors with the same multiplicity by multiplying
++    # their polynomial parts for multivariate case as well.
++    if result:
++        merged = []
++        for f, k in result:
++            if merged and merged[-1][1] == k:
++                merged[-1] = (dmp_mul(merged[-1][0], f, u, K), k)
++            else:
++                merged.append((f, k))
++        result = merged
+     return coeff, result
+ 
+ 

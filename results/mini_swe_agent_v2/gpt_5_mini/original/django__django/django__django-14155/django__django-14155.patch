@@ -1,0 +1,33 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..38fa61e22e 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -38,6 +38,28 @@ class ResolverMatch:
+         self.route = route
+         self.tried = tried
+ 
++        # Unwrap functools.partial objects so that the underlying function
++        # and any arguments/keywords provided up-front are exposed in
++        # ResolverMatch (e.g. in __repr__). ResolverMatch should reflect
++        # the callable being invoked and include any partial-applied
++        # arguments. Call-time kwargs (passed in via ``kwargs``) should
++        # override keywords provided to the partial.
++        if isinstance(self.func, functools.partial):
++            partial_obj = self.func
++            # underlying function
++            self.func = partial_obj.func
++            # combine positional args: partial args come before resolver args
++            partial_args = tuple(partial_obj.args) if partial_obj.args else ()
++            self.args = tuple(self.args) if self.args else ()
++            self.args = partial_args + self.args
++            # combine keywords, resolver kwargs override partial keywords
++            partial_kw = partial_obj.keywords or {}
++            resolver_kw = dict(self.kwargs) if self.kwargs else {}
++            merged = {}
++            merged.update(partial_kw)
++            merged.update(resolver_kw)
++            self.kwargs = merged
++
+         # If a URLRegexResolver doesn't have a namespace or app_name, it passes
+         # in an empty value.
+         self.app_names = [x for x in app_names if x] if app_names else []

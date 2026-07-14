@@ -1,0 +1,25 @@
+diff --git a/sympy/parsing/sympy_parser.py b/sympy/parsing/sympy_parser.py
+index e403654cb4..8028dc2af8 100644
+--- a/sympy/parsing/sympy_parser.py
++++ b/sympy/parsing/sympy_parser.py
+@@ -1201,8 +1201,18 @@ def visit_BinOp(self, node):
+ 
+     def visit_Call(self, node):
+         new_node = self.generic_visit(node)
+-        if isinstance(node.func, ast.Name) and node.func.id in self.functions:
+-            new_node.keywords.append(ast.keyword(arg='evaluate', value=ast.NameConstant(value=False, ctx=ast.Load())))
++        if isinstance(node.func, ast.Name):
++            func_id = getattr(node.func, 'id', '')
++            # Only inject evaluate=False for names that are likely SymPy constructors/classes
++            # (conventionally start with an uppercase letter). This avoids adding the keyword to
++            # functions like im/re which can change runtime behavior and cause errors.
++            if func_id and func_id[0].isupper():
++                # Avoid adding duplicate 'evaluate' keyword if already present
++                if not any(getattr(k, 'arg', None) == 'evaluate' for k in new_node.keywords):
++                    new_node.keywords.append(
++                        ast.keyword(arg='evaluate',
++                                    value=ast.NameConstant(value=False, ctx=ast.Load()))
++                    )
+         return new_node
+ 
+ 

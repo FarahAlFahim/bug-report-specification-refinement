@@ -1,0 +1,53 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 6866648d4e..e7c07856b2 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -501,13 +501,20 @@ def atoms(self, *types):
+ 
+         """
+         if types:
+-            types = tuple(
+-                [t if isinstance(t, type) else type(t) for t in types])
+-        else:
+-            types = (Atom,)
++            types = tuple(t if isinstance(t, type) else type(t) for t in types)
++            result = set()
++            for expr in preorder_traversal(self):
++                if isinstance(expr, types):
++                    result.add(expr)
++            return result
++        # No types were given: the intended meaning is to return leaf nodes
++        # of the expression tree (nodes with no children). Do not rely on
++        # isinstance(..., Atom) because some classes mark themselves as
++        # Atom but still expose .args. A leaf node is therefore any Basic
++        # instance with empty .args.
+         result = set()
+         for expr in preorder_traversal(self):
+-            if isinstance(expr, types):
++            if isinstance(expr, Basic) and not expr.args:
+                 result.add(expr)
+         return result
+ 
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 5b3c244b1c..19dae63028 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1172,10 +1172,14 @@ def atoms(self, *types):
+         {x}
+         """
+ 
+-        types = tuple(t if isinstance(t, type) else type(t) for t in types)
+-        if not types:
+-            types = (Atom,)
+-        return self._eval_atoms(*types)
++        # If types are given, normalize them to classes and pass through to
++        # the element-wise atom evaluation. If no types are given, do not
++        # force the default to (Atom,) here; let Basic.atoms() decide the
++        # correct default (which should be leaf nodes).
++        if types:
++            types = tuple(t if isinstance(t, type) else type(t) for t in types)
++            return self._eval_atoms(*types)
++        return self._eval_atoms()
+ 
+     @property
+     def free_symbols(self):

@@ -1,0 +1,112 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..86f131af02 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5950,6 +5950,33 @@ def _symbolic_factor_list(expr, opt, method):
+ 
+                 factors.append((_factors_product(other), exp))
+ 
++    # For square-free grouping we want to multiply together all
++    # irreducible factors that share the same multiplicity.  When
++    # factoring a symbolic product the factors coming from different
++    # multiplicative arguments may have the same exponent (e.g.
++    # (x-2)**3*(x-3)**3) and at this point `factors` may contain
++    # separate entries like (x-2, 3) and (x-3, 3).  Group them so
++    # that we return a single factor equal to the product of those
++    # irreducibles with that multiplicity (i.e. (x**2 - 5*x + 6, 3)).
++    if method == 'sqf':
++        grouped = {}
++
++        for f, k in factors:
++            # only group integer multiplicities (typical for sqf)
++            grouped.setdefault(k, []).append(f)
++
++        new_factors = []
++        for k, fs in grouped.items():
++            if len(fs) == 1:
++                new_factors.append((fs[0], k))
++            else:
++                # _factors_product accepts a list of (f,exp) pairs and
++                # returns the product as an Expr. Use exp=1 for each.
++                prod = _factors_product([(f, 1) for f in fs])
++                new_factors.append((prod, k))
++
++        factors = new_factors
++
+     return coeff, factors
+ 
+ 
+diff --git a/sympy/polys/sqfreetools.py b/sympy/polys/sqfreetools.py
+index 1783a7744a..b97b825107 100644
+--- a/sympy/polys/sqfreetools.py
++++ b/sympy/polys/sqfreetools.py
+@@ -314,22 +314,22 @@ def dup_sqf_list(f, K, all=False):
+ 
+     result, i = [], 1
+ 
++    # canonical square-free grouping algorithm
++    # g = gcd(f, f')
++    # p = f / g
+     h = dup_diff(f, 1, K)
+-    g, p, q = dup_inner_gcd(f, h, K)
++    g = dup_gcd(f, h, K)
++    p = dup_quo(f, g, K)
+ 
+-    while True:
+-        d = dup_diff(p, 1, K)
+-        h = dup_sub(q, d, K)
+-
+-        if not h:
+-            result.append((p, i))
+-            break
+-
+-        g, p, q = dup_inner_gcd(p, h, K)
++    while dup_degree(p) > 0:
++        G = dup_gcd(g, p, K)
++        H = dup_quo(p, G, K)
+ 
+-        if all or dup_degree(g) > 0:
+-            result.append((g, i))
++        if dup_degree(H) > 0 or all:
++            result.append((H, i))
+ 
++        g = dup_quo(g, G, K)
++        p = G
+         i += 1
+ 
+     return coeff, result
+@@ -402,22 +402,22 @@ def dmp_sqf_list(f, u, K, all=False):
+ 
+     result, i = [], 1
+ 
++    # canonical square-free grouping algorithm
++    # g = gcd(f, f')
++    # p = f / g
+     h = dmp_diff(f, 1, u, K)
+-    g, p, q = dmp_inner_gcd(f, h, u, K)
+-
+-    while True:
+-        d = dmp_diff(p, 1, u, K)
+-        h = dmp_sub(q, d, u, K)
+-
+-        if dmp_zero_p(h, u):
+-            result.append((p, i))
+-            break
++    g = dmp_gcd(f, h, u, K)
++    p = dmp_quo(f, g, u, K)
+ 
+-        g, p, q = dmp_inner_gcd(p, h, u, K)
++    while dmp_degree(p, u) > 0:
++        G = dmp_gcd(g, p, u, K)
++        H = dmp_quo(p, G, u, K)
+ 
+-        if all or dmp_degree(g, u) > 0:
+-            result.append((g, i))
++        if dmp_degree(H, u) > 0 or all:
++            result.append((H, i))
+ 
++        g = dmp_quo(g, G, u, K)
++        p = G
+         i += 1
+ 
+     return coeff, result

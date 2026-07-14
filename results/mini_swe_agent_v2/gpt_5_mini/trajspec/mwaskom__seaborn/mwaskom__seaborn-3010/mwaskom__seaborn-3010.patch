@@ -1,0 +1,27 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..41a47f0c 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -20,11 +20,19 @@ class PolyFit(Stat):
+     gridsize: int = 100
+ 
+     def _fit_predict(self, data):
++        # Drop observations with missing x or y so downstream numpy routines
++        # (e.g. np.polyfit -> np.linalg.lstsq) do not receive NaNs which can
++        # cause LinAlgError: "SVD did not converge in Linear Least Squares".
++        df = data[["x", "y"]].dropna()
+ 
+-        x = data["x"]
+-        y = data["y"]
++        x = df["x"]
++        y = df["y"]
++
++        # Any decisions about degenerate inputs (insufficient distinct x
++        # values) must be made with respect to the available, non-missing
++        # observations.
+         if x.nunique() <= self.order:
+-            # TODO warn?
++            # Not enough distinct x values to fit the requested polynomial.
+             xx = yy = []
+         else:
+             p = np.polyfit(x, y, self.order)

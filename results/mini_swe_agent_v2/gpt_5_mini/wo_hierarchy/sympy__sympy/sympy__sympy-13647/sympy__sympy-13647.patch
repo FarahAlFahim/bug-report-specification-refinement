@@ -1,0 +1,18 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 056d9bc49..74bd3a4d3 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -86,7 +86,12 @@ def entry(i, j):
+                 return self[i, j]
+             elif pos <= j < pos + other.cols:
+                 return other[i, j - pos]
+-            return self[i, j - pos - other.cols]
++            # For columns after the inserted block, the original column
++            # index is shifted left only by the number of inserted columns
++            # (other.cols). The previous implementation subtracted `pos`
++            # as well which produced an index that was too far to the
++            # left and misplaced those columns.
++            return self[i, j - other.cols]
+ 
+         return self._new(self.rows, self.cols + other.cols,
+                          lambda i, j: entry(i, j))

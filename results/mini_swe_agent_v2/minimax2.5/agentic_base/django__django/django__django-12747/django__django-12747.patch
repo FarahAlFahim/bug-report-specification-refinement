@@ -1,0 +1,20 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 16dff6a1cd..845ea55855 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -240,6 +240,15 @@ class Collector:
+         if self.can_fast_delete(objs):
+             self.fast_deletes.append(objs)
+             return
++        if not objs:
++            # For empty querysets where can_fast_delete() returns False,
++            # we still need to record the model so that delete() returns
++            # a consistent format (0, {'model_label': 0}).
++            # Only do this if objs is a queryset-like object with a model attribute.
++            if hasattr(objs, 'model'):
++                model = objs.model
++                self.data.setdefault(model, self.data.default_factory())
++            return
+         new_objs = self.add(objs, source, nullable,
+                             reverse_dependency=reverse_dependency)
+         if not new_objs:

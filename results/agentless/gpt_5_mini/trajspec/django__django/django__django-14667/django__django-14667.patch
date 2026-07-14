@@ -1,0 +1,43 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8635bf4..9df2716 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -678,7 +678,11 @@ class Query(BaseExpression):
+         "target", and the model and list of fields being added for that model.
+         """
+         field_names, defer = self.deferred_loading
+-        if not field_names:
++        # If there are no field restrictions and we're in "defer" mode,
++        # there's nothing to do. However, an empty field_names with
++        # defer==False is a meaningful state (explicitly requesting no
++        # immediate fields), so we must not return early in that case.
++        if not field_names and defer:
+             return
+         orig_opts = self.get_meta()
+         seen = {}
+@@ -2067,6 +2071,12 @@ class Query(BaseExpression):
+     def clear_deferred_loading(self):
+         """Remove any fields from the deferred loading set."""
+         self.deferred_loading = (frozenset(), True)
++        # Invalidate the cached loaded-field mapping, if present, because the
++        # deferred_loading state has changed.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_deferred_loading(self, field_names):
+         """
+@@ -2087,6 +2097,12 @@ class Query(BaseExpression):
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+             self.deferred_loading = existing.difference(field_names), False
++        # Invalidate the cached loaded-field mapping, if present, because the
++        # deferred_loading state has changed.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_immediate_loading(self, field_names):
+         """

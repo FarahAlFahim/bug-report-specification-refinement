@@ -1,0 +1,40 @@
+diff --git a/django/core/checks/translation.py b/django/core/checks/translation.py
+index 138ed07ff8..0582ead6d3 100644
+--- a/django/core/checks/translation.py
++++ b/django/core/checks/translation.py
+@@ -1,5 +1,10 @@
+ from django.conf import settings
+-from django.utils.translation.trans_real import language_code_re
++from django.conf.locale import LANG_INFO
++try:
++    from django.utils.translation.trans_real import language_code_re
++except Exception:
++    import re
++    language_code_re = re.compile(r'^[a-z]{1,8}(?:-[a-z0-9]{1,8})*(?:@[a-z0-9]{1,20})?$', re.IGNORECASE)
+ 
+ from . import Error, Tags, register
+ 
+@@ -56,6 +61,20 @@ def check_setting_languages_bidi(app_configs, **kwargs):
+ def check_language_settings_consistent(app_configs, **kwargs):
+     """Error if language settings are not consistent with each other."""
+     available_tags = {i for i, _ in settings.LANGUAGES} | {'en-us'}
+-    if settings.LANGUAGE_CODE not in available_tags:
+-        return [E004]
+-    return []
++
++    # If LANGUAGE_CODE is explicitly available, it's fine.
++    lang_code = settings.LANGUAGE_CODE
++    if lang_code in available_tags:
++        return []
++
++    # Consider documented runtime fallback behavior: accept LANGUAGE_CODE
++    # if any of its documented fallbacks (LANG_INFO) or its generic
++    # language (e.g. 'de' for 'de-at') are present in LANGUAGES.
++    possible = [lang_code]
++    possible.extend(LANG_INFO.get(lang_code, {}).get('fallback', []))
++    possible.append(lang_code.split('-')[0])
++
++    if any(code in available_tags for code in possible):
++        return []
++
++    return [E004]

@@ -1,0 +1,31 @@
+diff --git a/sklearn/calibration.py b/sklearn/calibration.py
+index 2c4a33616..100960843 100644
+--- a/sklearn/calibration.py
++++ b/sklearn/calibration.py
+@@ -760,7 +760,25 @@ class _CalibratedClassifier:
+                 # When binary, `predictions` consists only of predictions for
+                 # clf.classes_[1] but `pos_class_indices` = 0
+                 class_idx += 1
+-            proba[:, class_idx] = calibrator.predict(this_pred)
++
++            # Some calibrators (e.g. IsotonicRegression) may be wrapped by the
++            # global set_output machinery and return pandas objects such as
++            # Series or DataFrame with shape (n_samples, 1). Ensure we coerce
++            # the prediction to a 1d numpy array before assigning into the
++            # preallocated proba slice to avoid broadcasting errors.
++            calibrated = calibrator.predict(this_pred)
++            calibrated = np.asarray(calibrated)
++
++            if calibrated.ndim == 2 and calibrated.shape[1] == 1:
++                calibrated = calibrated.ravel()
++
++            if calibrated.ndim != 1:
++                raise ValueError(
++                    "Calibrator.predict must return a 1d array-like of shape "
++                    "(n_samples,), got array with shape %r" % (calibrated.shape,)
++                )
++
++            proba[:, class_idx] = calibrated
+ 
+         # Normalize the probabilities
+         if n_classes == 2:

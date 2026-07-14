@@ -1,0 +1,32 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..fe56ebab13 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -39,7 +39,7 @@ def doit(p, q):
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    p.is_Pow and p.exp.is_Integer and p.base == q and p.base.is_integer or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 
+@@ -86,10 +86,14 @@ def doit(p, q):
+             # XXX other possibilities?
+ 
+         # extract gcd; any further simplification should be done by the user
+-        G = gcd(p, q)
+-        if G != 1:
+-            p, q = [
+-                gcd_terms(i/G, clear=False, fraction=False) for i in (p, q)]
++        # but not if p = q**exp where exp is an integer and the base is not known to be an integer
++        if not (p.is_Pow and p.exp.is_Integer and p.base == q and p.base.is_integer is not True):
++            G = gcd(p, q)
++            if G != 1:
++                p, q = [
++                    gcd_terms(i/G, clear=False, fraction=False) for i in (p, q)]
++        else:
++            G = S.One
+         pwas, qwas = p, q
+ 
+         # simplify terms

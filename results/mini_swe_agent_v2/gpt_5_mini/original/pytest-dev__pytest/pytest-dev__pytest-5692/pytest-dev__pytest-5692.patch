@@ -1,0 +1,41 @@
+diff --git a/src/_pytest/junitxml.py b/src/_pytest/junitxml.py
+index 15c630b1d..02201097e 100644
+--- a/src/_pytest/junitxml.py
++++ b/src/_pytest/junitxml.py
+@@ -13,6 +13,8 @@ import os
+ import re
+ import sys
+ import time
++import socket
++import datetime
+ 
+ import py
+ 
+@@ -657,6 +659,18 @@ class LogXML:
+         )
+         logfile.write('<?xml version="1.0" encoding="utf-8"?>')
+ 
++        # include timestamp and hostname attributes on the testsuite element
++        # timestamp uses ISO8601 format without microseconds to match common junit output
++        try:
++            timestamp = datetime.datetime.fromtimestamp(self.suite_start_time).replace(microsecond=0).isoformat()
++        except Exception:
++            # fallback to an empty string if something goes wrong
++            timestamp = ""
++        try:
++            hostname = socket.gethostname()
++        except Exception:
++            hostname = ""
++
+         suite_node = Junit.testsuite(
+             self._get_global_properties_node(),
+             [x.to_xml() for x in self.node_reporters_ordered],
+@@ -666,6 +680,8 @@ class LogXML:
+             skipped=self.stats["skipped"],
+             tests=numtests,
+             time="%.3f" % suite_time_delta,
++            timestamp=timestamp,
++            hostname=hostname,
+         )
+         logfile.write(Junit.testsuites([suite_node]).unicode(indent=0))
+         logfile.close()

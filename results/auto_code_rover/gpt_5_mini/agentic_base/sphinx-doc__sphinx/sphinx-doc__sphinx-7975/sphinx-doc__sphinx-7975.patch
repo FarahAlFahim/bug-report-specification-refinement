@@ -1,0 +1,30 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 5af213932..fd3029164 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -100,6 +100,13 @@ class IndexEntries:
+ 
+         # sort the index entries; put all symbols at the front, even those
+         # following the letters in ASCII, this is where the chr(127) comes from
++        # compute canonical normalized localized "Symbols" key once so that
++        # explicit category_keys equal to the localized "Symbols" are treated
++        # as symbol groups (and not as letter groups by first-character test)
++        symkey = unicodedata.normalize('NFD', _('Symbols').lower())
++        if symkey.startswith('\N{RIGHT-TO-LEFT MARK}'):
++            symkey = symkey[1:]
++
+         def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
+             key, (void, void, category_key) = entry
+             if category_key:
+@@ -108,7 +115,10 @@ class IndexEntries:
+             lckey = unicodedata.normalize('NFD', key.lower())
+             if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 lckey = lckey[1:]
+-            if lckey[0:1].isalpha() or lckey.startswith('_'):
++            # If this normalized key equals the canonical localized "Symbols" key,
++            # treat it as a symbol group (do not prefix chr(127)). Otherwise
++            # keep the existing rule that pushes letter groups after symbol groups.
++            if not (lckey == symkey) and (lckey[0:1].isalpha() or lckey.startswith('_')):
+                 lckey = chr(127) + lckey
+             # ensure a determinstic order *within* letters by also sorting on
+             # the entry itself

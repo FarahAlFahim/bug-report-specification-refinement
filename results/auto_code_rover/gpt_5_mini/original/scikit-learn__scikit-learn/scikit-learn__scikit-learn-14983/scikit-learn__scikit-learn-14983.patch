@@ -1,0 +1,22 @@
+diff --git a/sklearn/model_selection/_split.py b/sklearn/model_selection/_split.py
+index c49a3ce6ae..3b961a2a7b 100644
+--- a/sklearn/model_selection/_split.py
++++ b/sklearn/model_selection/_split.py
+@@ -1103,6 +1103,17 @@ class _RepeatedSplits(metaclass=ABCMeta):
+         self.random_state = random_state
+         self.cvargs = cvargs
+ 
++    def __repr__(self):
++        # Build a concise, user-friendly representation including cvargs
++        # (e.g., n_splits), n_repeats and random_state.
++        params = []
++        # Sort cvargs for deterministic ordering
++        for key in sorted(self.cvargs.keys()):
++            params.append(f"{key}={self.cvargs[key]!r}")
++        params.append(f"n_repeats={self.n_repeats!r}")
++        params.append(f"random_state={self.random_state!r}")
++        return f"{self.__class__.__name__}({', '.join(params)})"
++
+     def split(self, X, y=None, groups=None):
+         """Generates indices to split data into training and test set.
+ 

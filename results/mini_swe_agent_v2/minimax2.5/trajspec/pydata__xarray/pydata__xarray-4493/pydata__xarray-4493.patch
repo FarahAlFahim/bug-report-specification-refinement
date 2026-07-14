@@ -1,0 +1,17 @@
+diff --git a/xarray/core/variable.py b/xarray/core/variable.py
+index 64c1895d..2fad6091 100644
+--- a/xarray/core/variable.py
++++ b/xarray/core/variable.py
+@@ -207,6 +207,12 @@ def as_compatible_data(data, fastpath=False):
+     if isinstance(data, NON_NUMPY_SUPPORTED_ARRAY_TYPES):
+         return _maybe_wrap_data(data)
+ 
++    if isinstance(data, xr.DataArray):
++        # Extract the underlying Variable from DataArrays to avoid
++        # triggering eager computation of dask-backed arrays
++        data = data.variable
++        return data.data
++
+     if isinstance(data, tuple):
+         data = utils.to_0d_object_array(data)
+ 

@@ -1,0 +1,79 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..609601bac1 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -152,8 +152,13 @@ class Text3D(mtext.Text):
+ 
+ def text_2d_to_3d(obj, z=0, zdir='z'):
+     """Convert a Text to a Text3D object."""
++    orig = obj.__class__
+     obj.__class__ = Text3D
+-    obj.set_3d_properties(z, zdir)
++    try:
++        obj.set_3d_properties(z, zdir)
++    except Exception:
++        obj.__class__ = orig
++        raise
+ 
+ 
+ class Line3D(lines.Line2D):
+@@ -221,8 +226,13 @@ class Line3D(lines.Line2D):
+ def line_2d_to_3d(line, zs=0, zdir='z'):
+     """Convert a 2D line to 3D."""
+ 
++    orig = line.__class__
+     line.__class__ = Line3D
+-    line.set_3d_properties(zs, zdir)
++    try:
++        line.set_3d_properties(zs, zdir)
++    except Exception:
++        line.__class__ = orig
++        raise
+ 
+ 
+ def _path_to_3d_segment(path, zs=0, zdir='z'):
+@@ -315,8 +325,13 @@ class Line3DCollection(LineCollection):
+ def line_collection_2d_to_3d(col, zs=0, zdir='z'):
+     """Convert a LineCollection to a Line3DCollection object."""
+     segments3d = _paths_to_3d_segments(col.get_paths(), zs, zdir)
++    orig = col.__class__
+     col.__class__ = Line3DCollection
+-    col.set_segments(segments3d)
++    try:
++        col.set_segments(segments3d)
++    except Exception:
++        col.__class__ = orig
++        raise
+ 
+ 
+ class Patch3D(Patch):
+@@ -379,8 +394,13 @@ def _get_patch_verts(patch):
+ def patch_2d_to_3d(patch, z=0, zdir='z'):
+     """Convert a Patch to a Patch3D object."""
+     verts = _get_patch_verts(patch)
++    orig = patch.__class__
+     patch.__class__ = Patch3D
+-    patch.set_3d_properties(verts, z, zdir)
++    try:
++        patch.set_3d_properties(verts, z, zdir)
++    except Exception:
++        patch.__class__ = orig
++        raise
+ 
+ 
+ def pathpatch_2d_to_3d(pathpatch, z=0, zdir='z'):
+@@ -389,8 +409,13 @@ def pathpatch_2d_to_3d(pathpatch, z=0, zdir='z'):
+     trans = pathpatch.get_patch_transform()
+ 
+     mpath = trans.transform_path(path)
++    orig = pathpatch.__class__
+     pathpatch.__class__ = PathPatch3D
+-    pathpatch.set_3d_properties(mpath, z, zdir)
++    try:
++        pathpatch.set_3d_properties(mpath, z, zdir)
++    except Exception:
++        pathpatch.__class__ = orig
++        raise
+ 
+ 
+ class Patch3DCollection(PatchCollection):

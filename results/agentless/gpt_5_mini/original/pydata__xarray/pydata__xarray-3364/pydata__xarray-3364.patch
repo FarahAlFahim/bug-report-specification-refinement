@@ -1,0 +1,76 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index 1ac1b8e..a442433 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -311,16 +311,30 @@ def _dataset_concat(
+     if variables_to_merge:
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++        # For each variable that should be merged, collect the Variable objects
++        # from each dataset. If a dataset is missing the variable, create a
++        # placeholder Variable filled with fill_value so that merging can proceed.
++        for var in variables_to_merge:
++            # collect present variables to determine common dims
++            present_vars = [ds.variables[var] for ds in datasets if var in ds.variables]
++            if not present_vars:
++                # shouldn't happen: variable came from parsing datasets, but be safe
++                continue
++
++            # determine common dims across present variables
++            common_dims = tuple(pd.unique([d for v in present_vars for d in v.dims]))
++            # determine shape for missing variables using dims_sizes
++            common_shape = tuple(dims_sizes.get(d, None) for d in common_dims)
++
++            for ds in datasets:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # create a Variable filled with fill_value for missing entries
++                    # Variable signature: Variable(dims, data, attrs=None, encoding=None)
++                    data = np.full(common_shape, fill_value)
++                    placeholder = Variable(common_dims, data)
++                    to_merge[var].append(placeholder)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(
+@@ -358,10 +372,26 @@ def _dataset_concat(
+     # n.b. this loop preserves variable order, needed for groupby.
+     for k in datasets[0].variables:
+         if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
++            # Build the per-dataset list of variables, inserting placeholders
++            # (filled with fill_value) for datasets that don't have this variable.
++            present_vars = [ds.variables[k] for ds in datasets if k in ds.variables]
++            if not present_vars:
++                # shouldn't happen, but be robust
++                continue
++
++            # determine dims to use for placeholders (exclude concat dim; ensure_common_dims will add it)
++            placeholder_dims = tuple(pd.unique([d for v in present_vars for d in v.dims]))
++            placeholder_shape = tuple(dims_sizes.get(d, None) for d in placeholder_dims)
++
++            vars_for_concat = []
++            for ds in datasets:
++                if k in ds.variables:
++                    vars_for_concat.append(ds.variables[k])
++                else:
++                    data = np.full(placeholder_shape, fill_value)
++                    vars_for_concat.append(Variable(placeholder_dims, data))
++
++            vars = ensure_common_dims(vars_for_concat)
+             combined = concat_vars(vars, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined

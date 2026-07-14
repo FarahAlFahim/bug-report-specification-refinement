@@ -1,0 +1,40 @@
+diff --git a/sympy/assumptions/refine.py b/sympy/assumptions/refine.py
+index e1f97190c0..f0740a4a24 100644
+--- a/sympy/assumptions/refine.py
++++ b/sympy/assumptions/refine.py
+@@ -373,10 +373,35 @@ def refine_matrixelement(expr, assumptions):
+             return expr
+         return MatrixElement(matrix, j, i)
+ 
++def refine_arg(expr, assumptions):
++    """
++    Handler for the argument (arg) function.
++
++    Simplify arg(z) under assumptions.  For real arguments this
++    can often be reduced to 0, pi or NaN.  Otherwise try to
++    rewrite the argument as atan2(im, re) and refine that.
++    """
++    from sympy import S
++    from sympy.functions.elementary.trigonometric import atan2
++
++    a = expr.args[0]
++    # If the argument is real we can often determine the value
++    if ask(Q.real(a), assumptions):
++        if ask(Q.positive(a), assumptions):
++            return S.Zero
++        if ask(Q.negative(a), assumptions):
++            return S.Pi
++        if ask(Q.zero(a), assumptions):
++            return S.NaN
++    # Fall back to rewriting as atan2(im, re) and refining that
++    x, y = a.as_real_imag()
++    return refine(atan2(y, x), assumptions)
++
+ handlers_dict = {
+     'Abs': refine_abs,
+     'Pow': refine_Pow,
+     'atan2': refine_atan2,
++    'arg': refine_arg,
+     're': refine_re,
+     'im': refine_im,
+     'sign': refine_sign,

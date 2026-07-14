@@ -1,0 +1,72 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..c792aaa17c 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -45,12 +45,33 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # For display purposes, unwrap functools.partial to show the underlying
++        # callable's dotted path (module + name/qualname). Do not mutate
++        # self.func/self.args/self.kwargs; this is only for diagnostics.
++        try:
++            import functools  # module-level import may already exist; import here to be safe
++        except Exception:
++            functools = None
++
++        display_callable = self.func
++        if functools is not None and isinstance(self.func, functools.partial):
++            display_callable = self.func.func
++
++        # Prefer __qualname__ when available, then __name__, otherwise fall
++        # back to the callable's class module/name (for callable instances).
++        if hasattr(display_callable, '__module__'):
++            module = display_callable.__module__
++        else:
++            module = display_callable.__class__.__module__
++
++        if hasattr(display_callable, '__qualname__'):
++            name = display_callable.__qualname__
++        elif hasattr(display_callable, '__name__'):
++            name = display_callable.__name__
+         else:
+-            # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            name = display_callable.__class__.__name__
++
++        self._func_path = module + '.' + name
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])
+@@ -59,8 +80,27 @@ class ResolverMatch:
+         return (self.func, self.args, self.kwargs)[index]
+ 
+     def __repr__(self):
++        # Merge any functools.partial pre-bound args/keywords for display only.
++        try:
++            import functools
++        except Exception:
++            functools = None
++
++        if functools is not None and isinstance(self.func, functools.partial):
++            p = self.func
++            p_args = tuple(getattr(p, 'args', ()) or ())
++            p_kwargs = getattr(p, 'keywords', None) or {}
++            display_args = p_args + tuple(self.args or ())
++            # Merge partial keywords first, then URL-resolved kwargs so the latter
++            # override partial-bound values in display (consistent with call order).
++            display_kwargs = dict(p_kwargs)
++            display_kwargs.update(self.kwargs or {})
++        else:
++            display_args = self.args
++            display_kwargs = self.kwargs
++
+         return "ResolverMatch(func=%s, args=%s, kwargs=%s, url_name=%s, app_names=%s, namespaces=%s, route=%s)" % (
+-            self._func_path, self.args, self.kwargs, self.url_name,
++            self._func_path, display_args, display_kwargs, self.url_name,
+             self.app_names, self.namespaces, self.route,
+         )
+ 

@@ -1,0 +1,34 @@
+diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py
+index 5fb84d86..906899d4 100644
+--- a/src/flask/blueprints.py
++++ b/src/flask/blueprints.py
+@@ -189,6 +189,14 @@ class Blueprint(Scaffold):
+             root_path=root_path,
+         )
+         self.name = name
++        # Blueprint names form part of dotted endpoint names and the
++        # dotted-scoping separator. Disallow dots in blueprint names so
++        # that composed endpoint lookups remain unambiguous. A runtime
++        # check is also present in register to catch mutated names.
++        assert "." not in self.name, (
++            "Blueprint names must not contain '.' as it is the reserved "
++            "separator for nested blueprint scoping"
++        )
+         self.url_prefix = url_prefix
+         self.subdomain = subdomain
+         self.deferred_functions: t.List[DeferredSetupFunction] = []
+@@ -267,6 +275,14 @@ class Blueprint(Scaffold):
+         """
+         first_registration = False
+ 
++        # Ensure the blueprint name does not contain the reserved
++        # dotted-scoping separator. This defensive check catches cases
++        # where the name was mutated after construction.
++        assert "." not in self.name, (
++            "Blueprint names must not contain '.' as it is the reserved "
++            "separator for nested blueprint scoping"
++        )
++
+         if self.name in app.blueprints:
+             assert app.blueprints[self.name] is self, (
+                 "A name collision occurred between blueprints"

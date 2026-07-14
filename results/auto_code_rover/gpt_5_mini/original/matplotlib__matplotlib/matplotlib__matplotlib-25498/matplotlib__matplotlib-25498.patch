@@ -1,0 +1,18 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..3dbd0c64e5 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -507,7 +507,13 @@ class Colorbar:
+         self.mappable = mappable
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap
++        # If the norm instance changed, ensure the new norm is autoscaled
++        # from the mappable's data (if present) so vmin/vmax are set before
++        # the colorbar recomputes boundaries and calls norm.inverse().
+         if mappable.norm != self.norm:
++            if mappable.get_array() is not None:
++                # Populate norm.vmin/vmax from the mappable's array if possible.
++                mappable.autoscale_None()
+             self.norm = mappable.norm
+             self._reset_locator_formatter_scale()
+ 

@@ -1,0 +1,42 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..08a5721cb3 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,36 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        # The wrapped expression may be a conditional/WHERE node which uses
++        # sentinel return values to signal special semantics. In particular,
++        # WhereNode.as_sql may return an empty string to mean "matches
++        # everything" (see django/db/models/sql/where.py). When placing such
++        # a node into a SELECT (e.g. via ExpressionWrapper for a boolean
++        # annotation), an empty fragment would produce invalid SQL like
++        # "SELECT AS "foo" ...". Translate the "matches everything"
++        # sentinel into an explicit True value for boolean outputs so that
++        # annotations compile to a valid SQL literal (consistent with the
++        # existing handling of EmptyResultSet -> False literal in
++        # SQLCompiler.get_select).
++        sql, params = compiler.compile(self.expression)
++        if sql == '':
++            try:
++                from django.db.models import fields as model_fields
++
++                # Only replace the empty fragment for boolean outputs; for
++                # other types, preserve the empty value.
++                if isinstance(self.output_field, model_fields.BooleanField):
++                    # Use a Value(True) so database adapters can render the
++                    # appropriate literal/parameter for True.
++                    from django.db.models.expressions import Value
++
++                    return compiler.compile(Value(True))
++            except Exception:
++                # Be conservative: if anything goes wrong importing or
++                # checking the field type, fall back to the original
++                # compiled fragment.
++                pass
++        return sql, params
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

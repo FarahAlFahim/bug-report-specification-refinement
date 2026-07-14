@@ -1,0 +1,62 @@
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1973,7 +1973,30 @@
+ 
+     @call_highest_priority('__rmatmul__')
+     def __matmul__(self, other):
+-        return self.__mul__(other)
++        """Matrix multiplication operator.
++
++        Unlike ``__mul__``, ``@`` should only represent matrix
++        multiplication.  Scalar operands are not allowed and will raise a
++        ValueError with guidance to use ``*`` instead (matching NumPy).
++        """
++        other = _matrixify(other)
++
++        # If other has a 2D shape then perform matrix-matrix multiplication
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            if self.shape[1] != other.shape[0]:
++                raise ShapeError("Matrix size mismatch: %s @ %s." % (
++                    self.shape, other.shape))
++
++            if getattr(other, 'is_Matrix', False):
++                return self._eval_matrix_mul(other)
++            if getattr(other, 'is_MatrixLike', False):
++                return MatrixArithmetic._eval_matrix_mul(self, other)
++
++        # Do not allow scalar operands for matmul; suggest using '*'
++        if not isinstance(other, collections.Iterable):
++            raise ValueError("Scalar operands are not allowed, use '*' instead")
++
++        return NotImplemented
+ 
+     @call_highest_priority('__rmul__')
+     def __mul__(self, other):
+@@ -2068,7 +2091,26 @@
+ 
+     @call_highest_priority('__matmul__')
+     def __rmatmul__(self, other):
+-        return self.__rmul__(other)
++        """Right-hand matrix multiplication.  Disallow scalar operands.
++
++        See ``__matmul__`` for rationale.
++        """
++        other = _matrixify(other)
++
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            if other.shape[1] != self.shape[0]:
++                raise ShapeError("Matrix size mismatch: %s @ %s." % (
++                    other.shape, self.shape))
++
++            if getattr(other, 'is_Matrix', False):
++                return other._new(other.as_mutable() * self)
++            if getattr(other, 'is_MatrixLike', False):
++                return MatrixArithmetic._eval_matrix_rmul(self, other)
++
++        if not isinstance(other, collections.Iterable):
++            raise ValueError("Scalar operands are not allowed, use '*' instead")
++
++        return NotImplemented
+ 
+     @call_highest_priority('__mul__')
+     def __rmul__(self, other):

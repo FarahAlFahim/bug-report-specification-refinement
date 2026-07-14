@@ -1,0 +1,70 @@
+diff --git a/requests/hooks.py b/requests/hooks.py
+index 9e0ce346..55416a33 100644
+--- a/requests/hooks.py
++++ b/requests/hooks.py
+@@ -37,10 +37,34 @@ def dispatch_hook(key, hooks, hook_data):
+     if key in hooks:
+         hooks = hooks.get(key)
+ 
++        # Normalize hooks into a flat list of callables.
+         if hasattr(hooks, '__call__'):
+             hooks = [hooks]
+-
+-        for hook in hooks:
++        else:
++            # Convert other iterables (but not strings/bytes) to a list.
++            if isinstance(hooks, (list, tuple)):
++                hooks = list(hooks)
++            elif hasattr(hooks, '__iter__') and not isinstance(hooks, (str, bytes)):
++                hooks = list(hooks)
++            else:
++                raise TypeError('Hooks for %r must be a callable or an iterable of callables.' % (key,))
++
++        # Flatten nested iterables and validate elements are callables.
++        flat_hooks = []
++
++        def _flatten(items):
++            for item in items:
++                if hasattr(item, '__call__'):
++                    flat_hooks.append(item)
++                elif isinstance(item, (list, tuple)) or (hasattr(item, '__iter__') and
++                                                          not isinstance(item, (str, bytes))):
++                    _flatten(list(item))
++                else:
++                    raise TypeError('Hook %r for event %r is not callable.' % (item, key))
++
++        _flatten(hooks)
++
++        for hook in flat_hooks:
+             _hook_data = hook(hook_data)
+             if _hook_data is not None:
+                 hook_data = _hook_data
+diff --git a/requests/models.py b/requests/models.py
+index d8456375..0f01e374 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -463,7 +463,23 @@ class Request(object):
+     def register_hook(self, event, hook):
+         """Properly register a hook."""
+ 
+-        self.hooks[event].append(hook)
++        # Allow registering a single callable or an iterable of callables.
++        # Reject strings/bytes as iterables of hooks.
++        if hasattr(hook, '__call__'):
++            self.hooks[event].append(hook)
++            return
++
++        # If hook is an iterable (list/tuple or other iterable), extend the
++        # hooks list with its elements. Validate each element is callable.
++        if isinstance(hook, (list, tuple)) or (hasattr(hook, '__iter__') and
++                                                not isinstance(hook, (str, bytes))):
++            for h in hook:
++                if not hasattr(h, '__call__'):
++                    raise TypeError('Hook %r for event %r is not callable.' % (h, event))
++                self.hooks[event].append(h)
++            return
++
++        raise TypeError('Hook must be a callable or an iterable of callables.')
+ 
+     def deregister_hook(self, event, hook):
+         """Deregister a previously registered hook.

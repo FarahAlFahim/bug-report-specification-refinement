@@ -1,0 +1,25 @@
+diff --git a/requests/packages/urllib3/response.py b/requests/packages/urllib3/response.py
+index 3c3e4e5..7426717 100644
+--- a/requests/packages/urllib3/response.py
++++ b/requests/packages/urllib3/response.py
+@@ -1,6 +1,7 @@
++
+ import zlib
+ import io
+-from socket import timeout as SocketTimeout
++from socket import timeout as SocketTimeout, error as SocketError
+ 
+ from ._collections import HTTPHeaderDict
+ from .exceptions import ProtocolError, DecodeError, ReadTimeoutError
+@@ -206,6 +207,11 @@ class HTTPResponse(io.IOBase):
+ 
+                 raise ReadTimeoutError(self._pool, None, 'Read timed out.')
+ 
++            except SocketError as e:
++                # Socket-level errors (for example: Connection reset by peer)
++                # should be surfaced as a ProtocolError to callers.
++                raise ProtocolError('Connection broken: %r' % e, e)
++
+             except HTTPException as e:
+                 # This includes IncompleteRead.
+                 raise ProtocolError('Connection broken: %r' % e, e)

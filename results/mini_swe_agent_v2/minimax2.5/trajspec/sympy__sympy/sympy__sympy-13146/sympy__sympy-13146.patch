@@ -1,0 +1,27 @@
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index 82bc545f33..1d4e9e808c 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -192,6 +192,22 @@ def __new__(cls, b, e, evaluate=None):
+ 
+         b = _sympify(b)
+         e = _sympify(e)
++        # Convert Float exponents to Rational when possible to ensure
++        # proper combining of like terms (e.g., x**2.5 vs x**(5/2))
++        if e.is_Float and not e.is_zero:
++            # Only convert if base is positive or a Symbol (to avoid complex root issues)
++            if b.is_positive or b.is_Symbol:
++                try:
++                    from sympy.core.numbers import _as_integer_ratio, Rational
++                    p, q = _as_integer_ratio(e)
++                    # Only convert if numerator and denominator are reasonably small
++                    # This avoids converting floats like 0.1 which have large binary representations
++                    # and floats with limited precision (like Float(0.10, 2))
++                    if p <= 100 and q <= 100:
++                        e = Rational(p, q)
++                except (ValueError, TypeError, AttributeError):
++                    # _as_integer_ratio may fail for some floats
++                    pass
+         if evaluate:
+             if e is S.Zero:
+                 return S.One

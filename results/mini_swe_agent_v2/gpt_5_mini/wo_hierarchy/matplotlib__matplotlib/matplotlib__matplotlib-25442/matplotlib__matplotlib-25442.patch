@@ -1,0 +1,142 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 77768e7383..0836f7df08 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1499,56 +1499,76 @@ class DraggableBase:
+         if not ref_artist.pickable():
+             ref_artist.set_picker(True)
+         self.got_artist = False
+-        self._use_blit = use_blit and self.canvas.supports_blit
+-        self.cids = [
+-            self.canvas.callbacks._connect_picklable(
+-                'pick_event', self.on_pick),
+-            self.canvas.callbacks._connect_picklable(
+-                'button_release_event', self.on_release),
+-        ]
++        # The canvas may not be available at construction time (e.g., the
++        # artist has not been added to a figure yet). Use a safe lookup and
++        # only query canvas attributes / connect callbacks when a canvas is
++        # present.
++        canvas = self.canvas
++        self._use_blit = use_blit and (canvas is not None and
++                                       getattr(canvas, "supports_blit", False))
++        if canvas is not None:
++            self.cids = [
++                canvas.callbacks._connect_picklable('pick_event', self.on_pick),
++                canvas.callbacks._connect_picklable(
++                    'button_release_event', self.on_release),
++            ]
++        else:
++            self.cids = []
+ 
+     # A property, not an attribute, to maintain picklability.
+-    canvas = property(lambda self: self.ref_artist.figure.canvas)
++    # A property, not an attribute, to maintain picklability. Return None
++    # if the referenced artist is not attached to a figure to avoid raising
++    # AttributeError when accessing canvas.
++    canvas = property(lambda self: None if self.ref_artist.figure is None
++                      else self.ref_artist.figure.canvas)
+ 
+     def on_motion(self, evt):
+         if self._check_still_parented() and self.got_artist:
+             dx = evt.x - self.mouse_x
+             dy = evt.y - self.mouse_y
+             self.update_offset(dx, dy)
+-            if self._use_blit:
+-                self.canvas.restore_region(self.background)
+-                self.ref_artist.draw(
+-                    self.ref_artist.figure._get_renderer())
+-                self.canvas.blit()
+-            else:
+-                self.canvas.draw()
+-
++            canvas = self.canvas
++            if self._use_blit and canvas is not None:
++                canvas.restore_region(self.background)
++                self.ref_artist.draw(self.ref_artist.figure._get_renderer())
++                canvas.blit()
++            elif canvas is not None:
++                canvas.draw()
+     def on_pick(self, evt):
+         if self._check_still_parented() and evt.artist == self.ref_artist:
+             self.mouse_x = evt.mouseevent.x
+             self.mouse_y = evt.mouseevent.y
+             self.got_artist = True
+-            if self._use_blit:
++            canvas = self.canvas
++            if self._use_blit and canvas is not None:
+                 self.ref_artist.set_animated(True)
+-                self.canvas.draw()
+-                self.background = \
+-                    self.canvas.copy_from_bbox(self.ref_artist.figure.bbox)
+-                self.ref_artist.draw(
+-                    self.ref_artist.figure._get_renderer())
+-                self.canvas.blit()
+-            self._c1 = self.canvas.callbacks._connect_picklable(
+-                "motion_notify_event", self.on_motion)
++                canvas.draw()
++                # copy_from_bbox may require a valid figure bbox; guard access
++                # through the canvas and figure being present.
++                self.background = canvas.copy_from_bbox(self.ref_artist.figure.bbox)
++                self.ref_artist.draw(self.ref_artist.figure._get_renderer())
++                canvas.blit()
++            if canvas is not None:
++                self._c1 = canvas.callbacks._connect_picklable(
++                    "motion_notify_event", self.on_motion)
++            else:
++                # Ensure attribute exists for later disconnect attempts.
++                self._c1 = None
+             self.save_offset()
+-
+     def on_release(self, event):
+         if self._check_still_parented() and self.got_artist:
+             self.finalize_offset()
+             self.got_artist = False
+-            self.canvas.mpl_disconnect(self._c1)
++            canvas = self.canvas
++            try:
++                c1 = self._c1
++            except AttributeError:
++                c1 = None
++            if canvas is not None and c1 is not None:
++                canvas.mpl_disconnect(c1)
+ 
+             if self._use_blit:
+                 self.ref_artist.set_animated(False)
+-
+     def _check_still_parented(self):
+         if self.ref_artist.figure is None:
+             self.disconnect()
+@@ -1558,15 +1578,28 @@ class DraggableBase:
+ 
+     def disconnect(self):
+         """Disconnect the callbacks."""
+-        for cid in self.cids:
+-            self.canvas.mpl_disconnect(cid)
++        canvas = self.canvas
++        # If there is no canvas (e.g., the artist was unparented), avoid
++        # dereferencing it. If canvas is None we cannot disconnect callbacks
++        # from it here, but nothing can be done safely without holding an
++        # explicit reference to the original canvas.
++        if canvas is not None:
++            for cid in list(self.cids):
++                try:
++                    canvas.mpl_disconnect(cid)
++                except Exception:
++                    # Defensive: ignore errors during cleanup.
++                    pass
+         try:
+             c1 = self._c1
+         except AttributeError:
+             pass
+         else:
+-            self.canvas.mpl_disconnect(c1)
+-
++            if canvas is not None and c1 is not None:
++                try:
++                    canvas.mpl_disconnect(c1)
++                except Exception:
++                    pass
+     def save_offset(self):
+         pass
+ 

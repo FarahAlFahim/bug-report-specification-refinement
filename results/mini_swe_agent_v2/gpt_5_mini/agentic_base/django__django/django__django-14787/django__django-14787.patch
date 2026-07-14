@@ -1,0 +1,30 @@
+diff --git a/django/utils/decorators.py b/django/utils/decorators.py
+index 5c9a5d01c7..0244cb3050 100644
+--- a/django/utils/decorators.py
++++ b/django/utils/decorators.py
+@@ -35,9 +35,22 @@ def _multi_decorate(decorators, method):
+     def _wrapper(self, *args, **kwargs):
+         # bound_method has the signature that 'decorator' expects i.e. no
+         # 'self' argument, but it's a closure over self so it can call
+-        # 'func'. Also, wrap method.__get__() in a function because new
+-        # attributes can't be set on bound method objects, only on functions.
+-        bound_method = partial(method.__get__(self, type(self)))
++        # 'method'. We must present a real function object to decorators
++        # because many decorators (for example those that use wraps())
++        # expect function-like attributes such as __name__, __module__ and
++        # __doc__. functools.partial objects are callable but do not expose
++        # these attributes which causes AttributeError when decorators try
++        # to access them. Wrap the bound method in a true function and
++        # copy the metadata from the original function before applying
++        # decorators.
++        def bound_method(*f_args, **f_kwargs):
++            return method.__get__(self, type(self))(*f_args, **f_kwargs)
++
++        # Copy metadata from the original (unbound) method so decorators
++        # that inspect or copy attributes (e.g. via functools.wraps)
++        # work correctly.
++        update_wrapper(bound_method, method)
++
+         for dec in decorators:
+             bound_method = dec(bound_method)
+         return bound_method(*args, **kwargs)

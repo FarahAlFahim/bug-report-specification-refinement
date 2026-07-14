@@ -1,0 +1,47 @@
+diff --git a/django/contrib/postgres/forms/array.py b/django/contrib/postgres/forms/array.py
+index 2e19cd574a..54ac3a5b6a 100644
+--- a/django/contrib/postgres/forms/array.py
++++ b/django/contrib/postgres/forms/array.py
+@@ -125,9 +125,15 @@ class SplitArrayWidget(forms.Widget):
+         )
+ 
+     def id_for_label(self, id_):
+-        # See the comment for RadioSelect.id_for_label()
+-        if id_:
+-            id_ += '_0'
++        """
++        Return the HTML id attribute for use by a <label>.
++
++        For multi-element widgets the default Widget.id_for_label returns
++        the base field id unchanged. Avoid hard-coding a reference to the
++        first subwidget here so that label targeting semantics can be
++        decided at the widget level (or left to the form/boundfield to
++        decide). See django.forms.widgets.MultiWidget for related logic.
++        """
+         return id_
+ 
+     def get_context(self, name, value, attrs=None):
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..5eddf457f9 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -849,8 +849,17 @@ class MultiWidget(Widget):
+         return context
+ 
+     def id_for_label(self, id_):
+-        if id_:
+-            id_ += '_0'
++        """
++        Return the HTML id attribute for use by a <label>.
++
++        The default Widget.id_for_label returns the base field id unchanged.
++        MultiWidget previously appended a literal '_0' to target the first
++        subwidget. That hard-coded behavior prevents widgets or forms from
++        choosing other semantics (for example omitting the 'for' attribute
++        or targeting a named subwidget). Preserve the neutral default here
++        and let specific widgets override id_for_label when they want to
++        target a particular subwidget.
++        """
+         return id_
+ 
+     def value_from_datadict(self, data, files, name):

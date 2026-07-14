@@ -1,0 +1,84 @@
+diff --git a/sympy/integrals/intpoly.py b/sympy/integrals/intpoly.py
+index fc72bd206f..cc44fb07dc 100644
+--- a/sympy/integrals/intpoly.py
++++ b/sympy/integrals/intpoly.py
+@@ -561,39 +561,50 @@ def decompose(expr, separate=False):
+     expr = S(expr)
+     poly_dict = {}
+ 
++    # Collect monomials as a list so that we can return them in a
++    # deterministic order when `separate` is True. For sums (Add), the
++    # monomials are the arguments; otherwise the whole expression is a
++    # single monomial.
+     if isinstance(expr, Expr) and not expr.is_number:
+-        if expr.is_Symbol:
+-            poly_dict[1] = expr
+-        elif expr.is_Add:
+-            symbols = expr.atoms(Symbol)
+-            degrees = [(sum(degree_list(monom, *symbols)), monom)
+-                       for monom in expr.args]
+-            if separate:
+-                return [monom[1] for monom in degrees]
+-            else:
+-                for monom in degrees:
+-                    degree, term = monom
+-                    if poly_dict.get(degree):
+-                        poly_dict[degree] += term
+-                    else:
+-                        poly_dict[degree] = term
+-        elif expr.is_Pow:
+-            _, degree = expr.args
+-            poly_dict[degree] = expr
+-        else:  # Now expr can only be of `Mul` type
+-            degree = 0
+-            for term in expr.args:
+-                term_type = len(term.args)
+-                if term_type == 0 and term.is_Symbol:
+-                    degree += 1
+-                elif term_type == 2:
+-                    degree += term.args[1]
+-            poly_dict[degree] = expr
++        if expr.is_Add:
++            monomials = list(expr.args)
++        else:
++            monomials = [expr]
+     else:
+-        poly_dict[0] = expr
++        monomials = [expr]
+ 
++    # If separate is requested, return a sorted list of monomials. Sort by
++    # total degree first, then by string representation to ensure a
++    # deterministic ordering across Python versions and runs.
+     if separate:
+-        return list(poly_dict.values())
++        # Determine symbol list for degree computations. Use the symbols
++        # from the whole expression so degree_list can be applied.
++        symbols = sorted(expr.atoms(Symbol), key=lambda s: str(s))
++        deg_mon_pairs = []
++        for mon in monomials:
++            if symbols:
++                deg = sum(degree_list(mon, *symbols))
++            else:
++                deg = 0
++            deg_mon_pairs.append((deg, str(mon), mon))
++        deg_mon_pairs.sort(key=lambda t: (t[0], t[1]))
++        return [t[2] for t in deg_mon_pairs]
++
++    # Otherwise, build the dictionary mapping degree -> homogeneous polynomial
++    # (summing terms of the same total degree), preserving the previous
++    # behavior.
++    symbols = sorted(expr.atoms(Symbol), key=lambda s: str(s))
++    for mon in monomials:
++        if symbols:
++            degree = sum(degree_list(mon, *symbols))
++        else:
++            # no symbols => constant
++            degree = 0
++        if poly_dict.get(degree):
++            poly_dict[degree] += mon
++        else:
++            poly_dict[degree] = mon
++
+     return poly_dict
+ 
+ 

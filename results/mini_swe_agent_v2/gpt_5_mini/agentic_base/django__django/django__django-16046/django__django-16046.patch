@@ -1,0 +1,15 @@
+diff --git a/django/utils/numberformat.py b/django/utils/numberformat.py
+index 488d6a77cd..41dcf6bc50 100644
+--- a/django/utils/numberformat.py
++++ b/django/utils/numberformat.py
+@@ -68,6 +68,10 @@ def format(
+             str_number = "{:f}".format(number)
+     else:
+         str_number = str(number)
++    # Guard against empty-string inputs (e.g. DB NULL rendered as "")
++    # to avoid indexing errors when testing for a sign character.
++    if not str_number:
++        return ""
+     if str_number[0] == "-":
+         sign = "-"
+         str_number = str_number[1:]

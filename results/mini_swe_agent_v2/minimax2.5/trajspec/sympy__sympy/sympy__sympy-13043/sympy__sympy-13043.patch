@@ -1,0 +1,50 @@
+diff --git a/sympy/integrals/intpoly.py b/sympy/integrals/intpoly.py
+index fc72bd206f..b91965e513 100644
+--- a/sympy/integrals/intpoly.py
++++ b/sympy/integrals/intpoly.py
+@@ -535,6 +535,26 @@ def y_axis_cut(ls):
+     return x0
+ 
+ 
++
++def _monomial_sort_key(monom, symbols):
++    """Return a sort key for a monomial: (total_degree, y_degree, x_degree, str(monom))."""
++    # Get the symbols as a sorted list for consistent ordering
++    symbols_list = sorted(symbols, key=lambda s: s.name)
++    # Handle the case where there are no symbols (constant term)
++    if not symbols_list:
++        return (0, 0, 0, str(monom))
++    try:
++        degrees = degree_list(monom, *symbols_list)
++    except:
++        # If degree_list fails, treat as constant (degree 0)
++        return (0, 0, 0, str(monom))
++    # Sort by total degree, then by y_degree (ascending), then by x_degree (ascending), then by string
++    if len(degrees) == 1:
++        # For single-variable terms, use a consistent ordering
++        return (sum(degrees), 0, 0, str(monom))
++    return (sum(degrees), degrees[1], degrees[0], str(monom))
++
++
+ def decompose(expr, separate=False):
+     """Decomposes an input polynomial into homogeneous ones of
+     smaller or equal degree.
+@@ -569,6 +589,7 @@ def decompose(expr, separate=False):
+             degrees = [(sum(degree_list(monom, *symbols)), monom)
+                        for monom in expr.args]
+             if separate:
++                degrees.sort(key=lambda m: _monomial_sort_key(m[1], symbols))
+                 return [monom[1] for monom in degrees]
+             else:
+                 for monom in degrees:
+@@ -593,7 +614,9 @@ def decompose(expr, separate=False):
+         poly_dict[0] = expr
+ 
+     if separate:
+-        return list(poly_dict.values())
++        # Sort by degree for deterministic output
++        symbols = expr.atoms(Symbol) if isinstance(expr, Expr) and not expr.is_number else []
++        return sorted(poly_dict.values(), key=lambda m: _monomial_sort_key(m, symbols))
+     return poly_dict
+ 
+ 

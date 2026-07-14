@@ -1,0 +1,28 @@
+diff --git a/pylint/checkers/misc.py b/pylint/checkers/misc.py
+index e597487..de14b48 100644
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -120,10 +120,15 @@ class EncodingChecker(BaseChecker):
+         super().open()
+ 
+         notes = "|".join(re.escape(note) for note in self.config.notes)
++        # Use a negative lookahead to ensure the character after the tag
++        # is not a word character. This preserves the intent of avoiding
++        # matches inside larger words while allowing punctuation-only tags
++        # (e.g. "???") to be matched.
++        boundary = r"(?!\w)"
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            regex_string = rf"#\s*({notes}|{self.config.notes_rgx}){boundary}"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes}){boundary}"
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)
+ 
+@@ -200,4 +205,4 @@ class EncodingChecker(BaseChecker):
+ 
+ def register(linter: "PyLinter") -> None:
+     linter.register_checker(EncodingChecker(linter))
+-    linter.register_checker(ByIdManagedMessagesChecker(linter))
++    linter.register_checker(ByIdManagedMessagesChecker(linter))

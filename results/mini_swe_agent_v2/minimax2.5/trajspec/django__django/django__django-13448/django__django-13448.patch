@@ -1,0 +1,13 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index 503f7f56fd..9e6c5ce855 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -104,7 +104,7 @@ class BaseDatabaseCreation:
+             for app_config in apps.get_app_configs():
+                 if (
+                     app_config.models_module is not None and
+-                    app_config.label in loader.migrated_apps and
++                    any(key[0] == app_config.label for key in loader.applied_migrations) and
+                     app_config.name not in settings.TEST_NON_SERIALIZED_APPS
+                 ):
+                     for model in app_config.get_models():

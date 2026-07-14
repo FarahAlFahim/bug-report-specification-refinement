@@ -1,0 +1,76 @@
+diff --git a/django/contrib/auth/base_user.py b/django/contrib/auth/base_user.py
+index 3a4a64ee19..f9afd00518 100644
+--- a/django/contrib/auth/base_user.py
++++ b/django/contrib/auth/base_user.py
+@@ -147,6 +147,24 @@ class AbstractBaseUser(models.Model):
+         except AttributeError:
+             return 'email'
+ 
++    def get_email_for_token(self):
++        """
++        Return a canonicalized email representation suitable for inclusion in
++        password-reset tokens. The default implementation mirrors the
++        case-insensitive/Unicode-normalized comparison used when looking up
++        users for password reset: it returns the configured email field
++        normalized with Unicode NFKC and casefolded. Custom user models may
++        override this to provide alternative normalization behavior.
++        """
++        email_field = self.get_email_field_name()
++        email_val = getattr(self, email_field, '')
++        if email_val is None:
++            return ''
++        if isinstance(email_val, str):
++            import unicodedata
++            return unicodedata.normalize('NFKC', email_val).casefold()
++        return str(email_val)
++
+     @classmethod
+     def normalize_username(cls, username):
+         return unicodedata.normalize('NFKC', username) if isinstance(username, str) else username
+diff --git a/django/contrib/auth/tokens.py b/django/contrib/auth/tokens.py
+index 93e2d71af2..7c5fb1c4e8 100644
+--- a/django/contrib/auth/tokens.py
++++ b/django/contrib/auth/tokens.py
+@@ -85,6 +85,14 @@ class PasswordResetTokenGenerator:
+            same password is chosen, due to password salting).
+         2. The last_login field will usually be updated very shortly after
+            a password reset.
++
++        Additionally, include a canonicalized email representation in the
++        token so that tokens issued to a previous email address are invalid
++        once the user's email changes. If the user model provides
++        `get_email_for_token()`, that will be used; otherwise the configured
++        email field is normalized using NFKC + casefold to match lookup
++        semantics.
++
+         Failing those things, settings.PASSWORD_RESET_TIMEOUT eventually
+         invalidates the token.
+ 
+@@ -94,7 +102,26 @@ class PasswordResetTokenGenerator:
+         # Truncate microseconds so that tokens are consistent even if the
+         # database doesn't support microseconds.
+         login_timestamp = '' if user.last_login is None else user.last_login.replace(microsecond=0, tzinfo=None)
+-        return str(user.pk) + user.password + str(login_timestamp) + str(timestamp)
++
++        # Include a canonicalized email value. Prefer a model-provided hook
++        # `get_email_for_token()` if present.
++        try:
++            email_for_token = user.get_email_for_token()
++        except AttributeError:
++            try:
++                email_field = user.get_email_field_name()
++            except Exception:
++                email_field = 'email'
++            email_val = getattr(user, email_field, '')
++            if email_val is None:
++                email_for_token = ''
++            elif isinstance(email_val, str):
++                import unicodedata
++                email_for_token = unicodedata.normalize('NFKC', email_val).casefold()
++            else:
++                email_for_token = str(email_val)
++
++        return str(user.pk) + user.password + str(login_timestamp) + str(email_for_token) + str(timestamp)
+ 
+     def _num_seconds(self, dt):
+         return int((dt - datetime(2001, 1, 1)).total_seconds())

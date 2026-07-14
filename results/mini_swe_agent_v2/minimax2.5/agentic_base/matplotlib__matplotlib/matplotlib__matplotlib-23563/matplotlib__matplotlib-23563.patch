@@ -1,0 +1,37 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..16049f1417 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -220,9 +220,13 @@ class Line3D(lines.Line2D):
+ 
+ def line_2d_to_3d(line, zs=0, zdir='z'):
+     """Convert a 2D line to 3D."""
+-
++    orig_class = line.__class__
+     line.__class__ = Line3D
+-    line.set_3d_properties(zs, zdir)
++    try:
++        line.set_3d_properties(zs, zdir)
++    except Exception:
++        line.__class__ = orig_class
++        raise
+ 
+ 
+ def _path_to_3d_segment(path, zs=0, zdir='z'):
+diff --git a/lib/mpl_toolkits/mplot3d/axes3d.py b/lib/mpl_toolkits/mplot3d/axes3d.py
+index e470295393..2912b13b34 100644
+--- a/lib/mpl_toolkits/mplot3d/axes3d.py
++++ b/lib/mpl_toolkits/mplot3d/axes3d.py
+@@ -1281,7 +1281,11 @@ class Axes3D(Axes):
+ 
+         lines = super().plot(xs, ys, *args, **kwargs)
+         for line in lines:
+-            art3d.line_2d_to_3d(line, zs=zs, zdir=zdir)
++            try:
++                art3d.line_2d_to_3d(line, zs=zs, zdir=zdir)
++            except Exception:
++                line.remove()
++                raise
+ 
+         xs, ys, zs = art3d.juggle_axes(xs, ys, zs, zdir)
+         self.auto_scale_xyz(xs, ys, zs, had_data)

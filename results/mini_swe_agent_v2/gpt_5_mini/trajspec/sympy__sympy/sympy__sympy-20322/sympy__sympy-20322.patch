@@ -1,0 +1,57 @@
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 46f310b122..06041f50aa 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -877,8 +877,21 @@ def _eval_expand_mul(self, **hints):
+         plain, sums, rewrite = [], [], False
+         for factor in expr.args:
+             if factor.is_Add:
+-                sums.append(factor)
+-                rewrite = True
++                # Avoid distributing over additive factors that contain
++                # Function instances (e.g., floor, ceiling, frac).  If an
++                # Add has Function terms, distributing multiplication into
++                # it can change the semantics in ways that lead to
++                # inconsistent user-visible results depending on parse
++                # or evaluation path.  Treat such Add factors as plain
++                # factors to prevent unsafe distribution.
++                if any(arg.is_Function for arg in factor.args):
++                    if factor.is_commutative:
++                        plain.append(factor)
++                    else:
++                        sums.append(Basic(factor))  # Wrapper
++                else:
++                    sums.append(factor)
++                    rewrite = True
+             else:
+                 if factor.is_commutative:
+                     plain.append(factor)
+diff --git a/sympy/functions/elementary/integers.py b/sympy/functions/elementary/integers.py
+index 2f2fd3efb8..7ee220fa77 100644
+--- a/sympy/functions/elementary/integers.py
++++ b/sympy/functions/elementary/integers.py
+@@ -555,6 +555,24 @@ def _value_one_or_more(self, other):
+             if other.is_integer and other.is_positive:
+                 return S.true
+ 
++    def _eval_expand_mul(self, **hints):
++        """
++        Similar to RoundFunction._eval_expand_mul: prevent multiplication
++        distribution into the argument of frac during expand(..., mul=True).
++        """
++        hints_no_mul = dict(hints)
++        hints_no_mul['mul'] = False
++        changed = False
++        new_args = []
++        for a in self.args:
++            new = a.expand(deep=False, **hints_no_mul)
++            new_args.append(new)
++            if new != a:
++                changed = True
++        if not changed:
++            return self
++        return self.func(*new_args, evaluate=False)
++
+ @dispatch(frac, Basic)  # type:ignore
+ def _eval_is_eq(lhs, rhs): # noqa:F811
+     if (lhs.rewrite(floor) == rhs) or \

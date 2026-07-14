@@ -1,0 +1,43 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..ceec0be6 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -23,13 +23,31 @@ class PolyFit(Stat):
+ 
+         x = data["x"]
+         y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
+-            xx = yy = []
+-        else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++        # Filter out missing values — GroupBy.apply hands raw subgroup data to
++        # stats, so each Stat implementation must handle NA values itself.
++        mask = x.notna() & y.notna()
++        if not mask.any():
++            # No valid data
++            return pd.DataFrame({"x": np.array([], dtype=float),
++                                 "y": np.array([], dtype=float)})
++
++        x_filtered = x[mask]
++        y_filtered = y[mask]
++
++        # Need more than `order` unique x values to fit a polynomial of that
++        # degree. Use the filtered values for this decision.
++        if x_filtered.nunique() <= self.order:
++            return pd.DataFrame({"x": np.array([], dtype=float),
++                                 "y": np.array([], dtype=float)})
++
++        # Convert to numpy arrays for numpy.polyfit and evaluate fit on a
++        # linspace spanning the filtered x range.
++        x_arr = x_filtered.to_numpy()
++        y_arr = y_filtered.to_numpy()
++
++        p = np.polyfit(x_arr, y_arr, self.order)
++        xx = np.linspace(x_arr.min(), x_arr.max(), self.gridsize)
++        yy = np.polyval(p, xx)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 

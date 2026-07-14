@@ -1,0 +1,25 @@
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index c957ffa564..7e3467eeff 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -40,8 +40,19 @@ class Q(tree.Node):
+         super().__init__(children=[*args, *sorted(kwargs.items())], connector=_connector, negated=_negated)
+ 
+     def _combine(self, other, conn):
++        # Allow combining Q objects with conditional Expressions (e.g. Exists).
++        # Combinable.__and__/__or__ wrap conditional expressions into Q on the
++        # left-hand path, so Q._combine must accept/wrap conditional
++        # expression-like operands on the right-hand path to preserve
++        # commutativity of boolean operators.
+         if not isinstance(other, Q):
+-            raise TypeError(other)
++            # If the other operand is a conditional expression (has
++            # conditional=True), wrap it in a Q to allow combination. This
++            # mirrors the behavior in Combinable.__and__/__or__.
++            if getattr(other, 'conditional', False):
++                other = Q(other)
++            else:
++                raise TypeError(other)
+ 
+         # If the other Q() is empty, ignore it and just use `self`.
+         if not other:

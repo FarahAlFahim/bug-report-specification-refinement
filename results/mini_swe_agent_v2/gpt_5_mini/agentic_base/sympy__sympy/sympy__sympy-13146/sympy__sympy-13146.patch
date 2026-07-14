@@ -1,0 +1,51 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index ba6ee29a9c..89cd7b9e7f 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1087,7 +1087,13 @@ def __getstate__(self):
+         return {'_prec': self._prec}
+ 
+     def _hashable_content(self):
+-        return (self._mpf_, self._prec)
++        # Use the normalized mpf tuple as the hashable content so that
++        # Floats that represent the same numeric value (possibly with
++        # different internal precision) compare equal and have the same
++        # hash. Including _prec here caused two numerically-equal Floats
++        # to have different hashes, preventing structural equality of
++        # expressions like x**2.5 and x**(5/2).evalf()
++        return (mpf_norm(self._mpf_, self._prec),)
+ 
+     def floor(self):
+         return Integer(int(mlib.to_int(
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index d5abe84da9..8bc4ea4fb8 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,11 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    # Python 3.3+: Callable is in collections.abc
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 
+--- /dev/fd/63	2026-05-28 03:56:04.755969000 +0000
++++ sympy/core/basic.py	2026-05-28 03:54:50.404642007 +0000
+@@ -1,6 +1,11 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    # Python 3.3+: Mapping is in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    from collections import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties

@@ -1,0 +1,34 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index c55864243a..525c6e65e6 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -3030,6 +3030,13 @@ class Figure(FigureBase):
+         from matplotlib import _pylab_helpers
+         if self.canvas.manager in _pylab_helpers.Gcf.figs.values():
+             state['_restore_to_pylab'] = True
++        # Do not persist backend-managed runtime caches.  In particular,
++        # backends may set ``figure._original_dpi`` at canvas construction
++        # time to remember the unscaled base DPI; persisting this value can
++        # cause device-pixel-ratio scaling to be applied repeatedly when a
++        # figure is unpickled and a new canvas is created.  Avoid storing
++        # such backend-only attributes in the pickled state.
++        state.pop('_original_dpi', None)
+         return state
+ 
+     def __setstate__(self, state):
+@@ -3041,6 +3048,15 @@ class Figure(FigureBase):
+                 f"This figure was saved with matplotlib version {version} and "
+                 f"is unlikely to function correctly.")
+ 
++        # Do not restore backend-only runtime caches such as
++        # ``_original_dpi``.  Restoring those can interact poorly with
++        # backend initialization which expects to set up those caches
++        # itself (and in particular assumes they reflect the base,
++        # unscaled figure.dpi).  Pop them from the state before
++        # assigning the figure __dict__ so that canvas construction
++        # will reinitialise them correctly.
++        state.pop('_original_dpi', None)
++
+         self.__dict__ = state
+ 
+         # re-initialise some of the unstored state information

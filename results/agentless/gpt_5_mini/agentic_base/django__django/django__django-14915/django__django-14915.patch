@@ -1,0 +1,23 @@
+diff --git a/django/forms/models.py b/django/forms/models.py
+index 5a30801..660b94a 100644
+--- a/django/forms/models.py
++++ b/django/forms/models.py
+@@ -1171,6 +1171,18 @@ class ModelChoiceIteratorValue:
+             other = other.value
+         return self.value == other
+ 
++    def __hash__(self):
++        """
++        ModelChoiceIteratorValue defines equality based on the wrapped .value.
++        To allow usage in hashed collections (dict/set membership checks) and
++        to preserve the equality/hash contract, expose a hash that delegates
++        to the wrapped value's hash.
++
++        Note: if the wrapped value is itself unhashable, hash(self.value)
++        will raise TypeError — this is the expected behavior.
++        """
++        return hash(self.value)
++
+ 
+ class ModelChoiceIterator:
+     def __init__(self, field):

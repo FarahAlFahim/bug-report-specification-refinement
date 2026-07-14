@@ -1,0 +1,19 @@
+diff --git a/sympy/simplify/cse_main.py b/sympy/simplify/cse_main.py
+index d649dd02a9..284cbcc873 100644
+--- a/sympy/simplify/cse_main.py
++++ b/sympy/simplify/cse_main.py
+@@ -586,6 +586,14 @@ def _find_repeated(expr):
+         if isinstance(expr, RootOf):
+             return
+ 
++        # Treat MatrixSymbol as atomic: do not extract whole MatrixSymbol
++        # subexpressions. Extracting whole MatrixSymbols causes later
++        # codegen to expand them into elementwise copies. Individual
++        # MatrixElements (entries) can still be extracted.
++        from sympy.matrices.expressions import MatrixSymbol as _MatrixSymbol
++        if isinstance(expr, _MatrixSymbol):
++            return
++
+         if isinstance(expr, Basic) and (expr.is_Atom or expr.is_Order):
+             if expr.is_Symbol:
+                 excluded_symbols.add(expr)

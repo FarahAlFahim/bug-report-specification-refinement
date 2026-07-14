@@ -1,0 +1,26 @@
+diff --git a/django/dispatch/dispatcher.py b/django/dispatch/dispatcher.py
+index b7d9d26389..9d85fd55a5 100644
+--- a/django/dispatch/dispatcher.py
++++ b/django/dispatch/dispatcher.py
+@@ -1,3 +1,4 @@
++import logging
+ import threading
+ import warnings
+ import weakref
+@@ -6,6 +7,8 @@ from django.utils.deprecation import RemovedInDjango40Warning
+ from django.utils.inspect import func_accepts_kwargs
+ 
+ 
++logger = logging.getLogger('django.signal')
++
+ def _make_id(target):
+     if hasattr(target, '__func__'):
+         return (id(target.__self__), id(target.__func__))
+@@ -209,6 +212,7 @@ class Signal:
+                 response = receiver(signal=self, sender=sender, **named)
+             except Exception as err:
+                 responses.append((receiver, err))
++                logger.exception(err)
+             else:
+                 responses.append((receiver, response))
+         return responses

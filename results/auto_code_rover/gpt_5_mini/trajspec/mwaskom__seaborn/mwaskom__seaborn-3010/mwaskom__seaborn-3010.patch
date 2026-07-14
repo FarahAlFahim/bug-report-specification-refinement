@@ -1,0 +1,23 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..bb2a2fed 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -20,10 +20,14 @@ class PolyFit(Stat):
+     gridsize: int = 100
+ 
+     def _fit_predict(self, data):
+-
+-        x = data["x"]
+-        y = data["y"]
+-        if x.nunique() <= self.order:
++        # Drop observations with missing x or y before any decisions or fitting.
++        vals = data[["x", "y"]].dropna()
++        x = vals["x"]
++        y = vals["y"]
++
++        # If there are no valid observations or not enough unique x values
++        # to support the requested polynomial order, return an empty result.
++        if x.empty or x.nunique() <= self.order:
+             # TODO warn?
+             xx = yy = []
+         else:

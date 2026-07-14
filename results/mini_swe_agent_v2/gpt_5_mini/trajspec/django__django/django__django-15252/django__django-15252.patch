@@ -1,0 +1,108 @@
+diff --git a/django/db/migrations/recorder.py b/django/db/migrations/recorder.py
+index 1a37c6b7d0..cb0e50addb 100644
+--- a/django/db/migrations/recorder.py
++++ b/django/db/migrations/recorder.py
+@@ -1,5 +1,5 @@
+ from django.apps.registry import Apps
+-from django.db import DatabaseError, models
++from django.db import DatabaseError, models, router
+ from django.utils.functional import classproperty
+ from django.utils.timezone import now
+ 
+@@ -52,6 +52,16 @@ class MigrationRecorder:
+ 
+     def has_table(self):
+         """Return True if the django_migrations table exists."""
++        # If the router disallows migrating the migrations app on this
++        # connection, behave as if the table does not exist so callers do
++        # not attempt to read or write migration state on disallowed DBs.
++        if not router.allow_migrate(
++            self.connection.alias,
++            self.Migration._meta.app_label,
++            model_name=self.Migration._meta.model_name,
++            model=self.Migration,
++        ):
++            return False
+         with self.connection.cursor() as cursor:
+             tables = self.connection.introspection.table_names(cursor)
+         return self.Migration._meta.db_table in tables
+@@ -62,6 +72,15 @@ class MigrationRecorder:
+         # in the codebase.
+         if self.has_table():
+             return
++        # Respect database routers: don't create the migrations table on
++        # databases where migrating the migrations app is disallowed.
++        if not router.allow_migrate(
++            self.connection.alias,
++            self.Migration._meta.app_label,
++            model_name=self.Migration._meta.model_name,
++            model=self.Migration,
++        ):
++            return
+         # Make the table
+         try:
+             with self.connection.schema_editor() as editor:
+@@ -74,6 +93,17 @@ class MigrationRecorder:
+         Return a dict mapping (app_name, migration_name) to Migration instances
+         for all applied migrations.
+         """
++        # If the router disallows migrations for the migrations app on this
++        # connection, report no applied migrations so the migration machinery
++        # does not attempt to operate against this database.
++        if not router.allow_migrate(
++            self.connection.alias,
++            self.Migration._meta.app_label,
++            model_name=self.Migration._meta.model_name,
++            model=self.Migration,
++        ):
++            return {}
++
+         if self.has_table():
+             return {(migration.app, migration.name): migration for migration in self.migration_qs}
+         else:
+@@ -83,14 +113,45 @@ class MigrationRecorder:
+ 
+     def record_applied(self, app, name):
+         """Record that a migration was applied."""
++        # Only record applied migrations on databases where the router
++        # allows migrating the migrations app.
++        if not router.allow_migrate(
++            self.connection.alias,
++            self.Migration._meta.app_label,
++            model_name=self.Migration._meta.model_name,
++            model=self.Migration,
++        ):
++            return
++
+         self.ensure_schema()
++        # ensure_schema already returned early if migration is disallowed.
+         self.migration_qs.create(app=app, name=name)
+ 
+     def record_unapplied(self, app, name):
+         """Record that a migration was unapplied."""
++        # Only record unapplied on databases where the router allows migrating
++        # the migrations app.
++        if not router.allow_migrate(
++            self.connection.alias,
++            self.Migration._meta.app_label,
++            model_name=self.Migration._meta.model_name,
++            model=self.Migration,
++        ):
++            return
++
+         self.ensure_schema()
+         self.migration_qs.filter(app=app, name=name).delete()
+ 
+     def flush(self):
+         """Delete all migration records. Useful for testing migrations."""
++        # Don't flush migration records on DBs where the router disallows
++        # migrating the migrations app.
++        if not router.allow_migrate(
++            self.connection.alias,
++            self.Migration._meta.app_label,
++            model_name=self.Migration._meta.model_name,
++            model=self.Migration,
++        ):
++            return
++
+         self.migration_qs.all().delete()

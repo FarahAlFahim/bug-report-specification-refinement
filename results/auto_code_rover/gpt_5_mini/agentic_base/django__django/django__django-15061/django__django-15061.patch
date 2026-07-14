@@ -1,0 +1,37 @@
+diff --git a/django/contrib/postgres/forms/array.py b/django/contrib/postgres/forms/array.py
+index 2e19cd574a..cbafde26f3 100644
+--- a/django/contrib/postgres/forms/array.py
++++ b/django/contrib/postgres/forms/array.py
+@@ -125,9 +125,12 @@ class SplitArrayWidget(forms.Widget):
+         )
+ 
+     def id_for_label(self, id_):
+-        # See the comment for RadioSelect.id_for_label()
++        # For multi-control widgets, don't return a single control's id
++        # for the wrapper label. Returning a falsy value will cause
++        # BoundField.label_tag() to omit the for attribute, consistent
++        # with RadioSelect and other multi-element widgets.
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def get_context(self, name, value, attrs=None):
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..53c09b86c7 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -849,8 +849,12 @@ class MultiWidget(Widget):
+         return context
+ 
+     def id_for_label(self, id_):
++        # For multi-control widgets, don't return a single control's id
++        # for the wrapper label. Returning a falsy value will cause
++        # BoundField.label_tag() to omit the for attribute, which is
++        # appropriate for widgets that render multiple inputs.
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def value_from_datadict(self, data, files, name):

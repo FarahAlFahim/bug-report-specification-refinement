@@ -1,0 +1,68 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..9abfde8e15 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -30,8 +30,61 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     camat = Matrix([[dimension_system.get_dimensional_dependencies(i, mark_dimensionless=True).get(j, 0) for i in target_dims] for j in canon_dim_units])
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+-    res_exponents = camat.solve_least_squares(exprmat, method=None)
+-    return res_exponents
++    # Check for exact solvability: only accept exact solutions, not least-squares approximations.
++    # If the augmented matrix has higher rank, there is no exact solution.
++    if camat.rank() != camat.row_join(exprmat).rank():
++        return None
++
++    # Single-target-unit case: check proportionality exactly.
++    if camat.cols == 1:
++        v = camat
++        # find an index where v is non-zero to compute candidate scalar
++        p = None
++        for i in range(v.rows):
++            vi = v[i, 0]
++            if vi != 0:
++                p = exprmat[i, 0] / vi
++                break
++        # If all entries of v are zero, accept only if exprmat is also all zero.
++        if p is None:
++            if all(exprmat[i, 0] == 0 for i in range(exprmat.rows)):
++                return Matrix([0])
++            else:
++                return None
++        # Verify exact proportionality
++        if v * p == exprmat:
++            return Matrix([p])
++        return None
++
++    # General case: obtain an exact (particular) solution.
++    try:
++        # If square and invertible, use solve for an exact solution.
++        if camat.rows == camat.cols:
++            # This will raise if singular; in that case fall through to gauss_jordan_solve.
++            sol = camat.solve(exprmat)
++            return sol
++        # For rectangular but consistent systems, use gauss_jordan_solve to get a particular solution.
++        sol = camat.gauss_jordan_solve(exprmat)
++        # gauss_jordan_solve may return a tuple (solution_matrix, parameters)
++        if isinstance(sol, tuple):
++            sol_vec, params = sol[0], sol[1]
++            # If free parameters are present, pick a particular solution by setting them to zero.
++            if params:
++                subs_map = {p: 0 for p in params}
++                sol_vec = sol_vec.subs(subs_map)
++            return sol_vec
++        return sol
++    except Exception:
++        # Fallback: use linsolve to get a solution set, and pick a particular solution (set parameters to 0).
++        from sympy import linsolve
++        sols = linsolve((camat, exprmat))
++        try:
++            sol = next(iter(sols))
++        except StopIteration:
++            return None
++        from sympy import Matrix as _Matrix
++        solm = _Matrix(sol)
++        return solm
+ 
+ 
+ def convert_to(expr, target_units, unit_system="SI"):

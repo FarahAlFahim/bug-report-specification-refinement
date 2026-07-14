@@ -1,0 +1,36 @@
+diff --git a/src/_pytest/assertion/util.py b/src/_pytest/assertion/util.py
+index 762e5761d..be870f18b 100644
+--- a/src/_pytest/assertion/util.py
++++ b/src/_pytest/assertion/util.py
+@@ -86,7 +86,12 @@ def issequence(x):
+ 
+ 
+ def istext(x):
+-    return isinstance(x, str)
++    # Treat native text types as "text" for the purposes of diffs.
++    # Include bytes and bytearray so that binary data is diffed in a
++    # human-friendly way (see _diff_text) instead of falling through
++    # to the generic sequence-based comparison which indexes bytes and
++    # yields integer ordinals on Python 3.
++    return isinstance(x, (str, bytes, bytearray))
+ 
+ 
+ def isdict(x):
+@@ -186,10 +191,13 @@ def _diff_text(left, right, verbose=0):
+         r = r.replace(r"\r", "\r")
+         return r
+ 
+-    if isinstance(left, bytes):
+-        left = escape_for_readable_diff(left)
+-    if isinstance(right, bytes):
+-        right = escape_for_readable_diff(right)
++    # Support both bytes and bytearray by converting bytearray to bytes
++    # before creating a readable diff. _diff_text expects binary inputs
++    # to be converted to a readable unicode form via escape_for_readable_diff.
++    if isinstance(left, (bytes, bytearray)):
++        left = escape_for_readable_diff(bytes(left))
++    if isinstance(right, (bytes, bytearray)):
++        right = escape_for_readable_diff(bytes(right))
+     if verbose < 1:
+         i = 0  # just in case left or right has zero length
+         for i in range(min(len(left), len(right))):

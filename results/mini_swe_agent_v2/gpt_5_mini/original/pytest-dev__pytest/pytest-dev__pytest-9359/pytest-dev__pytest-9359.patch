@@ -1,0 +1,30 @@
+diff --git a/src/_pytest/_code/source.py b/src/_pytest/_code/source.py
+index 6f54057c0..c41bb94a1 100644
+--- a/src/_pytest/_code/source.py
++++ b/src/_pytest/_code/source.py
+@@ -209,4 +209,25 @@ def getstatementrange_ast(
+             end -= 1
+         else:
+             break
++    # The end might still point to a comment or empty line, correct it.
++    while end:
++        line = source.lines[end - 1].lstrip()
++        if line.startswith("#") or not line:
++            end -= 1
++        else:
++            break
++    # Also strip trailing decorator lines ("@decorator") from the previous
++    # statement range.  In some Python versions (3.9+) the AST reports the
++    # lineno of a Function/Class definition as the first decorator line which
++    # can cause the decorator to be considered the start of the next
++    # statement. That makes the previous statement's range include the
++    # decorator, which is surprising when showing the source for a failed
++    # assertion.  Remove such decorator lines from the end so they are not
++    # attributed to the previous statement.
++    while end:
++        line = source.lines[end - 1].lstrip()
++        if line.startswith("@"):
++            end -= 1
++        else:
++            break
+     return astnode, start, end

@@ -1,0 +1,25 @@
+diff --git a/django/core/management/commands/inspectdb.py b/django/core/management/commands/inspectdb.py
+index f33bcbdccf..89feb594b6 100644
+--- a/django/core/management/commands/inspectdb.py
++++ b/django/core/management/commands/inspectdb.py
+@@ -182,6 +182,20 @@ class Command(BaseCommand):
+                             if ref_db_table == table_name
+                             else table2model(ref_db_table)
+                         )
++                        # If this is a self-referential relation or there are
++                        # multiple foreign keys in this table that reference
++                        # the same target table, provide an explicit
++                        # related_name to avoid reverse accessor name clashes
++                        # (see checks.fields.E304). Use the attribute name
++                        # for the related_name so it's unique per relation.
++                        try:
++                            same_table_refs = sum(
++                                1 for _, tbl in relations.values() if tbl == ref_db_table
++                            )
++                        except Exception:
++                            same_table_refs = 0
++                        if ref_db_table == table_name or same_table_refs > 1:
++                            extra_params["related_name"] = att_name
+                         if rel_to in known_models:
+                             field_type = "%s(%s" % (rel_type, rel_to)
+                         else:

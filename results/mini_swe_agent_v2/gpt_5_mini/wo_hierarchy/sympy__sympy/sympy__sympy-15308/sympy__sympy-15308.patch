@@ -1,0 +1,52 @@
+diff --git a/sympy/matrices/expressions/trace.py b/sympy/matrices/expressions/trace.py
+index 4a07d6a1f4..bc1f13028f 100644
+--- a/sympy/matrices/expressions/trace.py
++++ b/sympy/matrices/expressions/trace.py
+@@ -89,3 +89,25 @@ def trace(expr):
+         Trace
+     """
+     return Trace(expr).doit()
++
++# Printing support -------------------------------------------------------
++def _trace_latex(self, printer=None, **kwargs):
++    """Return a LaTeX representation for Trace objects.
++
++    This is used by the printing subsystem via the Printer.printmethod
++    (which for the LaTeX printer is "_latex"). The implementation will
++    delegate to the provided printer to ensure the inner matrix expression
++    is rendered using the printer's rules (so that A**2 becomes A^{2},
++    for example).
++    """
++    # Import locally to avoid circular imports at module import time.
++    if printer is None:
++        from sympy.printing.latex import LatexPrinter
++        printer = LatexPrinter()
++    contents = printer._print(self.arg)
++    return r'\\mbox{Tr}\\left(%s\\right)' % (contents)
++
++
++# Bind the method to Trace so that Printer.printmethod ("_latex") will
++# pick it up when printing Trace instances.
++Trace._latex = _trace_latex
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..6069039d22 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -2190,6 +2190,17 @@ def _print_Tr(self, p):
+         contents = self._print(p.args[0])
+         return r'\mbox{Tr}\left(%s\right)' % (contents)
+ 
++
++    def _print_Trace(self, p):
++        """Printer for matrices.expressions.trace.Trace objects.
++
++        Mirrors the existing _print_Tr handler but is specifically named
++        for the Trace class so that matrix Trace instances are handled
++        by the LaTeX printer and their inner expressions are recursively
++        printed using self._print.
++        """
++        contents = self._print(p.args[0])
++        return r'\mbox{Tr}\left(%s\right)' % (contents)
+     def _print_totient(self, expr, exp=None):
+         if exp is not None:
+             return r'\left(\phi\left(%s\right)\right)^{%s}' % (self._print(expr.args[0]),

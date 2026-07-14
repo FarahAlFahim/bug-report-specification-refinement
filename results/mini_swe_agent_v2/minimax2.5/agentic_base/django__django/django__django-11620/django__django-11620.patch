@@ -1,0 +1,30 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..805d139fbf 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -17,6 +17,7 @@ from django.conf import settings
+ from django.core.checks import Error, Warning
+ from django.core.checks.urls import check_resolver
+ from django.core.exceptions import ImproperlyConfigured, ViewDoesNotExist
++from django.http import Http404
+ from django.utils.datastructures import MultiValueDict
+ from django.utils.functional import cached_property
+ from django.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
+@@ -258,7 +259,7 @@ class RoutePattern(CheckURLMixin):
+                 converter = self.converters[key]
+                 try:
+                     kwargs[key] = converter.to_python(value)
+-                except ValueError:
++                except (ValueError, Http404):
+                     return None
+             return path[match.end():], (), kwargs
+         return None
+@@ -540,7 +541,7 @@ class URLResolver:
+             for pattern in self.url_patterns:
+                 try:
+                     sub_match = pattern.resolve(new_path)
+-                except Resolver404 as e:
++                except (Resolver404, Http404) as e:
+                     sub_tried = e.args[0].get('tried')
+                     if sub_tried is not None:
+                         tried.extend([pattern] + t for t in sub_tried)

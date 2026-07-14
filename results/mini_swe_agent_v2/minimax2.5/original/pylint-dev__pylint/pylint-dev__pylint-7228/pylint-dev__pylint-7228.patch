@@ -1,0 +1,71 @@
+diff --git a/pylint/config/argument.py b/pylint/config/argument.py
+index 3c2951517..68799b3e7 100644
+--- a/pylint/config/argument.py
++++ b/pylint/config/argument.py
+@@ -99,11 +99,32 @@ def _py_version_transformer(value: str) -> tuple[int, ...]:
+     return version
+ 
+ 
++def _regexp_transfomer(value: str | None) -> Pattern[str]:
++    """Transforms a regular expression.
++
++    Provides a better error message if the pattern contains Unicode
++    property escapes like \p{...} which are not supported by Python's
++    standard re module.
++    """
++    try:
++        return re.compile(value or "")
++    except re.error as e:
++        if value and "\p" in value:
++            msg = (
++                "Invalid regular expression: the pattern contains Unicode "
++                "property escapes (\p{...}) which are not supported by Python's "
++                "standard re module. Consider using the third-party 'regex' "
++                "module or an alternative pattern."
++            )
++            raise argparse.ArgumentTypeError(msg) from e
++        raise
++
++
+ def _regexp_csv_transfomer(value: str) -> Sequence[Pattern[str]]:
+     """Transforms a comma separated list of regular expressions."""
+     patterns: list[Pattern[str]] = []
+     for pattern in _csv_transformer(value):
+-        patterns.append(re.compile(pattern))
++        patterns.append(_regexp_transfomer(pattern))
+     return patterns
+ 
+ 
+@@ -130,7 +151,7 @@ _TYPE_TRANSFORMERS: dict[str, Callable[[str], _ArgumentTypes]] = {
+     "non_empty_string": _non_empty_string_transformer,
+     "path": _path_transformer,
+     "py_version": _py_version_transformer,
+-    "regexp": re.compile,
++    "regexp": _regexp_transfomer,
+     "regexp_csv": _regexp_csv_transfomer,
+     "regexp_paths_csv": _regexp_paths_csv_transfomer,
+     "string": pylint_utils._unquote,
+diff --git a/pylint/config/option.py b/pylint/config/option.py
+index 5043fe765..923abe7d5 100644
+--- a/pylint/config/option.py
++++ b/pylint/config/option.py
+@@ -23,7 +23,18 @@ def _csv_validator(_, name, value):
+ def _regexp_validator(_, name, value):
+     if hasattr(value, "pattern"):
+         return value
+-    return re.compile(value)
++    try:
++        return re.compile(value)
++    except re.error as e:
++        if value and "\\p" in value:
++            msg = (
++                f"Invalid regular expression for {name}: the pattern contains "
++                "Unicode property escapes (\\p{...}) which are not supported "
++                "by Python's standard re module. Consider using the third-party "
++                "'regex' module or an alternative pattern."
++            )
++            raise optparse.OptionValueError(msg) from e
++        raise
+ 
+ 
+ # pylint: disable=unused-argument

@@ -1,0 +1,15 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index ccac780..fad7dcf 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1138,6 +1138,10 @@ class QuerySet:
+         """
+         Return a new QuerySet instance that will select only distinct results.
+         """
++        # Distinct is not supported on combined queries (UNION/INTERSECT/EXCEPT).
++        # Ensure we raise early rather than silently producing incorrect SQL.
++        self._not_support_combined_queries('distinct')
++
+         assert not self.query.is_sliced, \
+             "Cannot create distinct fields once a slice has been taken."
+         obj = self._chain()

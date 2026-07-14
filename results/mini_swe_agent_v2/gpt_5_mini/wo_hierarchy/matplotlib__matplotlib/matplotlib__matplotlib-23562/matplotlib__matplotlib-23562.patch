@@ -1,0 +1,39 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..ed5edae199 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -867,10 +867,32 @@ class Poly3DCollection(PolyCollection):
+         self.stale = True
+ 
+     def get_facecolor(self):
+-        return self._facecolors2d
++        # The 2D projected facecolors (_facecolors2d) are created during
++        # do_3d_projection (called as part of the draw pipeline).  Callers
++        # may request the facecolor before a draw has occurred, in which
++        # case the attribute will not exist.  In that case, return a
++        # sensible fallback derived from the stored 3D-side facecolor
++        # state or the base-class PolyCollection value.
++        if hasattr(self, "_facecolors2d"):
++            return self._facecolors2d
++        # Fallback to 3D-side stored colors if available.
++        try:
++            return mcolors.to_rgba_array(self._facecolor3d, self._alpha3d)
++        except Exception:
++            # As a last resort, defer to the base class implementation.
++            return PolyCollection.get_facecolor(self)
+ 
+     def get_edgecolor(self):
+-        return self._edgecolors2d
++        # See get_facecolor for rationale.  Also respect the special-case
++        # where edgecolor == 'face'.
++        if hasattr(self, "_edgecolors2d"):
++            return self._edgecolors2d
++        if cbook._str_equal(getattr(self, "_edgecolors", None), 'face'):
++            return self.get_facecolor()
++        try:
++            return mcolors.to_rgba_array(self._edgecolor3d, self._alpha3d)
++        except Exception:
++            return PolyCollection.get_edgecolor(self)
+ 
+ 
+ def poly_collection_2d_to_3d(col, zs=0, zdir='z'):

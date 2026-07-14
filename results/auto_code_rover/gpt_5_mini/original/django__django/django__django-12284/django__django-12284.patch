@@ -1,0 +1,41 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 1a55d3d417..7f9549c3ff 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,12 +764,34 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            # If there's no existing accessor, create it. If there's an existing
++            # accessor, only replace it when it's the auto-generated
++            # functools.partialmethod that wraps Model._get_FIELD_display; do not
++            # overwrite user-defined methods.
++            import inspect
++            method_name = 'get_%s_display' % self.name
++            existing = inspect.getattr_static(cls, method_name, None)
++            if existing is None:
+                 setattr(
+                     cls,
+-                    'get_%s_display' % self.name,
++                    method_name,
+                     partialmethod(cls._get_FIELD_display, field=self),
+                 )
++            else:
++                # If the existing attribute is the auto-generated partialmethod,
++                # it was created previously for a Field on a parent class.
++                # Replace it so the accessor is bound to this Field instance,
++                # enabling it to see subclass-added choices.
++                try:
++                    from functools import partialmethod as _partialmethod_type
++                except Exception:
++                    _partialmethod_type = type(partialmethod(lambda: None))
++                if isinstance(existing, _partialmethod_type):
++                    setattr(
++                        cls,
++                        method_name,
++                        partialmethod(cls._get_FIELD_display, field=self),
++                    )
+ 
+     def get_filter_kwargs_for_object(self, obj):
+         """

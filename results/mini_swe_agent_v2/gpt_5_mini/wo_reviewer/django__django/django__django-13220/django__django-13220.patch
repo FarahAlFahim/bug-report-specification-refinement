@@ -1,0 +1,85 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..5b1573cd3a 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,80 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def _normalize_params(self, params):
++        """Normalize params into a hashable, comparable form.
++
++        - None -> None
++        - dict -> tuple(sorted(items))
++        - list/tuple -> tuple
++        - other -> as-is
++        """
++        if params is None:
++            return None
++        if isinstance(params, dict):
++            # Sort to ensure order-independence
++            return tuple(sorted(params.items()))
++        if isinstance(params, (list, tuple)):
++            return tuple(params)
++        return params
++
++    def _atomic_tuple(self, error):
++        """Return a normalized tuple representing an atomic error.
++
++        The tuple contains (message_str, code, params_normalized).
++        message_str is computed by formatting message with params when
++        params are present; otherwise str(message) is used.
++        """
++        message = error.message
++        params = getattr(error, 'params', None)
++        # Format message with params when provided, mirroring __iter__.
++        try:
++            if params:
++                message_str = message % params
++            else:
++                message_str = str(message)
++        except Exception:
++            # Fall back to string conversion if formatting fails
++            message_str = str(message)
++
++        code = getattr(error, 'code', None)
++        params_norm = self._normalize_params(params)
++        return (message_str, code, params_norm)
++
++    def __eq__(self, other):
++        """Value-based equality for ValidationError.
++
++        Equality compares the normalized atomic error contents. For
++        field-based errors (error_dict) the set of fields must match and
++        for each field the multiset of atomic errors must match. For
++        non-field errors (error_list) the multiset of atomic errors must
++        match. Order is ignored.
++        """
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++
++        # Both have error_dict: compare keys and per-field multisets.
++        if hasattr(self, 'error_dict') and hasattr(other, 'error_dict'):
++            if set(self.error_dict.keys()) != set(other.error_dict.keys()):
++                return False
++            from collections import Counter
++            for key in self.error_dict.keys():
++                left = [self._atomic_tuple(err) for err in self.error_dict[key]]
++                right = [self._atomic_tuple(err) for err in other.error_dict[key]]
++                if Counter(left) != Counter(right):
++                    return False
++            return True
++
++        # One has dict and the other doesn't -> not equal
++        if hasattr(self, 'error_dict') != hasattr(other, 'error_dict'):
++            return False
++
++        # Neither have error_dict: compare multisets of error_list
++        from collections import Counter
++        left = [self._atomic_tuple(err) for err in self.error_list]
++        right = [self._atomic_tuple(err) for err in other.error_list]
++        return Counter(left) == Counter(right)
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

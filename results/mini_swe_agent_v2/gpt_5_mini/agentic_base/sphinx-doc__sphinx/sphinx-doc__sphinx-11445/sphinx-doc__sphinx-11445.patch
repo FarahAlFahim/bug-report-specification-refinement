@@ -1,0 +1,22 @@
+diff --git a/sphinx/util/rst.py b/sphinx/util/rst.py
+index 7a1538325..768d6df62 100644
+--- a/sphinx/util/rst.py
++++ b/sphinx/util/rst.py
+@@ -25,7 +25,16 @@ except ImportError:
+ 
+ logger = logging.getLogger(__name__)
+ 
+-docinfo_re = re.compile(':\\w+:.*?')
++"""Regex to detect docinfo/field markers at the start of a line.
++
++The previous pattern (':\w+:.*?') incorrectly matched role-like
++expressions such as ":mod:`name`" which caused lines that are meant to
++be titles to be misclassified as docinfo. A docinfo/field marker is
++only valid when the second colon is followed by whitespace or end of
++line (i.e. ":field:" or ":field: value"). Match from the start of the
++line to avoid accidental matches elsewhere.
++"""
++docinfo_re = re.compile(r'^:\w+:(?:\s|$)')
+ symbols_re = re.compile(r'([!-\-/:-@\[-`{-~])')  # symbols without dot(0x2e)
+ SECTIONING_CHARS = ['=', '-', '~']
+ 

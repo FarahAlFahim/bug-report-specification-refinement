@@ -1,0 +1,54 @@
+diff --git a/django/contrib/auth/migrations/0011_update_proxy_permissions.py b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+index 0e66649695..55ef560297 100644
+--- a/django/contrib/auth/migrations/0011_update_proxy_permissions.py
++++ b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+@@ -24,10 +24,45 @@ def update_proxy_model_permissions(apps, schema_editor, reverse=False):
+         proxy_content_type = ContentType.objects.get_for_model(Model, for_concrete_model=False)
+         old_content_type = proxy_content_type if reverse else concrete_content_type
+         new_content_type = concrete_content_type if reverse else proxy_content_type
+-        Permission.objects.filter(
+-            permissions_query,
+-            content_type=old_content_type,
+-        ).update(content_type=new_content_type)
++
++        # Iterate through affected permissions and either move them or merge
++        # them into existing permissions on the target content type. A bulk
++        # update can violate the (content_type, codename) uniqueness
++        # constraint if a Permission with the same codename already exists
++        # for the target content type. Handle the transfer of M2M relations
++        # (groups and user permissions) when merging.
++        Group = apps.get_model('auth', 'Group')
++        User = apps.get_model('auth', 'User')
++
++        group_through = Group.permissions.through
++        user_through = User.user_permissions.through
++
++        for perm in Permission.objects.filter(permissions_query, content_type=old_content_type):
++            try:
++                existing = Permission.objects.get(content_type=new_content_type, codename=perm.codename)
++            except Permission.DoesNotExist:
++                # Safe to move the permission to the new content type.
++                perm.content_type = new_content_type
++                perm.save(update_fields=['content_type'])
++            else:
++                # Transfer group relations: for each group that has the old
++                # permission, ensure it has the existing permission, then
++                # remove the old relation.
++                for gp in group_through.objects.filter(permission_id=perm.pk):
++                    # create if not exists
++                    if not group_through.objects.filter(group_id=gp.group_id, permission_id=existing.pk).exists():
++                        group_through.objects.create(group_id=gp.group_id, permission_id=existing.pk)
++                    gp.delete()
++
++                # Transfer user relations similarly.
++                for up in user_through.objects.filter(permission_id=perm.pk):
++                    if not user_through.objects.filter(user_id=up.user_id, permission_id=existing.pk).exists():
++                        user_through.objects.create(user_id=up.user_id, permission_id=existing.pk)
++                    up.delete()
++
++                # Remove the old permission row now that relations have been
++                # transferred.
++                perm.delete()
+ 
+ 
+ def revert_proxy_model_permissions(apps, schema_editor):

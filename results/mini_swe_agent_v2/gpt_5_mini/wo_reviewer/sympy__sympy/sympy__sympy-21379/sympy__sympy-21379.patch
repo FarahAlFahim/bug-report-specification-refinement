@@ -1,0 +1,62 @@
+diff --git a/sympy/polys/polyutils.py b/sympy/polys/polyutils.py
+index f51f80098d..c13e1bc339 100644
+--- a/sympy/polys/polyutils.py
++++ b/sympy/polys/polyutils.py
+@@ -7,7 +7,6 @@
+ from sympy.polys.polyerrors import PolynomialError, GeneratorsError
+ from sympy.polys.polyoptions import build_options
+ 
+-
+ import re
+ 
+ _gens_order = {
+@@ -208,8 +207,26 @@ def _parallel_dict_from_expr_if_gens(exprs, opt):
+                         else:
+                             base, exp = decompose_power_rat(factor)
+ 
+-                        monom[indices[base]] = exp
++                        # Structural objects like Piecewise should not be
++                        # treated as polynomial generators. If a base is
++                        # a Piecewise then treat the whole factor as a
++                        # coefficient instead of trying to map it into
++                        # the generator indices (which would raise a
++                        # KeyError below).
++                        try:
++                            from sympy.functions.elementary.piecewise import                                 Piecewise
++                        except Exception:
++                            Piecewise = None
++
++                        if Piecewise is not None and isinstance(base, Piecewise):
++                            coeff.append(factor)
++                        else:
++                            monom[indices[base]] = exp
+                     except KeyError:
++                        # If the base is a structural object (e.g. Piecewise)
++                        # or does not involve any of the declared generators
++                        # then treat it as a coefficient. Otherwise raise an
++                        # error.
+                         if not factor.free_symbols.intersection(opt.gens):
+                             coeff.append(factor)
+                         else:
+@@ -266,8 +283,19 @@ def _is_coeff(factor):
+                     else:
+                         base, exp = decompose_power_rat(factor)
+ 
+-                    elements[base] = elements.setdefault(base, 0) + exp
+-                    gens.add(base)
++                    # Do not treat structural objects such as Piecewise
++                    # as polynomial generators. Instead, consider the
++                    # original factor to be part of the coefficient.
++                    try:
++                        from sympy.functions.elementary.piecewise import                             Piecewise
++                    except Exception:
++                        Piecewise = None
++
++                    if Piecewise is not None and isinstance(base, Piecewise):
++                        coeff.append(factor)
++                    else:
++                        elements[base] = elements.setdefault(base, 0) + exp
++                        gens.add(base)
+ 
+             terms.append((coeff, elements))
+ 

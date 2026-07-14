@@ -1,0 +1,53 @@
+diff --git a/django/contrib/admin/checks.py b/django/contrib/admin/checks.py
+index 0fefe65e48..7e5cd35f9f 100644
+--- a/django/contrib/admin/checks.py
++++ b/django/contrib/admin/checks.py
+@@ -3,7 +3,13 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.conf import settings
+-from django.contrib.admin.utils import NotRelationField, flatten, get_fields_from_path
++from django.contrib.admin.utils import (
++    NotRelationField,
++    flatten,
++    get_fields_from_path,
++    _get_non_gfk_field,
++    FieldIsAForeignKeyColumnName,
++)
+ from django.core import checks
+ from django.core.exceptions import FieldDoesNotExist
+ from django.db import models
+@@ -896,8 +902,21 @@ class ModelAdminChecks(BaseModelAdminChecks):
+         elif hasattr(obj, item):
+             return []
+         try:
+-            field = obj.model._meta.get_field(item)
++            # Use the same field-resolution semantics as the runtime helpers
++            # in django.contrib.admin.utils to ensure the system check and
++            # runtime behave consistently. _get_non_gfk_field intentionally
++            # treats GenericForeignKey and reverse relations as "not found"
++            # by raising FieldDoesNotExist, and raises
++            # FieldIsAForeignKeyColumnName for <fk>_id attname usage.
++            field = _get_non_gfk_field(obj.model._meta, item)
++        except FieldIsAForeignKeyColumnName:
++            # Using attname (e.g. '<fk>_id') is not supported for list_display.
++            return [
++                refer_to_missing_field(field=item, option=label, obj=obj, id="admin.E108")
++            ]
+         except FieldDoesNotExist:
++            # Fall back to attribute/callable on model or ModelAdmin, mirroring
++            # label_for_field() behavior at runtime.
+             try:
+                 field = getattr(obj.model, item)
+             except AttributeError:
+@@ -916,6 +935,10 @@ class ModelAdminChecks(BaseModelAdminChecks):
+                         id="admin.E108",
+                     )
+                 ]
++
++        # If we have a field object, ensure it's not a many-to-many or a
++        # reverse foreign key (one-to-many). These are not valid for
++        # list_display and should be reported as E109.
+         if isinstance(field, models.ManyToManyField) or (
+             getattr(field, "rel", None) and field.rel.field.many_to_one
+         ):

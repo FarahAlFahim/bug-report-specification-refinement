@@ -1,0 +1,42 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..827b26b580 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -840,6 +840,37 @@ class Grouper:
+         for group in unique_groups.values():
+             yield [x() for x in group]
+ 
++
++    def __getstate__(self):
++        """
++        Produce a picklable representation of the Grouper.
++
++        We clean dead weakrefs and return the live groups as a list of
++        lists of the actual member objects.  This avoids pickling
++        weakref.ReferenceType objects which are not picklable.
++        """
++        # Drop dead refs first
++        self.clean()
++        unique_groups = {id(group): group for group in self._mapping.values()}
++        groups = [[ref() for ref in group] for group in unique_groups.values()]
++        return {"groups": groups}
++
++    def __setstate__(self, state):
++        """
++        Restore internal weakref-based mapping from the pickled list-of-lists
++        representation produced by __getstate__.
++        """
++        groups = state.get("groups", [])
++        mapping = {}
++        for group in groups:
++            # create weakrefs for each member; separate weakrefs are fine
++            # because weakref.ref(obj) compares/hashes by the referenced
++            # object, which allows lookups to work as in the original code.
++            refs = [weakref.ref(obj) for obj in group]
++            for r in refs:
++                mapping[r] = refs
++        self._mapping = mapping
++
+     def get_siblings(self, a):
+         """Return all of the items joined with *a*, including itself."""
+         self.clean()

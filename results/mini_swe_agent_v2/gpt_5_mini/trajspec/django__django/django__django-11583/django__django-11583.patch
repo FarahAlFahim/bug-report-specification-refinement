@@ -1,0 +1,32 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 25c3b44250..26d1c12902 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -143,6 +143,14 @@ def iter_modules_and_files(modules, extra_files):
+             # The module could have been removed, don't fail loudly if this
+             # is the case.
+             continue
++        except Exception as exc:
++            # Path.resolve() can raise other exceptions (for example
++            # ValueError from os.readlink when encountering embedded NUL
++            # bytes in a symlink target). Don't let the autoreloader
++            # abort because of a single problematic path. Log a warning so
++            # the user can investigate the offending entry.
++            logger.warning('Unable to resolve module path %r: %s', path, exc)
++            continue
+         results.add(resolved_path)
+     return frozenset(results)
+ 
+@@ -189,6 +197,12 @@ def sys_path_directories():
+             resolved_path = path.resolve(strict=True).absolute()
+         except FileNotFoundError:
+             continue
++        except Exception as exc:
++            # As above, be tolerant of unexpected resolve-time errors and
++            # skip the offending sys.path entry rather than crashing the
++            # autoreloader. Provide a warning to aid diagnosis.
++            logger.warning('Unable to resolve sys.path entry %r: %s', path, exc)
++            continue
+         # If the path is a file (like a zip file), watch the parent directory.
+         if resolved_path.is_file():
+             yield resolved_path.parent

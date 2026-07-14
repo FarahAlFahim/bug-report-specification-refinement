@@ -1,0 +1,33 @@
+diff --git a/django/template/autoreload.py b/django/template/autoreload.py
+index cf1b20ba95..f20e2b48f1 100644
+--- a/django/template/autoreload.py
++++ b/django/template/autoreload.py
+@@ -19,16 +19,22 @@ def get_template_directories():
+         if not isinstance(backend, DjangoTemplates):
+             continue
+ 
+-        items.update(cwd / to_path(dir) for dir in backend.engine.dirs)
++        for dir in backend.engine.dirs:
++            path = (cwd / to_path(dir)).resolve()
++            # Don't include the current working directory as a template
++            # directory. This prevents the entire project directory from
++            # being watched, which would prevent the server from restarting
++            # when files are changed.
++            if path.exists() and path.is_dir() and path != cwd:
++                items.add(path)
+ 
+         for loader in backend.engine.template_loaders:
+             if not hasattr(loader, 'get_dirs'):
+                 continue
+-            items.update(
+-                cwd / to_path(directory)
+-                for directory in loader.get_dirs()
+-                if not is_django_path(directory)
+-            )
++            for directory in loader.get_dirs():
++                path = (cwd / to_path(directory)).resolve()
++                if not is_django_path(directory) and path.exists() and path.is_dir() and path != cwd:
++                    items.add(path)
+     return items
+ 
+ 

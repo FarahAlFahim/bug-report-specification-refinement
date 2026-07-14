@@ -1,0 +1,26 @@
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index a977256525..a8955c29f9 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -1078,6 +1078,21 @@ class MultiValueField(Field):
+ class FilePathField(ChoiceField):
+     def __init__(self, path, *, match=None, recursive=False, allow_files=True,
+                  allow_folders=False, **kwargs):
++        # Allow the path argument to be a zero-argument callable which will be
++        # resolved at form instantiation time. This lets model fields defer
++        # evaluation of machine-specific paths (for example, using
++        # os.path.join(settings.LOCAL_FILE_DIR, ...)) by supplying a
++        # callable. If a callable is provided, call it now to obtain the
++        # concrete path string used to enumerate the filesystem for choices.
++        if callable(path):
++            try:
++                resolved_path = path()
++            except TypeError as exc:
++                raise TypeError(
++                    "FilePathField path callable must be a zero-argument callable"
++                ) from exc
++            path = resolved_path
++
+         self.path, self.match, self.recursive = path, match, recursive
+         self.allow_files, self.allow_folders = allow_files, allow_folders
+         super().__init__(choices=(), **kwargs)

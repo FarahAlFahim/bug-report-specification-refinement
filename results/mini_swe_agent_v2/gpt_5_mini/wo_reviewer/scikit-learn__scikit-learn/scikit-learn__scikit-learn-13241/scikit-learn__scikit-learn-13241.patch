@@ -1,0 +1,31 @@
+diff --git a/sklearn/decomposition/kernel_pca.py b/sklearn/decomposition/kernel_pca.py
+index bb91d0cbb..824f34397 100644
+--- a/sklearn/decomposition/kernel_pca.py
++++ b/sklearn/decomposition/kernel_pca.py
+@@ -8,6 +8,7 @@ from scipy import linalg
+ from scipy.sparse.linalg import eigsh
+ 
+ from ..utils import check_random_state
++from ..utils.extmath import svd_flip
+ from ..utils.validation import check_is_fitted, check_array
+ from ..exceptions import NotFittedError
+ from ..base import BaseEstimator, TransformerMixin, _UnstableOn32BitMixin
+@@ -220,6 +221,18 @@ class KernelPCA(BaseEstimator, TransformerMixin, _UnstableOn32BitMixin):
+             self.alphas_ = self.alphas_[:, self.lambdas_ > 0]
+             self.lambdas_ = self.lambdas_[self.lambdas_ > 0]
+ 
++        # Make eigenvector signs deterministic. The sign of eigenvectors is
++        # undetermined (+/- ambiguity) after an eigendecomposition which can
++        # lead to non-deterministic outputs across runs. Follow the existing
++        # convention used elsewhere (e.g. PCA) and flip signs such that the
++        # largest absolute entry in each component is positive.
++        # We call svd_flip with a dummy "v" (identity) so that only
++        # self.alphas_ is sign-canonicalized.
++        if self.alphas_.size != 0:
++            # create a dummy right singular vector matrix with matching cols
++            dummy_v = np.eye(self.alphas_.shape[1], dtype=self.alphas_.dtype)
++            self.alphas_, _ = svd_flip(self.alphas_, dummy_v)
++
+         return K
+ 
+     def _fit_inverse_transform(self, X_transformed, X):

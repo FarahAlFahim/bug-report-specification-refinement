@@ -1,0 +1,23 @@
+diff --git a/django/forms/models.py b/django/forms/models.py
+index 5dcf923c12..681056b287 100644
+--- a/django/forms/models.py
++++ b/django/forms/models.py
+@@ -1170,6 +1170,18 @@ class ModelChoiceIteratorValue:
+         if isinstance(other, ModelChoiceIteratorValue):
+             other = other.value
+         return self.value == other
++    def __hash__(self):
++        """
++        Ensure ModelChoiceIteratorValue is hashable when the wrapped value
++        is hashable. Equality proxies to the wrapped ``value``, so the
++        hash must be consistent with that behavior.
++
++        If the wrapped ``value`` is unhashable (which is possible if a
++        custom ``prepare_value`` returns an unhashable object), this
++        will raise TypeError just like hashing the wrapped value would.
++        """
++        return hash(self.value)
++
+ 
+ 
+ class ModelChoiceIterator:

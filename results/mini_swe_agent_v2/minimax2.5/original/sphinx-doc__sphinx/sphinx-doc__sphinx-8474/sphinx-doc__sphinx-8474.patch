@@ -1,0 +1,19 @@
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index 4bde57930..1ef1f51ef 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -1072,6 +1072,14 @@ class StandardDomain(Domain):
+         else:
+             try:
+                 figure_id = target_node['ids'][0]
++                if builder.name == 'singlehtml':
++                    # singlehtml builder assembles toc_fignumbers with 'docname/figtype' keys
++                    key = '%s/%s' % (docname, figtype)
++                    try:
++                        return env.toc_fignumbers[env.config.master_doc][key][figure_id]
++                    except KeyError:
++                        # Maybe toc_fignumbers is not assembled yet
++                        pass
+                 return env.toc_fignumbers[docname][figtype][figure_id]
+             except (KeyError, IndexError) as exc:
+                 # target_node is found, but fignumber is not assigned.

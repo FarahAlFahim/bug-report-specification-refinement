@@ -1,0 +1,27 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index d37d43d5c5..6e75a7a77e 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -124,6 +124,22 @@ class DjangoHelpFormatter(HelpFormatter):
+             actions, key=lambda a: set(a.option_strings) & self.show_last != set()
+         )
+ 
++    def _fill_text(self, text, width, indent):
++        # Preserve original whitespace and formatting in help text
++        # by not collapsing newlines and indentation
++        text_width = max(width - len(indent), 1)
++        lines = text.splitlines()
++        result = []
++        for line in lines:
++            # Preserve leading whitespace for each line
++            # Wrap long lines while preserving indentation
++            import textwrap
++            wrapped = textwrap.fill(
++                line, width=text_width, initial_indent=indent, subsequent_indent=indent
++            )
++            result.append(wrapped)
++        return '\n'.join(result)
++
+     def add_usage(self, usage, actions, *args, **kwargs):
+         super().add_usage(usage, self._reordered_actions(actions), *args, **kwargs)
+ 

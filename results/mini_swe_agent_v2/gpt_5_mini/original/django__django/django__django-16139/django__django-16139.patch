@@ -1,0 +1,54 @@
+diff --git a/django/contrib/auth/forms.py b/django/contrib/auth/forms.py
+index b3cfc6723c..05d258f6b2 100644
+--- a/django/contrib/auth/forms.py
++++ b/django/contrib/auth/forms.py
+@@ -131,39 +131,16 @@ class UserCreationForm(forms.ModelForm):
+         # by super().
+         password = self.cleaned_data.get("password2")
+         if password:
+-            try:
+-                password_validation.validate_password(password, self.instance)
+-            except ValidationError as error:
+-                self.add_error("password2", error)
+-
+-    def save(self, commit=True):
+-        user = super().save(commit=False)
+-        user.set_password(self.cleaned_data["password1"])
+-        if commit:
+-            user.save()
+-        return user
+-
+-
+-class UserChangeForm(forms.ModelForm):
+-    password = ReadOnlyPasswordHashField(
+-        label=_("Password"),
+-        help_text=_(
+-            "Raw passwords are not stored, so there is no way to see this "
+-            "user’s password, but you can change the password using "
+-            '<a href="{}">this form</a>.'
+-        ),
+-    )
+-
+-    class Meta:
+-        model = User
+-        fields = "__all__"
+-        field_classes = {"username": UsernameField}
+-
+-    def __init__(self, *args, **kwargs):
+-        super().__init__(*args, **kwargs)
+-        password = self.fields.get("password")
+-        if password:
+-            password.help_text = password.help_text.format("../password/")
++            # The User admin change form may be accessed via another model's
++            # admin using a custom to_field (e.g. ?_to_field=uuid). In that
++            # case the user change form isn't necessarily addressed by the
++            # instance's primary key in the URL. The password change URL is
++            # registered on the UserAdmin as "<id>/password/" and the link
++            # in the help text should point to the password change page for
++            # the current user instance. Use the instance's pk so the link
++            # always resolves to the correct URL regardless of how the
++            # current change form was looked up.
++            password.help_text = password.help_text.format(f"../../{self.instance.pk}/password/")
+         user_permissions = self.fields.get("user_permissions")
+         if user_permissions:
+             user_permissions.queryset = user_permissions.queryset.select_related(

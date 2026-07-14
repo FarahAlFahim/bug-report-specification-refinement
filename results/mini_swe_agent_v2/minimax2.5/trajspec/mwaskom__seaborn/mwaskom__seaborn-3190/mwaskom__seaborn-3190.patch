@@ -1,0 +1,13 @@
+diff --git a/seaborn/_core/scales.py b/seaborn/_core/scales.py
+index 6c9ecbc9..167af915 100644
+--- a/seaborn/_core/scales.py
++++ b/seaborn/_core/scales.py
+@@ -878,6 +878,8 @@ class PseudoAxis:
+         """Return a numeric representation of the input data."""
+         if np.issubdtype(np.asarray(x).dtype, np.number):
+             return x
++        elif np.issubdtype(np.asarray(x).dtype, np.bool_):
++            return np.asarray(x).astype(float)
+         elif self.converter is None:
+             return x
+         return self.converter.convert(x, self.units, self)

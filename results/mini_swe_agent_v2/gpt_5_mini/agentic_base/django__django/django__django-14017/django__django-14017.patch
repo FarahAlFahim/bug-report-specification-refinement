@@ -1,0 +1,51 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index ffc3a7fda5..0c6734f088 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -137,14 +137,21 @@ class Combinable:
+         return self._combine(other, self.POW, True)
+ 
+     def __rand__(self, other):
+-        raise NotImplementedError(
+-            "Use .bitand() and .bitor() for bitwise logical operations."
+-        )
++        # Support reversed boolean combination with Q objects and other
++        # conditional expressions. If both operands are conditional,
++        # construct a combined Q object so that expressions like
++        # Q() & Exists(...) and Exists(...) & Q() behave commutatively.
++        if getattr(self, 'conditional', False) and getattr(other, 'conditional', False):
++            return Q(other) & Q(self)
++        return NotImplemented
+ 
+     def __ror__(self, other):
+-        raise NotImplementedError(
+-            "Use .bitand() and .bitor() for bitwise logical operations."
+-        )
++        # See __rand__ above. For reversed | operations, return a combined
++        # Q object when both operands are conditional; otherwise allow
++        # Python to try other fallbacks by returning NotImplemented.
++        if getattr(self, 'conditional', False) and getattr(other, 'conditional', False):
++            return Q(other) | Q(self)
++        return NotImplemented
+ 
+ 
+ @deconstructible
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index c957ffa564..e6874418bd 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -40,8 +40,13 @@ class Q(tree.Node):
+         super().__init__(children=[*args, *sorted(kwargs.items())], connector=_connector, negated=_negated)
+ 
+     def _combine(self, other, conn):
++        # If the other operand isn't a Q object, indicate that the
++        # operation is not implemented for this left-hand type so that
++        # Python will try the reflected operation on the right-hand
++        # operand (i.e. __rand__/__ror__). Raising TypeError here
++        # prevents that fallback and aborts the operation.
+         if not isinstance(other, Q):
+-            raise TypeError(other)
++            return NotImplemented
+ 
+         # If the other Q() is empty, ignore it and just use `self`.
+         if not other:

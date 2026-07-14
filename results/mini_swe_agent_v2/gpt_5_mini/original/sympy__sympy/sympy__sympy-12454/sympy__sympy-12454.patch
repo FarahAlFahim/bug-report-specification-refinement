@@ -1,0 +1,33 @@
+diff --git a/sympy/matrices/matrices.py b/sympy/matrices/matrices.py
+index 90ea232faf..ce4dcc8b0e 100644
+--- a/sympy/matrices/matrices.py
++++ b/sympy/matrices/matrices.py
+@@ -639,9 +639,11 @@ def _eval_is_zero(self):
+         return True
+ 
+     def _eval_is_upper_hessenberg(self):
++        # As with is_upper, ensure we don't index columns that don't exist
++        # for tall matrices by capping the inner loop at self.cols.
+         return all(self[i, j].is_zero
+                    for i in range(2, self.rows)
+-                   for j in range(i - 1))
++                   for j in range(min(max(0, i - 1), self.cols)))
+ 
+     def _eval_values(self):
+         return [i for i in self if not i.is_zero]
+@@ -1110,9 +1112,14 @@ def is_upper(self):
+         is_diagonal
+         is_upper_hessenberg
+         """
++        # In case the matrix has fewer columns than rows (a tall
++        # matrix) we must not attempt to index columns that do not
++        # exist.  Cap the inner loop at self.cols so that only valid
++        # column indices are accessed.  Use max with 0 to ensure a
++        # non-negative range stop.
+         return all(self[i, j].is_zero
+                    for i in range(1, self.rows)
+-                   for j in range(i))
++                   for j in range(min(max(0, i), self.cols)))
+ 
+     @property
+     def is_zero(self):

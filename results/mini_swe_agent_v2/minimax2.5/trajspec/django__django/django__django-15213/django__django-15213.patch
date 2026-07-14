@@ -1,0 +1,31 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..9a163397e7 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -385,6 +385,10 @@ class BaseExpression:
+         Custom format for select clauses. For example, EXISTS expressions need
+         to be wrapped in CASE WHEN on Oracle.
+         """
++        # Handle empty SQL from WhereNode (e.g., from ~Q(pk__in=[]))
++        # which means "match everything" and should be represented as '1' (TRUE)
++        if not sql:
++            sql = '1'
+         if hasattr(self.output_field, 'select_format'):
+             return self.output_field.select_format(compiler, sql, params)
+         return sql, params
+diff --git a/django/db/models/sql/where.py b/django/db/models/sql/where.py
+index 50ff13be75..7f064b3825 100644
+--- a/django/db/models/sql/where.py
++++ b/django/db/models/sql/where.py
+@@ -215,7 +215,10 @@ class WhereNode(tree.Node):
+         # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP
+         # BY list.
+         if not compiler.connection.features.supports_boolean_expr_in_select_clause:
+-            sql = f'CASE WHEN {sql} THEN 1 ELSE 0 END'
++            if sql:
++                sql = f'CASE WHEN {sql} THEN 1 ELSE 0 END'
++            else:
++                sql = '1'
+         return sql, params
+ 
+     def get_db_converters(self, connection):

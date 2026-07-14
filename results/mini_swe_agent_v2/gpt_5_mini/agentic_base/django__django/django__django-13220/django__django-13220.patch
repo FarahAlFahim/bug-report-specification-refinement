@@ -1,0 +1,61 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..96ed1e39c3 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,56 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def __eq__(self, other):
++        """Compare ValidationError instances by their rendered messages.
++
++        - If ``other`` is not a ValidationError, return NotImplemented.
++        - If one instance is dict-based and the other is not, they're not equal.
++        - For non-dict errors, compare the multisets of rendered messages.
++        - For dict-based errors, require the same set of fields and compare
++          each field's rendered messages as multisets.
++        """
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++
++        def _render_messages(error_list):
++            rendered = []
++            for err in error_list:
++                msg = err.message
++                if getattr(err, 'params', None):
++                    try:
++                        msg = msg % err.params
++                    except Exception:
++                        # If rendering fails, fall back to the original
++                        # template representation.
++                        msg = msg
++                rendered.append(str(msg))
++            return rendered
++
++        # If one has error_dict and the other doesn't, they're not equal.
++        self_has_dict = hasattr(self, 'error_dict')
++        other_has_dict = hasattr(other, 'error_dict')
++        if self_has_dict != other_has_dict:
++            return False
++
++        if self_has_dict:
++            # Both are dict-based: require same fields and per-field multisets.
++            if set(self.error_dict.keys()) != set(other.error_dict.keys()):
++                return False
++            for field in self.error_dict:
++                a = _render_messages(self.error_dict[field])
++                b = _render_messages(other.error_dict[field])
++                from collections import Counter
++                if Counter(a) != Counter(b):
++                    return False
++            return True
++        else:
++            # Both are non-dict: compare multisets of rendered messages.
++            a = _render_messages(self.error_list)
++            b = _render_messages(other.error_list)
++            from collections import Counter
++            return Counter(a) == Counter(b)
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

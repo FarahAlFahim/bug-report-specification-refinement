@@ -1,0 +1,56 @@
+diff --git a/django/db/migrations/autodetector.py b/django/db/migrations/autodetector.py
+index 30616c0172..9faad33fa8 100644
+--- a/django/db/migrations/autodetector.py
++++ b/django/db/migrations/autodetector.py
+@@ -1047,12 +1047,33 @@ class MigrationAutodetector:
+     def generate_added_constraints(self):
+         for (app_label, model_name), alt_constraints in self.altered_constraints.items():
+             for constraint in alt_constraints['added_constraints']:
++                # Validate referenced fields and collect FK dependencies so
++                # migrations include dependencies for related models. This
++                # mirrors the behaviour for unique_together handling where
++                # fields are resolved via get_field() and foreign-key
++                # dependencies are added.
++                dependencies = []
++                try:
++                    for field_name in getattr(constraint, 'fields', ()): 
++                        field = self.new_apps.get_model(app_label, model_name)._meta.get_field(field_name)
++                        if getattr(field, 'remote_field', None) and field.remote_field and field.remote_field.model:
++                            dependencies.extend(self._get_dependencies_for_foreign_key(field))
++                except Exception:
++                    # If the field doesn't exist, let the migration
++                    # generation surface the error elsewhere (model system
++                    # checks should catch this). We avoid swallowing
++                    # FieldDoesNotExist specifically so callers get useful
++                    # tracebacks; however, as a safety, fall back to
++                    # adding the operation without dependencies.
++                    dependencies = []
++
+                 self.add_operation(
+                     app_label,
+                     operations.AddConstraint(
+                         model_name=model_name,
+                         constraint=constraint,
+-                    )
++                    ),
++                    dependencies=dependencies,
+                 )
+ 
+     def generate_removed_constraints(self):
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 7bb3fa4706..bb19044707 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1866,6 +1866,12 @@ class Model(metaclass=ModelBase):
+     @classmethod
+     def _check_constraints(cls, databases):
+         errors = []
++        # Validate that fields referenced by model-level constraints exist
++        # and are local to the model. Use the existing _check_local_fields
++        # helper to produce consistent models.E012 / E013 / E016 errors.
++        for constraint in cls._meta.constraints:
++            if isinstance(constraint, UniqueConstraint):
++                errors.extend(cls._check_local_fields(constraint.fields, 'constraints'))
+         for db in databases:
+             if not router.allow_migrate_model(db, cls):
+                 continue

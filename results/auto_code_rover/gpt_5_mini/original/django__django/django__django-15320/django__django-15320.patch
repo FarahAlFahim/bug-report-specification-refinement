@@ -1,0 +1,45 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..e5987fd152 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1150,6 +1150,15 @@ class Subquery(BaseExpression, Combinable):
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+         self.query = getattr(queryset, 'query', queryset)
++        # Ensure the underlying Query is marked as a subquery so that the
++        # compiler will render it with surrounding parentheses. This keeps the
++        # slicing in as_sql() valid.
++        try:
++            self.query.subquery = True
++        except Exception:
++            # If the underlying object doesn't support setting this attribute,
++            # ignore and proceed.
++            pass
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1158,6 +1167,12 @@ class Subquery(BaseExpression, Combinable):
+ 
+     def set_source_expressions(self, exprs):
+         self.query = exprs[0]
++        # When replacing the source expression, ensure the assigned Query is
++        # marked as a subquery so it will be rendered with parentheses.
++        try:
++            self.query.subquery = True
++        except Exception:
++            pass
+ 
+     def _resolve_output_field(self):
+         return self.query.output_field
+@@ -1165,6 +1180,11 @@ class Subquery(BaseExpression, Combinable):
+     def copy(self):
+         clone = super().copy()
+         clone.query = clone.query.clone()
++        # Ensure the cloned underlying Query retains the subquery flag.
++        try:
++            clone.query.subquery = True
++        except Exception:
++            pass
+         return clone
+ 
+     @property

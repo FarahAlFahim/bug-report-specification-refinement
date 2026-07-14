@@ -1,0 +1,23 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 2fd9f63..5d3d4d3 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -635,6 +635,18 @@ class Abs(Function):
+         return (arg*conjugate(arg))**S.Half
+ 
+ 
++def _sign_eval_rewrite_as_Abs(self, arg, **kwargs):
++    # Local import to avoid circular/top-level import issues.
++    from sympy import Abs, Piecewise, S
++    # Preserve the semantics that sign(0) == 0 while exposing the algebraic
++    # identity sign(z) = z/Abs(z) for non-zero z. Using Piecewise keeps the
++    # rewrite symbolic and avoids producing an undefined 0/0 at z == 0.
++    return Piecewise((arg/Abs(arg), arg != 0), (S.Zero, True))
++
++# Attach the rewrite helper to the sign class so that Basic.rewrite(Abs)
++# will produce the algebraic form while preserving the zero-case.
++sign._eval_rewrite_as_Abs = _sign_eval_rewrite_as_Abs
++
+ class arg(Function):
+     """
+     Returns the argument (in radians) of a complex number. For a positive

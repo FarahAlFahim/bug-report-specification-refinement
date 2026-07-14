@@ -1,0 +1,82 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..d16f1f312 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -56,6 +56,8 @@ class MCodePrinter(CodePrinter):
+     def __init__(self, settings={}):
+         """Register function mappings supplied by user"""
+         CodePrinter.__init__(self, settings)
++        # identify this printer's language for CodePrinter diagnostics
++        self.language = "Mathematica"
+         self.known_functions = dict(known_functions)
+         userfuncs = settings.get('user_functions', {})
+         for k, v in userfuncs.items():
+@@ -63,7 +65,13 @@ def __init__(self, settings={}):
+                 userfuncs[k] = [(lambda *x: True, v)]
+                 self.known_functions.update(userfuncs)
+ 
+-    doprint = StrPrinter.doprint
++    # Use CodePrinter.doprint (not StrPrinter.doprint) so that the
++    # CodePrinter dispatch rules are used.  StrPrinter.doprint would
++    # bypass CodePrinter-specific printing (and its _print_* methods)
++    # which leads to incorrect formatting for some classes like
++    # LatticeOp (Max/Min). See issue with Max being printed as
++    # "Max(2, x)" instead of Mathematica-style "Max[x, 2]".
++    doprint = CodePrinter.doprint
+ 
+     def _print_Pow(self, expr):
+         PREC = precedence(expr)
+@@ -101,6 +109,23 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    # Ensure Expr class is handled by MCodePrinter._print_Function so that
++    # non-Function application-like objects (e.g. LatticeOp/Max) are
++    # formatted using Mathematica-style square brackets instead of
++    # falling back to the generic not-supported path which uses
++    # StrPrinter formatting (parentheses).
++    _print_Expr = _print_Function
++
++    def _print_LatticeOp(self, expr):
++        """
++        Print lattice operations (e.g. Min/Max) using Mathematica-style
++        square brackets and preserve argument ordering. StrPrinter prints
++        these with parentheses and sorts the arguments which produces
++        invalid Mathematica syntax (e.g. Max(2, x)). For Mathematica code
++        we want Max[x, 2].
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]
+@@ -117,6 +142,29 @@ def _print_Derivative(self, expr):
+         return "Hold[D[" + ', '.join(self.doprint(a) for a in [dexpr] + dvars) + "]]"
+ 
+ 
++
++
++    # Minimal implementations of CodePrinter abstract methods so that
++    # CodePrinter.doprint can be used. These provide simple, Mathematica-
++    # appropriate formatting for comments, statements, and code blocks.
++    def _rate_index_position(self, p):
++        return p
++
++    def _get_statement(self, codestring):
++        # Mathematica statements do not require a trailing semicolon here
++        return codestring
++
++    def _get_comment(self, text):
++        return "(* %s *)" % text
++
++    def _declare_number_const(self, name, value):
++        return "%s = %s" % (name, value)
++
++    def _format_code(self, lines):
++        return lines
++
++    def _get_loop_opening_ending(self, indices):
++        return ([], [])
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code
+ 

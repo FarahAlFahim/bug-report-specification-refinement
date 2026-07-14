@@ -1,0 +1,43 @@
+diff --git a/django/core/management/commands/sqlflush.py b/django/core/management/commands/sqlflush.py
+index 60e69e67bf..e1d593187a 100644
+--- a/django/core/management/commands/sqlflush.py
++++ b/django/core/management/commands/sqlflush.py
+@@ -9,7 +9,9 @@ class Command(BaseCommand):
+         "the database to the state they were in just after they were installed."
+     )
+ 
+-    output_transaction = True
++    # Only output BEGIN/COMMIT if the backend can rollback DDL.
++    # This is set per-invocation in handle().
++    output_transaction = False
+ 
+     def add_arguments(self, parser):
+         super().add_arguments(parser)
+diff --git a/django/core/management/commands/sqlmigrate.py b/django/core/management/commands/sqlmigrate.py
+index f0b663222a..b51d1739a4 100644
+--- a/django/core/management/commands/sqlmigrate.py
++++ b/django/core/management/commands/sqlmigrate.py
+@@ -56,7 +56,7 @@ class Command(BaseCommand):
+         targets = [(app_label, migration.name)]
+ 
+         # Show begin/end around output only for atomic migrations
+-        self.output_transaction = migration.atomic
++        self.output_transaction = migration.atomic and connection.features.can_rollback_ddl
+ 
+         # Make a plan that represents just the requested migrations and show SQL
+         # for it
+diff --git a/django/core/management/commands/sqlsequencereset.py b/django/core/management/commands/sqlsequencereset.py
+index d23f89ce1f..c85af2d0d9 100644
+--- a/django/core/management/commands/sqlsequencereset.py
++++ b/django/core/management/commands/sqlsequencereset.py
+@@ -18,6 +18,10 @@ class Command(AppCommand):
+         if app_config.models_module is None:
+             return
+         connection = connections[options['database']]
++        # Only output BEGIN/COMMIT if the backend can rollback DDL. If it
++        # can't, wrapping the statements in a transaction is misleading and
++        # inconsistent with how migrations are executed.
++        self.output_transaction = connection.features.can_rollback_ddl
+         models = app_config.get_models(include_auto_created=True)
+         statements = connection.ops.sequence_reset_sql(self.style, models)
+         return '\n'.join(statements)

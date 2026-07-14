@@ -1,0 +1,39 @@
+diff --git a/src/_pytest/junitxml.py b/src/_pytest/junitxml.py
+index 15c630b1d..696fae421 100644
+--- a/src/_pytest/junitxml.py
++++ b/src/_pytest/junitxml.py
+@@ -13,6 +13,7 @@ import os
+ import re
+ import sys
+ import time
++import socket
+ 
+ import py
+ 
+@@ -646,7 +647,16 @@ class LogXML:
+             os.makedirs(dirname)
+         logfile = open(self.logfile, "w", encoding="utf-8")
+         suite_stop_time = time.time()
+-        suite_time_delta = suite_stop_time - self.suite_start_time
++        # Defensive: suite_start_time may not have been set in all paths
++        start_time = getattr(self, "suite_start_time", time.time())
++        suite_time_delta = suite_stop_time - start_time
++
++        # timestamp in the form YYYY-MM-DDTHH:MM:SS and hostname
++        timestamp = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(start_time))
++        try:
++            hostname = socket.gethostname()
++        except Exception:
++            hostname = ""
+ 
+         numtests = (
+             self.stats["passed"]
+@@ -666,6 +676,8 @@ class LogXML:
+             skipped=self.stats["skipped"],
+             tests=numtests,
+             time="%.3f" % suite_time_delta,
++            timestamp=timestamp,
++            hostname=hostname,
+         )
+         logfile.write(Junit.testsuites([suite_node]).unicode(indent=0))
+         logfile.close()

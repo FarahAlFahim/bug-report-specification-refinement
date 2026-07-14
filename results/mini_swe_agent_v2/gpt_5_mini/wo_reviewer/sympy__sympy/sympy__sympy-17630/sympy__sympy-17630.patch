@@ -1,0 +1,51 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index 95302a05ca..4763107d62 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -164,7 +164,45 @@ def structurally_equal(self, other):
+     def _blockmul(self, other):
+         if (isinstance(other, BlockMatrix) and
+                 self.colblocksizes == other.rowblocksizes):
+-            return BlockMatrix(self.blocks*other.blocks)
++            # The dense product of the explicit matrix-of-blocks can
++            # contain scalar zeros (S.Zero) or other scalars in places
++            # where a matrix-like object is expected. Ensure that each
++            # entry in the resulting block-structure is a Matrix-like
++            # object with the correct shape. Scalar zeros should be
++            # converted to ZeroMatrix with the appropriate block
++            # dimensions. Non-matrix scalars (e.g. numbers resulting
++            # from 1x1 block multiplications) should be wrapped into
++            # Matrix objects of the appropriate size.
++            prod = self.blocks * other.blocks
++            # prod is a (dense) Matrix of block entries. Build a new
++            # Matrix of the same shape but with all entries guaranteed
++            # to be matrix-like.
++            r, c = prod.rows, prod.cols
++            new_entries = [None] * (r * c)
++            for i in range(r):
++                for j in range(c):
++                    e = prod[i, j]
++                    # If the entry already looks like a Matrix, keep it
++                    if getattr(e, 'is_Matrix', False):
++                        new_e = e
++                    else:
++                        # treat explicit scalar zero specially
++                        if getattr(e, 'is_zero', False):
++                            new_e = ZeroMatrix(self.rowblocksizes[i],
++                                               other.colblocksizes[j])
++                        else:
++                            # Wrap non-matrix scalar into a Matrix of
++                            # the appropriate block size. For the usual
++                            # cases this will be a 1x1 matrix but this
++                            # also covers any unexpected cases.
++                            rowsize = self.rowblocksizes[i]
++                            colsize = other.colblocksizes[j]
++                            # Fill the block with the scalar value
++                            new_e = Matrix(rowsize, colsize,
++                                           [e] * (rowsize * colsize))
++                    new_entries[i * c + j] = new_e
++            new_blocks = Matrix(r, c, new_entries)
++            return BlockMatrix(new_blocks)
+ 
+         return self * other
+ 

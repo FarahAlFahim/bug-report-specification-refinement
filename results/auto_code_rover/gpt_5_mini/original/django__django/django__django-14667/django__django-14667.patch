@@ -1,0 +1,56 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..e9ce965686 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -678,7 +678,11 @@ class Query(BaseExpression):
+         "target", and the model and list of fields being added for that model.
+         """
+         field_names, defer = self.deferred_loading
+-        if not field_names:
++        # Only short-circuit when there are no field names and we're in "defer"
++        # mode. If defer is False (explicit immediate-only empty set), we must
++        # continue processing so that an explicit only(...).defer(...) sequence
++        # is honored.
++        if not field_names and defer:
+             return
+         orig_opts = self.get_meta()
+         seen = {}
+@@ -2067,6 +2071,12 @@ class Query(BaseExpression):
+     def clear_deferred_loading(self):
+         """Remove any fields from the deferred loading set."""
+         self.deferred_loading = (frozenset(), True)
++        # Invalidate cached loaded-field names so future calls recompute based
++        # on the updated deferred_loading.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_deferred_loading(self, field_names):
+         """
+@@ -2087,6 +2097,12 @@ class Query(BaseExpression):
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+             self.deferred_loading = existing.difference(field_names), False
++        # Invalidate cached loaded-field names so future calls recompute based
++        # on the updated deferred_loading.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_immediate_loading(self, field_names):
+         """
+@@ -2111,6 +2127,12 @@ class Query(BaseExpression):
+         else:
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
++        # Invalidate cached loaded-field names so future calls recompute based
++        # on the updated deferred_loading.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def get_loaded_field_names(self):
+         """

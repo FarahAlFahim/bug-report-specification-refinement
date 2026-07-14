@@ -1,0 +1,72 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 28374272f4..f56d928e17 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -516,17 +516,64 @@ class Field(RegisterLookupMixin):
+     def __eq__(self, other):
+         # Needed for @total_ordering
+         if isinstance(other, Field):
+-            return self.creation_counter == other.creation_counter
++            # Fast-path: different creation counters are always different.
++            if self.creation_counter != other.creation_counter:
++                return False
++            # Disambiguate fields that were copied from the same abstract
++            # declaration (they can have identical creation_counters). Two
++            # fields are equal only if they are attached to the same model
++            # object.
++            return getattr(self, 'model', None) is getattr(other, 'model', None)
+         return NotImplemented
+ 
+     def __lt__(self, other):
+         # This is needed because bisect does not take a comparison function.
+         if isinstance(other, Field):
+-            return self.creation_counter < other.creation_counter
++            # Primary ordering is by creation_counter to preserve the
++            # original ordering semantics. If there's a tie (possible when
++            # fields are deep-copied from an abstract base), use the
++            # attached model identity as a deterministic tie-breaker.
++            if self.creation_counter != other.creation_counter:
++                return self.creation_counter < other.creation_counter
++
++            # Tie-breaker: compare model labels when both models exist.
++            self_model = getattr(self, 'model', None)
++            other_model = getattr(other, 'model', None)
++
++            # If both fields are on the same model instance, fall back to
++            # object id comparison to get a stable ordering.
++            if self_model is other_model:
++                return id(self) < id(other)
++
++            # Fields without an attached model sort before fields with a
++            # model to keep ordering deterministic.
++            if self_model is None and other_model is None:
++                return id(self) < id(other)
++            if self_model is None:
++                return True
++            if other_model is None:
++                return False
++
++            # Both models exist: try to use their label_lower as a
++            # human-readable, stable identifier. If unavailable, fall back
++            # to object id of the model class.
++            try:
++                self_label = self_model._meta.label_lower
++                other_label = other_model._meta.label_lower
++            except Exception:
++                return id(self_model) < id(other_model)
++
++            if self_label != other_label:
++                return self_label < other_label
++
++            return id(self_model) < id(other_model)
+         return NotImplemented
+ 
+     def __hash__(self):
+-        return hash(self.creation_counter)
++        # Include the attached model identity in the hash so that distinct
++        # Field instances copied from the same abstract base do not collide
++        # in sets/dicts when they share the same creation_counter.
++        return hash((self.creation_counter, getattr(self, 'model', None)))
+ 
+     def __deepcopy__(self, memodict):
+         # We don't have to deepcopy very much here, since most things are not

@@ -1,0 +1,59 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index 0d5c493..86526d7 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -927,6 +927,54 @@ default: %(va)s
+                         return last_ax
+             return None
+ 
++        # If the canvas or widgetlock currently reference this Axes, release
++        # those references so they don't hold stale pointers after the Axes
++        # are removed.  This is important when widgets may hold the mouse
++        # grab or a widgetlock while user callbacks clear and recreate the
++        # figure (e.g., during a RangeSlider on_changed callback).
++        canvas = getattr(self, "canvas", None)
++        if canvas is not None:
++            # Release mouse grab if the Axes being removed currently owns it.
++            # Different backends/versions may store the grab in either
++            # 'mouse_grabber' or '_mouse_grabber', and there is a public API
++            # method 'grab_mouse' which can accept None to release.
++            mg = getattr(canvas, "mouse_grabber", None)
++            if mg is None:
++                mg = getattr(canvas, "_mouse_grabber", None)
++            if mg is ax:
++                # Prefer the public API if available, otherwise clear the attr.
++                try:
++                    if hasattr(canvas, "grab_mouse"):
++                        # Some canvases implement grab_mouse(widget) where
++                        # passing None releases the grab.
++                        canvas.grab_mouse(None)
++                    else:
++                        if hasattr(canvas, "mouse_grabber"):
++                            canvas.mouse_grabber = None
++                        if hasattr(canvas, "_mouse_grabber"):
++                            canvas._mouse_grabber = None
++                except Exception:
++                    # Best-effort fallback to avoid leaving a stale reference.
++                    if hasattr(canvas, "mouse_grabber"):
++                        canvas.mouse_grabber = None
++                    if hasattr(canvas, "_mouse_grabber"):
++                        canvas._mouse_grabber = None
++
++            # If a widgetlock on the canvas is held by a widget bound to this
++            # Axes, release it so other widgets/tools can acquire it.
++            wl = getattr(canvas, "widgetlock", None)
++            if wl is not None:
++                owner = getattr(wl, "_owner", None)
++                try:
++                    if owner is not None and getattr(owner, "ax", None) is ax:
++                        if hasattr(wl, "release"):
++                            wl.release(owner)
++                        else:
++                            # Best-effort fallback.
++                            wl._owner = None
++                except Exception:
++                    wl._owner = None
++
+         self._axstack.remove(ax)
+         self._axobservers.process("_axes_change_event", self)
+         self.stale = True

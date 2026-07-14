@@ -1,0 +1,46 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 24d89897f7..fb2230f43b 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -121,10 +121,15 @@ def _hashable_content(self):
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
+-            if not isinstance(other, Expr):
+-                return False
+-        except (SympifyError, SyntaxError):
++            # Use strict sympification to avoid parsing/evaluating the
++            # repr() of arbitrary objects. This is consistent with
++            # Basic.__eq__ which uses _sympify.
++            other = _sympify(other)
++        except SympifyError:
++            # Let Python try other rich-comparison implementations
++            # (and avoid executing possibly unsafe repr-based parsing).
++            return NotImplemented
++        if not isinstance(other, Expr):
+             return False
+         # check for pure number expr
+         if  not (self.is_Number and other.is_Number) and (
+diff --git a/sympy/core/sympify.py b/sympy/core/sympify.py
+index ed4ea6ce5e..ab8db6b277 100644
+--- a/sympy/core/sympify.py
++++ b/sympy/core/sympify.py
+@@ -359,9 +359,14 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+     # _sympy_ (which is a canonical and robust way to convert
+     # anything to SymPy expression).
+     #
+-    # As a last chance, we try to take "a"'s normal form via unicode()
+-    # and try to parse it. If it fails, then we have no luck and
+-    # return an exception
++    # As a last chance, only attempt to parse/evaluate the object
++    # if it is already a string. Do NOT attempt to stringify arbitrary
++    # non-string objects (via repr/unicode) and pass that to the parser,
++    # since that can lead to executing code derived from __repr__.
++    if not isinstance(a, string_types):
++        # We don't have a safe conversion; signal failure.
++        raise SympifyError(a)
++
+     try:
+         from .compatibility import unicode
+         a = unicode(a)

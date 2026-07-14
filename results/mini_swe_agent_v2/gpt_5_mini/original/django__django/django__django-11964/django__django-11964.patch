@@ -1,0 +1,34 @@
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index 189fb4fa44..4585bcf43b 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -12,6 +12,7 @@ from collections import namedtuple
+ 
+ from django.db.models.constants import LOOKUP_SEP
+ from django.utils import tree
++import enum
+ 
+ # PathInfo is used when converting lookups (fk__somecol). The contents
+ # describe the relation in Model terms (model Options and Fields for both
+@@ -138,6 +139,21 @@ class DeferredAttribute:
+             data[field_name] = val
+         return data[field_name]
+ 
++    def __set__(self, instance, value):
++        """
++        Intercept assignments to model fields so that enum.Enum values
++        (for Choices subclasses) are converted to their underlying value
++        before being stored on the instance. Related-field descriptors
++        override __set__ when they need custom behaviour, so this only
++        affects the generic case.
++        """
++        # Convert enum.Enum instances to their .value so that freshly
++        # created model instances behave the same as instances loaded
++        # from the database (which receive raw values).
++        if isinstance(value, enum.Enum):
++            value = value.value
++        instance.__dict__[self.field.attname] = value
++
+     def _check_parent_chain(self, instance):
+         """
+         Check if the field value can be fetched from a parent field already

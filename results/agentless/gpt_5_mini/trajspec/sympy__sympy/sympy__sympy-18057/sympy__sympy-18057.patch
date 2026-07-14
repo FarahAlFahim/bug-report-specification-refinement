@@ -1,0 +1,17 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index b5265ce..37964e0 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -121,7 +121,11 @@ class Expr(Basic, EvalfMixin):
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
++            # Use strict sympification here to avoid the "last chance" path
++            # that stringifies arbitrary objects and parses/evaluates their
++            # repr(). This prevents executing code or producing unexpected
++            # conversions when comparing an Expr to a non-SymPy object.
++            other = sympify(other, strict=True)
+             if not isinstance(other, Expr):
+                 return False
+         except (SympifyError, SyntaxError):

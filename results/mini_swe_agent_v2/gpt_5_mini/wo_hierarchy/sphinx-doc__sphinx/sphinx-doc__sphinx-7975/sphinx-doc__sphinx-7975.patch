@@ -1,0 +1,50 @@
+--- /tmp/orig_indexentries.py	2026-05-14 20:51:55.128541007 +0000
++++ sphinx/environment/adapters/indexentries.py	2026-05-14 20:50:41.661862000 +0000
+@@ -100,19 +100,21 @@
+ 
+         # sort the index entries; put all symbols at the front, even those
+         # following the letters in ASCII, this is where the chr(127) comes from
+-        def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
++        def keyfunc(entry: Tuple[str, List]) -> Tuple[int, str, str]:
+             key, (void, void, category_key) = entry
+             if category_key:
+                 # using specified category key to sort
+                 key = category_key
+             lckey = unicodedata.normalize('NFD', key.lower())
+-            if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
++            if lckey.startswith('‏'):
+                 lckey = lckey[1:]
+-            if lckey[0:1].isalpha() or lckey.startswith('_'):
+-                lckey = chr(127) + lckey
+-            # ensure a determinstic order *within* letters by also sorting on
+-            # the entry itself
+-            return (lckey, entry[0])
++            # determine whether this key is alphabetic/underscore or a symbol
++            is_letter = (lckey[0:1].isalpha() or lckey.startswith('_'))
++            # category: 0 for symbols (should come first), 1 for letters/_
++            category = 1 if is_letter else 0
++            # ensure a determinstic order by sorting on category, the key
++            # itself and finally the original entry
++            return (category, lckey, entry[0])
+         newlist = sorted(new.items(), key=keyfunc)
+ 
+         if group_entries:
+@@ -146,13 +148,13 @@
+                 i += 1
+ 
+         # sort the sub-index entries
+-        def keyfunc2(entry: Tuple[str, List]) -> str:
++        def keyfunc2(entry: Tuple[str, List]) -> Tuple[int, str]:
+             key = unicodedata.normalize('NFD', entry[0].lower())
+-            if key.startswith('\N{RIGHT-TO-LEFT MARK}'):
++            if key.startswith('‏'):
+                 key = key[1:]
+-            if key[0:1].isalpha() or key.startswith('_'):
+-                key = chr(127) + key
+-            return key
++            is_letter = (key[0:1].isalpha() or key.startswith('_'))
++            category = 1 if is_letter else 0
++            return (category, key)
+ 
+         # group the entries by letter
+         def keyfunc3(item: Tuple[str, List]) -> str:

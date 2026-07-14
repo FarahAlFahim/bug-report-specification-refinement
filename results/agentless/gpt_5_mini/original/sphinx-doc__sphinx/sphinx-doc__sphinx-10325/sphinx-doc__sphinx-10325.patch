@@ -1,0 +1,70 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 53e783e..1330a23 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -110,10 +110,26 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :inherited-members: option to auto directives.
++
++    This accepts either:
++    - None/True which means the default 'object' behavior (represented as a
++      single-item set {'object'}), or
++    - a comma-separated string of class names, or
++    - any iterable of class names.
++
++    The result is normalized to a set of class-name strings.
++    """
+     if arg in (None, True):
+-        return 'object'
+-    else:
++        return {'object'}
++    # a comma-separated string of class names
++    if isinstance(arg, str):
++        return {x.strip() for x in arg.split(',') if x.strip()}
++    # any iterable of items that can be converted to strings (e.g. list/tuple)
++    try:
++        return {str(x).strip() for x in arg if str(x).strip()}
++    except Exception:
++        # fallback: return as-is
+         return arg
+ 
+ 
+@@ -680,12 +696,31 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
++            """Return True if the given member should be considered an inherited
++            member from one of the classes specified in the inherited-members
++            option (and thus be filtered/ignored).
++            """
+             if inspect.isclass(self.object):
++                inherited = self.options.inherited_members
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
+-                    elif name in cls.__dict__:
++                    # skip the class itself
++                    if cls is self.object:
++                        continue
++
++                    # If inherited is a collection of class names, check membership.
++                    # If it's a single string, compare directly. If matched, this
++                    # member is considered to come from a specified superclass.
++                    if isinstance(inherited, (set, list, tuple)):
++                        if cls.__name__ in inherited:
++                            # given member is a member of specified *super class*
++                            return True
++                    elif isinstance(inherited, str):
++                        if cls.__name__ == inherited:
++                            return True
++
++                    # otherwise, if the member is defined on this superclass,
++                    # it's not considered filtered (it's "owned" by that class).
++                    if name in cls.__dict__:
+                         return False
+                     elif name in self.get_attr(cls, '__annotations__', {}):
+                         return False

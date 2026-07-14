@@ -1,0 +1,26 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 75349099..221d9b11 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1472,7 +1472,7 @@ class PairGrid(Grid):
+                 for ax in diag_axes[1:]:
+                     share_axis(diag_axes[0], ax, "y")
+ 
+-            self.diag_vars = np.array(diag_vars, np.object_)
++            self.diag_vars = list(diag_vars)
+             self.diag_axes = np.array(diag_axes, np.object_)
+ 
+         if "hue" not in signature(func).parameters:
+@@ -1657,8 +1657,12 @@ class PairGrid(Grid):
+     def _add_axis_labels(self):
+         """Add labels to the left and bottom Axes."""
+         for ax, label in zip(self.axes[-1, :], self.x_vars):
++            if isinstance(label, tuple):
++                label = str(label)
+             ax.set_xlabel(label)
+         for ax, label in zip(self.axes[:, 0], self.y_vars):
++            if isinstance(label, tuple):
++                label = str(label)
+             ax.set_ylabel(label)
+ 
+     def _find_numeric_cols(self, data):

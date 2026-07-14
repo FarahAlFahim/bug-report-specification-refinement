@@ -1,0 +1,29 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..8683ed434d 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -1175,7 +1175,23 @@ def get_backend():
+     --------
+     matplotlib.use
+     """
+-    return rcParams['backend']
++    # Accessing rcParams['backend'] can trigger resolution of the
++    # ``_auto_backend_sentinel`` which imports ``matplotlib.pyplot`` and
++    # causes side-effects (creating or closing figures).  Avoid that here
++    # to make get_backend() side-effect free.  Prefer the explicit
++    # requested backend if present, otherwise fall back to sensible
++    # defaults without importing pyplot.
++    backend = rcParams._get_backend_or_none()
++    if backend is not None:
++        return backend
++    # Try defaults in order of preference without triggering backend
++    # resolution.  rcParamsDefault may also use the sentinel, so guard
++    # against that and ultimately fall back to 'agg'.
++    default_backend = rcParamsDefault.get('backend', None)
++    if default_backend is not None and default_backend is not rcsetup._auto_backend_sentinel:
++        return default_backend
++    # As a last resort, return a reasonable non-interactive backend.
++    return 'agg'
+ 
+ 
+ def interactive(b):

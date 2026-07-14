@@ -1,0 +1,18 @@
+diff --git a/sklearn/feature_selection/mutual_info_.py b/sklearn/feature_selection/mutual_info_.py
+index d5d1b7fb5..eb0a676cc 100644
+--- a/sklearn/feature_selection/mutual_info_.py
++++ b/sklearn/feature_selection/mutual_info_.py
+@@ -247,7 +247,12 @@ def _estimate_mi(X, y, discrete_features='auto', discrete_target=False,
+     X, y = check_X_y(X, y, accept_sparse='csc', y_numeric=not discrete_target)
+     n_samples, n_features = X.shape
+ 
+-    if discrete_features == 'auto':
++    # `discrete_features` can be a bool, the string "auto", or an array-like
++    # mask/indices. Comparing an array-like to the string "auto" produces an
++    # array of booleans which makes the if-statement ambiguous (and raises a
++    # ValueError with recent NumPy). Only treat `discrete_features` as the
++    # special value 'auto' when it is a scalar.
++    if np.isscalar(discrete_features) and discrete_features == 'auto':
+         discrete_features = issparse(X)
+ 
+     if isinstance(discrete_features, bool):

@@ -1,0 +1,170 @@
+diff --git a/django/core/checks/model_checks.py b/django/core/checks/model_checks.py
+index 5c2266ca1d..be7e3aed44 100644
+--- a/django/core/checks/model_checks.py
++++ b/django/core/checks/model_checks.py
+@@ -5,10 +5,17 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.core.checks import Error, Tags, register
++from django.db import connections, router
+ 
+ 
+ @register(Tags.models)
+ def check_all_models(app_configs=None, **kwargs):
++    # Collect tables/indexes/constraints per-database alias. In multi-db setups
++    # models may be routed to different database aliases by a database router,
++    # so name uniqueness should be enforced per-database rather than across
++    # the entire project. Use both the router decision and
++    # Options.can_migrate(connection) to determine whether a model will be
++    # migrated to a particular connection.
+     db_table_models = defaultdict(list)
+     indexes = defaultdict(list)
+     constraints = defaultdict(list)
+@@ -17,13 +24,57 @@ def check_all_models(app_configs=None, **kwargs):
+         models = apps.get_models()
+     else:
+         models = chain.from_iterable(app_config.get_models() for app_config in app_configs)
++
++    # Determine the database aliases to consider. connections is iterable
++    # over configured database aliases. If there are no configured connections
++    # fall back to the default alias.
++    aliases = list(connections) if list(connections) else [connections.DEFAULT_DB_ALIAS]
++
+     for model in models:
+-        if model._meta.managed and not model._meta.proxy:
+-            db_table_models[model._meta.db_table].append(model._meta.label)
++        if not (model._meta.managed and not model._meta.proxy):
++            # Unmanaged or proxy models aren't created in the database.
++            # Still run model-level checks.
++            if not inspect.ismethod(model.check):
++                errors.append(
++                    Error(
++                        "The '%s.check()' class method is currently overridden by %r." \
++                        % (model.__name__, model.check),
++                        obj=model,
++                        id='models.E020'
++                    )
++                )
++            else:
++                errors.extend(model.check(**kwargs))
++            continue
++
++        # For each configured database alias, check whether the router and
++        # model options indicate the model will be migrated there. If so,
++        # record its table/index/constraint names keyed by alias so that
++        # uniqueness is enforced per-database.
++        for alias in aliases:
++            connection = connections[alias]
++            try:
++                will_migrate = router.allow_migrate_model(alias, model)
++            except Exception:
++                # If router raises for some reason, fall back to conservative
++                # behaviour and assume migration is allowed.
++                will_migrate = True
++            if not will_migrate:
++                continue
++            # Options.can_migrate performs backend-specific checks (e.g.
++            # required_db_vendor) and should also be respected.
++            try:
++                can_migrate = model._meta.can_migrate(connection)
++            except Exception:
++                can_migrate = True
++            if not can_migrate:
++                continue
++            db_table_models[(alias, model._meta.db_table)].append(model._meta.label)
++
+         if not inspect.ismethod(model.check):
+             errors.append(
+                 Error(
+-                    "The '%s.check()' class method is currently overridden by %r."
++                    "The '%s.check()' class method is currently overridden by %r." \
+                     % (model.__name__, model.check),
+                     obj=model,
+                     id='models.E020'
+@@ -31,40 +82,77 @@ def check_all_models(app_configs=None, **kwargs):
+             )
+         else:
+             errors.extend(model.check(**kwargs))
++
+         for model_index in model._meta.indexes:
+-            indexes[model_index.name].append(model._meta.label)
++            # Indexes are created when the model is migrated; record them
++            # for each alias the model will be migrated to.
++            for alias in aliases:
++                connection = connections[alias]
++                try:
++                    will_migrate = router.allow_migrate_model(alias, model)
++                except Exception:
++                    will_migrate = True
++                if not will_migrate:
++                    continue
++                try:
++                    can_migrate = model._meta.can_migrate(connection)
++                except Exception:
++                    can_migrate = True
++                if not can_migrate:
++                    continue
++                indexes[(alias, model_index.name)].append(model._meta.label)
+         for model_constraint in model._meta.constraints:
+-            constraints[model_constraint.name].append(model._meta.label)
+-    for db_table, model_labels in db_table_models.items():
++            for alias in aliases:
++                connection = connections[alias]
++                try:
++                    will_migrate = router.allow_migrate_model(alias, model)
++                except Exception:
++                    will_migrate = True
++                if not will_migrate:
++                    continue
++                try:
++                    can_migrate = model._meta.can_migrate(connection)
++                except Exception:
++                    can_migrate = True
++                if not can_migrate:
++                    continue
++                constraints[(alias, model_constraint.name)].append(model._meta.label)
++
++    # Emit errors for duplicate db_table names per-alias.
++    for (alias, db_table), model_labels in db_table_models.items():
+         if len(model_labels) != 1:
+             errors.append(
+                 Error(
+-                    "db_table '%s' is used by multiple models: %s."
+-                    % (db_table, ', '.join(db_table_models[db_table])),
++                    "db_table '%s' is used by multiple models on database '%s': %s." \
++                    % (db_table, alias, ', '.join(model_labels)),
+                     obj=db_table,
+                     id='models.E028',
+                 )
+             )
+-    for index_name, model_labels in indexes.items():
++
++    for (alias, index_name), model_labels in indexes.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)
+             errors.append(
+                 Error(
+-                    "index name '%s' is not unique %s %s." % (
++                    "index name '%s' is not unique on database '%s' %s %s." % (
+                         index_name,
++                        alias,
+                         'for model' if len(model_labels) == 1 else 'amongst models:',
+                         ', '.join(sorted(model_labels)),
+                     ),
+                     id='models.E029' if len(model_labels) == 1 else 'models.E030',
+                 ),
+             )
+-    for constraint_name, model_labels in constraints.items():
++
++    for (alias, constraint_name), model_labels in constraints.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)
+             errors.append(
+                 Error(
+-                    "constraint name '%s' is not unique %s %s." % (
++                    "constraint name '%s' is not unique on database '%s' %s %s." % (
+                         constraint_name,
++                        alias,
+                         'for model' if len(model_labels) == 1 else 'amongst models:',
+                         ', '.join(sorted(model_labels)),
+                     ),

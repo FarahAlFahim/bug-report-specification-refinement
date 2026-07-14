@@ -1,0 +1,51 @@
+diff --git a/sympy/functions/elementary/hyperbolic.py b/sympy/functions/elementary/hyperbolic.py
+index 860989f7c1..f0c6f0c5f6 100644
+--- a/sympy/functions/elementary/hyperbolic.py
++++ b/sympy/functions/elementary/hyperbolic.py
+@@ -248,7 +248,14 @@ def _eval_is_real(self):
+         # if `im` is of the form n*pi
+         # else, check if it is a number
+         re, im = arg.as_real_imag()
+-        return (im%pi).is_zero
++        try:
++            return (im%pi).is_zero
++        except Exception:
++            # In some cases (e.g. Piecewise in im) the polynomial
++            # machinery used by Mod can raise PolynomialError. In
++            # that situation we should not raise during a predicates
++            # check; return None to indicate unknown truth value.
++            return None
+ 
+     def _eval_is_extended_real(self):
+         if self.args[0].is_extended_real:
+@@ -437,7 +444,14 @@ def _eval_is_real(self):
+         # the imaginary part can be an expression like n*pi
+         # if not, check if the imaginary part is a number
+         re, im = arg.as_real_imag()
+-        return (im%pi).is_zero
++        try:
++            return (im%pi).is_zero
++        except Exception:
++            # In some cases (e.g. Piecewise in im) the polynomial
++            # machinery used by Mod can raise PolynomialError. In
++            # that situation we should not raise during a predicates
++            # check; return None to indicate unknown truth value.
++            return None
+ 
+     def _eval_is_positive(self):
+         # cosh(x+I*y) = cos(y)*cosh(x) + I*sin(y)*sinh(x)
+@@ -658,7 +672,13 @@ def _eval_is_real(self):
+         re, im = arg.as_real_imag()
+ 
+         # if denom = 0, tanh(arg) = zoo
+-        if re == 0 and im % pi == pi/2:
++        try:
++            if re == 0 and im % pi == pi/2:
++                return None
++        except Exception:
++            # Be conservative if modulus cannot be computed (e.g.
++            # Piecewise in im) and return unknown.
++            return None
+             return None
+ 
+         # check if im is of the form n*pi/2 to make sin(2*im) = 0

@@ -1,0 +1,74 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8ef..6b24c7853 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -27,6 +27,9 @@ class SimpleRSTHeader(FixedWidthHeader):
+ 
+ 
+ class SimpleRSTData(FixedWidthData):
++    # Default for the simple RST layout with a single header row is 3
++    # but this may be overridden by the RST writer initialization to
++    # account for a variable number of header_rows.
+     start_line = 3
+     end_line = -1
+     splitter_class = FixedWidthTwoLineDataSplitter
+@@ -57,10 +60,56 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, delimiter_pad=None, bookend=False, header_rows=None):
++        """Initialize RST writer.
++
++        Accept writer kwargs such as header_rows and forward them to the
++        FixedWidth initializer. Then adjust the data.start_line to account for
++        the header.start_line and the number of header rows so that data
++        begins at the correct line for arbitrary header_rows.
++        """
++        super().__init__(delimiter_pad=delimiter_pad, bookend=bookend, header_rows=header_rows)
++
++        # Compute data.start_line based on header.start_line and number of
++        # header rows.  The general relationship is:
++        #   data.start_line = header.start_line + len(header.header_rows) + 1
++        # (if header.start_line is defined).  If header.start_line is None,
++        # then there is no header and data starts at line 0.
++        try:
++            hdr_rows = len(self.header.header_rows)
++        except Exception:
++            hdr_rows = 0
++
++        if getattr(self.header, "start_line", None) is None:
++            # No header
++            self.data.start_line = 0
++        elif isinstance(self.header.start_line, int):
++            self.data.start_line = self.header.start_line + hdr_rows + 1
++        else:
++            # If header.start_line is callable, leave behavior to the reader
++            # machinery; do not attempt to evaluate here.
++            pass
+ 
+     def write(self, lines):
++        """Wrap the fixed-width output with the top and bottom border lines.
++
++        The fixed-width writer returns header rows, then (if present) the
++        position/border line, then data lines.  The index of that position
++        line is equal to the number of header_rows.  Use that line as the
++        border to prepend and append so that multi-row headers are handled
++        correctly.
++        """
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
++
++        header_rows = getattr(self.header, "header_rows", []) or []
++        # Only add borders if there is a position/border line (i.e., header
++        # has a position_line defined) and there is at least one header row
++        # (otherwise there is nothing to border).
++        if getattr(self.header, "position_line", None) is not None and len(header_rows) > 0:
++            pos_idx = len(header_rows)
++            # Guard index in case of unexpected output
++            if 0 <= pos_idx < len(lines):
++                border = lines[pos_idx]
++                lines = [border] + lines + [border]
++
+         return lines

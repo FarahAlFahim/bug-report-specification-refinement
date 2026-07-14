@@ -1,0 +1,44 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..9165337096 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,7 +825,38 @@ def _print_MatAdd(self, expr):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine whether the matrix term is negative without
++                # attempting to sympify internal raw name strings. Use
++                # structural extraction of a scalar coefficient when
++                # available (MatMul/MatAdd APIs). Fall back to checking the
++                # rendered text for a leading '-' (same strategy as other
++                # printers) to avoid sympifying raw MatrixSymbol names.
++                is_neg = False
++                try:
++                    # MatMul exposes as_coeff_mmul/as_coeff_matrices
++                    if hasattr(item, 'as_coeff_mmul'):
++                        coeff = item.as_coeff_mmul()[0]
++                        is_neg = bool(getattr(coeff, 'is_negative', False))
++                    elif hasattr(item, 'as_coeff_matrices'):
++                        coeff = item.as_coeff_matrices()[0]
++                        is_neg = bool(getattr(coeff, 'is_negative', False))
++                except Exception:
++                    # If structural extraction fails for any reason, fall
++                    # back to textual inspection below.
++                    is_neg = False
++
++                if not is_neg:
++                    # Fallback: inspect the already-rendered term text
++                    # for a leading minus, which avoids sympifying internals.
++                    try:
++                        # pform is a prettyForm; convert to string and check
++                        # for a leading '-' on the first line.
++                        pstr = pform.render() if hasattr(pform, 'render') else str(pform)
++                        is_neg = pstr.lstrip().startswith('-')
++                    except Exception:
++                        is_neg = False
++
++                if is_neg:
+                     s = prettyForm(*stringPict.next(s, ' '))
+                     pform = self._print(item)
+                 else:

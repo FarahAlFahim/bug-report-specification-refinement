@@ -1,0 +1,39 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 1feaa7a..b1e3bae 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,32 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    # Many Axes (e.g., mpl_toolkits.axes_grid1.mpl_axes.Axes) provide an
++    # `axis` mapping that supports indexing like ax.axis["bottom"].toggle(...).
++    # Other Axes subclasses (for example cartopy's GeoAxes) expose `axis` as a
++    # callable method, so indexing will raise. Try the mapping approach first,
++    # and fall back to directly setting visibility on ticklabels and axis
++    # labels if that fails.
++    try:
++        ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
++        ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    except Exception:
++        # Fallback for Axes without mapping-like .axis (e.g., cartopy GeoAxes).
++        # Toggle visibility of tick labels and axis labels directly.
++        try:
++            # X (bottom)
++            for lbl in ax.get_xticklabels():
++                lbl.set_visible(not bottom_off)
++            ax.xaxis.get_label().set_visible(not bottom_off)
++            # Y (left)
++            for lbl in ax.get_yticklabels():
++                lbl.set_visible(not left_off)
++            ax.yaxis.get_label().set_visible(not left_off)
++        except Exception:
++            # As a last resort, try using tick_params to control ticklabel
++            # visibility. This won't hide the axis label, but it's better than
++            # crashing.
++            ax.tick_params(labelbottom=not bottom_off, labelleft=not left_off)
+ 
+ 
+ class CbarAxesBase:

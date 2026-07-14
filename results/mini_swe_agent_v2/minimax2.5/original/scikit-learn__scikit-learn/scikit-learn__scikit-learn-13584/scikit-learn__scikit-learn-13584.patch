@@ -1,0 +1,51 @@
+diff --git a/sklearn/utils/_pprint.py b/sklearn/utils/_pprint.py
+index b8686dba5..57d4272ad 100644
+--- a/sklearn/utils/_pprint.py
++++ b/sklearn/utils/_pprint.py
+@@ -67,6 +67,8 @@ from inspect import signature
+ import pprint
+ from collections import OrderedDict
+ 
++import numpy as np
++
+ from ..base import BaseEstimator
+ from .._config import get_config
+ from . import is_scalar_nan
+@@ -95,12 +97,36 @@ def _changed_params(estimator):
+     init_params = signature(init_func).parameters
+     init_params = {name: param.default for name, param in init_params.items()}
+     for k, v in params.items():
+-        if (v != init_params[k] and
++        if (_changed(v, init_params[k]) and
+                 not (is_scalar_nan(init_params[k]) and is_scalar_nan(v))):
+             filtered_params[k] = v
+     return filtered_params
+ 
+ 
++def _changed(x, y):
++    """Return True if x is different from y, else False.
++
++    This helper is needed to handle the case where x is a numpy array and y
++    is a scalar (or vice versa), in which case the comparison x != y returns
++    an array instead of a boolean. We use x.any() to check if any element is
++    different.
++    """
++    # x != y will raise a ValueError if the comparison returns an array
++    # with more than one element
++    try:
++        result = (x != y)
++        # Check if result is a boolean (not an array)
++        if isinstance(result, (bool, np.bool_)):
++            return result
++        # If result is an array, check if any element is different
++        return bool(result.any())
++    except ValueError:
++        # If the comparison returns an array, check if any element is
++        # different
++        result = (x != y)
++        return bool(result.any())
++
++
+ class _EstimatorPrettyPrinter(pprint.PrettyPrinter):
+     """Pretty Printer class for estimator objects.
+ 

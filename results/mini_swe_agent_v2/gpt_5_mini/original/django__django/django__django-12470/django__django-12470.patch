@@ -1,0 +1,31 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 92213a4e67..8da3efea83 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -722,12 +722,25 @@ class SQLCompiler:
+             results = []
+             for item in opts.ordering:
+                 if hasattr(item, 'resolve_expression') and not isinstance(item, OrderBy):
++                    # If the relation ordering item is an expression, adapt
++                    # its direction to reflect whether the relation itself
++                    # is being ordered descendingly.
+                     item = item.desc() if descending else item.asc()
+                 if isinstance(item, OrderBy):
+                     results.append((item, False))
+                     continue
++                # When recursing into the related model's ordering, the
++                # meaning of a literal '-' prefix on the related model's
++                # ordering should be relative to the original default
++                # ordering for the whole query (default_order), not the
++                # already-decoded 'order' direction for the relation. The
++                # previous implementation passed 'order' here which caused
++                # double-negation of '-' when the relation was itself
++                # requested to be ordered DESC. Pass through the original
++                # default_order to ensure '-' always means "descending"
++                # with respect to the query's standard ordering.
+                 results.extend(self.find_ordering_name(item, opts, alias,
+-                                                       order, already_seen))
++                                                       default_order, already_seen))
+             return results
+         targets, alias, _ = self.query.trim_joins(targets, joins, path)
+         return [(OrderBy(transform_function(t, alias), descending=descending), False) for t in targets]

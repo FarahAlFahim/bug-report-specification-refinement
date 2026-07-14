@@ -1,0 +1,54 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..45b9a3ad8b 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,8 +148,49 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    if name == "version_info":
++        # Provide a readily-comparable version tuple at top-level.
++        # Prefer a PEP440-compatible parsed.release tuple when available;
++        # otherwise, fall back to extracting numeric groups from the
++        # version string.
++        # Ensure __version__ is computed and cached first.
++        try:
++            version = globals().get("__version__") or __getattr__("__version__")
++        except AttributeError:
++            # If __version__ cannot be obtained for some reason, propagate
++            # the AttributeError to be consistent with attribute access.
++            raise
++        parsed = parse_version(version)
++        release = getattr(parsed, "release", None)
++        if release:
++            # parsed.release may contain ints already (packaging.Version)
++            # or strings for legacy parsing; coerce to ints where possible.
++            try:
++                version_info = tuple(int(x) for x in release)
++            except Exception:
++                # As a conservative fallback, extract digit groups.
++                nums = re.findall(r"\d+", version)
++                version_info = tuple(int(x) for x in nums)
++        else:
++            nums = re.findall(r"\d+", version)
++            version_info = tuple(int(x) for x in nums)
++        # Cache it on the module for future fast access.
++        globals()["version_info"] = version_info
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
++def __dir__():
++    """Advertise dynamic attributes provided by __getattr__.
++
++    This ensures that dir(matplotlib) includes attributes like
++    ``__version__`` and ``version_info`` even though they are provided
++    dynamically via __getattr__.
++    """
++    # Start with the standard attributes, then add any dynamic ones we
++    # support.
++    dynamic = ["__version__", "version_info"]
++    return sorted(set(list(globals().keys()) + dynamic))
++
+ 
+ def _check_versions():
+ 

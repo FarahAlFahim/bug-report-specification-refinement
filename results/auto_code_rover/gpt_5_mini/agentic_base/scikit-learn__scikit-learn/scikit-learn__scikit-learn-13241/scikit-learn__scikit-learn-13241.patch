@@ -1,0 +1,21 @@
+diff --git a/sklearn/decomposition/kernel_pca.py b/sklearn/decomposition/kernel_pca.py
+index bb91d0cbba..2dbd596e4f 100644
+--- a/sklearn/decomposition/kernel_pca.py
++++ b/sklearn/decomposition/kernel_pca.py
+@@ -220,6 +220,16 @@ class KernelPCA(BaseEstimator, TransformerMixin, _UnstableOn32BitMixin):
+             self.alphas_ = self.alphas_[:, self.lambdas_ > 0]
+             self.lambdas_ = self.lambdas_[self.lambdas_ > 0]
+ 
++        # enforce deterministic sign convention for eigenvectors to avoid
++        # arbitrary sign flips across runs. svd_flip will flip columns so that
++        # the largest (in magnitude) component in each column is positive.
++        if hasattr(self, "alphas_") and getattr(self.alphas_, "size", 0) != 0:
++            # only apply if there is at least one component
++            if self.alphas_.ndim == 2 and self.alphas_.shape[1] > 0:
++                from ..utils.extmath import svd_flip
++                self.alphas_, _ = svd_flip(self.alphas_, self.alphas_,
++                                           u_based_decision=True)
++
+         return K
+ 
+     def _fit_inverse_transform(self, X_transformed, X):

@@ -1,0 +1,156 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..bdbcfd354 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -516,6 +516,24 @@ def _format_assertmsg(obj):
+     return obj
+ 
+ 
++
++def _gen_with_last(gen, container):
++    """Iterate over ``gen`` while keeping the most-recently seen
++    element in ``container[0]``. This allows assertion diagnostics to
++    display the element that caused ``all()``/``any()`` to short-
++    circuit without fully materializing the generator.
++
++    The container is expected to be a list used as a mutable single-
++    element storage so it works across Python versions and minimizes
++    observable side-effects beyond assignments to the container.
++    """
++    for item in gen:
++        if container:
++            container[0] = item
++        else:
++            container.append(item)
++        yield item
++
+ def _should_repr_global_name(obj):
+     if callable(obj):
+         return False
+@@ -968,14 +986,41 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
+-        new_func, func_expl = self.visit(call.func)
+-        arg_expls = []
+-        new_args = []
+-        new_kwargs = []
+-        for arg in call.args:
+-            res, expl = self.visit(arg)
+-            arg_expls.append(expl)
+-            new_args.append(res)
++        # Special-case builtins all()/any() with a generator expression
++        # argument so we can capture the element that caused a
++        # short-circuit without materializing the whole generator.
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        ):
++            # Wrap the generator so we record the most-recent item in a
++            # mutable container; see _gen_with_last above.
++            gen = call.args[0]
++            container = self.assign(ast.List([], ast.Load()))
++            wrapped = self.helper("_gen_with_last", gen, container)
++            new_func, func_expl = self.visit(call.func)
++            arg_expls = []
++            new_args = [wrapped]
++            # For diagnostics show the last-seen element (index 0 of the
++            # container). Use display() so it's saferepr'ed.
++            if hasattr(ast, "Index"):
++                idx = ast.Index(ast.Num(0))
++            else:
++                idx = ast.Num(0)
++            cont_sub = ast.Subscript(container, idx, ast.Load())
++            arg_expls.append(self.explanation_param(self.display(cont_sub)))
++            new_kwargs = []
++        else:
++            new_func, func_expl = self.visit(call.func)
++            arg_expls = []
++            new_args = []
++            new_kwargs = []
++            for arg in call.args:
++                res, expl = self.visit(arg)
++                arg_expls.append(expl)
++                new_args.append(res)
+         for keyword in call.keywords:
+             res, expl = self.visit(keyword.value)
+             new_kwargs.append(ast.keyword(keyword.arg, res))
+@@ -991,6 +1036,7 @@ warn_explicit(
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
+ 
++
+     def visit_Starred(self, starred):
+         # From Python 3.5, a Starred node can appear in a function call
+         res, expl = self.visit(starred.value)
+@@ -1001,25 +1047,49 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
+-        new_func, func_expl = self.visit(call.func)
+-        arg_expls = []
+-        new_args = []
+-        new_kwargs = []
+-        new_star = new_kwarg = None
+-        for arg in call.args:
+-            res, expl = self.visit(arg)
+-            new_args.append(res)
+-            arg_expls.append(expl)
+-        for keyword in call.keywords:
+-            res, expl = self.visit(keyword.value)
+-            new_kwargs.append(ast.keyword(keyword.arg, res))
+-            arg_expls.append(keyword.arg + "=" + expl)
+-        if call.starargs:
+-            new_star, expl = self.visit(call.starargs)
+-            arg_expls.append("*" + expl)
+-        if call.kwargs:
+-            new_kwarg, expl = self.visit(call.kwargs)
+-            arg_expls.append("**" + expl)
++        # Special-case builtins all()/any() with a generator expression
++        # argument so we can capture the element that caused a
++        # short-circuit without materializing the whole generator.
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        ):
++            gen = call.args[0]
++            container = self.assign(ast.List([], ast.Load()))
++            wrapped = self.helper("_gen_with_last", gen, container)
++            new_func, func_expl = self.visit(call.func)
++            arg_expls = []
++            new_args = [wrapped]
++            if hasattr(ast, "Index"):
++                idx = ast.Index(ast.Num(0))
++            else:
++                idx = ast.Num(0)
++            cont_sub = ast.Subscript(container, idx, ast.Load())
++            arg_expls.append(self.explanation_param(self.display(cont_sub)))
++            new_kwargs = []
++            new_star = new_kwarg = None
++        else:
++            new_func, func_expl = self.visit(call.func)
++            arg_expls = []
++            new_args = []
++            new_kwargs = []
++            new_star = new_kwarg = None
++            for arg in call.args:
++                res, expl = self.visit(arg)
++                new_args.append(res)
++                arg_expls.append(expl)
++            for keyword in call.keywords:
++                res, expl = self.visit(keyword.value)
++                new_kwargs.append(ast.keyword(keyword.arg, res))
++                arg_expls.append(keyword.arg + "=" + expl)
++            if call.starargs:
++                new_star, expl = self.visit(call.starargs)
++                arg_expls.append("*" + expl)
++            if call.kwargs:
++                new_kwarg, expl = self.visit(call.kwargs)
++                arg_expls.append("**" + expl)
+         expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
+         new_call = ast.Call(new_func, new_args, new_kwargs, new_star, new_kwarg)
+         res = self.assign(new_call)

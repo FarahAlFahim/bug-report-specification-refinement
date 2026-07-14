@@ -1,0 +1,21 @@
+diff --git a/sympy/matrices/matrices.py b/sympy/matrices/matrices.py
+index ce58c49..e0b1b1b 100644
+--- a/sympy/matrices/matrices.py
++++ b/sympy/matrices/matrices.py
+@@ -2048,10 +2048,12 @@ class MatrixBase(MatrixDeprecated,
+             if len(args) == 3 and isinstance(args[2], collections.Callable):
+                 op = args[2]
+                 flat_list = []
+-                for i in range(rows):
+-                    flat_list.extend(
+-                        [cls._sympify(op(cls._sympify(i), cls._sympify(j)))
+-                         for j in range(cols)])
++                # Fill flat_list in column-major order (columns varying slowest),
++                # which matches internal storage expectations.
++                for j in range(cols):
++                    for i in range(rows):
++                        flat_list.append(
++                            cls._sympify(op(cls._sympify(i), cls._sympify(j))))
+ 
+             # Matrix(2, 2, [1, 2, 3, 4])
+             elif len(args) == 3 and is_sequence(args[2]):

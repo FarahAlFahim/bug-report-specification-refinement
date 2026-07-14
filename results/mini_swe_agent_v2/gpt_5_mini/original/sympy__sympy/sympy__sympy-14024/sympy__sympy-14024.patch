@@ -1,0 +1,61 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index a1bf92bde1..a8c0aeda0d 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,11 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    # Python 3.10+ moved abstract collection ABCs to collections.abc
++    from collections.abc import Mapping
++    from collections import defaultdict
++except Exception:
++    from collections import Mapping, defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..06ce2f833a 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,11 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++try:
++    from collections.abc import MutableSet
++except Exception:
++    MutableSet = collections.MutableSet
++
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +273,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)
+diff --git a/sympy/simplify/powsimp.py b/sympy/simplify/powsimp.py
+index a7fd30e118..9ea89eddf3 100644
+--- a/sympy/simplify/powsimp.py
++++ b/sympy/simplify/powsimp.py
+@@ -202,7 +202,13 @@ def recurse(arg, **kwargs):
+         be = list(c_powers.items())
+         _n = S.NegativeOne
+         for i, (b, e) in enumerate(be):
+-            if ((-b).is_Symbol or b.is_Add) and -b in c_powers:
++            # Combine base and negated base pairs like a**x * (-a)**y -> (-1)**y * a**(x+y)
++            # but avoid doing this for plain numeric bases since extracting
++            # a (-1) factor from a numeric base can change the chosen branch
++            # of the complex logarithm for non-integer exponents and lead to
++            # inconsistent numeric evaluations. See issue with simplifying
++            # (-a)**x * a**(-x) when a is a concrete positive Integer.
++            if not b.is_Number and ((-b).is_Symbol or b.is_Add) and -b in c_powers:
+                 if (b.is_positive in (0, 1) or e.is_integer):
+                     c_powers[-b] += c_powers.pop(b)
+                     if _n in c_powers:

@@ -1,0 +1,54 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..8a7b9197d3 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -1095,7 +1095,48 @@ def rc_context(rc=None, fname=None):
+             rcParams.update(rc)
+         yield
+     finally:
+-        dict.update(rcParams, orig)  # Revert to the original rcs.
++        # Revert to the original rcs.
++        #
++        # Avoid restoring the 'backend' rcParam back to the
++        # _auto_backend_sentinel if a concrete backend was loaded while
++        # inside the context. Restoring the sentinel later triggers
++        # backend resolution (which calls switch_backend and closes all
++        # figures), which can unexpectedly clear the global figure
++        # registry. See PR description for details.
++        try:
++            from . import rcsetup
++        except Exception:
++            # If rcsetup cannot be imported for any reason, fall back to
++            # the old behavior.
++            dict.update(rcParams, orig)
++        else:
++            try:
++                # orig is an RcParams copy; use its low-level dict access
++                # to check whether it had the auto-backend sentinel.
++                orig_backend = dict.__getitem__(orig, "backend")
++            except Exception:
++                # If anything goes wrong accessing backend in orig, fall
++                # back to restoring everything.
++                dict.update(rcParams, orig)
++            else:
++                # If the saved original backend was the auto-backend
++                # sentinel but the current global rcParams has a concrete
++                # backend, do not restore the sentinel (skip restoring
++                # the 'backend' key). Otherwise restore all keys as
++                # before.
++                try:
++                    current_backend = dict.__getitem__(rcParams, "backend")
++                except Exception:
++                    dict.update(rcParams, orig)
++                else:
++                    if (orig_backend is rcsetup._auto_backend_sentinel
++                            and current_backend is not rcsetup._auto_backend_sentinel):
++                        # Restore all keys except 'backend'. Use a shallow
++                        # copy of orig to avoid mutating it.
++                        tmp = {k: v for k, v in orig.items() if k != "backend"}
++                        rcParams.update(tmp)
++                    else:
++                        dict.update(rcParams, orig)
+ 
+ 
+ def use(backend, *, force=True):

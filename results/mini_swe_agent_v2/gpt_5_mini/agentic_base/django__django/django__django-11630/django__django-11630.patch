@@ -1,0 +1,87 @@
+diff --git a/django/core/checks/model_checks.py b/django/core/checks/model_checks.py
+index 5c2266ca1d..8924d387b8 100644
+--- a/django/core/checks/model_checks.py
++++ b/django/core/checks/model_checks.py
+@@ -5,6 +5,7 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.core.checks import Error, Tags, register
++from django.db import connections, router
+ 
+ 
+ @register(Tags.models)
+@@ -17,9 +18,19 @@ def check_all_models(app_configs=None, **kwargs):
+         models = apps.get_models()
+     else:
+         models = chain.from_iterable(app_config.get_models() for app_config in app_configs)
++    # When multiple databases are used, models may legitimately share the
++    # same db_table / index / constraint names if they are routed to be
++    # migrated to different database aliases. Use the database routers to
++    # determine which connections a model will be migrated to and partition
++    # name collections by database alias. Only consider models that are
++    # managed and not proxies.
++    aliases = list(connections)
+     for model in models:
+         if model._meta.managed and not model._meta.proxy:
+-            db_table_models[model._meta.db_table].append(model._meta.label)
++            # Determine which database aliases this model will be migrated to.
++            allowed_aliases = [alias for alias in aliases if router.allow_migrate_model(alias, model)]
++            for alias in allowed_aliases:
++                db_table_models[(alias, model._meta.db_table)].append(model._meta.label)
+         if not inspect.ismethod(model.check):
+             errors.append(
+                 Error(
+@@ -32,39 +43,44 @@ def check_all_models(app_configs=None, **kwargs):
+         else:
+             errors.extend(model.check(**kwargs))
+         for model_index in model._meta.indexes:
+-            indexes[model_index.name].append(model._meta.label)
++            for alias in allowed_aliases:
++                indexes[(alias, model_index.name)].append(model._meta.label)
+         for model_constraint in model._meta.constraints:
+-            constraints[model_constraint.name].append(model._meta.label)
+-    for db_table, model_labels in db_table_models.items():
++            for alias in allowed_aliases:
++                constraints[(alias, model_constraint.name)].append(model._meta.label)
++    # Only consider collisions that occur on the same database alias.
++    for (alias, db_table), model_labels in db_table_models.items():
+         if len(model_labels) != 1:
+             errors.append(
+                 Error(
+-                    "db_table '%s' is used by multiple models: %s."
+-                    % (db_table, ', '.join(db_table_models[db_table])),
++                    "db_table '%s' is used by multiple models on database '%s': %s." 
++                    % (db_table, alias, ', '.join(model_labels)),
+                     obj=db_table,
+                     id='models.E028',
+                 )
+             )
+-    for index_name, model_labels in indexes.items():
++    for (alias, index_name), model_labels in indexes.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)
+             errors.append(
+                 Error(
+-                    "index name '%s' is not unique %s %s." % (
++                    "index name '%s' is not unique on database '%s' %s %s." % (
+                         index_name,
++                        alias,
+                         'for model' if len(model_labels) == 1 else 'amongst models:',
+                         ', '.join(sorted(model_labels)),
+                     ),
+                     id='models.E029' if len(model_labels) == 1 else 'models.E030',
+                 ),
+             )
+-    for constraint_name, model_labels in constraints.items():
++    for (alias, constraint_name), model_labels in constraints.items():
+         if len(model_labels) > 1:
+             model_labels = set(model_labels)
+             errors.append(
+                 Error(
+-                    "constraint name '%s' is not unique %s %s." % (
++                    "constraint name '%s' is not unique on database '%s' %s %s." % (
+                         constraint_name,
++                        alias,
+                         'for model' if len(model_labels) == 1 else 'amongst models:',
+                         ', '.join(sorted(model_labels)),
+                     ),

@@ -1,0 +1,51 @@
+diff --git a/sklearn/svm/base.py b/sklearn/svm/base.py
+index 64cebe837..29d351535 100644
+--- a/sklearn/svm/base.py
++++ b/sklearn/svm/base.py
+@@ -281,14 +281,43 @@ class BaseLibSVM(BaseEstimator, metaclass=ABCMeta):
+         self._warn_from_fit_status()
+ 
+         if hasattr(self, "classes_"):
++            # For classifiers dual coefficients are arranged as
++            # n_classes - 1 rows. In degenerate cases len(classes_) may be
++            # 1 which yields zero rows. Handle this safely instead of
++            # allowing a division by zero below.
+             n_class = len(self.classes_) - 1
+         else:  # regression
+             n_class = 1
++
+         n_SV = self.support_vectors_.shape[0]
+ 
+-        dual_coef_indices = np.tile(np.arange(n_SV), n_class)
+-        dual_coef_indptr = np.arange(0, dual_coef_indices.size + 1,
+-                                     dual_coef_indices.size / n_class)
++        # Handle degenerate cases where there are no classes or no
++        # support vectors. In such cases libsvm_sparse may return
++        # empty arrays and we must construct an appropriate empty CSR
++        # matrix instead of performing arithmetic that can raise
++        # ZeroDivisionError (e.g., 0/0) or creating non-integer steps.
++        if n_class == 0:
++            # No rows of dual coefficients.
++            self.dual_coef_ = sp.csr_matrix((0, n_SV), dtype=np.float64)
++            return
++
++        if n_SV == 0:
++            # No support vectors: create an empty matrix with n_class rows
++            # and zero columns.
++            self.dual_coef_ = sp.csr_matrix((n_class, 0), dtype=np.float64)
++            return
++
++        # Normal case: there is at least one class row and one support
++        # vector. Build indices and integer indptr step.
++        dual_coef_indices = np.tile(np.arange(n_SV, dtype=np.int32), n_class)
++
++        # The number of entries per row is exactly n_SV, so step is an
++        # integer. Using integer step avoids float arange steps and the
++        # possibility of non-integer indptr values.
++        step = int(n_SV)
++        dual_coef_indptr = np.arange(0, dual_coef_indices.size + 1, step,
++                                     dtype=np.int32)
++
+         self.dual_coef_ = sp.csr_matrix(
+             (dual_coef_data, dual_coef_indices, dual_coef_indptr),
+             (n_class, n_SV))

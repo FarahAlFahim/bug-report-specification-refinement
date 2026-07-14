@@ -1,0 +1,35 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index a6a3e97..73b4ce4 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1123,13 +1123,23 @@ class Query(BaseExpression):
+                     self.check_query_object_type(v, opts, field)
+ 
+     def check_filterable(self, expression):
+-        """Raise an error if expression cannot be used in a WHERE clause."""
+-        if not getattr(expression, 'filterable', True):
+-            raise NotSupportedError(
+-                expression.__class__.__name__ + ' is disallowed in the filter '
+-                'clause.'
+-            )
+-        if hasattr(expression, 'get_source_expressions'):
++        """Raise an error if expression cannot be used in a WHERE clause.
++
++        Only objects that are expressions (BaseExpression) are considered for the
++        expression-level 'filterable' flag. This avoids accidental attribute-name
++        collisions on arbitrary RHS values (for example, model instances that
++        define a BooleanField named 'filterable').
++        """
++        # Import locally to avoid potential circular imports at module import time.
++        from django.db.models.expressions import BaseExpression
++
++        # Only expression-like objects carry the semantics of 'filterable'.
++        if isinstance(expression, BaseExpression):
++            if not getattr(expression, 'filterable', True):
++                raise NotSupportedError(
++                    expression.__class__.__name__ + ' is disallowed in the filter '
++                    'clause.'
++                )
+             for expr in expression.get_source_expressions():
+                 self.check_filterable(expr)
+ 

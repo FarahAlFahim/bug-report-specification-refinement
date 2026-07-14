@@ -1,0 +1,47 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..b82403b25 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -240,6 +240,18 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # Persist training-set labels_ for compatibility with clusterer API.
++        # labels_ contains the most likely component for each training sample.
++        try:
++            # predict will check fitted state and return argmax of
++            # _estimate_weighted_log_prob(X)
++            self.labels_ = self.predict(X)
++        except Exception:
++            # In case something goes wrong, ensure we don't break fit()
++            # but do not set labels_.
++            if hasattr(self, 'labels_'):
++                delattr(self, 'labels_')
++
+         return self
+ 
+     def _e_step(self, X):
+@@ -360,6 +372,23 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         _, log_resp = self._estimate_log_prob_resp(X)
+         return np.exp(log_resp)
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the mixture model and return the labels for the training data.
++
++        This mirrors the ClusterMixin.fit_predict convention: it fits the
++        estimator and returns the training-set labels_ attribute.
++        """
++        self.fit(X)
++        return self.labels_
++
++    @property
++    def n_clusters(self):
++        """Number of mixture components (alias for n_components).
++
++        This provides a clusterer-compatible accessor name.
++        """
++        return self.n_components
++
+     def sample(self, n_samples=1):
+         """Generate random samples from the fitted Gaussian distribution.
+ 

@@ -1,0 +1,34 @@
+diff --git a/sklearn/compose/_column_transformer.py b/sklearn/compose/_column_transformer.py
+index a26145117..490836b87 100644
+--- a/sklearn/compose/_column_transformer.py
++++ b/sklearn/compose/_column_transformer.py
+@@ -862,9 +862,26 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+                 if not self.verbose_feature_names_out:
+                     return output
+ 
+-                transformer_names = [
+-                    t[0] for t in self._iter(fitted=True, replace_strings=True)
+-                ]
++                # Derive transformer names corresponding to the provided
++                # DataFrame outputs `Xs`.  During fit, `_record_output_indices`
++                # records the output slice for each transformer in
++                # `self.output_indices_`. Use that ordering and filter out
++                # transformers that produced no output (zero-length slices).
++                #
++                # Fallback to the previous iteration-based approach if
++                # `output_indices_` is not available (e.g., in some
++                # non-fitted states).
++                if hasattr(self, "output_indices_"):
++                    transformer_names = [
++                        name
++                        for name, sl in self.output_indices_.items()
++                        if (sl.stop - sl.start) > 0
++                    ]
++                else:
++                    transformer_names = [
++                        t[0] for t in self._iter(fitted=True, replace_strings=True)
++                    ]
++
+                 feature_names_outs = [X.columns for X in Xs]
+                 names_out = self._add_prefix_for_feature_names_out(
+                     list(zip(transformer_names, feature_names_outs))

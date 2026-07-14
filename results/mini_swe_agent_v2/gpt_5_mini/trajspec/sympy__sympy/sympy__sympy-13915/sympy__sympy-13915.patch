@@ -1,0 +1,82 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index d4ca323e0d..168faf72ad 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,11 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++try:
++    # Python 3.3+: Mapping lives in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    from collections import Mapping
++from collections import defaultdict
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3a..3f3f72c94f 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,11 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++try:
++    # Python 3.3+: abstract collection classes live in collections.abc
++    import collections.abc as _collections_abc
++except Exception:
++    _collections_abc = collections
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +273,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(_collections_abc.MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 4f01eeedbd..d3821232a0 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -1001,7 +1001,15 @@ def _combine_inverse(lhs, rhs):
+         Returns lhs/rhs, but treats arguments like symbols, so things like
+         oo/oo return 1, instead of a nan.
+         """
++        # If both sides are identical but involve ComplexInfinity (zoo)
++        # then the result is indeterminate (NaN).  Collapsing zoo/zoo to 1
++        # is incorrect because ComplexInfinity is a singleton representing
++        # an undefined phase; zoo/zoo should be NaN.  For identical
++        # expressions that do not contain ComplexInfinity it is safe to
++        # return 1.
+         if lhs == rhs:
++            if lhs is S.ComplexInfinity or lhs.has(S.ComplexInfinity):
++                return S.NaN
+             return S.One
+ 
+         def check(l, r):
+@@ -1012,11 +1020,19 @@ def check(l, r):
+                 return l.__add__(0) == r.evalf().__add__(0)
+             return False
+         if check(lhs, rhs) or check(rhs, lhs):
++            # same rationale as above: if either side contains ComplexInfinity
++            # then the comparison-based shortcut should yield NaN instead of 1
++            if lhs is S.ComplexInfinity or rhs is S.ComplexInfinity or                lhs.has(S.ComplexInfinity) or rhs.has(S.ComplexInfinity):
++                return S.NaN
+             return S.One
+         if lhs.is_Mul and rhs.is_Mul:
+             a = list(lhs.args)
+             b = [1]
+             for x in rhs.args:
++                # If any cancelling factor involves ComplexInfinity then the
++                # division is indeterminate.  Avoid cancelling such factors.
++                if x is S.ComplexInfinity or x.has(S.ComplexInfinity):
++                    return S.NaN
+                 if x in a:
+                     a.remove(x)
+                 elif -x in a:

@@ -1,0 +1,74 @@
+diff --git a/sklearn/cluster/_affinity_propagation.py b/sklearn/cluster/_affinity_propagation.py
+index 4806afee90..0d7ee671af 100644
+--- a/sklearn/cluster/_affinity_propagation.py
++++ b/sklearn/cluster/_affinity_propagation.py
+@@ -152,6 +152,9 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+ 
+     ind = np.arange(n_samples)
+ 
++    # Ensure E is defined even if the loop does not run or does not converge
++    E = np.zeros(n_samples, dtype=bool)
++
+     for it in range(max_iter):
+         # tmp = A + S; compute responsibilities
+         np.add(A, S, tmp)
+@@ -187,19 +190,23 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+         # Check for convergence
+         E = (np.diag(A) + np.diag(R)) > 0
+         e[:, it % convergence_iter] = E
+-        K = np.sum(E, axis=0)
++        K = np.sum(E)
+ 
+         if it >= convergence_iter:
+             se = np.sum(e, axis=1)
+             unconverged = (np.sum((se == convergence_iter) + (se == 0))
+                            != n_samples)
+-            if (not unconverged and (K > 0)) or (it == max_iter):
++            # Only break when the true convergence criterion is met:
++            if (not unconverged and (K > 0)):
+                 if verbose:
+                     print("Converged after %d iterations." % it)
+                 break
+     else:
+         if verbose:
+             print("Did not converge")
++        # Explicitly mark as non-converged: no exemplars
++        E = np.zeros(n_samples, dtype=bool)
++        K = 0
+ 
+     I = np.flatnonzero(E)
+     K = I.size  # Identify exemplars
+@@ -222,8 +229,8 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+     else:
+         warnings.warn("Affinity propagation did not converge, this model "
+                       "will not have any cluster centers.", ConvergenceWarning)
+-        labels = np.array([-1] * n_samples)
+-        cluster_centers_indices = []
++        labels = np.full(n_samples, -1, dtype=int)
++        cluster_centers_indices = np.array([], dtype=int)
+ 
+     if return_n_iter:
+         return cluster_centers_indices, labels, it + 1
+@@ -389,7 +396,22 @@ class AffinityPropagation(ClusterMixin, BaseEstimator):
+                 copy=self.copy, verbose=self.verbose, return_n_iter=True)
+ 
+         if self.affinity != "precomputed":
++            # Map exemplar indices back to the input feature space
+             self.cluster_centers_ = X[self.cluster_centers_indices_].copy()
++        else:
++            # For precomputed affinity: if affinity_propagation reported no
++            # exemplars, create an empty cluster_centers_ array so predict()
++            # follows the documented behavior (return -1 labels) instead of
++            # raising a ValueError. If exemplars exist in the precomputed case,
++            # we intentionally do NOT create cluster_centers_ so predict() will
++            # raise as before because mapping exemplars to feature space is not
++            # supported.
++            if (isinstance(self.cluster_centers_indices_, np.ndarray) and
++                    self.cluster_centers_indices_.size == 0):
++                # Use X.shape[1] (n_samples) for number of columns to provide a
++                # 2-D empty array with shape (0, n_features). Only the row
++                # dimension is relevant for predict().
++                self.cluster_centers_ = np.empty((0, X.shape[1]))
+ 
+         return self
+ 

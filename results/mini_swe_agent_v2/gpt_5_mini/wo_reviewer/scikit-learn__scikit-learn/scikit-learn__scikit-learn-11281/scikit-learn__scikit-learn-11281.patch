@@ -1,0 +1,83 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..346216584 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -71,10 +71,17 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+     provides basic common methods for mixture models.
+     """
+ 
+-    def __init__(self, n_components, tol, reg_covar,
+-                 max_iter, n_init, init_params, random_state, warm_start,
+-                 verbose, verbose_interval):
+-        self.n_components = n_components
++    def __init__(self, n_components=1, n_clusters=None, tol=1e-3,
++                 reg_covar=1e-6, max_iter=100, n_init=1,
++                 init_params='kmeans', random_state=None, warm_start=False,
++                 verbose=0, verbose_interval=10):
++        # n_clusters is an alias for n_components to make the mixture
++        # estimators compatible with clustering estimators' API. If
++        # n_clusters is provided we prefer it over n_components.
++        if n_clusters is None:
++            self.n_components = n_components
++        else:
++            self.n_components = n_clusters
+         self.tol = tol
+         self.reg_covar = reg_covar
+         self.max_iter = max_iter
+@@ -240,6 +247,16 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # Persist training-set labels_ to be compatible with clusterer API.
++        try:
++            # compute labels from current parameters and training data X
++            self.labels_ = self._estimate_weighted_log_prob(X).argmax(axis=1)
++        except Exception:
++            # In rare edge cases (e.g., ill-defined parameters) we avoid
++            # failing in fit; labels_ will simply not be set.
++            if hasattr(self, "labels_"):
++                delattr(self, "labels_")
++
+         return self
+ 
+     def _e_step(self, X):
+@@ -322,6 +339,11 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         """
+         return self.score_samples(X).mean()
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the model on X and return the assigned labels."""
++        self.fit(X)
++        return self.labels_
++
+     def predict(self, X):
+         """Predict the labels for the data samples in X using trained model.
+ 
+diff --git a/sklearn/mixture/bayesian_mixture.py b/sklearn/mixture/bayesian_mixture.py
+index aef6828fa..a1bc263c3 100644
+--- a/sklearn/mixture/bayesian_mixture.py
++++ b/sklearn/mixture/bayesian_mixture.py
+@@ -240,6 +240,9 @@ class BayesianGaussianMixture(BaseMixture):
+         Lower bound value on the likelihood (of the training data with
+         respect to the model) of the best fit of inference.
+ 
++    labels_ : array, shape (n_samples,)
++        Component labels assigned to the training data after calling ``fit``.
++
+     weight_concentration_prior_ : tuple or float
+         The dirichlet concentration of each component on the weight
+         distribution (Dirichlet). The type depends on
+diff --git a/sklearn/mixture/gaussian_mixture.py b/sklearn/mixture/gaussian_mixture.py
+index d58a9e326..0f16057a8 100644
+--- a/sklearn/mixture/gaussian_mixture.py
++++ b/sklearn/mixture/gaussian_mixture.py
+@@ -574,6 +574,9 @@ class GaussianMixture(BaseMixture):
+     lower_bound_ : float
+         Log-likelihood of the best fit of EM.
+ 
++    labels_ : array, shape (n_samples,)
++        Component labels assigned to the training data after calling ``fit``.
++
+     See Also
+     --------
+     BayesianGaussianMixture : Gaussian mixture model fit with a variational

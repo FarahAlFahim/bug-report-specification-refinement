@@ -1,0 +1,26 @@
+diff --git a/pylint/reporters/text.py b/pylint/reporters/text.py
+index 29bd46798..e6e1be09c 100644
+--- a/pylint/reporters/text.py
++++ b/pylint/reporters/text.py
+@@ -175,15 +175,18 @@ class TextReporter(BaseReporter):
+         self._template = template
+ 
+         # Check to see if all parameters in the template are attributes of the Message
+-        arguments = re.findall(r"\{(.+?)(:.*)?\}", template)
++        # Handle escaped braces ({{ and }}) by replacing them with placeholders
++        template_for_args = template.replace("{{", "\x00").replace("}}", "\x01")
++        arguments = re.findall(r"\{(.+?)(:.*)?\}", template_for_args)
+         for argument in arguments:
+             if argument[0] not in MESSAGE_FIELDS:
+                 warnings.warn(
+                     f"Don't recognize the argument '{argument[0]}' in the --msg-template. "
+                     "Are you sure it is supported on the current version of pylint?"
+                 )
+-                template = re.sub(r"\{" + argument[0] + r"(:.*?)?\}", "", template)
+-        self._fixed_template = template
++                template = re.sub(r"\{" + re.escape(argument[0]) + r"(:.*?)?\}", "", template)
++        # Restore escaped braces
++        self._fixed_template = template.replace("\x00", "{").replace("\x01", "}")
+ 
+     def write_message(self, msg: Message) -> None:
+         """Convenience method to write a formatted message with class default

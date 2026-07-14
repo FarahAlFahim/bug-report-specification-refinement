@@ -1,0 +1,21 @@
+diff --git a/django/core/management/commands/inspectdb.py b/django/core/management/commands/inspectdb.py
+index f33bcbdccf..ce4f14e0e5 100644
+--- a/django/core/management/commands/inspectdb.py
++++ b/django/core/management/commands/inspectdb.py
+@@ -186,6 +186,16 @@ class Command(BaseCommand):
+                             field_type = "%s(%s" % (rel_type, rel_to)
+                         else:
+                             field_type = "%s('%s'" % (rel_type, rel_to)
++                        # Provide an explicit related_name so that multiple
++                        # foreign-keys from the same source table to the same
++                        # target don't end up with duplicate default reverse
++                        # accessor names (which would trigger fields.E304).
++                        # Use a deterministic name based on the source model
++                        # and the attribute name generated for the field.
++                        extra_params.setdefault(
++                            "related_name",
++                            "%s_%s" % (table2model(table_name).lower(), att_name),
++                        )
+                     else:
+                         # Calling `get_field_type` to get the field type string and any
+                         # additional parameters and notes.

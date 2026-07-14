@@ -1,0 +1,15 @@
+diff --git a/sympy/parsing/latex/_parse_latex_antlr.py b/sympy/parsing/latex/_parse_latex_antlr.py
+index 2e4a45ad20..7c13534a0f 100644
+--- a/sympy/parsing/latex/_parse_latex_antlr.py
++++ b/sympy/parsing/latex/_parse_latex_antlr.py
+@@ -383,6 +383,10 @@ def convert_frac(frac):
+     expr_top = convert_expr(frac.upper)
+     expr_bot = convert_expr(frac.lower)
+     inverse_denom = sympy.Pow(expr_bot, -1, evaluate=False)
++    # Simplify the inverse only if expr_bot is already a negative power (i.e., a fraction)
++    # This handles nested fractions properly, e.g., Pow(Pow(c, -2), -1) becomes Pow(c, 2)
++    if isinstance(expr_bot, sympy.Pow) and expr_bot.exp.is_negative:
++        inverse_denom = sympy.simplify(inverse_denom)
+     if expr_top == 1:
+         return inverse_denom
+     else:

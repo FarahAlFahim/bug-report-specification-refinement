@@ -1,0 +1,27 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..5f5b3112b8 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -927,6 +927,22 @@ default: %(va)s
+                         return last_ax
+             return None
+ 
++        # If the canvas currently has this Axes as the mouse grabber,
++        # release it before removing the Axes to avoid leaving a stale
++        # mouse_grabber reference that would block future widget interactions.
++        canvas = getattr(self, "canvas", None)
++        if canvas is not None and getattr(canvas, "mouse_grabber", None) is ax:
++            # release_mouse typically clears mouse_grabber only if it matches
++            # the passed Axes; call it to ensure proper cleanup. Guard in case
++            # the backend's release_mouse misbehaves.
++            release = getattr(canvas, "release_mouse", None)
++            if release is not None:
++                try:
++                    release(ax)
++                except Exception:
++                    # Do not let backend issues prevent axes removal.
++                    pass
++
+         self._axstack.remove(ax)
+         self._axobservers.process("_axes_change_event", self)
+         self.stale = True

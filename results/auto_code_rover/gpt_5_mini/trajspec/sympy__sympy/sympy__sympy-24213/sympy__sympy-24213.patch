@@ -1,0 +1,37 @@
+diff --git a/sympy/physics/units/systems/si.py b/sympy/physics/units/systems/si.py
+index 700495ad9d..5999e99255 100644
+--- a/sympy/physics/units/systems/si.py
++++ b/sympy/physics/units/systems/si.py
+@@ -333,9 +333,9 @@
+ ):
+     dimex = SI.get_dimensional_expr(_scale_factor)
+     if dimex != 1:
+-        # XXX: equivalent_dims is an instance method taking two arguments in
+-        # addition to self so this can not work:
+-        if not DimensionSystem.equivalent_dims(_dimension, Dimension(dimex)):  # type: ignore
++        # Call equivalent_dims on the DimensionSystem instance associated with
++        # the SI UnitSystem rather than on the DimensionSystem class.
++        if not SI.get_dimension_system().equivalent_dims(_dimension, Dimension(dimex)):  # type: ignore
+             raise ValueError("quantity value and dimension mismatch")
+ del _scale_factor, _dimension
+ 
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index a436880c4b..cefe33fc40 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -175,10 +175,12 @@ def _collect_factor_and_dimension(self, expr):
+             for addend in expr.args[1:]:
+                 addend_factor, addend_dim = \
+                     self._collect_factor_and_dimension(addend)
+-                if dim != addend_dim:
++                # Use the DimensionSystem instance's equivalence test so that
++                # dimensionally-equivalent but structurally-different Dimensions
++                # are accepted (e.g., acceleration * time vs velocity).
++                if not self.get_dimension_system().equivalent_dims(dim, addend_dim):
+                     raise ValueError(
+-                        'Dimension of "{}" is {}, '
+-                        'but it should be {}'.format(
++                        'Dimension of "{}" is {}, but it should be {}'.format(
+                             addend, addend_dim, dim))
+                 factor += addend_factor
+             return factor, dim

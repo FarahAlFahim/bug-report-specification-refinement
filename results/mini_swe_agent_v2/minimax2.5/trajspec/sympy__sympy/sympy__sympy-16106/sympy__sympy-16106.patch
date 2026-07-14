@@ -1,0 +1,72 @@
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index 1aa0ee01a2..1374897f59 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -449,6 +449,18 @@ def _print_Basic(self, e):
+             x.appendChild(self._print(arg))
+         return x
+ 
++    def _print_IndexedBase(self, e):
++        x = self.dom.createElement("indexedbase")
++        x.appendChild(self._print(e.label))
++        return x
++
++    def _print_Indexed(self, e):
++        x = self.dom.createElement("indexed")
++        x.appendChild(self._print(e.base))
++        for idx in e.indices:
++            x.appendChild(self._print(idx))
++        return x
++
+     def _print_AssocOp(self, e):
+         x = self.dom.createElement('apply')
+         x_1 = self.dom.createElement(self.mathml_tag(e))
+@@ -1017,6 +1029,28 @@ def _print_Basic(self, e):
+         mrow.appendChild(brac)
+         return mrow
+ 
++    def _print_IndexedBase(self, e):
++        mrow = self.dom.createElement("mrow")
++        mi = self.dom.createElement("mi")
++        mi.appendChild(self.dom.createTextNode("indexedbase"))
++        mrow.appendChild(mi)
++        brac = self.dom.createElement("mfenced")
++        brac.appendChild(self._print(e.label))
++        mrow.appendChild(brac)
++        return mrow
++
++    def _print_Indexed(self, e):
++        mrow = self.dom.createElement("mrow")
++        mi = self.dom.createElement("mi")
++        mi.appendChild(self.dom.createTextNode("indexed"))
++        mrow.appendChild(mi)
++        brac = self.dom.createElement("mfenced")
++        brac.appendChild(self._print(e.base))
++        for idx in e.indices:
++            brac.appendChild(self._print(idx))
++        mrow.appendChild(brac)
++        return mrow
++
+     def _print_Tuple(self, e):
+         mrow = self.dom.createElement('mrow')
+         x = self.dom.createElement('mfenced')
+diff --git a/sympy/tensor/indexed.py b/sympy/tensor/indexed.py
+index fd7bfab417..de601e9d32 100644
+--- a/sympy/tensor/indexed.py
++++ b/sympy/tensor/indexed.py
+@@ -136,6 +136,7 @@ class Indexed(Expr):
+     is_Indexed = True
+     is_symbol = True
+     is_Atom = True
++    _iterable = False
+ 
+     def __new__(cls, base, *args, **kw_args):
+         from sympy.utilities.misc import filldedent
+@@ -385,6 +386,7 @@ class IndexedBase(Expr, NotIterable):
+     is_commutative = True
+     is_symbol = True
+     is_Atom = True
++    _iterable = False
+ 
+     def __new__(cls, label, shape=None, **kw_args):
+         from sympy import MatrixBase, NDimArray

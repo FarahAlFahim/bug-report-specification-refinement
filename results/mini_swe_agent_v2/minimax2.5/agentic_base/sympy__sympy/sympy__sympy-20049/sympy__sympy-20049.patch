@@ -1,0 +1,65 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..f830329fc9 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -242,8 +242,10 @@ def acc(self, frame):
+ 
+         _check_frame(frame)
+         if not (frame in self._acc_dict):
+-            if self._vel_dict[frame] != 0:
+-                return (self._vel_dict[frame]).dt(frame)
++            # Use vel() method to get velocity (which can compute from position)
++            vel = self.vel(frame)
++            if vel != 0:
++                return vel.dt(frame)
+             else:
+                 return Vector(0)
+         return self._acc_dict[frame]
+@@ -518,10 +520,43 @@ def vel(self, frame):
+         """
+ 
+         _check_frame(frame)
+-        if not (frame in self._vel_dict):
+-            raise ValueError('Velocity of point ' + self.name + ' has not been'
+-                             ' defined in ReferenceFrame ' + frame.name)
+-        return self._vel_dict[frame]
++        if frame in self._vel_dict:
++            return self._vel_dict[frame]
++        # Try to compute velocity from position chain
++        # Find a point in the chain that has a known velocity
++        # First, collect all points in the position chain
++        chain_points = set()
++        queue = [self]
++        while queue:
++            pt = queue.pop(0)
++            if pt not in chain_points:
++                chain_points.add(pt)
++                for next_pt in pt._pos_dict:
++                    if next_pt not in chain_points:
++                        queue.append(next_pt)
++                for prev_pt in pt._pos_dict.values():
++                    if hasattr(prev_pt, '_pos_dict'):
++                        for next_pt in prev_pt._pos_dict:
++                            if next_pt not in chain_points:
++                                queue.append(next_pt)
++        # Remove self from the set
++        chain_points.discard(self)
++        # Check each point in the chain for known velocity
++        for pt in chain_points:
++            if frame in pt._vel_dict:
++                # Found a point with known velocity
++                other_vel = pt._vel_dict[frame]
++                pos = self.pos_from(pt)
++                return other_vel + pos.dt(frame)
++        # If no point in the chain has explicit velocity, try to compute
++        # velocity from position vector alone (assuming base point has zero velocity)
++        if self._pos_dict:
++            # Get any point in the position chain
++            otherpoint = next(iter(self._pos_dict))
++            pos = self.pos_from(otherpoint)
++            return pos.dt(frame)
++        raise ValueError('Velocity of point ' + self.name + ' has not been'
++                         ' defined in ReferenceFrame ' + frame.name)
+ 
+     def partial_velocity(self, frame, *gen_speeds):
+         """Returns the partial velocities of the linear velocity vector of this

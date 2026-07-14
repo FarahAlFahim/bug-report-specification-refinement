@@ -1,0 +1,22 @@
+diff --git a/django/forms/boundfield.py b/django/forms/boundfield.py
+index 2ff8b0ee26..f77952e4a9 100644
+--- a/django/forms/boundfield.py
++++ b/django/forms/boundfield.py
+@@ -277,7 +277,16 @@ class BoundWidget:
+ 
+     @property
+     def id_for_label(self):
+-        return 'id_%s_%s' % (self.data['name'], self.data['index'])
++        # Prefer an explicit id provided on the subwidget's attrs. If the
++        # attrs dict contains an "id" key (even if the value is None),
++        # return that value. Otherwise fall back to the historical
++        # constructed id based on the name and index. This ensures that
++        # ids set by ChoiceWidget (e.g. CheckboxSelectMultiple options)
++        # are respected when rendering labels.
++        attrs = self.data.get('attrs', {}) or {}
++        if 'id' in attrs:
++            return attrs['id']
++        return 'id_%s_%s' % (self.data.get('name'), self.data.get('index'))
+ 
+     @property
+     def choice_label(self):

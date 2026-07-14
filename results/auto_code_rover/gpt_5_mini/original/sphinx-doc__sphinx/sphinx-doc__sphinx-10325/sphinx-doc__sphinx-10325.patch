@@ -1,0 +1,78 @@
+diff --git a/sphinx/ext/apidoc.py b/sphinx/ext/apidoc.py
+index 68afc83b8..09fe48d88 100644
+--- a/sphinx/ext/apidoc.py
++++ b/sphinx/ext/apidoc.py
+@@ -34,7 +34,7 @@ else:
+     OPTIONS = [
+         'members',
+         'undoc-members',
+-        # 'inherited-members', # disabled because there's a bug in sphinx
++        'inherited-members',
+         'show-inheritance',
+     ]
+ 
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..c42a8c36f 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -680,17 +680,49 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
+-                    elif name in cls.__dict__:
+-                        return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
+-                        return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+-                        return False
++            """Return True if the given member should be considered an inherited
++            member coming from a base class that matches the configured
++            inherited_members option.
++
++            The option may be:
++            - the sentinel 'object' -> preserve existing semantics (do not
++              filter by specific base class names here),
++            - a str -> single class name,
++            - a set/iterable of str -> multiple class names.
++            """
++            if not inspect.isclass(self.object):
++                return False
++
++            opt = self.options.inherited_members
++
++            # Preserve old semantics when option is the sentinel 'object'
++            if opt == 'object':
++                return False
++
++            # Normalize option to a set of names
++            if isinstance(opt, str):
++                names = {opt}
++            else:
++                try:
++                    names = {str(s).strip() for s in opt if s is not None}
++                except TypeError:
++                    # not iterable, treat as single name
++                    names = {str(opt)}
++
++            # Walk MRO to find the class that actually defines the member.
++            # If the defining class' name is in the configured set, filter it.
++            for cls in self.object.__mro__:
++                if cls is self.object:
++                    # skip the class itself; we're interested in bases
++                    continue
++
++                # if this class defines the attribute (in its __dict__ or annotations)
++                if name in getattr(cls, '__dict__', {}):
++                    return cls.__name__ in names
++                if name in self.get_attr(cls, '__annotations__', {}):
++                    return cls.__name__ in names
++                if isinstance(obj, ObjectMember) and obj.class_ is cls:
++                    return cls.__name__ in names
+ 
+             return False
+ 

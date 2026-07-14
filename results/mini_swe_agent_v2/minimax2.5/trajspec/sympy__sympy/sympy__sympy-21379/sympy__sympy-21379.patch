@@ -1,0 +1,16 @@
+diff --git a/sympy/polys/polyutils.py b/sympy/polys/polyutils.py
+index f51f80098d..9c8d17a186 100644
+--- a/sympy/polys/polyutils.py
++++ b/sympy/polys/polyutils.py
+@@ -266,6 +266,11 @@ def _is_coeff(factor):
+                     else:
+                         base, exp = decompose_power_rat(factor)
+ 
++                    # Don't add Piecewise to generators or elements
++                    from sympy.functions.elementary.piecewise import Piecewise
++                    if isinstance(base, Piecewise):
++                        continue
++
+                     elements[base] = elements.setdefault(base, 0) + exp
+                     gens.add(base)
+ 

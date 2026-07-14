@@ -1,0 +1,89 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..4f6e52702d 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -80,21 +80,78 @@ def __repr__(self):
+ 
+     def __mul__(self, other):
+         from sympy.physics.units import Quantity
++        from sympy.physics.units import UnitSystem
+         if not isinstance(other, (Quantity, Prefix)):
+             return super().__mul__(other)
+ 
+-        fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        if isinstance(other, Prefix):
+             # simplify prefix
++            fact = self.scale_factor * other.scale_factor
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
+-        return self.scale_factor * other
++        # When multiplying a Prefix with a Quantity, create a new prefixed unit
++        # only if the prefix has base 10 (standard SI prefix)
++        # Check if a prefixed unit already exists
++        prefixed_unit_name = "%s%s" % (self.name, other.name)
++        
++        # Only create prefixed units for base 10 prefixes
++        if self.base == 10:
++            for unit in UnitSystem._quantity_scale_factors_global:
++                if unit.name == prefixed_unit_name:
++                    return unit
++
++            # Create a new prefixed unit
++            from sympy.physics.units.quantities import Quantity
++            from sympy import Symbol
++            new_unit = Quantity(
++                prefixed_unit_name,
++                abbrev=Symbol("%s%s" % (self.abbrev, other.abbrev)),
++                is_prefixed=True,
++            )
++            UnitSystem._quantity_dimensional_equivalence_map_global[new_unit] = other
++            UnitSystem._quantity_scale_factors_global[new_unit] = (self.scale_factor, other)
++            return new_unit
++        else:
++            # For non-standard prefixes (not base 10), return scaled value
++            return self.scale_factor * other
++
++    def __rmul__(self, other):
++        from sympy.physics.units import Quantity
++        from sympy.physics.units import UnitSystem
++        if not isinstance(other, Quantity):
++            return super().__rmul__(other)
++
++        # When multiplying a Quantity with a Prefix (e.g., W * milli), 
++        # create a new prefixed unit (same as Prefix * Quantity)
++        # The prefix should come first (e.g., milliwatt, not wattmilli)
++        # Check if a prefixed unit already exists (check both orderings)
++        prefixed_unit_name = "%s%s" % (self.name, other.name)
++        
++        # Only create prefixed units for base 10 prefixes
++        if self.base == 10:
++            for unit in UnitSystem._quantity_scale_factors_global:
++                if unit.name == prefixed_unit_name:
++                    return unit
++
++            # Create a new prefixed unit
++            from sympy.physics.units.quantities import Quantity
++            from sympy import Symbol
++            new_unit = Quantity(
++                prefixed_unit_name,
++                abbrev=Symbol("%s%s" % (self.abbrev, other.abbrev)),
++                is_prefixed=True,
++            )
++            UnitSystem._quantity_dimensional_equivalence_map_global[new_unit] = other
++            UnitSystem._quantity_scale_factors_global[new_unit] = (self.scale_factor, other)
++            return new_unit
++        else:
++            # For non-standard prefixes (not base 10), return scaled value
++            return self.scale_factor * other
+ 
+     def __truediv__(self, other):
+         if not hasattr(other, "scale_factor"):

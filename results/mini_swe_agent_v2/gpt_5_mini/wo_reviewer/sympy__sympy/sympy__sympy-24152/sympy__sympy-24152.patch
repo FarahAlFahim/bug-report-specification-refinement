@@ -1,0 +1,44 @@
+diff --git a/sympy/physics/quantum/tensorproduct.py b/sympy/physics/quantum/tensorproduct.py
+index 78accaf295..59a00c1605 100644
+--- a/sympy/physics/quantum/tensorproduct.py
++++ b/sympy/physics/quantum/tensorproduct.py
+@@ -246,9 +246,36 @@ def _eval_expand_tensorproduct(self, **hints):
+             if isinstance(args[i], Add):
+                 for aa in args[i].args:
+                     tp = TensorProduct(*args[:i] + (aa,) + args[i + 1:])
+-                    if isinstance(tp, TensorProduct):
+-                        tp = tp._eval_expand_tensorproduct()
+-                    add_args.append(tp)
++                    # The TensorProduct constructor may pull out commutative
++                    # factors and return a Mul or a pure commutative scalar.
++                    # Use args_cnc to split commutative and non-commutative
++                    # parts so we can properly recurse into any inner
++                    # TensorProduct and distribute the commutative factors
++                    # across sums.
++                    try:
++                        c_part, nc_part = tp.args_cnc()
++                    except Exception:
++                        # Fallback: if args_cnc is not available for this
++                        # object, treat the whole thing as non-commutative.
++                        c_part, nc_part = (), (tp,)
++
++                    if len(nc_part) == 1 and isinstance(nc_part[0], TensorProduct):
++                        # Recurse into the inner TensorProduct to expand it.
++                        expanded_nc = nc_part[0]._eval_expand_tensorproduct()
++                        c_mul = Mul(*c_part)
++                        if isinstance(expanded_nc, Add):
++                            for term in expanded_nc.args:
++                                add_args.append(c_mul * term)
++                        else:
++                            add_args.append(c_mul * expanded_nc)
++                    else:
++                        # Either there is no non-commutative part (pure scalar)
++                        # or the non-commutative part is not a raw TensorProduct
++                        # (could be a Pow/Mul wrapping). If tp itself is a
++                        # TensorProduct, recurse; otherwise append as-is.
++                        if isinstance(tp, TensorProduct):
++                            tp = tp._eval_expand_tensorproduct()
++                        add_args.append(tp)
+                 break
+ 
+         if add_args:

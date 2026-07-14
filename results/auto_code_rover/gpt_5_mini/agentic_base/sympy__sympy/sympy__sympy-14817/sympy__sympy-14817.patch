@@ -1,0 +1,34 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..79fb67e0e3 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -821,13 +821,27 @@ def _print_BlockMatrix(self, B):
+     def _print_MatAdd(self, expr):
+         s = None
+         for item in expr.args:
++            # compute pretty form once
+             pform = self._print(item)
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine sign from leading scalar coefficient when possible,
++                # do not attempt to sympify internal names (avoid S(...)).
++                neg = False
++                coeff = None
++                if hasattr(item, "as_coeff_mmul"):
++                    try:
++                        coeff, factors = item.as_coeff_mmul()
++                    except Exception:
++                        coeff = None
++                # Treat as negative only if the leading coefficient is a numeric negative
++                if coeff is not None and getattr(coeff, "is_Number", False) and getattr(coeff, "is_negative", False):
++                    neg = True
++
++                if neg:
++                    # for negative terms, use a single space separator (no explicit '+')
+                     s = prettyForm(*stringPict.next(s, ' '))
+-                    pform = self._print(item)
+                 else:
+                     s = prettyForm(*stringPict.next(s, ' + '))
+                 s = prettyForm(*stringPict.next(s, pform))

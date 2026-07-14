@@ -1,0 +1,29 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 16823e9..c3272fd 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -280,6 +280,24 @@ class Field(RegisterLookupMixin):
+             if isinstance(choices_group, str):
+                 break
+         else:
++            # Choices shape is valid. If this field exposes a max_length attribute,
++            # ensure that any string choice keys will fit within it.
++            max_length = getattr(self, 'max_length', None)
++            if isinstance(max_length, int):
++                longest = 0
++                # Use flatchoices to inspect the stored choice keys.
++                for choice_key, _ in self.flatchoices:
++                    if isinstance(choice_key, str):
++                        longest = max(longest, len(choice_key))
++                if longest > max_length:
++                    return [
++                        checks.Error(
++                            "The 'max_length' of this field is not large enough to "
++                            "hold the longest choice value (%d characters)." % longest,
++                            obj=self,
++                            id='fields.E122',
++                        )
++                    ]
+             return []
+ 
+         return [

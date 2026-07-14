@@ -1,0 +1,58 @@
+diff --git a/sympy/parsing/latex/_parse_latex_antlr.py b/sympy/parsing/latex/_parse_latex_antlr.py
+index 2e4a45ad20..947fdcec74 100644
+--- a/sympy/parsing/latex/_parse_latex_antlr.py
++++ b/sympy/parsing/latex/_parse_latex_antlr.py
+@@ -20,6 +20,35 @@
+ except Exception:
+     pass
+ 
++
++
++def normalized_reciprocal(e):
++    """Return a normalized reciprocal of expression e.
++
++    - If e is a Pow, invert its exponent, combining nested Pows.
++    - If e is a Mul, return product of reciprocals of its factors.
++    - Otherwise return Pow(e, -1).
++    """
++    # Pow: invert exponent; if base is Pow combine exponents; if base is
++    # Mul distribute the exponent across factors with negation.
++    if isinstance(e, sympy.Pow):
++        base = e.base
++        exp = e.exp
++        if isinstance(base, sympy.Pow):
++            # (b**e1)**e2 -> b**(e1*e2); reciprocal multiplies by -1
++            new_exp = sympy.Mul(base.exp, exp, -1, evaluate=False)
++            return sympy.Pow(base.base, new_exp, evaluate=False)
++        if isinstance(base, sympy.Mul):
++            return sympy.Mul(*[
++                sympy.Pow(f, sympy.Mul(exp, -1, evaluate=False), evaluate=False)
++                for f in base.args
++            ], evaluate=False)
++        return sympy.Pow(base, sympy.Mul(exp, -1, evaluate=False), evaluate=False)
++    if isinstance(e, sympy.Mul):
++        return sympy.Mul(*[normalized_reciprocal(a) for a in e.args], evaluate=False)
++    return sympy.Pow(e, -1, evaluate=False)
++
++
+ ErrorListener = import_module('antlr4.error.ErrorListener',
+                               warn_not_installed=True,
+                               import_kwargs={'fromlist': ['ErrorListener']}
+@@ -140,7 +169,7 @@ def convert_mp(mp):
+     elif mp.DIV() or mp.CMD_DIV() or mp.COLON():
+         lh = convert_mp(mp_left)
+         rh = convert_mp(mp_right)
+-        return sympy.Mul(lh, sympy.Pow(rh, -1, evaluate=False), evaluate=False)
++        return sympy.Mul(lh, normalized_reciprocal(rh), evaluate=False)
+     else:
+         if hasattr(mp, 'unary'):
+             return convert_unary(mp.unary())
+@@ -382,7 +411,7 @@ def convert_frac(frac):
+ 
+     expr_top = convert_expr(frac.upper)
+     expr_bot = convert_expr(frac.lower)
+-    inverse_denom = sympy.Pow(expr_bot, -1, evaluate=False)
++    inverse_denom = normalized_reciprocal(expr_bot)
+     if expr_top == 1:
+         return inverse_denom
+     else:

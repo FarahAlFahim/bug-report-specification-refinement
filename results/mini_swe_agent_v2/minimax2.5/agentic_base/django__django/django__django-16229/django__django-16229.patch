@@ -1,0 +1,27 @@
+diff --git a/django/forms/boundfield.py b/django/forms/boundfield.py
+index 9f2ae59ab4..ce7919333e 100644
+--- a/django/forms/boundfield.py
++++ b/django/forms/boundfield.py
+@@ -144,11 +144,17 @@ class BoundField:
+                 hidden_widget,
+                 self.html_initial_name,
+             )
+-            try:
+-                initial_value = field.to_python(initial_value)
+-            except ValidationError:
+-                # Always assume data has changed if validation fails.
+-                return True
++            # If the hidden initial value is not in the submitted data,
++            # fall back to the field's initial value (which may be a callable
++            # default).
++            if initial_value is None:
++                initial_value = self.initial
++            else:
++                try:
++                    initial_value = field.to_python(initial_value)
++                except ValidationError:
++                    # Always assume data has changed if validation fails.
++                    return True
+         else:
+             initial_value = self.initial
+         return field.has_changed(initial_value, self.data)

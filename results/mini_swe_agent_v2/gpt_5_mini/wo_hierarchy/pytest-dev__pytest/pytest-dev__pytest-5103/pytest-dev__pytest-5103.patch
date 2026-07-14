@@ -1,0 +1,50 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..1e88ac15f 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -699,6 +699,13 @@ class AssertionRewriter(ast.NodeVisitor):
+             pos += 1
+         else:
+             lineno = item.lineno
++        # Ensure alias nodes have location info on Python versions that require it
++        for a in aliases:
++            try:
++                a.lineno = lineno
++                a.col_offset = 0
++            except Exception:
++                pass
+         imports = [
+             ast.Import([alias], lineno=lineno, col_offset=0) for alias in aliases
+         ]
+@@ -1045,6 +1052,24 @@ warn_explicit(
+         expl = pat % (res_expl, res_expl, value_expl, attr.attr)
+         return res, expl
+ 
++    def visit_GeneratorExp(self, gen):
++        """Provide a nicer explanation for generator expressions.
++
++        Generator expressions are lazy and their repr is an unhelpful
++        "<generator object ...>".  To give users useful diagnostics we
++        keep the generator object as the runtime value (so semantics are
++        preserved) but format its contents by materializing it into a
++        list for the assertion explanation.
++        """
++        # Assign the generator expression to a temp so the runtime value
++        # remains the generator object.
++        res = self.assign(gen)
++        # For the explanation, display list(res) so the repr shows the
++        # materialized items instead of the generator object's repr.
++        list_display = ast_Call(self.builtin("list"), [res], [])
++        return res, self.explanation_param(self.display(list_display))
++
++
+     def visit_Compare(self, comp):
+         self.push_format_context()
+         left_res, left_expl = self.visit(comp.left)
+@@ -1081,4 +1106,4 @@ warn_explicit(
+             res = ast.BoolOp(ast.And(), load_names)
+         else:
+             res = load_names[0]
+-        return res, self.explanation_param(self.pop_format_context(expl_call))
++        return res, self.explanation_param(self.pop_format_context(expl_call))
+\ No newline at end of file

@@ -1,0 +1,31 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 901918674a..ed7ac79cc6 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -614,8 +614,24 @@ def _print_BasisDependent(self, expr):
+ 
+     def _print_Indexed(self, expr):
+         tex_base = self._print(expr.base)
+-        tex = '{'+tex_base+'}'+'_{%s}' % ','.join(
+-            map(self._print, expr.indices))
++
++        def _sanitize_index(idx):
++            # Some index printers (e.g., TensorIndex) emit a leading valence
++            # marker '^' or '_' together with a braced group, e.g. '_{i_1}'.
++            # When such pieces are joined into a single outer subscript group
++            # like M_{...}, the leading '_' inside the group is illegal TeX.
++            # To avoid malformed LaTeX, strip a leading '^' or '_' and its
++            # immediate outer braces if present, preserving the inner content.
++            s = self._print(idx)
++            if s and s[0] in ('_', '^'):
++                s2 = s[1:]
++                if s2.startswith('{') and s2.endswith('}'):
++                    s2 = s2[1:-1]
++                return s2
++            return s
++
++        tex = '{' + tex_base + '}' + '_{%s}' % ','.join(
++            _sanitize_index(i) for i in expr.indices)
+         return tex
+ 
+     def _print_IndexedBase(self, expr):

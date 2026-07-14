@@ -1,0 +1,14 @@
+--- /tmp/orig_serializer.py	2026-05-29 12:15:27.839927006 +0000
++++ django/db/migrations/serializer.py	2026-05-29 12:14:55.727608005 +0000
+@@ -168,7 +168,10 @@
+         ):
+             klass = self.value.__self__
+             module = klass.__module__
+-            return "%s.%s.%s" % (module, klass.__name__, self.value.__name__), {
++            # Use qualified name so nested classes keep their outer scope
++            # in the serialized dotted path (e.g. Outer.Inner.method).
++            klass_name = getattr(klass, "__qualname__", klass.__name__)
++            return "%s.%s.%s" % (module, klass_name, self.value.__name__), {
+                 "import %s" % module
+             }
+         # Further error checking

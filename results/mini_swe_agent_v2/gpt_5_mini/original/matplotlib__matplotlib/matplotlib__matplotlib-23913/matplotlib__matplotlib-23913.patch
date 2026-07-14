@@ -1,0 +1,25 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..e2dea835d5 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -306,6 +306,7 @@ class Legend(Artist):
+     def __init__(
+         self, parent, handles, labels,
+         loc=None,
++        draggable=False,
+         numpoints=None,      # number of points in the legend line
+         markerscale=None,    # relative size of legend markers vs. original
+         markerfirst=True,    # left/right ordering of legend marker and label
+@@ -539,6 +540,12 @@ class Legend(Artist):
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
+ 
++        # Enable draggable support at construction time if requested.
++        if draggable:
++            # Default update mode is 'loc' to preserve historical behavior
++            # when calling set_draggable after creation.
++            self.set_draggable(True)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

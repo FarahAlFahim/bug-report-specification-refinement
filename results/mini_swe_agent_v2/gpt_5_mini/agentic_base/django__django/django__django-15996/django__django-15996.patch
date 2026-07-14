@@ -1,0 +1,75 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 38da1e6ecc..34baa9011d 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -125,10 +125,66 @@ class EnumSerializer(BaseSerializer):
+     def serialize(self):
+         enum_class = self.value.__class__
+         module = enum_class.__module__
+-        return (
+-            "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
+-            {"import %s" % module},
+-        )
++
++        # Most Enum members have a single name and can be serialized as
++        # module.EnumClass['NAME']. However, Flag/IntFlag values may be
++        # combinations of multiple members and don't have a single .name.
++        # In that case, decompose the value into named members and emit an
++        # OR-expression of per-member index expressions (e.g.
++        # re.RegexFlag['IGNORECASE'] | re.RegexFlag['UNICODE']). If that
++        # isn't possible, fall back to repr(value) to avoid producing
++        # expressions like EnumClass[None].
++        name = getattr(self.value, "name", None)
++        if name is not None:
++            return (
++                "%s.%s[%r]" % (module, enum_class.__qualname__, name),
++                {"import %s" % module},
++            )
++
++        # Handle Flag/IntFlag combinations specially.
++        try:
++            if issubclass(enum_class, enum.Flag):
++                members = None
++                # Prefer stdlib helper if available.
++                decompose = getattr(enum, "_decompose", None)
++                if decompose is not None:
++                    try:
++                        members = decompose(enum_class, self.value)
++                    except Exception:
++                        members = None
++                if members is None:
++                    # Fallback decomposition: select declared members that
++                    # are contained in the value. Handle zero-valued
++                    # members specially (only include if value is zero).
++                    try:
++                        value_int = int(self.value)
++                        members = []
++                        for m in enum_class:
++                            m_int = int(m)
++                            if m_int == 0:
++                                if value_int == 0:
++                                    members.append(m)
++                            else:
++                                if (m_int & value_int) == m_int:
++                                    members.append(m)
++                    except Exception:
++                        members = None
++
++                if members:
++                    parts = []
++                    for m in members:
++                        if getattr(m, "name", None) is None:
++                            continue
++                        parts.append("%s.%s[%r]" % (module, enum_class.__qualname__, m.name))
++                    if parts:
++                        return (" | ".join(parts), {"import %s" % module})
++        except Exception:
++            # Any unexpected errors should fall through to repr fallback.
++            pass
++
++        # Fallback: use repr(value) which is a safe Python expression, and
++        # avoids producing EnumClass[None].
++        return (repr(self.value), set())
+ 
+ 
+ class FloatSerializer(BaseSimpleSerializer):

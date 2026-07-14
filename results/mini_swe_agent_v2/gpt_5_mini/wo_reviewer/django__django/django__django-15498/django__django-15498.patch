@@ -1,0 +1,36 @@
+diff --git a/django/views/static.py b/django/views/static.py
+index 1c558a53ff..c1d054f66d 100644
+--- a/django/views/static.py
++++ b/django/views/static.py
+@@ -126,15 +126,29 @@ def was_modified_since(header=None, mtime=0, size=0):
+       This is the size of the item we're talking about.
+     """
+     try:
++        # Treat missing or empty/whitespace-only headers as if they were not
++        # provided. This mirrors the behavior in django.utils.cache where
++        # falsy If-Modified-Since headers are ignored.
+         if header is None:
+             raise ValueError
++        header = header.strip()
++        if not header:
++            raise ValueError
++
+         matches = re.match(r"^([^;]+)(; length=([0-9]+))?$", header, re.IGNORECASE)
+-        header_mtime = parse_http_date(matches[1])
+-        header_len = matches[3]
++        if not matches:
++            # Header didn't match the expected pattern; treat as missing.
++            raise ValueError
++
++        header_mtime = parse_http_date(matches.group(1))
++        header_len = matches.group(3)
+         if header_len and int(header_len) != size:
+             raise ValueError
+         if int(mtime) > header_mtime:
+             raise ValueError
+     except (AttributeError, ValueError, OverflowError):
++        # On any parsing/validation error, act as if the resource was
++        # modified (i.e. don't return 304). This keeps previous semantics
++        # while avoiding unhandled exceptions for invalid headers.
+         return True
+     return False

@@ -1,0 +1,28 @@
+diff --git a/django/db/backends/base/schema.py b/django/db/backends/base/schema.py
+index 03f0f11507..6e908cfb3c 100644
+--- a/django/db/backends/base/schema.py
++++ b/django/db/backends/base/schema.py
+@@ -582,7 +582,12 @@ class BaseDatabaseSchemaEditor:
+             )
+             if default_name in constraint_names:
+                 constraint_names = [default_name]
+-        if len(constraint_names) != 1:
++        # If there are multiple matching constraints, that's ambiguous and
++        # should be treated as an error. However, if there are zero matches,
++        # the composed constraint is already absent (possibly dropped by a
++        # prior operation in the same migration or by the database when a
++        # referenced column was removed) — treat that as a benign no-op.
++        if len(constraint_names) > 1:
+             raise ValueError(
+                 "Found wrong number (%s) of constraints for %s(%s)"
+                 % (
+@@ -591,6 +596,9 @@ class BaseDatabaseSchemaEditor:
+                     ", ".join(columns),
+                 )
+             )
++        if not constraint_names:
++            # Nothing to delete.
++            return
+         self.execute(self._delete_constraint_sql(sql, model, constraint_names[0]))
+ 
+     def alter_db_table(self, model, old_db_table, new_db_table):

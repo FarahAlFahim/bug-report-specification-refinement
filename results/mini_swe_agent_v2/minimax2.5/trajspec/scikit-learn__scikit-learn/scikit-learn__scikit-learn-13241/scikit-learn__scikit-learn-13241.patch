@@ -1,0 +1,18 @@
+diff --git a/sklearn/decomposition/kernel_pca.py b/sklearn/decomposition/kernel_pca.py
+index bb91d0cbb..2747c2c72 100644
+--- a/sklearn/decomposition/kernel_pca.py
++++ b/sklearn/decomposition/kernel_pca.py
+@@ -210,6 +210,13 @@ class KernelPCA(BaseEstimator, TransformerMixin, _UnstableOn32BitMixin):
+                                                 maxiter=self.max_iter,
+                                                 v0=v0)
+ 
++        # The eigenvectors can be scaled by -1, which changes the sign.
++        # To ensure deterministic output, we flip the sign of the eigenvectors
++        # so that the largest absolute value per component is positive.
++        max_abs_cols = np.argmax(np.abs(self.alphas_), axis=0)
++        signs = np.sign(self.alphas_[max_abs_cols, range(self.alphas_.shape[1])])
++        self.alphas_ *= signs
++
+         # sort eigenvectors in descending order
+         indices = self.lambdas_.argsort()[::-1]
+         self.lambdas_ = self.lambdas_[indices]

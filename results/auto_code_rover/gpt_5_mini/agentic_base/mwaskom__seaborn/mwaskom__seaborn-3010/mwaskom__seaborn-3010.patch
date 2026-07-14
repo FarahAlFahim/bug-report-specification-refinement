@@ -1,0 +1,45 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..21578177 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -20,17 +20,29 @@ class PolyFit(Stat):
+     gridsize: int = 100
+ 
+     def _fit_predict(self, data):
+-
+-        x = data["x"]
+-        y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
+-            xx = yy = []
+-        else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
+-
++    
++        # Coerce inputs to numeric, aligning x and y and dropping pairs with missing values.
++        x = pd.to_numeric(data["x"], errors="coerce")
++        y = pd.to_numeric(data["y"], errors="coerce")
++        df = pd.DataFrame({"x": x, "y": y}).dropna()
++    
++        # If there are no valid observations or not enough unique x values, return empty result.
++        if df.empty or df["x"].nunique() <= self.order:
++            return pd.DataFrame(dict(x=[], y=[]))
++    
++        # Ensure float numpy arrays are passed to numpy.polyfit and handle potential linear
++        # algebra failures gracefully by returning no fit instead of raising.
++        xv = df["x"].to_numpy(dtype=float)
++        yv = df["y"].to_numpy(dtype=float)
++        try:
++            p = np.polyfit(xv, yv, self.order)
++        except np.linalg.LinAlgError:
++            # Fitting failed (e.g., SVD did not converge); return empty fit.
++            return pd.DataFrame(dict(x=[], y=[]))
++    
++        xx = np.linspace(xv.min(), xv.max(), self.gridsize)
++        yy = np.polyval(p, xx)
++    
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 
+     # TODO we should have a way of identifying the method that will be applied

@@ -1,0 +1,18 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index 11aebbc59f..e6efd60631 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -301,7 +301,12 @@ def blocks(self):
+         data = [[mats[i] if i == j else ZeroMatrix(mats[i].rows, mats[j].cols)
+                         for j in range(len(mats))]
+                         for i in range(len(mats))]
+-        return ImmutableDenseMatrix(data)
++        # Preserve nested Matrix objects as block elements by disabling
++        # automatic evaluation/concatenation. ImmutableDenseMatrix(...,
++        # evaluate=True) will attempt to concatenate submatrices which
++        # flattens a 1x1 block matrix into the inner matrix; using
++        # evaluate=False keeps the matrix-of-blocks structure intact.
++        return ImmutableDenseMatrix(data, evaluate=False)
+ 
+     @property
+     def shape(self):

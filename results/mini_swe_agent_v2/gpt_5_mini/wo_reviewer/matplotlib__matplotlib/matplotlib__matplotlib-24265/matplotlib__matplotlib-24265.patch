@@ -1,0 +1,26 @@
+diff --git a/lib/matplotlib/style/core.py b/lib/matplotlib/style/core.py
+index fb0a5426e6..c63cd542c8 100644
+--- a/lib/matplotlib/style/core.py
++++ b/lib/matplotlib/style/core.py
+@@ -255,6 +255,21 @@ def reload_library():
+     """Reload the style library."""
+     global library
+     library = update_user_library(_base_library)
++
++    # Create legacy aliases for seaborn styles so that legacy names like
++    # 'seaborn-colorblind' resolve to the same rc-params as the
++    # canonical 'seaborn-v0_8-colorblind'. Do not overwrite any
++    # user-provided legacy names from USER_LIBRARY_PATHS.
++    canonical_prefix = "seaborn-v0_8-"
++    legacy_prefix = "seaborn-"
++    for key in list(library.keys()):
++        if key.startswith(canonical_prefix):
++            legacy = key.replace(canonical_prefix, legacy_prefix, 1)
++            # Only add the alias if the legacy name does not already
++            # exist (i.e., was provided by the user).
++            if legacy not in library:
++                library[legacy] = library[key]
++
+     available[:] = sorted(library.keys())
+ 
+ 

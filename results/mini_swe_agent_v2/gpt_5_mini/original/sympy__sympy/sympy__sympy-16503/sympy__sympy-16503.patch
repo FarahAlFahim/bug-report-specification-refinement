@@ -1,0 +1,18 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 7a3de33522..1bf553f0a3 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -629,7 +629,12 @@ def adjust(s, wid=None, how='<^>'):
+             # put the present prettyF to the right
+             prettyF = prettyForm(*prettySign.right(prettyF))
+ 
+-        prettyF.baseline = max_upper + sign_height//2
++        # The baseline of prettyF has already been adjusted for the
++        # first summand above when centering the summation sign with
++        # the function (see the adjustment inside the loop). Do not
++        # overwrite that here; keep the adjusted baseline so that
++        # subsequent operations (e.g. addition) align correctly.
++        # Keep the multiplication binding for combined printing.
+         prettyF.binding = prettyForm.MUL
+         return prettyF
+ 

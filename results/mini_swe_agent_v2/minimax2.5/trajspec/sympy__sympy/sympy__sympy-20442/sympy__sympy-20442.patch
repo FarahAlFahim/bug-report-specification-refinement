@@ -1,0 +1,33 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..03c9ea9ba7 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -24,6 +24,28 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     if not canon_expr_units.issubset(set(canon_dim_units)):
+         return None
+ 
++    # For single target unit, check if the dimensions are compatible
++    # by ensuring that the source dimension can be expressed as a power of the target dimension
++    # This prevents converting between orthogonal units (e.g., action to energy)
++    if len(target_units) == 1:
++        target_deps = dimension_system.get_dimensional_dependencies(target_dims[0], mark_dimensionless=True)
++        # Check if all target dimension keys are present in source with same or lower exponents
++        # and all source dimension keys are present in target with same exponents
++        for k, v in dim_dependencies.items():
++            if k not in target_deps:
++                # Dimension key not in target - incompatible
++                return None
++            if target_deps[k] != v:
++                # Dimension key has different exponent - check if it's a simple power relationship
++                # For a simple power relationship, source should have only one dimension key
++                if len(dim_dependencies) != 1 or len(target_deps) != 1:
++                    # Multiple dimension keys - this is likely orthogonal units
++                    return None
++        # Also check that target doesn't have extra dimensions not in source
++        for k in target_deps:
++            if k not in dim_dependencies:
++                return None
++
+     seen = set()
+     canon_dim_units = [i for i in canon_dim_units if not (i in seen or seen.add(i))]
+ 

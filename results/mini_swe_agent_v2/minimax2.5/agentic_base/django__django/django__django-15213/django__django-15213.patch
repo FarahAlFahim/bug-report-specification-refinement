@@ -1,0 +1,14 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 69a2d9298f..e6351c747e 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -281,6 +281,9 @@ class SQLCompiler:
+                     sql, params = self.compile(Value(empty_result_set_value))
+             else:
+                 sql, params = col.select_format(self, sql, params)
++                if not sql:
++                    # Select a predicate that's always True.
++                    sql, params = '1', ()
+             ret.append((col, (sql, params), alias))
+         return ret, klass_info, annotations
+ 

@@ -1,0 +1,28 @@
+diff --git a/django/contrib/auth/forms.py b/django/contrib/auth/forms.py
+index b3cfc6723c..c0e66d7a61 100644
+--- a/django/contrib/auth/forms.py
++++ b/django/contrib/auth/forms.py
+@@ -163,7 +163,22 @@ class UserChangeForm(forms.ModelForm):
+         super().__init__(*args, **kwargs)
+         password = self.fields.get("password")
+         if password:
+-            password.help_text = password.help_text.format("../password/")
++            # The admin change URL may be reached via a related lookup that
++            # uses a non-PK "to_field" value (the URL will include
++            # "?_to_field=..." and the path segment before "change/" will
++            # be the to_field value). The password-change view expects the
++            # user PK in the URL, so construct a link that points to the
++            # PK-based password change URL when possible. For unsaved
++            # instances (no PK yet), fall back to the relative "../password/"
++            # link.
++            try:
++                pk = self.instance.pk
++            except Exception:
++                pk = None
++            if pk is not None:
++                password.help_text = password.help_text.format(f"../../{pk}/password/")
++            else:
++                password.help_text = password.help_text.format("../password/")
+         user_permissions = self.fields.get("user_permissions")
+         if user_permissions:
+             user_permissions.queryset = user_permissions.queryset.select_related(

@@ -1,0 +1,148 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 77768e7383..08fcb3294b 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1499,16 +1499,32 @@ class DraggableBase:
+         if not ref_artist.pickable():
+             ref_artist.set_picker(True)
+         self.got_artist = False
+-        self._use_blit = use_blit and self.canvas.supports_blit
+-        self.cids = [
+-            self.canvas.callbacks._connect_picklable(
+-                'pick_event', self.on_pick),
+-            self.canvas.callbacks._connect_picklable(
+-                'button_release_event', self.on_release),
+-        ]
++        # Cache the canvas at construction time to avoid dereferencing
++        # ref_artist.figure when the artist becomes unparented.
++        try:
++            canvas = ref_artist.figure.canvas
++        except Exception:
++            canvas = None
++        self._canvas = canvas
++        self._use_blit = use_blit and (canvas is not None and canvas.supports_blit)
++        if canvas is not None:
++            self.cids = [
++                canvas.callbacks._connect_picklable('pick_event', self.on_pick),
++                canvas.callbacks._connect_picklable('button_release_event', self.on_release),
++            ]
++        else:
++            self.cids = []
+ 
+     # A property, not an attribute, to maintain picklability.
+-    canvas = property(lambda self: self.ref_artist.figure.canvas)
++    @property
++    def canvas(self):
++        # Prefer the cached canvas to avoid re-dereferencing figure.
++        if getattr(self, '_canvas', None) is not None:
++            return self._canvas
++        try:
++            return self.ref_artist.figure.canvas
++        except Exception:
++            return None
+ 
+     def on_motion(self, evt):
+         if self._check_still_parented() and self.got_artist:
+@@ -1516,11 +1532,14 @@ class DraggableBase:
+             dy = evt.y - self.mouse_y
+             self.update_offset(dx, dy)
+             if self._use_blit:
++                if self.canvas is None:
++                    return
+                 self.canvas.restore_region(self.background)
+-                self.ref_artist.draw(
+-                    self.ref_artist.figure._get_renderer())
++                self.ref_artist.draw(self.ref_artist.figure._get_renderer())
+                 self.canvas.blit()
+             else:
++                if self.canvas is None:
++                    return
+                 self.canvas.draw()
+ 
+     def on_pick(self, evt):
+@@ -1530,42 +1549,71 @@ class DraggableBase:
+             self.got_artist = True
+             if self._use_blit:
+                 self.ref_artist.set_animated(True)
+-                self.canvas.draw()
+-                self.background = \
+-                    self.canvas.copy_from_bbox(self.ref_artist.figure.bbox)
+-                self.ref_artist.draw(
+-                    self.ref_artist.figure._get_renderer())
+-                self.canvas.blit()
+-            self._c1 = self.canvas.callbacks._connect_picklable(
+-                "motion_notify_event", self.on_motion)
++                if self.canvas is None:
++                    self._use_blit = False
++                else:
++                    self.canvas.draw()
++                    try:
++                        self.background = self.canvas.copy_from_bbox(self.ref_artist.figure.bbox)
++                    except Exception:
++                        self._use_blit = False
++                self.ref_artist.draw(self.ref_artist.figure._get_renderer())
++                if self._use_blit and self.canvas is not None:
++                    self.canvas.blit()
++            # connect motion handler if we have a canvas
++            if self.canvas is not None:
++                self._c1 = self.canvas.callbacks._connect_picklable('motion_notify_event', self.on_motion)
++            else:
++                self._c1 = None
+             self.save_offset()
+ 
+     def on_release(self, event):
+         if self._check_still_parented() and self.got_artist:
+             self.finalize_offset()
+             self.got_artist = False
+-            self.canvas.mpl_disconnect(self._c1)
++            # Only disconnect if we have a canvas and a connection id.
++            if self.canvas is not None and getattr(self, '_c1', None) is not None:
++                try:
++                    self.canvas.mpl_disconnect(self._c1)
++                except Exception:
++                    pass
+ 
+             if self._use_blit:
+                 self.ref_artist.set_animated(False)
+ 
+     def _check_still_parented(self):
+         if self.ref_artist.figure is None:
+-            self.disconnect()
++            try:
++                self.disconnect()
++            except Exception:
++                pass
+             return False
+-        else:
+-            return True
++        return True
+ 
+     def disconnect(self):
+         """Disconnect the callbacks."""
++        canvas = getattr(self, '_canvas', None)
++        if canvas is None:
++            try:
++                canvas = self.ref_artist.figure.canvas
++            except Exception:
++                canvas = None
++        if canvas is None:
++            return
+         for cid in self.cids:
+-            self.canvas.mpl_disconnect(cid)
++            try:
++                canvas.mpl_disconnect(cid)
++            except Exception:
++                pass
+         try:
+             c1 = self._c1
+         except AttributeError:
+             pass
+         else:
+-            self.canvas.mpl_disconnect(c1)
++            try:
++                canvas.mpl_disconnect(c1)
++            except Exception:
++                pass
+ 
+     def save_offset(self):
+         pass

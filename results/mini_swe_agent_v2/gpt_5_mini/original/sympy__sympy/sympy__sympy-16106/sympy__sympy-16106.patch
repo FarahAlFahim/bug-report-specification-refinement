@@ -1,0 +1,57 @@
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index 1aa0ee01a2..f86f2193d6 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -442,6 +442,27 @@ def _print_Function(self, e):
+         for arg in e.args:
+             x.appendChild(self._print(arg))
+         return x
++    def _print_Indexed(self, e):
++        """Explicit printing for Indexed objects: <indexed><indexedbase>..</indexedbase><ci>i</ci>..</indexed>"""
++        x = self.dom.createElement('indexed')
++        # base (IndexedBase or other)
++        x.appendChild(self._print(e.base))
++        # indices
++        for idx in e.indices:
++            x.appendChild(self._print(idx))
++        return x
++
++    def _print_IndexedBase(self, e):
++        """Explicit printing for IndexedBase objects: <indexedbase>label</indexedbase>"""
++        x = self.dom.createElement('indexedbase')
++        # The label is typically a Symbol; print it accordingly
++        try:
++            x.appendChild(self._print(e.label))
++        except Exception:
++            # fallback: print the first arg if present
++            if e.args:
++                x.appendChild(self._print(e.args[0]))
++        return x
+ 
+     def _print_Basic(self, e):
+         x = self.dom.createElement(self.mathml_tag(e))
+@@ -991,6 +1012,24 @@ def _print_Function(self, e):
+         mrow.appendChild(x)
+         mrow.appendChild(y)
+         return mrow
++    def _print_Indexed(self, e):
++        """Presentation printing for Indexed objects."""
++        x = self.dom.createElement('mrow')
++        inner = self.dom.createElement('indexed')
++        inner.appendChild(self._print(e.base))
++        for idx in e.indices:
++            inner.appendChild(self._print(idx))
++        x.appendChild(inner)
++        return x
++
++    def _print_IndexedBase(self, e):
++        x = self.dom.createElement('mi')
++        try:
++            x.appendChild(self._print(e.label))
++        except Exception:
++            if e.args:
++                x.appendChild(self._print(e.args[0]))
++        return x
+ 
+     def _print_polylog(self, expr, exp=None):
+         mrow = self.dom.createElement('mrow')

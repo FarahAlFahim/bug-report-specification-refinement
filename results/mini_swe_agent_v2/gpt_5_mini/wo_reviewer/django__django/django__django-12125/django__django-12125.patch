@@ -1,0 +1,54 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..7e9341a5f8 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -90,7 +90,28 @@ class DeconstructableSerializer(BaseSerializer):
+ 
+     @staticmethod
+     def _serialize_path(path):
+-        module, name = path.rsplit(".", 1)
++        """
++        Split a dotted path into an importable module and the remaining
++        attribute path. The incoming path can contain class __qualname__
++        components (e.g. "pkg.module.Outer.Inner"), so simply splitting
++        on the last dot may produce a non-importable module. Try the
++        longest possible left-hand module that is importable.
++        """
++        parts = path.split('.')
++        # Try progressively shorter prefixes as possible importable modules.
++        for i in range(len(parts) - 1, 0, -1):
++            module = '.'.join(parts[:i])
++            name = '.'.join(parts[i:])
++            try:
++                __import__(module)
++            except Exception:
++                continue
++            # Special-case django.db.models to use "models." prefix.
++            if module == "django.db.models":
++                return "models.%s" % name, {"from django.db import models"}
++            return path, {"import %s" % module}
++        # Fallback: use original behaviour (let import fail later)
++        module, name = path.rsplit('.', 1)
+         if module == "django.db.models":
+             imports = {"from django.db import models"}
+             name = "models.%s" % name
+@@ -266,10 +287,17 @@ class TypeSerializer(BaseSerializer):
+                 return string, set(imports)
+         if hasattr(self.value, "__module__"):
+             module = self.value.__module__
++            # For builtins, use the plain name (e.g. 'int').
+             if module == builtins.__name__:
+                 return self.value.__name__, set()
+-            else:
+-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
++            # Try to use the qualified name to preserve nested class
++            # qualifiers (Outer.Inner). Reject local classes (qualname
++            # containing '<') which cannot be reliably imported.
++            qualname = getattr(self.value, '__qualname__', None)
++            if qualname and '<' not in qualname:
++                return '%s.%s' % (module, qualname), {'import %s' % module}
++            # Fallback to __name__ if qualname isn't available or importable.
++            return '%s.%s' % (module, self.value.__name__), {'import %s' % module}
+ 
+ 
+ class UUIDSerializer(BaseSerializer):

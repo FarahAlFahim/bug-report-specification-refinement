@@ -1,0 +1,20 @@
+diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py
+index a3ae1f048e..32f391a14f 100644
+--- a/django/db/backends/sqlite3/base.py
++++ b/django/db/backends/sqlite3/base.py
+@@ -196,6 +196,15 @@ class DatabaseWrapper(BaseDatabaseWrapper):
+                 'for controlling thread shareability.',
+                 RuntimeWarning
+             )
++        # Ensure a sensible default timeout is set for SQLite connections.
++        # Without a timeout, operations can fail with "database is locked"
++        # when multiple connections attempt to write the same database
++        # (for example when using persistent test databases with
++        # --keepdb). Allow an explicit timeout to be provided via
++        # DATABASES['OPTIONS']['timeout'] and otherwise default to 5.0
++        # seconds which is a reasonable trade-off between fast failures
++        # and giving other connections time to complete.
++        kwargs.setdefault('timeout', 5.0)
+         kwargs.update({'check_same_thread': False, 'uri': True})
+         return kwargs
+ 

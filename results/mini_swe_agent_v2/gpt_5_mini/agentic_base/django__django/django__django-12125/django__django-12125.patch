@@ -1,0 +1,76 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 7d226955d5..d590860f7a 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -90,13 +90,41 @@ class DeconstructableSerializer(BaseSerializer):
+ 
+     @staticmethod
+     def _serialize_path(path):
+-        module, name = path.rsplit(".", 1)
++        # Attempt to find the longest importable module prefix for the
++        # given path. This allows qualifying nested/inner classes where the
++        # qualname may contain dots (e.g. "Outer.Inner"). For example,
++        # given "myapp.models.Outer.Inner", we want to import
++        # "myapp.models" and refer to the full path when serializing.
++        parts = path.split('.')
++        module = None
++        for i in range(len(parts) - 1, 0, -1):
++            module_candidate = '.'.join(parts[:i])
++            try:
++                __import__(module_candidate)
++            except Exception:
++                continue
++            module = module_candidate
++            break
++
++        if module is None:
++            # Fall back to the original behaviour (last-dot split). This may
++            # raise later if the module is not importable, which mirrors the
++            # previous implementation.
++            module, name = path.rsplit('.', 1)
++        else:
++            name = path
++
+         if module == "django.db.models":
++            # Special-case django.db.models to use "models.X" in the
++            # serialized string and import the models package.
++            # Determine the portion after the django.db.models prefix.
++            rest = path[len('django.db.models.'):] if path.startswith('django.db.models.') else path
+             imports = {"from django.db import models"}
+-            name = "models.%s" % name
++            name = "models.%s" % rest
+         else:
+             imports = {"import %s" % module}
+-            name = path
++            # name already set to `path` when a module prefix was found,
++            # otherwise it is the last dotted component as before.
+         return name, imports
+ 
+     def serialize(self):
+@@ -266,10 +294,24 @@ class TypeSerializer(BaseSerializer):
+                 return string, set(imports)
+         if hasattr(self.value, "__module__"):
+             module = self.value.__module__
++            # Use __qualname__ to preserve enclosing class qualifiers for
++            # nested classes (e.g. Outer.Inner). __name__ does not include
++            # the outer class and would produce an incorrect import path.
++            qualname = getattr(self.value, '__qualname__', self.value.__name__)
++
++            # If qualname contains '<', it's a local/unimportable class
++            # (e.g. defined in a function), and cannot be serialized as
++            # module.qualname. Fail fast with a helpful error.
++            if '<' in qualname:
++                raise ValueError(
++                    'Cannot serialize %r: it appears to be a local (nested in a function) '
++                    'class which is not importable.' % (self.value,)
++                )
++
+             if module == builtins.__name__:
+-                return self.value.__name__, set()
++                return qualname, set()
+             else:
+-                return "%s.%s" % (module, self.value.__name__), {"import %s" % module}
++                return "%s.%s" % (module, qualname), {"import %s" % module}
+ 
+ 
+ class UUIDSerializer(BaseSerializer):

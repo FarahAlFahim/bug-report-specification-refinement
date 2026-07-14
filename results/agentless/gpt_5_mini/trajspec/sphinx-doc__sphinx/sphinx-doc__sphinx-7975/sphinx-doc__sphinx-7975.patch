@@ -1,0 +1,40 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 44ea73a..7abc878 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -99,7 +99,10 @@ class IndexEntries:
+                 subentry[0].sort(key=keyfunc0)  # type: ignore
+ 
+         # sort the index entries; put all symbols at the front, even those
+-        # following the letters in ASCII, this is where the chr(127) comes from
++        # following the letters in ASCII. Use a sentinel character that sorts
++        # after all Unicode code points to ensure alphabetic keys are ordered
++        # after symbol-leading keys.
++        _SENTINEL = '\U0010FFFF'
+         def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
+             key, (void, void, category_key) = entry
+             if category_key:
+@@ -109,7 +112,7 @@ class IndexEntries:
+             if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 lckey = lckey[1:]
+             if lckey[0:1].isalpha() or lckey.startswith('_'):
+-                lckey = chr(127) + lckey
++                lckey = _SENTINEL + lckey
+             # ensure a determinstic order *within* letters by also sorting on
+             # the entry itself
+             return (lckey, entry[0])
+@@ -151,7 +154,7 @@ class IndexEntries:
+             if key.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 key = key[1:]
+             if key[0:1].isalpha() or key.startswith('_'):
+-                key = chr(127) + key
++                key = _SENTINEL + key
+             return key
+ 
+         # group the entries by letter
+@@ -173,4 +176,4 @@ class IndexEntries:
+             else:
+                 return v[2]
+         return [(key_, list(group))
+-                for (key_, group) in groupby(newlist, keyfunc3)]
++                for (key_, group) in groupby(newlist, keyfunc3)]

@@ -1,0 +1,36 @@
+diff --git a/sympy/simplify/fu.py b/sympy/simplify/fu.py
+index 612bc0bb69..8f14d067c8 100644
+--- a/sympy/simplify/fu.py
++++ b/sympy/simplify/fu.py
+@@ -1900,6 +1900,31 @@ def trig_split(a, b, two=False):
+         n2 = -n2
+     a, b = [i.as_expr() for i in (ua, ub)]
+ 
++    # Check if the Factors incorrectly simplified sqrt(sin(x)**2) to sin(x)
++    # or sqrt(cos(x)**2) to cos(x). This happens because Factors stores
++    # sqrt(sin(x)**2) as {sin(x)**2: 1/2} and as_expr() converts it back to sin(x).
++    # We need to restore the sqrt form to avoid incorrect simplifications.
++    def _restore_sqrt_trig(factors_obj):
++        """Check if Factors contains sqrt(sin(x)**2) or sqrt(cos(x)**2) pattern."""
++        for factor, exp in factors_obj.factors.items():
++            if exp == S.Half and factor.is_Pow and factor.exp == 2:
++                # factor is f(x)**2
++                base = factor.base
++                # Check if base is sin or cos
++                if isinstance(base, sin) or isinstance(base, cos):
++                    return sqrt(base**2)
++        return None
++
++    # Check and restore sqrt form for a
++    sqrt_a = _restore_sqrt_trig(ua)
++    if sqrt_a is not None:
++        a = sqrt_a
++    
++    # Check and restore sqrt form for b
++    sqrt_b = _restore_sqrt_trig(ub)
++    if sqrt_b is not None:
++        b = sqrt_b
++
+     def pow_cos_sin(a, two):
+         """Return ``a`` as a tuple (r, c, s) such that
+         ``a = (r or 1)*(c or 1)*(s or 1)``.

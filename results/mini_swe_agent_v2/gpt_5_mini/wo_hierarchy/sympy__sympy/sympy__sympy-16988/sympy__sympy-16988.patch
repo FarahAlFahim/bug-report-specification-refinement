@@ -1,0 +1,41 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..cbe3423e7d 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1260,12 +1260,31 @@ def __new__(cls, *args, **kwargs):
+         evaluate = kwargs.get('evaluate', global_evaluate[0])
+ 
+         # flatten inputs to merge intersections and iterables
+-        args = _sympify(args)
+-
+-        # Reduce sets using known rules
++        # Note: use a generator of sympified args and the
++        # class _new_args_filter to perform canonicalization
++        # (flattening, deduplication, and short-circuiting)
++        # similar to LatticeOp.__new__ so that simplify_intersection
++        # does not receive duplicated arguments which can
++        # affect finite-set heuristics.
+         if evaluate:
+-            args = list(cls._new_args_filter(args))
+-            return simplify_intersection(args)
++            args = (_sympify(arg) for arg in args)
++            try:
++                _args = frozenset(cls._new_args_filter(args))
++            except Exception as exc:
++                # ShortCircuit is used by LatticeOp._new_args_filter to
++                # indicate the presence of the absorbing element (zero)
++                # which for Intersection is the empty set.
++                from sympy.core.operations import ShortCircuit
++                if isinstance(exc, ShortCircuit):
++                    return sympify(cls.zero)
++                raise
++            # If no args remain, return identity (UniversalSet)
++            if not _args:
++                return S.UniversalSet
++            if len(_args) == 1:
++                return list(_args)[0]
++            # pass a deduplicated list to the simplifier
++            return simplify_intersection(list(_args))
+ 
+         args = list(ordered(args, Set._infimum_key))
+ 

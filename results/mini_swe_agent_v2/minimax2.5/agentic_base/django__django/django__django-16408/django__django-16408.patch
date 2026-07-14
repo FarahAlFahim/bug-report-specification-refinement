@@ -1,0 +1,34 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7c433b3f06..09e8e61b50 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1283,7 +1283,7 @@ class SQLCompiler:
+                     break
+                 if name in self.query._filtered_relations:
+                     fields_found.add(name)
+-                    final_field, _, join_opts, joins, _, _ = self.query.setup_joins(
++                    final_field, _, join_opts, joins, path, _ = self.query.setup_joins(
+                         [name], opts, root_alias
+                     )
+                     model = join_opts.model
+@@ -1291,11 +1291,18 @@ class SQLCompiler:
+                     from_parent = (
+                         issubclass(model, opts.model) and model is not opts.model
+                     )
++                    # When the FilteredRelation path has multiple levels, use
++                    # the intermediate field (second-to-last join_field) for
++                    # local_setter to correctly populate _known_related_objects.
++                    if len(path) > 1:
++                        field = path[-2].join_field
++                    else:
++                        field = final_field
+                     klass_info = {
+                         "model": model,
+-                        "field": final_field,
++                        "field": field,
+                         "reverse": True,
+-                        "local_setter": partial(local_setter, final_field),
++                        "local_setter": partial(local_setter, field),
+                         "remote_setter": partial(remote_setter, name),
+                         "from_parent": from_parent,
+                     }

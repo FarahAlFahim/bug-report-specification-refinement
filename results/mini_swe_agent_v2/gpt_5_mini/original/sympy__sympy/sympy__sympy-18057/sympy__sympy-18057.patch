@@ -1,0 +1,36 @@
+diff --git a/sympy/core/sympify.py b/sympy/core/sympify.py
+index ed4ea6ce5e..4aed68a362 100644
+--- a/sympy/core/sympify.py
++++ b/sympy/core/sympify.py
+@@ -354,19 +354,19 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+             # Not all iterables are rebuildable with their type.
+             pass
+ 
+-    # At this point we were given an arbitrary expression
+-    # which does not inherit from Basic and doesn't implement
+-    # _sympy_ (which is a canonical and robust way to convert
+-    # anything to SymPy expression).
++    # At this point we were given an arbitrary expression which does not
++    # inherit from Basic and doesn't implement _sympy_ (which is a
++    # canonical and robust way to convert anything to a SymPy expression).
+     #
+-    # As a last chance, we try to take "a"'s normal form via unicode()
+-    # and try to parse it. If it fails, then we have no luck and
+-    # return an exception
+-    try:
+-        from .compatibility import unicode
+-        a = unicode(a)
+-    except Exception as exc:
+-        raise SympifyError(a, exc)
++    # Historically, as a last chance we attempted to coerce such objects to
++    # strings via unicode() and parse their repr. Doing so is unsafe for
++    # arbitrary objects because it may evaluate arbitrary code (for
++    # instance attribute access in reprs like "x.y"). When sympify is used
++    # in strict mode (via _sympify) we must not attempt this fallback.  In
++    # non-strict mode passing a non-string object here is also dangerous and
++    # surprising, so we avoid parsing arbitrary reprs entirely.  Instead,
++    # raise SympifyError to indicate we could not convert the object.
++    raise SympifyError(a)
+ 
+     from sympy.parsing.sympy_parser import (parse_expr, TokenError,
+                                             standard_transformations)

@@ -1,0 +1,36 @@
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index da67263b19..b30c3411fc 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -955,13 +955,28 @@ def _recursive_to_string(doprint, arg):
+     if isinstance(arg, (Basic, MatrixOperations)):
+         return doprint(arg)
+     elif iterable(arg):
++        # Handle native Python sequences (lists and tuples) so that the
++        # printer is only invoked on SymPy types. Ensure that singleton
++        # tuples are serialized with a trailing comma so that the generated
++        # source evaluates to a tuple ("(elem,)") rather than the
++        # parenthesized value ("(elem)") which would be the element itself.
+         if isinstance(arg, list):
+-            left, right = "[]"
++            left, right = "[", "]"
++            inner = ', '.join(_recursive_to_string(doprint, e) for e in arg)
++            return left + inner + right
+         elif isinstance(arg, tuple):
+-            left, right = "()"
++            # Special-case tuple lengths to ensure correct Python literal
++            # formatting: empty tuple -> "()", singleton -> "(x,)",
++            # multi-element -> "(a, b, ...)".
++            if len(arg) == 0:
++                return '()'
++            elif len(arg) == 1:
++                return '(' + _recursive_to_string(doprint, arg[0]) + ',)'
++            else:
++                inner = ', '.join(_recursive_to_string(doprint, e) for e in arg)
++                return '(' + inner + ')'
+         else:
+             raise NotImplementedError("unhandled type: %s, %s" % (type(arg), arg))
+-        return left +', '.join(_recursive_to_string(doprint, e) for e in arg) + right
+     elif isinstance(arg, str):
+         return arg
+     else:

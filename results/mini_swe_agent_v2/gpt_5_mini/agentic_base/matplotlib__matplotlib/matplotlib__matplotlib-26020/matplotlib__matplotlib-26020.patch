@@ -1,0 +1,73 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..dbe4a108a9 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -10,11 +10,45 @@ from .axes_divider import Size, SubplotDivider, Divider
+ from .mpl_axes import Axes
+ 
+ 
++def _toggle_axis_by_orientation(ax, orientation, ticklabels, label):
++    """Toggle ticklabels and label for a given orientation on *ax*.
++
++    This helper handles both the axes_grid1 AxisDict API (where ``ax.axis[""]``
++    is subscriptable and provides ``.toggle``) and the regular Matplotlib
++    Axes API (where ``ax.axis`` is a method and the x/y axis objects are
++    available as ``ax.xaxis``/``ax.yaxis``).
++    """
++    # Try the axes_grid1 AxisDict API first
++    try:
++        axis = ax.axis[orientation]
++    except Exception:
++        # Fallback to the standard Matplotlib Axes API
++        if orientation in ("bottom", "top"):
++            xa = getattr(ax, "xaxis", None)
++            if xa is not None:
++                xa.set_tick_params(**{"labelbottom": ticklabels, "labeltop": False})
++                lab = xa.get_label()
++                if lab is not None:
++                    lab.set_visible(label)
++        elif orientation in ("left", "right"):
++            ya = getattr(ax, "yaxis", None)
++            if ya is not None:
++                ya.set_tick_params(**{"labelleft": ticklabels, "labelright": False})
++                lab = ya.get_label()
++                if lab is not None:
++                    lab.set_visible(label)
++    else:
++        # If the AxisDict API is present, use it.
++        axis.toggle(ticklabels=ticklabels, label=label)
++
++
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    _toggle_axis_by_orientation(ax, "bottom", ticklabels=bottom_off,
++                                label=bottom_off)
++    _toggle_axis_by_orientation(ax, "left", ticklabels=left_off,
++                                label=left_off)
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +62,18 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        # Deprecated API: try to support both the axes_grid1 AxisDict
++        # and the regular Matplotlib Axes so that third-party Axes
++        # subclasses (e.g. cartopy GeoAxes) work without raising
++        # TypeError when ``self.axis`` is a method.
++        try:
++            axis = self.axis[self.orientation]
++        except Exception:
++            # Fallback to xaxis/yaxis handling
++            _toggle_axis_by_orientation(self, self.orientation,
++                                        ticklabels=b, label=b)
++        else:
++            axis.toggle(ticklabels=b, label=b)
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

@@ -1,0 +1,32 @@
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+index 28eaae5f..925e4511 100644
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -278,7 +278,15 @@ def summarize_variable(
+             raise TypeError(f"`max_width` value of `{max_width}` is not a valid int")
+         else:
+             max_width = max_width_options
+-    first_col = pretty_print(f"  {marker} {name} ", col_width)
++    
++    # Get units from attrs if available
++    units = var.attrs.get("units", None)
++    if units:
++        name_str = f"{name}, in {units}"
++    else:
++        name_str = str(name)
++    
++    first_col = pretty_print(f"  {marker} {name_str} ", col_width)
+     if var.dims:
+         dims_str = "({}) ".format(", ".join(map(str, var.dims)))
+     else:
+@@ -353,6 +361,10 @@ def _get_col_items(mapping):
+             level_names = var.to_index_variable().level_names
+             if level_names is not None:
+                 col_items += list(level_names)
++        # Also include units in the column width calculation
++        units = var.attrs.get("units", None)
++        if units:
++            col_items.append(f"{k}, in {units}")
+     return col_items
+ 
+ 

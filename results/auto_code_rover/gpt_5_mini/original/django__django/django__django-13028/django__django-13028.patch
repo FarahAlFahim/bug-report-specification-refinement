@@ -1,0 +1,31 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index ce18098fd2..a1c18e8955 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1123,7 +1123,25 @@ class Query(BaseExpression):
+                     self.check_query_object_type(v, opts, field)
+ 
+     def check_filterable(self, expression):
+-        """Raise an error if expression cannot be used in a WHERE clause."""
++        """Raise an error if expression cannot be used in a WHERE clause.
++
++        Only apply the 'filterable' check to expression-like objects (those
++        implementing the expression API). Plain objects (model instances,
++        primitives, iterables, QuerySets used as RHS values, etc.) should not
++        be subject to this check even if they happen to expose an attribute
++        named 'filterable'.
++        """
++        # Only expression-like objects should be subject to the filterable check.
++        # Detect these by checking for the expression API:
++        #  - get_source_expressions (Expression API)
++        #  - resolve_expression (used by expressions/subqueries)
++        #  - or being an instance of BaseExpression (Query subclasses inherit it).
++        if not (hasattr(expression, 'get_source_expressions') or
++                hasattr(expression, 'resolve_expression') or
++                isinstance(expression, BaseExpression)):
++            # Not an expression-like object: allow it as a RHS value.
++            return
++
+         if not getattr(expression, 'filterable', True):
+             raise NotSupportedError(
+                 expression.__class__.__name__ + ' is disallowed in the filter '

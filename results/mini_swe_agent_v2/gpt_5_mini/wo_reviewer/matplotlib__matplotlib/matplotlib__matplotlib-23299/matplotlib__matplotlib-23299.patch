@@ -1,0 +1,19 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..e2d972e474 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -1095,7 +1095,13 @@ def rc_context(rc=None, fname=None):
+             rcParams.update(rc)
+         yield
+     finally:
+-        dict.update(rcParams, orig)  # Revert to the original rcs.
++        # Revert to the original rcParams. Use rcParams.update here so that
++        # any special-casing in RcParams.__setitem__ (notably the handling
++        # of rcsetup._auto_backend_sentinel for the 'backend' key) is
++        # respected. Restoring the auto-backend sentinel unconditionally via
++        # dict.update can trigger backend resolution on later reads which
++        # may have destructive side-effects (e.g. closing existing figures).
++        rcParams.update(orig)
+ 
+ 
+ def use(backend, *, force=True):

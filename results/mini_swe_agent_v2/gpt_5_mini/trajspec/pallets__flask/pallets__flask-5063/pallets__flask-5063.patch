@@ -1,0 +1,51 @@
+diff --git a/src/flask/cli.py b/src/flask/cli.py
+index 37a15ff2..e9cd53ef 100644
+--- a/src/flask/cli.py
++++ b/src/flask/cli.py
+@@ -1018,20 +1018,42 @@ def routes_command(sort: str, all_methods: bool) -> None:
+         for rule in rules
+     ]
+ 
+-    headers = ("Endpoint", "Methods", "Rule")
++    # Compute per-rule domain/subdomain information. The Rule object may
++    # expose ``host`` or ``subdomain`` attributes depending on werkzeug
++    # version; fall back to the application's SERVER_NAME when appropriate.
++    server_name = current_app.config.get("SERVER_NAME") or ""
++
++    def _domain_for_rule(rule):
++        host = getattr(rule, "host", None)
++        subdomain = getattr(rule, "subdomain", None)
++
++        if subdomain:
++            if server_name:
++                return f"{subdomain}.{server_name}"
++            return subdomain
++        if host:
++            return host
++        if server_name:
++            return server_name
++        return ""
++
++    domains = [_domain_for_rule(rule) for rule in rules]
++
++    headers = ("Endpoint", "Methods", "Domain", "Rule")
+     widths = (
+         max(len(rule.endpoint) for rule in rules),
+         max(len(methods) for methods in rule_methods),
++        max(len(domain) for domain in domains),
+         max(len(rule.rule) for rule in rules),
+     )
+     widths = [max(len(h), w) for h, w in zip(headers, widths)]
+-    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}".format(*widths)
++    row = "{{0:<{0}}}  {{1:<{1}}}  {{2:<{2}}}  {{3:<{3}}}".format(*widths)
+ 
+     click.echo(row.format(*headers).strip())
+     click.echo(row.format(*("-" * width for width in widths)))
+ 
+-    for rule, methods in zip(rules, rule_methods):
+-        click.echo(row.format(rule.endpoint, methods, rule.rule).rstrip())
++    for rule, methods, domain in zip(rules, rule_methods, domains):
++        click.echo(row.format(rule.endpoint, methods, domain, rule.rule).rstrip())
+ 
+ 
+ cli = FlaskGroup(

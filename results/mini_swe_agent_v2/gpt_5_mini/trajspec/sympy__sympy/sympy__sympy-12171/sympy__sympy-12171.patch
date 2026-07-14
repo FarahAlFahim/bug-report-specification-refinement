@@ -1,0 +1,59 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..6f0189713e 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -77,6 +77,54 @@ def _print_Mul(self, expr):
+             res += '**'.join(self.parenthesize(a, PREC) for a in nc)
+         return res
+ 
++
++    def _print_Derivative(self, expr):
++        """Print Derivative using Mathematica's D[..., ...] syntax.
++
++        Handles both simple variable entries (t) and tuples of the form
++        (t, n) for higher-order derivatives by converting the latter to
++        Mathematica's {t, n} form.
++        """
++        func = self.doprint(expr.args[0])
++        var_parts = []
++        for v in expr.args[1:]:
++            try:
++                # If v is a 2-tuple like (t, 2), print as {t, 2}
++                if len(v) == 2:
++                    var_parts.append('{%s, %s}' % (self.doprint(v[0]), self.doprint(v[1])))
++                else:
++                    var_parts.append(self.doprint(v))
++            except Exception:
++                # Fallback for objects that do not support len()
++                var_parts.append(self.doprint(v))
++        return 'D[%s, %s]' % (func, ', '.join(var_parts))
++
++    def _print_Float(self, expr):
++        """Print Float using Mathematica's scientific notation '*^'.
++
++        This adapts the base float string produced by the parent printer by
++        translating the 'e' exponent marker to Mathematica's '*^' and
++        canonicalizing the exponent by converting it to an integer (so
++        that leading zeros like 'e-04' become '*^-4').
++        """
++        # get the base float representation from the parent printer
++        printed = CodePrinter._print_Float(self, expr)
++        # look for exponent marker 'e' or 'E'
++        e_index = printed.find('e')
++        if e_index == -1:
++            e_index = printed.find('E')
++        if e_index != -1:
++            mantissa = printed[:e_index]
++            exp = printed[e_index + 1:]
++            try:
++                exp_int = int(exp)
++                exp_str = str(exp_int)
++            except Exception:
++                # fallback: preserve as-is if conversion fails
++                exp_str = exp
++            return '%s*^%s' % (mantissa, exp_str)
++        return printed
++
+     def _print_Pi(self, expr):
+         return 'Pi'
+ 

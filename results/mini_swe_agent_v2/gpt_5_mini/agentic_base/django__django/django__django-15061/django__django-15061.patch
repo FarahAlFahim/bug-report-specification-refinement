@@ -1,0 +1,41 @@
+diff --git a/django/contrib/postgres/forms/array.py b/django/contrib/postgres/forms/array.py
+index 2e19cd574a..3a71f14c4d 100644
+--- a/django/contrib/postgres/forms/array.py
++++ b/django/contrib/postgres/forms/array.py
+@@ -125,9 +125,14 @@ class SplitArrayWidget(forms.Widget):
+         )
+ 
+     def id_for_label(self, id_):
+-        # See the comment for RadioSelect.id_for_label()
++        # Multi-element widgets shouldn't point the wrapper <label> at a
++        # single subwidget (for example, "for="id_0""). Return an
++        # empty string to signal that no for="..." attribute should be
++        # rendered on the wrapper label. This mirrors RadioSelect's
++        # behaviour which intentionally omits a for attribute for choice
++        # widgets that render multiple controls.
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def get_context(self, name, value, attrs=None):
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..f914059661 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -849,8 +849,14 @@ class MultiWidget(Widget):
+         return context
+ 
+     def id_for_label(self, id_):
++        # Multi-element widgets shouldn't point the wrapper <label> at a
++        # single subwidget (for example, "for="id_0""). Return an
++        # empty string to signal that no for="..." attribute should be
++        # rendered on the wrapper label. This mirrors RadioSelect's
++        # behaviour which intentionally omits a for attribute for choice
++        # widgets that render multiple controls.
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def value_from_datadict(self, data, files, name):

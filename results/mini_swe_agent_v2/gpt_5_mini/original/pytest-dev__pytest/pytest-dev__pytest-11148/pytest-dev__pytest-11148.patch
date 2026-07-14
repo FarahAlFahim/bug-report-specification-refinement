@@ -1,0 +1,52 @@
+diff --git a/src/_pytest/logging.py b/src/_pytest/logging.py
+index ea856837c..5808c2909 100644
+--- a/src/_pytest/logging.py
++++ b/src/_pytest/logging.py
+@@ -39,6 +39,47 @@ from _pytest.main import Session
+ from _pytest.stash import StashKey
+ from _pytest.terminal import TerminalReporter
+ 
++
++def _set_module_attr_on_duplicates(mod, attr: str, value) -> None:
++    """Set attribute ``attr`` on ``mod`` and any other imported module
++    objects that correspond to the same source file.
++
++    In some import layouts (namespace packages, importlib import modes,
++    or when a package is imported under different names), the same
++    physical module can be present in sys.modules under multiple keys
++    as distinct module objects. Code that mutates module-level state
++    (for example during initialization) may inadvertently only update
++    one of those objects, leading to surprising behaviour in other
++    importers.
++
++    This helper sets the attribute on the provided module and also on
++    any other modules in sys.modules whose ``__file__`` value matches
++    the provided module's ``__file__``.
++    """
++    import sys
++
++    try:
++        file = getattr(mod, "__file__", None)
++    except Exception:
++        file = None
++
++    # Set attribute on the primary module object first
++    setattr(mod, attr, value)
++
++    if not file:
++        return
++
++    # Also set on any duplicate module objects that point to same file
++    for m in list(sys.modules.values()):
++        if m is mod or m is None:
++            continue
++        try:
++            if getattr(m, "__file__", None) == file:
++                setattr(m, attr, value)
++        except Exception:
++            # Be defensive: modules may be partially initialized.
++            continue
++
+ if TYPE_CHECKING:
+     logging_StreamHandler = logging.StreamHandler[StringIO]
+ 

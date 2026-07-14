@@ -1,0 +1,36 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..5cbd426909 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1669,6 +1669,15 @@ def eval(x):
+     @property
+     def expr(self):
+         return self._args[0]
++    @property
++    def kind(self):
++        """Forward the kind of the wrapped expression.
++
++        Unevaluated derivatives should report the kind of the expression
++        being differentiated (e.g. a MatrixKind for a MatrixSymbol).
++        """
++        return self.expr.kind
++
+ 
+     @property
+     def _wrt_variables(self):
+@@ -2336,6 +2345,15 @@ def variables(self):
+     def expr(self):
+         """The expression on which the substitution operates"""
+         return self._args[0]
++    @property
++    def kind(self):
++        """Forward the kind of the wrapped expression.
++
++        Subs represent unevaluated substitutions on an underlying
++        expression and should therefore report that expression's kind.
++        """
++        return self.expr.kind
++
+ 
+     @property
+     def point(self):

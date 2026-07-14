@@ -1,0 +1,61 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index ab763da..7c2a36c 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1616,6 +1616,56 @@ class Derivative(Expr):
+     def _eval_is_commutative(self):
+         return self.expr.is_commutative
+ 
++    @property
++    def kind(self):
++        """
++        Infer the mathematical kind of a Derivative from the kind of the
++        expression being differentiated and from the kinds/types of the
++        differentiation variables.  This mirrors the behaviour expected for
++        array/matrix derivatives: if any differentiation variable is
++        array/matrix-like then the derivative should be array/matrix-kind
++        whose element_kind is derived from the expression's kind.
++        """
++        # Local imports to avoid top-level import cycles
++        from sympy.matrices.common import MatrixKind, MatrixCommon
++        from sympy import MatrixExpr, Tuple as SympyTuple
++        from sympy.tensor.array.ndim_array import ArrayKind, NDimArray
++        from sympy.core.kind import UndefinedKind
++
++        # Base kind of the expression (fall back to UndefinedKind)
++        expr_kind = getattr(self.expr, 'kind', UndefinedKind)
++
++        # extract element kind: if expr_kind is an array/matrix kind it will
++        # have .element_kind; otherwise element_kind is the expr_kind itself
++        element_kind = getattr(expr_kind, 'element_kind', expr_kind)
++
++        # Types that indicate array/matrix-like differentiation variables
++        array_types = (MatrixCommon, MatrixExpr, NDimArray, list, tuple, SympyTuple)
++
++        # If any differentiation variable is an NDimArray (general array),
++        # the derivative should be ArrayKind(element_kind)
++        for v in self._wrt_variables:
++            if isinstance(v, NDimArray):
++                return ArrayKind(element_kind)
++
++        # If any differentiation variable is matrix-like, return MatrixKind
++        for v in self._wrt_variables:
++            if isinstance(v, (MatrixCommon, MatrixExpr)):
++                return MatrixKind(element_kind)
++
++        # If any differentiation variable is a sequence-like (list/tuple/Tuple)
++        # check its members for array/matrix-like types
++        for v in self._wrt_variables:
++            if isinstance(v, (list, tuple, SympyTuple)):
++                for iv in v:
++                    if isinstance(iv, NDimArray):
++                        return ArrayKind(element_kind)
++                    if isinstance(iv, (MatrixCommon, MatrixExpr)):
++                        return MatrixKind(element_kind)
++
++        # Otherwise the derivative kind follows the expression kind
++        return expr_kind
++
+     def _eval_derivative(self, v):
+         # If v (the variable of differentiation) is not in
+         # self.variables, we might be able to take the derivative.

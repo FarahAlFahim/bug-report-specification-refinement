@@ -1,0 +1,57 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..a06fe836ab 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -840,6 +840,52 @@ class Grouper:
+         for group in unique_groups.values():
+             yield [x() for x in group]
+ 
++    def __getstate__(self):
++        """
++        Return a picklable representation of the Grouper.
++
++        We serialize only live referent objects (not weakref.ReferenceType instances).
++        The state is a dict with "groups": a list of lists of live objects.
++        """
++        # Drop dead refs first.
++        self.clean()
++        unique_groups = {id(group): group for group in self._mapping.values()}
++        groups = []
++        for group in unique_groups.values():
++            grp = []
++            for ref in group:
++                obj = ref()
++                if obj is not None:
++                    grp.append(obj)
++            if grp:
++                groups.append(grp)
++        return {"groups": groups}
++
++    def __setstate__(self, state):
++        """
++        Reconstruct internal weakref-based structures from the pickled state.
++
++        For each saved group list, create a shared list of weakref.ref(obj)
++        (skipping objects that are not weak-referenceable), and map each weakref
++        to that list so all members share the same group object.
++        """
++        groups = state.get("groups", [])
++        mapping = {}
++        for group in groups:
++            group_refs = []
++            for obj in group:
++                try:
++                    ref = weakref.ref(obj)
++                except TypeError:
++                    # Object is not weak-referenceable; skip it.
++                    continue
++                group_refs.append(ref)
++            if not group_refs:
++                continue
++            for ref in group_refs:
++                mapping[ref] = group_refs
++        self._mapping = mapping
++
+     def get_siblings(self, a):
+         """Return all of the items joined with *a*, including itself."""
+         self.clean()

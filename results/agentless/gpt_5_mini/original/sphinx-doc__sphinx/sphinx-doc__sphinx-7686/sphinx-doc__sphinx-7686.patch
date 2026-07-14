@@ -1,0 +1,42 @@
+diff --git a/sphinx/ext/autosummary/__init__.py b/sphinx/ext/autosummary/__init__.py
+index a777a88..43873e5 100644
+--- a/sphinx/ext/autosummary/__init__.py
++++ b/sphinx/ext/autosummary/__init__.py
+@@ -779,6 +779,6 @@ def setup(app: Sphinx) -> Dict[str, Any]:
+     app.add_config_value('autosummary_generate_overwrite', True, False)
+     app.add_config_value('autosummary_mock_imports',
+                          lambda config: config.autodoc_mock_imports, 'env')
+-    app.add_config_value('autosummary_imported_members', [], False, [bool])
++    app.add_config_value('autosummary_imported_members', False, False, [bool])
+ 
+-    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
++    return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index 9925546..5391770 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -246,7 +246,23 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        # Build the members list. If imported_members is True, include all
++        # attributes; otherwise, include only attributes defined in this
++        # module (i.e. whose __module__ matches the module's name).
++        if imported_members:
++            members_list = dir(obj)
++        else:
++            members_list = []
++            for name in dir(obj):
++                try:
++                    value = safe_getattr(obj, name)
++                except AttributeError:
++                    continue
++                # keep the member only if it's defined in this module
++                if getattr(value, '__module__', None) == obj.__name__:
++                    members_list.append(name)
++        ns['members'] = members_list
++
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \

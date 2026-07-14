@@ -1,0 +1,23 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..b25b3eb973 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,17 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        try:
++            return compiler.compile(self.expression)
++        except EmptyResultSet:
++            # If the inner expression can't match anything, some
++            # wrappers (e.g. boolean expressions) can provide a
++            # fallback SQL value. Follow the same pattern as Func.as_sql
++            # to allow expressions to define an empty_result_set_value.
++            empty_result_set_value = getattr(self, 'empty_result_set_value', NotImplemented)
++            if empty_result_set_value is NotImplemented:
++                raise
++            return compiler.compile(Value(empty_result_set_value))
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

@@ -1,0 +1,49 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 157903faf..60dc36fc8 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -677,10 +677,20 @@ class AssertionRewriter(ast.NodeVisitor):
+                 and isinstance(item, ast.Expr)
+                 and isinstance(item.value, ast.Constant)
+             ):
+-                doc = item.value.value
+-                if self.is_rewrite_disabled(doc):
+-                    return
+-                expect_docstring = False
++                val = item.value.value
++                # Only treat as a module docstring when the constant value is
++                # actually a string/bytes. Other constant types (e.g. int)
++                # are real top-level statements and must not be mistaken for
++                # the docstring.
++                if isinstance(val, (str, bytes)):
++                    doc = val
++                    if self.is_rewrite_disabled(doc):
++                        return
++                    expect_docstring = False
++                else:
++                    # Not a docstring -> this is a real statement, stop scanning
++                    # for docstring/future-imports and insert imports at current pos.
++                    break
+             elif (
+                 isinstance(item, ast.ImportFrom)
+                 and item.level == 0
+@@ -742,8 +752,17 @@ class AssertionRewriter(ast.NodeVisitor):
+                     nodes.append(field)
+ 
+     @staticmethod
+-    def is_rewrite_disabled(docstring: str) -> bool:
+-        return "PYTEST_DONT_REWRITE" in docstring
++    def is_rewrite_disabled(docstring) -> bool:
++        """Return True if the module docstring disables assertion rewriting.
++
++        The docstring may be a str or bytes; for other types (including None,
++        ints, etc.) rewriting is not disabled.
++        """
++        if isinstance(docstring, str):
++            return "PYTEST_DONT_REWRITE" in docstring
++        if isinstance(docstring, bytes):
++            return b"PYTEST_DONT_REWRITE" in docstring
++        return False
+ 
+     def variable(self) -> str:
+         """Get a new variable."""

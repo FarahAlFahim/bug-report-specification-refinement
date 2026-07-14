@@ -1,0 +1,47 @@
+diff --git a/src/_pytest/tmpdir.py b/src/_pytest/tmpdir.py
+index 29c7e19d7..43b7de4b7 100644
+--- a/src/_pytest/tmpdir.py
++++ b/src/_pytest/tmpdir.py
+@@ -115,7 +115,11 @@ class TempPathFactory:
+             # use a sub-directory in the temproot to speed-up
+             # make_numbered_dir() call
+             rootdir = temproot.joinpath(f"pytest-of-{user}")
+-            rootdir.mkdir(exist_ok=True)
++            # Ensure intermediate directories are created in case the
++            # username previously contained path-separators which have been
++            # normalized to underscores, and to avoid FileNotFoundError when
++            # parent directories don't yet exist.
++            rootdir.mkdir(parents=True, exist_ok=True)
+             basetemp = make_numbered_dir_with_cleanup(
+                 prefix="pytest-", root=rootdir, keep=3, lock_timeout=LOCK_TIMEOUT
+             )
+@@ -154,10 +158,28 @@ def get_user() -> Optional[str]:
+     import getpass
+ 
+     try:
+-        return getpass.getuser()
++        user = getpass.getuser()
+     except (ImportError, KeyError):
+         return None
+ 
++    # Normalize the username so it is safe to embed in filesystem path
++    # components. Replace any non-word characters with underscores so that
++    # names like 'contoso\john_doe', 'acme/joe' or 'john doe@example.com'
++    # become single filesystem-safe components.
++    try:
++        # use the same character class as elsewhere in this module
++        safe = re.sub(r"[^\w]", "_", user)
++    except Exception:
++        # If anything goes wrong during normalization, fall back to the raw
++        # value so we don't lose the original username entirely.
++        safe = user
++
++    # If the sanitized username is empty (e.g. user was composed solely of
++    # illegal characters) fall back to None so callers can use a default.
++    if not safe:
++        return None
++    return safe
++
+ 
+ def pytest_configure(config: Config) -> None:
+     """Create a TempdirFactory and attach it to the config object.

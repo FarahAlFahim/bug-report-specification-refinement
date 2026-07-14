@@ -1,0 +1,36 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..c6076c478d 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -280,6 +280,31 @@ class Field(RegisterLookupMixin):
+             if isinstance(choices_group, str):
+                 break
+         else:
++            # If choices are valid, ensure any string-based choice values
++            # fit within the field's max_length (when provided). Skip
++            # lazy translation Promises as their length can't be determined
++            # at system-check time.
++            if self.max_length is not None and isinstance(self.max_length, int):
++                required_length = 0
++                for choice, _ in self.flatchoices:
++                    if isinstance(choice, str) and not isinstance(choice, Promise):
++                        required_length = max(required_length, len(choice))
++                if required_length > self.max_length:
++                    return [
++                        checks.Error(
++                            "'choices' contains a value with length %(required)d which is greater than 'max_length' (%(max)d).",
++                            hint=(
++                                "Increase the field's 'max_length' to at least %(required)d "
++                                "or shorten the affected choice values."
++                            ),
++                            obj=self,
++                            id='fields.E009',
++                            params={
++                                'required': required_length,
++                                'max': self.max_length,
++                            },
++                        )
++                    ]
+             return []
+ 
+         return [

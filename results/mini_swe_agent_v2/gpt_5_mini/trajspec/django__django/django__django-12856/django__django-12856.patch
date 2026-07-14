@@ -1,0 +1,52 @@
+diff --git a/django/db/migrations/autodetector.py b/django/db/migrations/autodetector.py
+index 30616c0172..c4f391ed8a 100644
+--- a/django/db/migrations/autodetector.py
++++ b/django/db/migrations/autodetector.py
+@@ -1047,12 +1047,27 @@ class MigrationAutodetector:
+     def generate_added_constraints(self):
+         for (app_label, model_name), alt_constraints in self.altered_constraints.items():
+             for constraint in alt_constraints['added_constraints']:
++                # Collect dependencies for any FK fields referenced by the constraint,
++                # mirroring the handling for unique_together so that migrations
++                # include ordering dependencies for related models.
++                dependencies = []
++                for field_name in constraint.fields:
++                    try:
++                        field = self.new_apps.get_model(app_label, model_name)._meta.get_field(field_name)
++                    except Exception:
++                        # If the field doesn't exist, let model checks surface the
++                        # error elsewhere; don't crash autodetection here.
++                        continue
++                    if field.remote_field and field.remote_field.model:
++                        dependencies.extend(self._get_dependencies_for_foreign_key(field))
++
+                 self.add_operation(
+                     app_label,
+                     operations.AddConstraint(
+                         model_name=model_name,
+                         constraint=constraint,
+-                    )
++                    ),
++                    dependencies=dependencies,
+                 )
+ 
+     def generate_removed_constraints(self):
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 7bb3fa4706..04aa011fd3 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1926,6 +1926,14 @@ class Model(metaclass=ModelBase):
+                         id='models.W038',
+                     )
+                 )
++
++            # Validate that fields referred to by UniqueConstraint actually exist
++            # on the model. This mirrors unique_together/index handling and
++            # surfaces models.E012 earlier (during checks/makemigrations) instead
++            # of raising FieldDoesNotExist later during SQL generation.
++            for constraint in cls._meta.constraints:
++                if isinstance(constraint, UniqueConstraint):
++                    errors.extend(cls._check_local_fields(constraint.fields, 'constraints'))
+         return errors
+ 
+ 

@@ -1,0 +1,63 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 28374272f4..736b55020a 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -516,16 +516,56 @@ class Field(RegisterLookupMixin):
+     def __eq__(self, other):
+         # Needed for @total_ordering
+         if isinstance(other, Field):
+-            return self.creation_counter == other.creation_counter
++            # When both fields are attached to models, require both the
++            # same creation_counter and the same model to consider them
++            # equal. If neither field is attached to a model, fall back to
++            # comparing creation_counter for backwards compatibility.
++            self_has_model = hasattr(self, 'model')
++            other_has_model = hasattr(other, 'model')
++            if self_has_model and other_has_model:
++                return (
++                    self.creation_counter == other.creation_counter and
++                    self.model == other.model
++                )
++            if not self_has_model and not other_has_model:
++                return self.creation_counter == other.creation_counter
++            # One field is attached to a model and the other is not: they
++            # are distinct.
++            return False
+         return NotImplemented
+ 
+     def __lt__(self, other):
+         # This is needed because bisect does not take a comparison function.
+         if isinstance(other, Field):
+-            return self.creation_counter < other.creation_counter
++            # Order primarily by creation_counter. When equal, break ties
++            # deterministically using model identity (app_label.object_name),
++            # then field name, and finally object id as a stable fallback to
++            # ensure a total ordering.
++            def ordering_key(f):
++                model_label = ''
++                name = ''
++                if hasattr(f, 'model') and f.model is not None:
++                    try:
++                        app_label = f.model._meta.app_label
++                        obj_name = f.model._meta.object_name
++                        model_label = f"{app_label}.{obj_name}"
++                    except Exception:
++                        # If model._meta isn't as expected, fall back to the
++                        # model's repr to get a deterministic string.
++                        model_label = repr(f.model)
++                if hasattr(f, 'name') and f.name is not None:
++                    name = f.name
++                return (f.creation_counter, model_label, name, id(f))
++
++            return ordering_key(self) < ordering_key(other)
+         return NotImplemented
+ 
+     def __hash__(self):
++        # Hash must be consistent with equality. If the field is attached
++        # to a model, include the model identity in the hash. Otherwise,
++        # fall back to hashing the creation_counter for unattached fields.
++        if hasattr(self, 'model') and self.model is not None:
++            return hash((self.creation_counter, self.model))
+         return hash(self.creation_counter)
+ 
+     def __deepcopy__(self, memodict):

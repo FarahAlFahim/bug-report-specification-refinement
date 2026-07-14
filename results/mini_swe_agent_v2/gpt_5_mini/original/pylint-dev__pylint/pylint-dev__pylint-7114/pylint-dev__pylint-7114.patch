@@ -1,0 +1,40 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afce..3dc255256 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -121,16 +121,26 @@ def expand_modules(
+         else:
+             is_namespace = modutils.is_namespace(spec)
+             is_directory = modutils.is_directory(spec)
++        # Only add the module representing the package itself if we have
++        # an actual file for it (eg. __init__.py) or if it's not a
++        # directory. In Python 3 namespace packages may not have an
++        # __init__.py; in that case we should not try to add a non
++        # existent module entry pointing to a/__init__.py because that
++        # would later cause a parse-error when pylint attempts to open
++        # the file. See issue where a directory containing a file with
++        # the same basename as the directory caused pylint to look for
++        # a/__init__.py even when it doesn't exist.
+         if not is_namespace:
+-            result.append(
+-                {
+-                    "path": filepath,
+-                    "name": modname,
+-                    "isarg": True,
+-                    "basepath": filepath,
+-                    "basename": modname,
+-                }
+-            )
++            if os.path.exists(filepath):
++                result.append(
++                    {
++                        "path": filepath,
++                        "name": modname,
++                        "isarg": True,
++                        "basepath": filepath,
++                        "basename": modname,
++                    }
++                )
+         has_init = (
+             not (modname.endswith(".__init__") or modname == "__init__")
+             and os.path.basename(filepath) == "__init__.py"

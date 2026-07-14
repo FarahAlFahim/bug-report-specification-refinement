@@ -1,0 +1,28 @@
+--- /tmp/orig_base.py	2026-05-28 16:43:11.290701010 +0000
++++ django/db/backends/sqlite3/base.py	2026-05-28 16:42:21.453234000 +0000
+@@ -196,7 +196,24 @@
+                 'for controlling thread shareability.',
+                 RuntimeWarning
+             )
+-        kwargs.update({'check_same_thread': False, 'uri': True})
++        # Ensure the connection can be shared between threads. Do not
++        # unconditionally force URI parsing here as that can change how
++        # SQLite interprets plain filenames. Respect an explicit
++        # OPTIONS['uri'] if provided; otherwise, infer URI mode for
++        # special SQLite names (e.g. starting with 'file:' or containing
++        # 'mode=memory'). See ticket about persistent TEST.NAME files and
++        # keepdb causing locked databases when URI parsing is incorrectly
++        # enabled.
++        kwargs.update({'check_same_thread': False})
++        # Respect user-supplied OPTIONS['uri'] if present. If not present,
++        # enable URI parsing only for names that look like an SQLite URI.
++        uri_option = settings_dict.get('OPTIONS', {}).get('uri')
++        if uri_option is None:
++            db_name = str(settings_dict['NAME'])
++            inferred_uri = db_name.startswith('file:') or 'mode=memory' in db_name
++            kwargs['uri'] = inferred_uri
++        else:
++            kwargs['uri'] = bool(uri_option)
+         return kwargs
+ 
+     @async_unsafe

@@ -1,0 +1,19 @@
+diff --git a/sklearn/model_selection/_split.py b/sklearn/model_selection/_split.py
+index 8743303..bb3ccca 100644
+--- a/sklearn/model_selection/_split.py
++++ b/sklearn/model_selection/_split.py
+@@ -1103,6 +1103,14 @@ class _RepeatedSplits(metaclass=ABCMeta):
+         self.random_state = random_state
+         self.cvargs = cvargs
+ 
++    def __repr__(self):
++        """Return the canonical representation for repeated splitters.
++
++        Uses the module-level helper _build_repr to produce a readable
++        parameterized representation consistent with other CV splitters.
++        """
++        return _build_repr(self)
++
+     def split(self, X, y=None, groups=None):
+         """Generates indices to split data into training and test set.
+ 

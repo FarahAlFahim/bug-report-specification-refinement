@@ -1,0 +1,35 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..78b3ca3302 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -579,6 +579,30 @@ def run_with_reloader(main_func, *args, **kwargs):
+     try:
+         if os.environ.get(DJANGO_AUTORELOAD_ENV) == 'true':
+             reloader = get_reloader()
++            # Ensure the script that started the process is watched. The
++            # reloader builds its watched files from imported modules and
++            # explicitly registered files. The startup script (e.g. manage.py)
++            # is often not imported and so would be missed. Add it as an
++            # extra watched file so edits to it trigger reloads. Use an
++            # absolute resolved Path to match the form used by
++            # iter_modules_and_files()/BaseReloader.watch_file().
++            try:
++                startup = sys.argv[0]
++                if startup:
++                    startup_path = Path(startup).resolve().absolute()
++                    if startup_path.exists():
++                        try:
++                            reloader.watch_file(startup_path)
++                        except ValueError:
++                            # watch_file requires an absolute path; we've
++                            # already resolved to an absolute Path, but be
++                            # defensive and ignore failures.
++                            logger.debug('Could not watch startup file %s', startup_path)
++            except Exception:
++                # Don't let any issues here prevent the server from
++                # starting. Watcher will continue to operate without the
++                # startup script being explicitly watched.
++                logger.debug('Failed to add startup script to watched files', exc_info=True)
+             logger.info('Watching for file changes with %s', reloader.__class__.__name__)
+             start_django(reloader, main_func, *args, **kwargs)
+         else:

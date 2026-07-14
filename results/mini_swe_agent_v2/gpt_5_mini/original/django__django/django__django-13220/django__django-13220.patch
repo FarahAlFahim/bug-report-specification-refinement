@@ -1,0 +1,37 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..9af18c3918 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -183,6 +183,32 @@ class ValidationError(Exception):
+         return 'ValidationError(%s)' % self
+ 
+ 
++    def __eq__(self, other):
++        """Compare two ValidationError instances for equality.
++
++        Two ValidationErrors are equal if they represent the same set of
++        messages. For error dicts, the comparison is independent of the
++        ordering of fields and of the ordering of messages within each
++        field. For non-field errors (error_list), the ordering of messages
++        is also ignored but duplicate messages are respected (multiset
++        semantics).
++        """
++        if not isinstance(other, ValidationError):
++            return False
++
++        from collections import Counter
++
++        def _as_counter_dict(err):
++            # Return a mapping field -> Counter(messages). For non-dict
++            # ValidationErrors use NON_FIELD_ERRORS as the key.
++            if hasattr(err, 'error_dict'):
++                md = err.message_dict
++                return {k: Counter(v) for k, v in md.items()}
++            return {NON_FIELD_ERRORS: Counter(err.messages)}
++
++        return _as_counter_dict(self) == _as_counter_dict(other)
++
++
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""
+     pass

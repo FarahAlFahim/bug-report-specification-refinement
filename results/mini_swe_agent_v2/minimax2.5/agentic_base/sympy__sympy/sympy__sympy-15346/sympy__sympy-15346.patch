@@ -1,0 +1,13 @@
+diff --git a/sympy/simplify/fu.py b/sympy/simplify/fu.py
+index 9d939727c5..79be4a1050 100644
+--- a/sympy/simplify/fu.py
++++ b/sympy/simplify/fu.py
+@@ -1313,7 +1313,7 @@ def f(rv):
+                 while cc in c:
+                     k += 1
+                     cc *= 2
+-                if k > 1:
++                if k > 2:
+                     newarg = sin(2**k*ci*a)/2**k/sin(ci*a)
+                     # see how many times this can be taken
+                     take = None

@@ -1,0 +1,38 @@
+diff --git a/sympy/simplify/cse_main.py b/sympy/simplify/cse_main.py
+index d649dd02a9..67db88ac81 100644
+--- a/sympy/simplify/cse_main.py
++++ b/sympy/simplify/cse_main.py
+@@ -616,6 +616,33 @@ def _find_repeated(expr):
+         if isinstance(e, Basic):
+             _find_repeated(e)
+ 
++    ## Post-process to avoid redundant matrix-element eliminations
++    # If a whole MatrixExpr is chosen for elimination, do not also
++    # eliminate its MatrixElement children. Keeping only the matrix-level
++    # temporary avoids generating redundant scalar temporaries that refer
++    # to the newly created matrix temporary (which would cause extra copies
++    # during code generation).
++    try:
++        # MatrixElement is defined in matexpr; import from there to avoid
++        # relying on it being exported in the package __init__.
++        from sympy.matrices.expressions.matexpr import MatrixElement
++    except Exception:
++        MatrixElement = None
++
++    if MatrixElement is not None:
++        _to_remove = set()
++        for node in list(to_eliminate):
++            # If this node is a MatrixElement and its parent matrix is also
++            # scheduled for elimination, drop the element node from
++            # to_eliminate so references will point directly to the
++            # matrix temporary.
++            if isinstance(node, MatrixElement):
++                parent = node.parent
++                if parent in to_eliminate:
++                    _to_remove.add(node)
++        if _to_remove:
++            to_eliminate -= _to_remove
++
+     ## Rebuild tree
+ 
+     # Remove symbols from the generator that conflict with names in the expressions.

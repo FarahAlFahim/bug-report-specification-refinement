@@ -1,0 +1,188 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..8fadc9542 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,7 +968,104 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # First visit the function itself to obtain its explanation.
+         new_func, func_expl = self.visit(call.func)
++
++        # Special-case builtin all()/any() with a single comprehension argument
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            is_all = call.func.id == "all"
++            comp = call.args[0]
++
++            # Allocate the result variable and initialize it:
++            # all -> True, any -> False
++            res_var_name = self.variable()
++            init_value = ast.NameConstant(True) if is_all else ast.NameConstant(False)
++            # append the initialization assign to statements
++            self.statements.append(ast.Assign([ast.Name(res_var_name, ast.Store())], init_value))
++
++            # Create a list to collect per-element explanations
++            expl_list = self.assign(ast.List([], ast.Load()))
++            app = ast.Attribute(expl_list, "append", ast.Load())
++
++            # Save current statements/on_failure to restore later
++            save_statements = self.statements
++            save_on_failure = self.on_failure
++
++            # We'll build nested loop ASTs whose innermost body is 'inner_body'
++            inner_body = []
++
++            # For each element evaluation we need a temp variable to hold the element result
++            elem_var_name = self.variable()
++
++            # Visit the element expression while directing generated statements into inner_body
++            self.statements = inner_body
++            # For element explanations we need a fresh format context per element
++            self.push_format_context()
++            elt_res_expr, elt_expl = self.visit(comp.elt)
++            # Assign evaluated element to elem_var
++            inner_body.append(ast.Assign([ast.Name(elem_var_name, ast.Store())], elt_res_expr))
++            # Pop the format context to obtain a formatted explanation expression
++            expl_format = self.pop_format_context(ast.Str(elt_expl))
++            # Arrange for the explanation to be appended to expl_list when a failure occurs.
++            # Use the saved on_failure (global per-assert failure path)
++            call_append = ast_Call(app, [expl_format], [])
++            save_on_failure.append(ast.Expr(call_append))
++
++            # Build the condition that decides short-circuit:
++            # For all: if not elem -> short-circuit (store elem and break)
++            # For any: if elem -> short-circuit
++            test = ast.UnaryOp(ast.Not(), ast.Name(elem_var_name, ast.Load())) if is_all else ast.Name(elem_var_name, ast.Load())
++
++            # On short-circuit, store the element value into the result variable and break
++            store_and_break = [
++                ast.Assign([ast.Name(res_var_name, ast.Store())], ast.Name(elem_var_name, ast.Load())),
++                ast.Break(),
++            ]
++            # Wrap the short-circuit actions in an If statement checking the test
++            inner_body.append(ast.If(test, store_and_break, []))
++
++            # Now build nested For/If nodes from the comprehension's generators.
++            # Start from the innermost body built above
++            current = inner_body
++            # If the comprehension is a ListComp, its semantics create a list, but we still
++            # want to evaluate elements in order and short-circuit similarly.
++            # Process generators in reverse to nest them
++            for gen in reversed(comp.generators):
++                # If there are 'ifs' on the comprehension, combine them into a single condition
++                ifs = gen.ifs
++                if ifs:
++                    if len(ifs) == 1:
++                        cond = ifs[0]
++                    else:
++                        cond = ast.BoolOp(ast.And(), ifs)
++                    body_with_if = [ast.If(cond, current, [])]
++                    loop = ast.For(gen.target, gen.iter, body_with_if, [])
++                else:
++                    loop = ast.For(gen.target, gen.iter, current, [])
++                current = [loop]
++
++            # Append the top-level loop(s) to the saved statements
++            save_statements.extend(current)
++
++            # Restore statements and on_failure
++            self.statements = save_statements
++            self.on_failure = save_on_failure
++
++            # Prepare and return the explanation for the overall call
++            res_name = ast.Name(res_var_name, ast.Load())
++            res_expl = self.explanation_param(self.display(res_name))
++            # For the textual part, show the function and a placeholder for the comprehension arg
++            arg_desc = "<comprehension>"
++            outer_expl = "%s\n{%s = %s(%s)\n}" % (res_expl, res_expl, func_expl, arg_desc)
++            return res_name, outer_expl
++
++        # Fallback: original behavior for other calls
+         arg_expls = []
+         new_args = []
+         new_kwargs = []
+@@ -1002,6 +1099,78 @@ warn_explicit(
+         visit `ast.Call nodes on 3.4 and below`
+         """
+         new_func, func_expl = self.visit(call.func)
++
++        # Special-case builtin all()/any() with a single comprehension argument
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            is_all = call.func.id == "all"
++            comp = call.args[0]
++
++            # Allocate the result variable and initialize it:
++            # all -> True, any -> False
++            res_var_name = self.variable()
++            init_value = ast.NameConstant(True) if is_all else ast.NameConstant(False)
++            self.statements.append(ast.Assign([ast.Name(res_var_name, ast.Store())], init_value))
++
++            # Create a list to collect per-element explanations
++            expl_list = self.assign(ast.List([], ast.Load()))
++            app = ast.Attribute(expl_list, "append", ast.Load())
++
++            # Save current statements/on_failure to restore later
++            save_statements = self.statements
++            save_on_failure = self.on_failure
++
++            # Build inner body
++            inner_body = []
++
++            # Temp variable for element result
++            elem_var_name = self.variable()
++
++            # Direct generated statements for visiting element into inner_body
++            self.statements = inner_body
++            self.push_format_context()
++            elt_res_expr, elt_expl = self.visit(comp.elt)
++            inner_body.append(ast.Assign([ast.Name(elem_var_name, ast.Store())], elt_res_expr))
++            expl_format = self.pop_format_context(ast.Str(elt_expl))
++            call_append = ast_Call(app, [expl_format], [])
++            save_on_failure.append(ast.Expr(call_append))
++
++            test = ast.UnaryOp(ast.Not(), ast.Name(elem_var_name, ast.Load())) if is_all else ast.Name(elem_var_name, ast.Load())
++            inner_body.append(ast.If(test, [ast.Assign([ast.Name(res_var_name, ast.Store())], ast.Name(elem_var_name, ast.Load())), ast.Break()], []))
++
++            # Build nested loops from generators
++            current = inner_body
++            for gen in reversed(comp.generators):
++                ifs = gen.ifs
++                if ifs:
++                    if len(ifs) == 1:
++                        cond = ifs[0]
++                    else:
++                        cond = ast.BoolOp(ast.And(), ifs)
++                    body_with_if = [ast.If(cond, current, [])]
++                    loop = ast.For(gen.target, gen.iter, body_with_if, [])
++                else:
++                    loop = ast.For(gen.target, gen.iter, current, [])
++                current = [loop]
++
++            save_statements.extend(current)
++
++            # Restore
++            self.statements = save_statements
++            self.on_failure = save_on_failure
++
++            res_name = ast.Name(res_var_name, ast.Load())
++            res_expl = self.explanation_param(self.display(res_name))
++            arg_desc = "<comprehension>"
++            outer_expl = "%s\n{%s = %s(%s)\n}" % (res_expl, res_expl, func_expl, arg_desc)
++            return res_name, outer_expl
++
++        # Legacy fallback behavior
+         arg_expls = []
+         new_args = []
+         new_kwargs = []

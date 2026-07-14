@@ -1,0 +1,22 @@
+diff --git a/django/core/cache/backends/filebased.py b/django/core/cache/backends/filebased.py
+index 631da49444..473ce684b1 100644
+--- a/django/core/cache/backends/filebased.py
++++ b/django/core/cache/backends/filebased.py
+@@ -90,10 +90,15 @@ class FileBasedCache(BaseCache):
+ 
+     def has_key(self, key, version=None):
+         fname = self._key_to_file(key, version)
+-        if os.path.exists(fname):
++        # Avoid a race between exists() and open(): the file may be removed
++        # by another thread/process after the exists() check (for example
++        # _is_expired() deletes expired files). Open the file directly and
++        # handle FileNotFoundError which indicates the file no longer exists.
++        try:
+             with open(fname, "rb") as f:
+                 return not self._is_expired(f)
+-        return False
++        except FileNotFoundError:
++            return False
+ 
+     def _cull(self):
+         """

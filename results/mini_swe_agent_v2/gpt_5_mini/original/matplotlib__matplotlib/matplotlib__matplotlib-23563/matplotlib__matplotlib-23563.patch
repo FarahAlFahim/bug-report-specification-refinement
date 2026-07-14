@@ -1,0 +1,29 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..fb29e5bbc5 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -211,7 +211,23 @@ class Line3D(lines.Line2D):
+ 
+     @artist.allow_rasterization
+     def draw(self, renderer):
+-        xs3d, ys3d, zs3d = self._verts3d
++        # _verts3d may not exist if something went wrong earlier
++        # (e.g. an exception during setting 3d properties). Defensively
++        # fall back to using the 2D data with z=0 to avoid raising an
++        # AttributeError during drawing. This mirrors historical behavior
++        # where 3D lines without explicit z coordinates are drawn in the
++        # xy-plane.
++        verts = getattr(self, "_verts3d", None)
++        if verts is None:
++            xs2d = self.get_xdata()
++            ys2d = self.get_ydata()
++            # ensure arrays so proj_transform can handle them
++            xs3d = np.asarray(xs2d)
++            ys3d = np.asarray(ys2d)
++            zs3d = np.zeros_like(xs3d)
++            self._verts3d = (xs3d, ys3d, zs3d)
++        else:
++            xs3d, ys3d, zs3d = verts
+         xs, ys, zs = proj3d.proj_transform(xs3d, ys3d, zs3d, self.axes.M)
+         self.set_data(xs, ys)
+         super().draw(renderer)

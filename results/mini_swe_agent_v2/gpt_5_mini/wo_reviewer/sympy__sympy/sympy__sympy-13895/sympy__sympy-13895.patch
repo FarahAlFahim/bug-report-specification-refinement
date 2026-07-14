@@ -1,0 +1,27 @@
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index b2832dd264..064abb6cc6 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -1511,8 +1511,22 @@ def as_content_primitive(self, radical=False, clear=True):
+         """
+ 
+         b, e = self.as_base_exp()
++        # normalize any content from the base (but do not eagerly extract
++        # numeric content from the power unless it is provably semantics-
++        # preserving). See PR: only extract numeric content R from b**e when
++        # either the exponent is an integer (so (a*b)**n == a**n*b**n holds)
++        # or the base is provably positive (so real-valued principal branches
++        # are preserved for rational exponents).
+         b = _keep_coeff(*b.as_content_primitive(radical=radical, clear=clear))
+         ce, pe = e.as_content_primitive(radical=radical, clear=clear)
++
++        # If the exponent is not provably an integer and the base is not
++        # provably positive then we must avoid extracting numeric content
++        # from the power since (a*b)**x != a**x * b**x in general for
++        # symbolic (non-integer) x (principal branch issues). In that case
++        # report no extractable content.
++        if not (e.is_integer or b.is_positive):
++            return S.One, self.func(b, e)
+         if b.is_Rational:
+             #e
+             #= ce*pe

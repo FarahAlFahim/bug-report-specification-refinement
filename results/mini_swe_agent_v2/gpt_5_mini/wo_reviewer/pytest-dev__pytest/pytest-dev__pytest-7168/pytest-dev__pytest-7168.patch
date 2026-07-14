@@ -1,0 +1,108 @@
+--- /tmp/orig_saferepr.py	2026-06-01 19:52:42.447464008 +0000
++++ src/_pytest/_io/saferepr.py	2026-06-01 19:52:14.810807009 +0000
+@@ -9,19 +9,50 @@
+     except (KeyboardInterrupt, SystemExit):
+         raise
+     except BaseException:
+-        return '{}("{}")'.format(type(obj).__name__, obj)
++        # Avoid calling obj in format() here as that may trigger
++        # user-defined __format__/__str__/__repr__ or attribute access
++        # (for example __getattribute__) and raise again. Use only
++        # the object's type name and id which are safe to obtain.
++        try:
++            return "{} object at 0x{:x}".format(type(obj).__name__, id(obj))
++        except Exception:
++            # As a last resort, return a very small constant string.
++            return "<unrepresentable object>"
+ 
+ 
+ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
++    # Compose a safe representation describing that repr() raised.
++    # This function must not itself raise (it's used from exception
++    # handlers) so guard all operations that could touch user code.
+     try:
+-        exc_info = _try_repr_or_str(exc)
++        try:
++            exc_info = _try_repr_or_str(exc)
++        except (KeyboardInterrupt, SystemExit):
++            raise
++        except BaseException:
++            # If obtaining a string for the exception fails, fall back to
++            # a constant message referencing the exception type and id.
++            exc_info = "unpresentable exception ({})".format(
++                _try_repr_or_str(exc)
++            )
++
++        # Use type(obj).__name__ and id(obj) which do not trigger
++        # instance attribute lookup (avoiding __getattribute__).
++        typename = type(obj).__name__
++        return "<[{} raised in repr()] {} object at 0x{:x}>".format(
++            exc_info, typename, id(obj)
++        )
+     except (KeyboardInterrupt, SystemExit):
+         raise
+-    except BaseException as exc:
+-        exc_info = "unpresentable exception ({})".format(_try_repr_or_str(exc))
+-    return "<[{} raised in repr()] {} object at 0x{:x}>".format(
+-        exc_info, obj.__class__.__name__, id(obj)
+-    )
++    except BaseException:
++        # As an ultimate fallback, return a minimal safe string that
++        # does not access the object at all besides its id().
++        try:
++            return "<[unrepresentable raised in repr()] object at 0x{:x}>".format(
++                id(obj)
++            )
++        except Exception:
++            return "<[unrepresentable raised in repr()]>"
+ 
+ 
+ def _ellipsize(s: str, maxsize: int) -> str:
+@@ -48,7 +79,14 @@
+         except (KeyboardInterrupt, SystemExit):
+             raise
+         except BaseException as exc:
+-            s = _format_repr_exception(exc, x)
++            try:
++                s = _format_repr_exception(exc, x)
++            except (KeyboardInterrupt, SystemExit):
++                raise
++            except BaseException:
++                s = "<unrepresentable {} object at 0x{:x}>".format(
++                    type(x).__name__, id(x)
++                )
+         return _ellipsize(s, self.maxsize)
+ 
+     def repr_instance(self, x: Any, level: int) -> str:
+@@ -57,7 +95,14 @@
+         except (KeyboardInterrupt, SystemExit):
+             raise
+         except BaseException as exc:
+-            s = _format_repr_exception(exc, x)
++            try:
++                s = _format_repr_exception(exc, x)
++            except (KeyboardInterrupt, SystemExit):
++                raise
++            except BaseException:
++                s = "<unrepresentable {} object at 0x{:x}>".format(
++                    type(x).__name__, id(x)
++                )
+         return _ellipsize(s, self.maxsize)
+ 
+ 
+@@ -69,7 +114,14 @@
+     try:
+         return pprint.pformat(obj)
+     except Exception as exc:
+-        return _format_repr_exception(exc, obj)
++        try:
++            return _format_repr_exception(exc, obj)
++        except (KeyboardInterrupt, SystemExit):
++            raise
++        except BaseException:
++            return "<unrepresentable {} object at 0x{:x}>".format(
++                type(obj).__name__, id(obj)
++            )
+ 
+ 
+ def saferepr(obj: Any, maxsize: int = 240) -> str:

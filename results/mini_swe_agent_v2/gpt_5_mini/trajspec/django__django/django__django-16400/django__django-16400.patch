@@ -1,0 +1,77 @@
+diff --git a/django/db/models/manager.py b/django/db/models/manager.py
+index 467e79f9b9..903f02f702 100644
+--- a/django/db/models/manager.py
++++ b/django/db/models/manager.py
+@@ -141,7 +141,18 @@ class BaseManager:
+ 
+     @property
+     def db(self):
+-        return self._db or router.db_for_read(self.model, **self._hints)
++        """Return the database associated with this manager.
++
++        Avoid consulting the DB router when there is no explicit database set
++        and there are no routing hints. Some routers depend on request-local
++        or thread-local state and should not be invoked during management
++        commands where that state is absent.
++        """
++        if self._db:
++            return self._db
++        if self._hints:
++            return router.db_for_read(self.model, **self._hints)
++        return self._db
+ 
+     #######################
+     # PROXIES TO QUERYSET #
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index 13d24bb871..35344c4206 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1768,10 +1768,26 @@ class QuerySet(AltersData):
+ 
+     @property
+     def db(self):
+-        """Return the database used if this query is executed now."""
++        """Return the database used if this query is executed now.
++
++        Avoid consulting the DB router when there is no explicit database set
++        and there are no routing hints. Calling router.db_for_read/write with
++        empty hints can trigger request-local/thread-local dependent routers
++        during management commands (e.g. post-migrate) where no request
++        context is available. In that case, return the explicit _db (which
++        will be ``None``) rather than calling the router.
++        """
+         if self._for_write:
+-            return self._db or router.db_for_write(self.model, **self._hints)
+-        return self._db or router.db_for_read(self.model, **self._hints)
++            if self._db:
++                return self._db
++            if self._hints:
++                return router.db_for_write(self.model, **self._hints)
++            return self._db
++        if self._db:
++            return self._db
++        if self._hints:
++            return router.db_for_read(self.model, **self._hints)
++        return self._db
+ 
+     ###################
+     # PRIVATE METHODS #
+@@ -2101,8 +2117,16 @@ class RawQuerySet:
+ 
+     @property
+     def db(self):
+-        """Return the database used if this query is executed now."""
+-        return self._db or router.db_for_read(self.model, **self._hints)
++        """Return the database used if this query is executed now.
++
++        Avoid consulting the DB router when there is no explicit database set
++        and there are no routing hints.
++        """
++        if self._db:
++            return self._db
++        if self._hints:
++            return router.db_for_read(self.model, **self._hints)
++        return self._db
+ 
+     def using(self, alias):
+         """Select the database this RawQuerySet should execute against."""

@@ -1,0 +1,29 @@
+diff --git a/lib/matplotlib/colors.py b/lib/matplotlib/colors.py
+index 2d3072da04..bf02bfbcf9 100644
+--- a/lib/matplotlib/colors.py
++++ b/lib/matplotlib/colors.py
+@@ -725,6 +725,24 @@ class Colormap:
+                 # Avoid converting large positive values to negative integers.
+                 np.clip(xa, -1, self.N, out=xa)
+                 xa = xa.astype(int)
++        # Ensure integer index arrays can represent the sentinel indices
++        # used for over/under/bad.  If a user supplied a narrow integer
++        # dtype (for example uint8) assigning sentinel values such as
++        # N, N+1, N+2 can overflow and -- since NumPy 1.24 -- emits
++        # DeprecationWarnings about out-of-bound integer conversion.
++        # Upcast integer inputs to a platform-sized signed integer when
++        # the sentinel values do not fit in the input dtype.
++        if xa.dtype.kind in ('u', 'i'):
++            try:
++                info = np.iinfo(xa.dtype)
++            except ValueError:
++                # Not a standard integer type; fall back to intp.
++                xa = xa.astype(np.intp)
++            else:
++                # Only upcast if the largest sentinel doesn't fit.
++                if self._i_bad > info.max:
++                    xa = xa.astype(np.intp)
++
+         # Set the over-range indices before the under-range;
+         # otherwise the under-range values get converted to over-range.
+         xa[xa > self.N - 1] = self._i_over

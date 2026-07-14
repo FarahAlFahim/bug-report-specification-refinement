@@ -1,0 +1,32 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..9a25550eb2 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,6 +148,27 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++
++    if name == "version_info":
++        # Ensure __version__ is computed and cached.
++        if "__version__" not in globals():
++            v = __getattr__("__version__")
++        else:
++            v = __version__
++        # Try to parse the version and expose the release tuple.
++        try:
++            from packaging.version import parse as parse_version
++            rel = tuple(parse_version(v).release)
++        except Exception:
++            # Fallback: attempt a simple dot-split with int conversion where possible.
++            try:
++                rel = tuple(int(x) if x.isdigit() else x for x in v.split("."))
++            except Exception:
++                rel = ()
++        global version_info
++        version_info = rel
++        return version_info
++
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

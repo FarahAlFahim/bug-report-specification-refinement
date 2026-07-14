@@ -1,0 +1,44 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..2323384a0e 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1210,12 +1210,39 @@ class ManyToManyField(RelatedField):
+     def check(self, **kwargs):
+         return [
+             *super().check(**kwargs),
++            *self._check_symmetrical_related_name(),
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
+         ]
+ 
++    def _check_symmetrical_related_name(self):
++        """
++        If a ManyToManyField is symmetrical (including the default for
++        self-referential relations), no reverse accessor is created on the
++        target model. Defining a related_name in this situation is a
++        likely mistake and should be disallowed.
++        """
++        # If the user didn't provide a related_name, nothing to check.
++        if self._related_name is None:
++            return []
++
++        # If the relation is symmetrical, a related accessor will not be
++        # installed on the target model, so related_name is meaningless.
++        if getattr(self.remote_field, 'symmetrical', False):
++            return [
++                checks.Error(
++                    "ManyToManyField defines a related_name for a symmetrical relation, "
++                    "which does not create a reverse accessor on the target model.",
++                    hint=("Remove the related_name argument for symmetrical ManyToManyField "
++                          "or set symmetrical=False if you want a reverse accessor."),
++                    obj=self,
++                    id='fields.E322',
++                )
++            ]
++        return []
++
+     def _check_unique(self, **kwargs):
+         if self.unique:
+             return [

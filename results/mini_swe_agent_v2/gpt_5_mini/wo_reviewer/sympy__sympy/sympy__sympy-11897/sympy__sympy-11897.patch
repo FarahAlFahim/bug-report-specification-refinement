@@ -1,0 +1,35 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 2501524c30..c132633ba4 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,11 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++# ``Mapping`` was moved to ``collections.abc`` in Python 3.3+. Import from
++# there when available for compatibility with newer Python versions.
++try:
++    from collections.abc import Mapping
++except Exception:
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index b1ead153ef..4c9d8cab55 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,12 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++# ``Callable`` was moved to ``collections.abc`` in Python 3.3+. Import from
++# there when available to be compatible with newer Python versions.
++try:
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 

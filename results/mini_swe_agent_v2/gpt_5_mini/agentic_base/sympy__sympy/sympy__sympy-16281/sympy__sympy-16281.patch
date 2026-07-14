@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 6d3cc05bd3..2afa4646ee 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -490,10 +490,19 @@ def _print_Product(self, expr):
+         sign_height = 0
+ 
+         for lim in expr.limits:
+-            width = (func_height + 2) * 5 // 3 - 2
++            # Use a narrower width that scales modestly with the height of
++            # the function being decorated. The previous hardcoded formula
++            # produced overly wide product symbols for small heights.
++            # A width of (func_height + 1) gives a compact, visually balanced
++            # product sign that is comparable in proportion to Sum.
++            width = max(1, func_height + 1)
++
+             sign_lines = []
+             sign_lines.append(corner_chr + (horizontal_chr*width) + corner_chr)
+-            for i in range(func_height + 1):
++            # The vertical segments of the product sign should match the
++            # function height. Previously an extra empty row was produced by
++            # using func_height + 1.
++            for i in range(func_height):
+                 sign_lines.append(vertical_chr + (' '*width) + vertical_chr)
+ 
+             pretty_sign = stringPict('')
+@@ -515,8 +524,12 @@ def _print_Product(self, expr):
+                 first = False
+ 
+             height = pretty_sign.height()
++            # Right-padding should use height blank lines so that vertical
++            # spacing beneath the horizontal bar is symmetric. Previously
++            # height - 1 was used which produced asymmetric spacing and an
++            # extra low baseline.
+             padding = stringPict('')
+-            padding = prettyForm(*padding.stack(*[' ']*(height - 1)))
++            padding = prettyForm(*padding.stack(*[' ']*height))
+             pretty_sign = prettyForm(*pretty_sign.right(padding))
+ 
+             pretty_func = prettyForm(*pretty_sign.right(pretty_func))

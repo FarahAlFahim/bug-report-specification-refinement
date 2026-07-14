@@ -1,0 +1,70 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index bc0a281..bbf73c7 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -79,38 +79,44 @@ class Prefix(Expr):
+                 str(self.name), str(self.abbrev), self._exponent, self.base)
+ 
+     def __mul__(self, other):
++        # Multiplying a Prefix with a Quantity should delegate to the Quantity's
++        # multiplication so that the resulting representation keeps the unit
++        # on the left (e.g. milli * watt -> watt * milli). Only handle
++        # Prefix * Prefix combination here.
+         from sympy.physics.units import Quantity
+-        if not isinstance(other, (Quantity, Prefix)):
+-            return super().__mul__(other)
+-
+-        fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
+-            # simplify prefix
++        if isinstance(other, Prefix):
++            fact = self.scale_factor * other.scale_factor
++            if fact == 1:
++                return 1
++            # simplify prefix*prefix to a single prefix if possible
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+-
+-        return self.scale_factor * other
++        elif isinstance(other, Quantity):
++            # delegate to Quantity.__rmul__ / Quantity.__mul__ so the unit stays
++            # in the usual order (unit * prefix)
++            return other * self
++        else:
++            return super().__mul__(other)
+ 
+     def __truediv__(self, other):
+-        if not hasattr(other, "scale_factor"):
+-            return super().__truediv__(other)
+-
+-        fact = self.scale_factor / other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # Similar reasoning as in __mul__: only handle Prefix / Prefix here.
++        from sympy.physics.units import Quantity
++        if isinstance(other, Prefix):
++            fact = self.scale_factor / other.scale_factor
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+-
+-        return self.scale_factor / other
++        elif isinstance(other, Quantity):
++            # For prefix / quantity delegate to numeric division by the quantity.
++            # Keep behavior consistent with multiplication delegation.
++            return self.scale_factor / other
++        else:
++            return super().__truediv__(other)
+ 
+     def __rtruediv__(self, other):
+         if other == 1:

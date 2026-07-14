@@ -1,0 +1,32 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 63ca817355..3354d85851 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -6,7 +6,9 @@ from itertools import chain
+ from django.core.exceptions import EmptyResultSet, FieldError
+ from django.db import DatabaseError, NotSupportedError
+ from django.db.models.constants import LOOKUP_SEP
+-from django.db.models.expressions import OrderBy, Random, RawSQL, Ref, Value
++from django.db.models.expressions import (
++    OrderBy, Random, RawSQL, Ref, Value, Subquery,
++)
+ from django.db.models.functions import Cast
+ from django.db.models.query_utils import Q, select_related_descend
+ from django.db.models.sql.constants import (
+@@ -102,8 +104,16 @@ class SQLCompiler:
+             # when  we have public API way of forcing the GROUP BY clause.
+             # Converts string references to expressions.
+             for expr in self.query.group_by:
++                # Converts string references to expressions.
+                 if not hasattr(expr, 'as_sql'):
+                     expressions.append(self.query.resolve_ref(expr))
++                    continue
++                # If a Ref was supplied for a Subquery annotation (see
++                # Subquery.get_group_by_cols), replace the Ref with the
++                # underlying Subquery expression so the final GROUP BY uses
++                # the full subquery SQL instead of the annotation alias.
++                if isinstance(expr, Ref) and isinstance(expr.source, Subquery):
++                    expressions.append(expr.source)
+                 else:
+                     expressions.append(expr)
+         # Note that even if the group_by is set, it is only the minimal

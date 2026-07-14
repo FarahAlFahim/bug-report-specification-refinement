@@ -1,0 +1,44 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 69a2d9298f..c0e2312b4d 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -272,6 +272,13 @@ class SQLCompiler:
+         for col, alias in select:
+             try:
+                 sql, params = self.compile(col)
++                # If compile(...) returns an empty SQL string, that represents
++                # a predicate that matches everything. In a SELECT/annotation
++                # context we must render a valid SQL expression instead of
++                # passing an empty string into the SELECT list.
++                if sql == '':
++                    # Select a predicate that's always True.
++                    sql, params = '1', ()
+             except EmptyResultSet:
+                 empty_result_set_value = getattr(col, 'empty_result_set_value', NotImplemented)
+                 if empty_result_set_value is NotImplemented:
+@@ -1662,8 +1669,23 @@ class SQLAggregateCompiler(SQLCompiler):
+         """
+         sql, params = [], []
+         for annotation in self.query.annotation_select.values():
+-            ann_sql, ann_params = self.compile(annotation)
+-            ann_sql, ann_params = annotation.select_format(self, ann_sql, ann_params)
++            try:
++                ann_sql, ann_params = self.compile(annotation)
++                # If compile(...) returns an empty SQL string, that represents
++                # a predicate that matches everything. In a SELECT/annotation
++                # context we must render a valid SQL expression instead of
++                # passing an empty string into the SELECT list.
++                if ann_sql == '':
++                    ann_sql, ann_params = '1', ()
++            except EmptyResultSet:
++                empty_result_set_value = getattr(annotation, 'empty_result_set_value', NotImplemented)
++                if empty_result_set_value is NotImplemented:
++                    # Select a predicate that's always False.
++                    ann_sql, ann_params = '0', ()
++                else:
++                    ann_sql, ann_params = self.compile(Value(empty_result_set_value))
++            else:
++                ann_sql, ann_params = annotation.select_format(self, ann_sql, ann_params)
+             sql.append(ann_sql)
+             params.extend(ann_params)
+         self.col_count = len(self.query.annotation_select)

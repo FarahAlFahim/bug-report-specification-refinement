@@ -1,0 +1,19 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 105dc93251..be62c02599 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -263,8 +263,12 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
+         if isinstance(self.rhs, Query):
+             if self.rhs.has_limit_one():
+                 # The subquery must select only the pk.
+-                self.rhs.clear_select_clause()
+-                self.rhs.add_fields(['pk'])
++                if not self.rhs.annotation_select:
++                    # If the subquery has annotations, preserve them.
++                    # Otherwise, modify the subquery to select only the pk.
++                    self.rhs = self.rhs.clone()
++                    self.rhs.clear_select_clause()
++                    self.rhs.add_fields(['pk'])
+             else:
+                 raise ValueError(
+                     'The QuerySet value for an exact lookup must be limited to '

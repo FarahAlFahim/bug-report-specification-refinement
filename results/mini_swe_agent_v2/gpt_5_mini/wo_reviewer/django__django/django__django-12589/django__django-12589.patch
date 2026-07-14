@@ -1,0 +1,22 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 84960d77e1..150ac82ecb 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1051,7 +1051,16 @@ class Subquery(Expression):
+ 
+     def get_group_by_cols(self, alias=None):
+         if alias:
+-            return [Ref(alias, self)]
++            # When a Subquery is annotated with an alias and later used
++            # in GROUP BY (e.g. .values('alias') or similar), returning
++            # a Ref(alias, self) causes the compiler to emit the quoted
++            # alias ("alias") in the GROUP BY clause. If another JOINed
++            # table contains a column with the same name this leads to an
++            # ambiguous column reference error. To avoid this, when an
++            # alias is provided, prefer grouping by the subquery expression
++            # itself which emits the full subquery SQL (e.g. (SELECT ...))
++            # and is unambiguous.
++            return [self]
+         external_cols = self.query.get_external_cols()
+         if any(col.possibly_multivalued for col in external_cols):
+             return [self]

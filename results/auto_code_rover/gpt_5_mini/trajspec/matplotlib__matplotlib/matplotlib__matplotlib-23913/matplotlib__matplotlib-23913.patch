@@ -1,0 +1,60 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..db4b548840 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -283,9 +283,24 @@ columnspacing : float, default: :rc:`legend.columnspacing`
+     The spacing between columns, in font-size units.
+ 
+ handler_map : dict or None
+-    The custom dictionary mapping instances or types to a legend
+-    handler. This *handler_map* updates the default handler map
+-    found at `matplotlib.legend.Legend.get_legend_handler_map`.
++The custom dictionary mapping instances or types to a legend
++handler. This *handler_map* updates the default handler map
++found at `matplotlib.legend.Legend.get_legend_handler_map`.
++
++draggable : bool, default: False
++    Whether the legend should be made draggable with the mouse upon
++    creation. If ``True``, the legend will be made draggable immediately,
++    equivalent to calling :meth:`Legend.set_draggable` after construction.
++
++draggable_use_blit : bool, default: False
++    Whether to use blitting for faster redraw while dragging. See
++    :ref:`func-animation` for details on blitting.
++
++draggable_update : {'loc', 'bbox'}, default: 'loc'
++    The legend parameter to be updated when dragging is finalized:
++
++    - 'loc': update the *loc* parameter of the legend
++    - 'bbox': update the *bbox_to_anchor* parameter of the legend
+ """)
+ 
+ 
+@@ -342,6 +357,11 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
++        # Whether the legend is draggable at creation time. These are
++        # keyword-only for backward compatibility with positional args.
++        draggable=False,
++        draggable_use_blit=False,
++        draggable_update='loc',
+         ncol=1  # synonym for ncols (backward compatibility)
+     ):
+         """
+@@ -539,6 +559,15 @@ class Legend(Artist):
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
+ 
++        # If requested, enable dragging now that internals (legend box,
++        # figure/axes, and offsets) have been initialized.
++        if draggable:
++            # Use the public API to create the DraggableLegend helper; it will
++            # validate the 'update' value and only instantiate when needed.
++            self.set_draggable(True,
++                               use_blit=draggable_use_blit,
++                               update=draggable_update)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

@@ -1,0 +1,28 @@
+diff --git a/requests/adapters.py b/requests/adapters.py
+index 841cbbfe..dddaa812 100644
+--- a/requests/adapters.py
++++ b/requests/adapters.py
+@@ -26,9 +26,12 @@ from .packages.urllib3.exceptions import ProxyError as _ProxyError
+ from .packages.urllib3.exceptions import ProtocolError
+ from .packages.urllib3.exceptions import ReadTimeoutError
+ from .packages.urllib3.exceptions import SSLError as _SSLError
++from .packages.urllib3.exceptions import DecodeError
+ from .packages.urllib3.exceptions import ResponseError
++from .packages.urllib3.exceptions import TimeoutError as _TimeoutError
+ from .cookies import extract_cookies_to_jar
+ from .exceptions import (ConnectionError, ConnectTimeout, ReadTimeout, SSLError,
++                         ContentDecodingError, Timeout,
+                          ProxyError, RetryError)
+ from .auth import _basic_auth_str
+ 
+@@ -432,4 +435,10 @@ class HTTPAdapter(BaseAdapter):
+             else:
+                 raise
+ 
++        except DecodeError as e:
++            raise ContentDecodingError(e, request=request)
++
++        except _TimeoutError as e:
++            raise Timeout(e, request=request)
++
+         return self.build_response(request, resp)

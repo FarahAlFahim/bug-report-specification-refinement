@@ -1,0 +1,58 @@
+diff --git a/django/contrib/auth/migrations/0011_update_proxy_permissions.py b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+index 0e66649695..ba2aff76db 100644
+--- a/django/contrib/auth/migrations/0011_update_proxy_permissions.py
++++ b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+@@ -24,10 +24,49 @@ def update_proxy_model_permissions(apps, schema_editor, reverse=False):
+         proxy_content_type = ContentType.objects.get_for_model(Model, for_concrete_model=False)
+         old_content_type = proxy_content_type if reverse else concrete_content_type
+         new_content_type = concrete_content_type if reverse else proxy_content_type
+-        Permission.objects.filter(
+-            permissions_query,
+-            content_type=old_content_type,
+-        ).update(content_type=new_content_type)
++
++        # Iterate over matching Permission rows and move them one-by-one to
++        # avoid creating duplicate (content_type, codename) entries which
++        # would violate the unique_together constraint on
++        # (content_type, codename). When a target Permission already exists
++        # we re-point any many-to-many relations (groups/users) to the
++        # existing Permission and remove the duplicate row.
++        Group = apps.get_model('auth', 'Group')
++        User = apps.get_model('auth', 'User')
++
++        # Resolve through models for group and user many-to-many relations.
++        group_through = Group._meta.get_field('permissions').remote_field.through
++        user_through = User._meta.get_field('user_permissions').remote_field.through
++
++        # Use a list() to avoid QuerySet evaluation issues while we modify rows.
++        for perm in list(Permission.objects.filter(permissions_query, content_type=old_content_type)):
++            try:
++                # Try to find an existing target permission with the same codename.
++                target_perm = Permission.objects.get(content_type=new_content_type, codename=perm.codename)
++            except Permission.DoesNotExist:
++                # No collision: move this permission to the new content type.
++                perm.content_type = new_content_type
++                perm.save()
++                continue
++
++            # A permission with the same (content_type, codename) already
++            # exists. Re-point any group/user relations to the existing
++            # permission, taking care not to create duplicate through-table
++            # rows.
++            # Update group relations: set permission_id to target_perm.id for
++            # any rows that reference the old perm, ignoring rows that would
++            # duplicate an existing (group_id, permission_id) pair.
++            group_through.objects.filter(permission_id=perm.id).exclude(
++                group_id__in=group_through.objects.filter(permission_id=target_perm.id).values_list('group_id', flat=True)
++            ).update(permission_id=target_perm.id)
++
++            # Update user relations similarly.
++            user_through.objects.filter(permission_id=perm.id).exclude(
++                user_id__in=user_through.objects.filter(permission_id=target_perm.id).values_list('user_id', flat=True)
++            ).update(permission_id=target_perm.id)
++
++            # Delete the old permission row now that relations have been moved.
++            perm.delete()
+ 
+ 
+ def revert_proxy_model_permissions(apps, schema_editor):

@@ -1,0 +1,254 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c0fd2fa4..6d6b8cd0 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -23,6 +23,7 @@ from .utils import (
+     desaturate,
+     get_color_cycle,
+     remove_na,
++    index_data,
+ )
+ 
+ 
+@@ -930,7 +931,7 @@ class VectorPlotter:
+                 # We know that __getitem__ will work
+ 
+                 if val in data:
+-                    plot_data[key] = data[val]
++                    plot_data[key] = index_data(data, val)
+                 elif val in index:
+                     plot_data[key] = index[val]
+                 variables[key] = val
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 75349099..6e631d25 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -247,7 +247,7 @@ class Grid(_BaseGrid):
+             palette = color_palette(n_colors=1)
+ 
+         else:
+-            hue_names = categorical_order(data[hue], hue_order)
++            hue_names = categorical_order(utils.index_data(data, hue), hue_order)
+             n_colors = len(hue_names)
+ 
+             # By default use either the current color palette or HUSL
+@@ -380,7 +380,7 @@ class FacetGrid(Grid):
+         if hue is None:
+             hue_names = None
+         else:
+-            hue_names = categorical_order(data[hue], hue_order)
++            hue_names = categorical_order(utils.index_data(data, hue), hue_order)
+ 
+         colors = self._get_palette(data, hue, hue_order, palette)
+ 
+@@ -388,12 +388,12 @@ class FacetGrid(Grid):
+         if row is None:
+             row_names = []
+         else:
+-            row_names = categorical_order(data[row], row_order)
++            row_names = categorical_order(utils.index_data(data, row), row_order)
+ 
+         if col is None:
+             col_names = []
+         else:
+-            col_names = categorical_order(data[col], col_order)
++            col_names = categorical_order(utils.index_data(data, col), col_order)
+ 
+         # Additional dict of kwarg -> list of values for mapping the hue var
+         hue_kws = hue_kws if hue_kws is not None else {}
+@@ -402,9 +402,9 @@ class FacetGrid(Grid):
+         # value in one of the faceting variables, but only if dropna is True
+         none_na = np.zeros(len(data), bool)
+         if dropna:
+-            row_na = none_na if row is None else data[row].isnull()
+-            col_na = none_na if col is None else data[col].isnull()
+-            hue_na = none_na if hue is None else data[hue].isnull()
++            row_na = none_na if row is None else utils.index_data(data, row).isnull()
++            col_na = none_na if col is None else utils.index_data(data, col).isnull()
++            hue_na = none_na if hue is None else utils.index_data(data, hue).isnull()
+             not_na = ~(row_na | col_na | hue_na)
+         else:
+             not_na = ~none_na
+@@ -651,19 +651,19 @@ class FacetGrid(Grid):
+ 
+         # Construct masks for the row variable
+         if self.row_names:
+-            row_masks = [data[self._row_var] == n for n in self.row_names]
++            row_masks = [utils.index_data(data, self._row_var) == n for n in self.row_names]
+         else:
+             row_masks = [np.repeat(True, len(self.data))]
+ 
+         # Construct masks for the column variable
+         if self.col_names:
+-            col_masks = [data[self._col_var] == n for n in self.col_names]
++            col_masks = [utils.index_data(data, self._col_var) == n for n in self.col_names]
+         else:
+             col_masks = [np.repeat(True, len(self.data))]
+ 
+         # Construct masks for the hue variable
+         if self.hue_names:
+-            hue_masks = [data[self._hue_var] == n for n in self.hue_names]
++            hue_masks = [utils.index_data(data, self._hue_var) == n for n in self.hue_names]
+         else:
+             hue_masks = [np.repeat(True, len(self.data))]
+ 
+@@ -1318,12 +1318,12 @@ class PairGrid(Grid):
+             # (and was originally written exclusively that way) but now can delegate
+             # to the axes-level functions, while always handling legend creation.
+             # See GH2307
+-            hue_names = hue_order = categorical_order(data[hue], hue_order)
++            hue_names = hue_order = categorical_order(utils.index_data(data, hue), hue_order)
+             if dropna:
+                 # Filter NA from the list of unique hue names
+                 hue_names = list(filter(pd.notnull, hue_names))
+             self.hue_names = hue_names
+-            self.hue_vals = data[hue]
++            self.hue_vals = utils.index_data(data, hue)
+ 
+         # Additional dict of kwarg -> list of values for mapping the hue var
+         self.hue_kws = hue_kws if hue_kws is not None else {}
+@@ -1487,9 +1487,9 @@ class PairGrid(Grid):
+             else:
+                 plt.sca(ax)
+ 
+-            vector = self.data[var]
++            vector = utils.index_data(self.data, var)
+             if self._hue_var is not None:
+-                hue = self.data[self._hue_var]
++                hue = utils.index_data(self.data, self._hue_var)
+             else:
+                 hue = None
+ 
+@@ -1516,7 +1516,7 @@ class PairGrid(Grid):
+         fixed_color = kwargs.pop("color", None)
+ 
+         for var, ax in zip(self.diag_vars, self.diag_axes):
+-            hue_grouped = self.data[var].groupby(self.hue_vals)
++            hue_grouped = utils.index_data(self.data, var).groupby(self.hue_vals)
+ 
+             plot_kwargs = kwargs.copy()
+             if str(func.__module__).startswith("seaborn"):
+@@ -1591,12 +1591,12 @@ class PairGrid(Grid):
+         if self._hue_var is not None and self._hue_var not in axes_vars:
+             axes_vars.append(self._hue_var)
+ 
+-        data = self.data[axes_vars]
++        data = self.data.loc[:, axes_vars]
+         if self._dropna:
+             data = data.dropna()
+ 
+-        x = data[x_var]
+-        y = data[y_var]
++        x = utils.index_data(data, x_var)
++        y = utils.index_data(data, y_var)
+         if self._hue_var is None:
+             hue = None
+         else:
+@@ -1665,7 +1665,7 @@ class PairGrid(Grid):
+         """Find which variables in a DataFrame are numeric."""
+         numeric_cols = []
+         for col in data:
+-            if variable_type(data[col]) == "numeric":
++            if variable_type(utils.index_data(data, col)) == "numeric":
+                 numeric_cols.append(col)
+         return numeric_cols
+ 
+@@ -2134,7 +2134,7 @@ def pairplot(
+             if isinstance(markers, str):
+                 plot_kws["marker"] = markers
+             elif hue is not None:
+-                plot_kws["style"] = data[hue]
++                plot_kws[\"style\"] = utils.index_data(data, hue)
+                 plot_kws["markers"] = markers
+ 
+     # Draw the marginal plots on the diagonal
+diff --git a/seaborn/regression.py b/seaborn/regression.py
+index c6b81a17..6648841f 100644
+--- a/seaborn/regression.py
++++ b/seaborn/regression.py
+@@ -41,7 +41,7 @@ class _LinearPlotter:
+         # Set the variables
+         for var, val in kws.items():
+             if isinstance(val, str):
+-                vector = data[val]
++                vector = utils.index_data(data, val)
+             elif isinstance(val, list):
+                 vector = np.asarray(val)
+             else:
+@@ -598,7 +598,7 @@ def lmplot(
+     # Reduce the dataframe to only needed columns
+     need_cols = [x, y, hue, col, row, units, x_partial, y_partial]
+     cols = np.unique([a for a in need_cols if a is not None]).tolist()
+-    data = data[cols]
++    data = data.loc[:, cols]
+ 
+     # Initialize the grid
+     facets = FacetGrid(
+diff --git a/seaborn/utils.py b/seaborn/utils.py
+index c5acc5e2..03aa7350 100644
+--- a/seaborn/utils.py
++++ b/seaborn/utils.py
+@@ -19,7 +19,8 @@ from seaborn.external.version import Version
+ from seaborn.external.appdirs import user_cache_dir
+ 
+ __all__ = ["desaturate", "saturate", "set_hls_values", "move_legend",
+-           "despine", "get_dataset_names", "get_data_home", "load_dataset"]
++           "despine", "get_dataset_names", "get_data_home", "load_dataset",
++           "index_data"]
+ 
+ DATASET_SOURCE = "https://raw.githubusercontent.com/mwaskom/seaborn-data/master"
+ DATASET_NAMES_URL = f"{DATASET_SOURCE}/dataset_names.txt"
+@@ -894,3 +895,53 @@ def _disable_autolayout():
+ def _version_predates(lib: ModuleType, version: str) -> bool:
+     """Helper function for checking version compatibility."""
+     return Version(lib.__version__) < Version(version)
++
++
++def index_data(data, key):
++    """Safely index a pandas DataFrame or Series by a key that may be a tuple.
++
++    Pandas DataFrame.__getitem__ treats tuple keys as an iterable for
++    multi-column selection, which can raise a KeyError when the intended
++    behavior is to select a single MultiIndex column labeled by the tuple.
++
++    This helper will prefer .loc for DataFrame column selection when the
++    key is present in the columns, falling back to .get() when appropriate.
++
++    Parameters
++    ----------
++    data : pandas.DataFrame or pandas.Series or mapping-like
++    key : hashable
++        The key to select.
++
++    Returns
++    -------
++    selection : Series, DataFrame or None
++    """
++    if key is None:
++        return None
++
++    # If data is a DataFrame, prefer .loc to avoid tuple expansion in __getitem__
++    try:
++        if isinstance(data, pd.DataFrame):
++            # ``key in data.columns`` will do the right membership test for
++            # tuple column labels on a MultiIndex columns object.
++            try:
++                if key in data.columns:
++                    return data.loc[:, key]
++            except Exception:
++                # Fall back to .get below on any unexpected error
++                pass
++    except Exception:
++        # If isinstance check or columns access fails, fall through
++        pass
++
++    # For other cases (Series, dict-like), try the mapping get method
++    try:
++        return data.get(key)
++    except Exception:
++        # As a last resort try .loc access and let any raised error propagate
++        try:
++            return data.loc[:, key]
++        except Exception:
++            # Try simple item access
++            return data[key]

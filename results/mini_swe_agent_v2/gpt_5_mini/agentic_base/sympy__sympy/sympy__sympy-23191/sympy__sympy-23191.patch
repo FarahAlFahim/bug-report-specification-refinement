@@ -1,0 +1,53 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 66461181d0..26018b9876 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -1143,23 +1143,36 @@ def _print_BasisDependent(self, expr):
+             # XXX: What is this hack?
+             if '\n' in partstr:
+                 tempstr = partstr
+-                tempstr = tempstr.replace(vectstrs[i], '')
++                # Remove only the trailing occurrence of the basis-vector
++                # label that was appended (do not remove occurrences that
++                # are part of the scalar pretty text). Use rfind to locate
++                # the last occurrence and remove just that slice.
++                lbl = vectstrs[i]
++                idx = tempstr.rfind(lbl)
++                if idx != -1:
++                    tempstr = tempstr[:idx] + tempstr[idx + len(lbl):]
++
++                # Insert the label at the last matching parenthesis-extension
++                # glyph so that it remains visually trailing the multi-line
++                # scalar (previous code inserted at the first match).
+                 if '\N{right parenthesis extension}' in tempstr:   # If scalar is a fraction
+-                    for paren in range(len(tempstr)):
++                    # find last occurrence
++                    par_idx = tempstr.rfind('\N{right parenthesis extension}')
++                    if par_idx != -1:
+                         flag[i] = 1
+-                        if tempstr[paren] == '\N{right parenthesis extension}':
+-                            tempstr = tempstr[:paren] + '\N{right parenthesis extension}'\
+-                                         + ' '  + vectstrs[i] + tempstr[paren + 1:]
+-                            break
++                        tempstr = tempstr[:par_idx] + '\N{right parenthesis extension}' + ' ' + lbl + tempstr[par_idx + 1:]
+                 elif '\N{RIGHT PARENTHESIS LOWER HOOK}' in tempstr:
+                     flag[i] = 1
+-                    tempstr = tempstr.replace('\N{RIGHT PARENTHESIS LOWER HOOK}',
+-                                        '\N{RIGHT PARENTHESIS LOWER HOOK}'
+-                                        + ' ' + vectstrs[i])
++                    # replace only the last occurrence
++                    hook = '\N{RIGHT PARENTHESIS LOWER HOOK}'
++                    par_idx = tempstr.rfind(hook)
++                    if par_idx != -1:
++                        tempstr = tempstr[:par_idx] + hook + ' ' + lbl + tempstr[par_idx + len(hook):]
+                 else:
+-                    tempstr = tempstr.replace('\N{RIGHT PARENTHESIS UPPER HOOK}',
+-                                        '\N{RIGHT PARENTHESIS UPPER HOOK}'
+-                                        + ' ' + vectstrs[i])
++                    hook = '\N{RIGHT PARENTHESIS UPPER HOOK}'
++                    par_idx = tempstr.rfind(hook)
++                    if par_idx != -1:
++                        tempstr = tempstr[:par_idx] + hook + ' ' + lbl + tempstr[par_idx + len(hook):]
+                 o1[i] = tempstr
+ 
+         o1 = [x.split('\n') for x in o1]

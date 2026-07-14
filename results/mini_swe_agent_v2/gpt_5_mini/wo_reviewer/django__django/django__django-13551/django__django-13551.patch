@@ -1,0 +1,73 @@
+diff --git a/django/contrib/auth/base_user.py b/django/contrib/auth/base_user.py
+index 3a4a64ee19..e34c512146 100644
+--- a/django/contrib/auth/base_user.py
++++ b/django/contrib/auth/base_user.py
+@@ -147,6 +147,24 @@ class AbstractBaseUser(models.Model):
+         except AttributeError:
+             return 'email'
+ 
++    def get_email_for_token(self):
++        """
++        Return a canonical email string to be used when generating tokens.
++
++        By default this normalizes the email using BaseUserManager.normalize_email
++        (which lowercases the domain part) and applies Unicode NFKC
++        normalization followed by casefolding to produce a case/Unicode-
++        insensitive canonical representation. Custom user models may override
++        this method to provide alternative canonicalization if required.
++        """
++        email_field = self.get_email_field_name()
++        email = getattr(self, email_field, '') or ''
++        # Import locally to avoid circular imports at module import time.
++        from django.contrib.auth.base_user import BaseUserManager
++
++        email = BaseUserManager.normalize_email(email)
++        return unicodedata.normalize('NFKC', email).casefold() if isinstance(email, str) else email
++
+     @classmethod
+     def normalize_username(cls, username):
+         return unicodedata.normalize('NFKC', username) if isinstance(username, str) else username
+diff --git a/django/contrib/auth/tokens.py b/django/contrib/auth/tokens.py
+index 93e2d71af2..5899ee2ef6 100644
+--- a/django/contrib/auth/tokens.py
++++ b/django/contrib/auth/tokens.py
+@@ -1,4 +1,5 @@
+ from datetime import datetime
++import unicodedata
+ 
+ from django.conf import settings
+ from django.utils.crypto import constant_time_compare, salted_hmac
+@@ -94,7 +95,32 @@ class PasswordResetTokenGenerator:
+         # Truncate microseconds so that tokens are consistent even if the
+         # database doesn't support microseconds.
+         login_timestamp = '' if user.last_login is None else user.last_login.replace(microsecond=0, tzinfo=None)
+-        return str(user.pk) + user.password + str(login_timestamp) + str(timestamp)
++
++        # Include a canonical email value in the token input so that tokens
++        # are bound to the email address that was used for delivery. If the
++        # user model provides get_email_for_token(), use it. Otherwise, fall
++        # back to using the configured email field and normalize it in a
++        # way consistent with PasswordResetForm.get_users() (NFKC + casefold
++        # after normalizing the domain via BaseUserManager.normalize_email).
++        try:
++            email_for_token = user.get_email_for_token()
++        except Exception:
++            # Import locally to avoid potential circular imports at module
++            # import time.
++            from django.contrib.auth.base_user import BaseUserManager
++
++            email_field = user.get_email_field_name()
++            email_for_token = getattr(user, email_field, '') or ''
++            # Normalize domain part (lowercase) as BaseUserManager.normalize_email
++            email_for_token = BaseUserManager.normalize_email(email_for_token)
++            # Unicode normalize and casefold for case/Unicode-insensitive
++            # canonical representation.
++            if isinstance(email_for_token, str):
++                email_for_token = unicodedata.normalize('NFKC', email_for_token).casefold()
++
++        return (
++            str(user.pk) + user.password + str(login_timestamp) + str(email_for_token) + str(timestamp)
++        )
+ 
+     def _num_seconds(self, dt):
+         return int((dt - datetime(2001, 1, 1)).total_seconds())

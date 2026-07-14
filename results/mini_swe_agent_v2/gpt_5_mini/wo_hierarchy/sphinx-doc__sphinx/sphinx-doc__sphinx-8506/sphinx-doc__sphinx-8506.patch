@@ -1,0 +1,44 @@
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index c87217c56..fd4e32337 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -43,7 +43,11 @@ logger = logging.getLogger(__name__)
+ 
+ 
+ # RE for option descriptions
+-option_desc_re = re.compile(r'((?:/|--|-|\+)?[^\s=[]+)(=?\s*.*)')
++# RE for option descriptions
++# Accept any non-whitespace sequence as an option token (so tokens that
++# include characters like '[' or '=' are allowed). The second group
++# captures any following whitespace+text as the argument part.
++option_desc_re = re.compile(r'((?:/|--|-|\+)?\S+)(\s*.*)')
+ # RE for grammar tokens
+ token_re = re.compile(r'`(\w+)`', re.U)
+ 
+@@ -191,12 +195,20 @@ class Cmdoption(ObjectDescription):
+             potential_option = potential_option.strip()
+             m = option_desc_re.match(potential_option)
+             if not m:
+-                logger.warning(__('Malformed option description %r, should '
+-                                  'look like "opt", "-opt args", "--opt args", '
+-                                  '"/opt args" or "+opt args"'), potential_option,
+-                               location=signode)
+-                continue
+-            optname, args = m.groups()
++                # Be liberal in what we accept: if the token doesn't match
++                # the regex for some reason, treat the whole token as the
++                # option name (no args) rather than emitting a warning and
++                # skipping it. This preserves compatibility with older
++                # Sphinx behaviour that allowed arbitrary non-whitespace
++                # option tokens such as "[enable=]PATTERN".
++                optname = potential_option
++                args = ''
++            else:
++                optname, args = m.groups()
++                # ensure args is a string (the regex always returns a
++                # string, possibly empty)
++                if args is None:
++                    args = ''
+             if count:
+                 signode += addnodes.desc_addname(', ', ', ')
+             signode += addnodes.desc_name(optname, optname)

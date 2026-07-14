@@ -1,0 +1,20 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 0aa07e0b99..f872e4fc0e 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1642,7 +1642,14 @@ class Query(BaseExpression):
+                             allow_many,
+                             fail_on_missing,
+                         )
+-                        path.extend(filtered_relation_path[:-1])
++                        # Use the full path for the inner FilteredRelation so
++                        # that the FilteredRelation.path recorded by
++                        # setup_joins() contains the complete join chain.
++                        # Previously the last PathInfo element was dropped
++                        # (filtered_relation_path[:-1]), which led to an
++                        # incomplete reuse set and incorrect join/alias
++                        # wiring when combined with select_related().
++                        path.extend(filtered_relation_path)
+                     else:
+                         field = opts.get_field(filtered_relation.relation_name)
+             if field is not None:

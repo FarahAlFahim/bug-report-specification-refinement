@@ -1,0 +1,20 @@
+diff --git a/sklearn/preprocessing/label.py b/sklearn/preprocessing/label.py
+index 61b8d4a21..7b67e2e0f 100644
+--- a/sklearn/preprocessing/label.py
++++ b/sklearn/preprocessing/label.py
+@@ -127,6 +127,15 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         check_is_fitted(self, 'classes_')
+         y = column_or_1d(y, warn=True)
+ 
++        # Special-case empty target to avoid dtype-casting issues when
++        # np.searchsorted is called with an empty array. column_or_1d
++        # can return an empty float64 array for empty Python lists which
++        # would trigger an error when searching against string-typed
++        # self.classes_. Return an empty integer array in that case as
++        # there are no encoded labels to produce.
++        if y.size == 0:
++            return np.empty(0, dtype=int)
++
+         classes = np.unique(y)
+         if len(np.intersect1d(classes, self.classes_)) < len(classes):
+             diff = np.setdiff1d(classes, self.classes_)

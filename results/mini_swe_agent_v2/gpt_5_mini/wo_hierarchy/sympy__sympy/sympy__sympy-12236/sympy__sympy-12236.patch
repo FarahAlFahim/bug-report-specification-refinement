@@ -1,0 +1,51 @@
+diff --git a/sympy/polys/constructor.py b/sympy/polys/constructor.py
+index f62532ef93..316bbfff95 100644
+--- a/sympy/polys/constructor.py
++++ b/sympy/polys/constructor.py
+@@ -2,7 +2,7 @@
+ 
+ from __future__ import print_function, division
+ 
+-from sympy.polys.polyutils import parallel_dict_from_basic
++from sympy.polys.polyutils import parallel_dict_from_basic, _dict_reorder
+ from sympy.polys.polyoptions import build_options
+ from sympy.polys.domains import ZZ, QQ, RR, EX
+ from sympy.polys.domains.realfield import RealField
+@@ -119,6 +119,37 @@ def _construct_composite(coeffs, opt):
+     if not gens:
+         return None
+ 
++    # Reconcile coefficient gens with outer polynomial gens (opt.gens).
++    # If there is overlap between gens used for coefficient expressions and
++    # the outer polynomial generators then reorder/drop levels in the
++    # polys dictionaries so that the monomial tuples remain consistent
++    # with the gens ordering. If reordering is impossible we fall back to
++    # using the expression domain (by returning None here) so that later
++    # logic will choose EX.
++    if getattr(opt, 'gens', None):
++        try:
++            overlap = set(gens) & set(opt.gens)
++            if overlap:
++                # Build new gens by removing any gens that are present in
++                # opt.gens. The remaining gens are for the coefficient domain.
++                new_gens = tuple(g for g in gens if g not in opt.gens)
++
++                # If nothing left then we cannot construct a composite
++                # coefficient domain here.
++                if not new_gens:
++                    return None
++
++                new_polys = []
++                for poly in polys:
++                    monoms, coeffs = _dict_reorder(poly, gens, new_gens)
++                    # _dict_reorder returns iterables; materialize into dict
++                    new_polys.append(dict(list(zip(monoms, coeffs))))
++
++                polys = new_polys
++                gens = new_gens
++        except Exception:
++            return None
++
+     if opt.composite is None:
+         if any(gen.is_number for gen in gens):
+             return None # generators are number-like so lets better use EX

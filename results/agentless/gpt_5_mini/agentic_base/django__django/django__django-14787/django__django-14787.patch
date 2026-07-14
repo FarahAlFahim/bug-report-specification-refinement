@@ -1,0 +1,44 @@
+diff --git a/django/utils/decorators.py b/django/utils/decorators.py
+index 9a57ac9..1851345 100644
+--- a/django/utils/decorators.py
++++ b/django/utils/decorators.py
+@@ -1,6 +1,7 @@
++
+ "Functions that help with dynamically creating decorators for views."
+ 
+-from functools import partial, update_wrapper, wraps
++from functools import update_wrapper, wraps
+ 
+ 
+ class classonlymethod(classmethod):
+@@ -33,14 +34,23 @@ def _multi_decorate(decorators, method):
+         decorators = [decorators]
+ 
+     def _wrapper(self, *args, **kwargs):
+-        # bound_method has the signature that 'decorator' expects i.e. no
+-        # 'self' argument, but it's a closure over self so it can call
+-        # 'func'. Also, wrap method.__get__() in a function because new
+-        # attributes can't be set on bound method objects, only on functions.
+-        bound_method = partial(method.__get__(self, type(self)))
++        # Create a proper function wrapper around the bound method so that
++        # decorators receive a function-like object exposing __name__,
++        # __module__, __doc__, etc. Bound method objects and functools.partial
++        # do not allow new attributes to be set, which breaks decorators that
++        # use functools.wraps or inspect function metadata.
++        bound_method = method.__get__(self, type(self))
++
++        def _bound(*a, **kw):
++            return bound_method(*a, **kw)
++
++        # Preserve metadata from the original (unbound) method on the wrapper.
++        update_wrapper(_bound, method)
++
++        func = _bound
+         for dec in decorators:
+-            bound_method = dec(bound_method)
+-        return bound_method(*args, **kwargs)
++            func = dec(func)
++        return func(*args, **kwargs)
+ 
+     # Copy any attributes that a decorator adds to the function it decorates.
+     for dec in decorators:

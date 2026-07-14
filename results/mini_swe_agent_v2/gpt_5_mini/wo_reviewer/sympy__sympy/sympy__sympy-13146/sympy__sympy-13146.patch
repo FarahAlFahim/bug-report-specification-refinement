@@ -1,0 +1,22 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index ba6ee29a9c..428d1ae0eb 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1087,7 +1087,16 @@ def __getstate__(self):
+         return {'_prec': self._prec}
+ 
+     def _hashable_content(self):
+-        return (self._mpf_, self._prec)
++        # Use a numeric string representation for hashing so that
++        # Floats that are numerically equal (but may differ in
++        # internal mpf tuple or precision) are treated as the same
++        # hashable content. This allows grouping code (Add/Mul)
++        # that relies on Basic hashing/equality to combine like
++        # terms even when Float internals differ.
++        #
++        # We avoid using the internal _mpf_/_prec here because those
++        # encode structural identity rather than numeric equality.
++        return (str(self),)
+ 
+     def floor(self):
+         return Integer(int(mlib.to_int(

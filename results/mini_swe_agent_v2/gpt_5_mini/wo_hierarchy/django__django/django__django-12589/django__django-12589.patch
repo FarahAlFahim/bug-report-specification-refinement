@@ -1,0 +1,23 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 63ca817355..a5ffc1c2b0 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -133,7 +133,17 @@ class SQLCompiler:
+         expressions = self.collapse_group_by(expressions, having_group_by)
+ 
+         for expr in expressions:
+-            sql, params = self.compile(expr)
++            # If the expression is a Ref pointing to a Subquery source,
++            # compile the Subquery itself so that GROUP BY emits the
++            # subquery SQL (SELECT ...) instead of a bare quoted alias.
++            compile_expr = expr
++            try:
++                from django.db.models.expressions import Subquery
++            except Exception:
++                Subquery = None
++            if Subquery is not None and isinstance(expr, Ref) and isinstance(getattr(expr, 'source', None), Subquery):
++                compile_expr = expr.source
++            sql, params = self.compile(compile_expr)
+             params_hash = make_hashable(params)
+             if (sql, params_hash) not in seen:
+                 result.append((sql, params))

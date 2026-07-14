@@ -1,0 +1,55 @@
+diff --git a/requests/adapters.py b/requests/adapters.py
+index 841cbbfe..43b6ec3c 100644
+--- a/requests/adapters.py
++++ b/requests/adapters.py
+@@ -25,10 +25,12 @@ from .packages.urllib3.exceptions import MaxRetryError
+ from .packages.urllib3.exceptions import ProxyError as _ProxyError
+ from .packages.urllib3.exceptions import ProtocolError
+ from .packages.urllib3.exceptions import ReadTimeoutError
++from .packages.urllib3.exceptions import TimeoutError as _TimeoutError
++from .packages.urllib3.exceptions import DecodeError as _DecodeError
+ from .packages.urllib3.exceptions import SSLError as _SSLError
+ from .packages.urllib3.exceptions import ResponseError
+ from .cookies import extract_cookies_to_jar
+-from .exceptions import (ConnectionError, ConnectTimeout, ReadTimeout, SSLError,
++from .exceptions import (ConnectionError, ConnectTimeout, ReadTimeout, Timeout, SSLError,
+                          ProxyError, RetryError)
+ from .auth import _basic_auth_str
+ 
+@@ -424,6 +426,13 @@ class HTTPAdapter(BaseAdapter):
+         except _ProxyError as e:
+             raise ProxyError(e)
+ 
++        except _TimeoutError as e:
++            raise Timeout(e, request=request)
++
++        except _DecodeError as e:
++            from .exceptions import ContentDecodingError
++            raise ContentDecodingError(e, request=request)
++
+         except (_SSLError, _HTTPError) as e:
+             if isinstance(e, _SSLError):
+                 raise SSLError(e, request=request)
+diff --git a/requests/models.py b/requests/models.py
+index 4270c647..b4d95be6 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -20,7 +20,8 @@ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+ from .packages.urllib3.exceptions import (
+-    DecodeError, ReadTimeoutError, ProtocolError, LocationParseError)
++    TimeoutError,
++    DecodeError, ProtocolError, LocationParseError)
+ from .exceptions import (
+     HTTPError, MissingSchema, InvalidURL, ChunkedEncodingError,
+     ContentDecodingError, ConnectionError, StreamConsumedError)
+@@ -660,7 +661,7 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
+-                except ReadTimeoutError as e:
++                except TimeoutError as e:
+                     raise ConnectionError(e)
+             else:
+                 # Standard file-like object.

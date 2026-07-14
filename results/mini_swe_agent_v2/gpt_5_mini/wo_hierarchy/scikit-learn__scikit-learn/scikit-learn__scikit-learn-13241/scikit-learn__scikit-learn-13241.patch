@@ -1,0 +1,27 @@
+diff --git a/sklearn/decomposition/kernel_pca.py b/sklearn/decomposition/kernel_pca.py
+index bb91d0cbb..9f80dba9a 100644
+--- a/sklearn/decomposition/kernel_pca.py
++++ b/sklearn/decomposition/kernel_pca.py
+@@ -220,6 +220,22 @@ class KernelPCA(BaseEstimator, TransformerMixin, _UnstableOn32BitMixin):
+             self.alphas_ = self.alphas_[:, self.lambdas_ > 0]
+             self.lambdas_ = self.lambdas_[self.lambdas_ > 0]
+ 
++        # Enforce deterministic sign convention for eigenvectors. Eigenvectors
++        # are only defined up to a global sign (+v or -v). Different
++        # eigensolver runs (different backends, random init in ARPACK, BLAS
++        # differences) can produce eigenvectors with flipped signs across runs.
++        # To make the output deterministic and consistent with other
++        # decompositions (which use svd_flip), we flip each component (column)
++        # so that the entry with largest absolute value is positive.
++        if (getattr(self, "alphas_", None) is not None and self.alphas_.size):
++            # find index of max abs value in each column
++            max_abs_rows = np.argmax(np.abs(self.alphas_), axis=0)
++            signs = np.sign(self.alphas_[max_abs_rows, range(self.alphas_.shape[1])])
++            # treat zeros (all-zero column) as positive (no flip)
++            signs[signs == 0] = 1
++            # apply sign to each column
++            self.alphas_ = self.alphas_ * signs[np.newaxis, :]
++
+         return K
+ 
+     def _fit_inverse_transform(self, X_transformed, X):

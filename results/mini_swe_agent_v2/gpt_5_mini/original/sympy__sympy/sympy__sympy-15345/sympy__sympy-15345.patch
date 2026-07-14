@@ -1,0 +1,50 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..e56c0c7b9 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -63,7 +63,31 @@ def __init__(self, settings={}):
+                 userfuncs[k] = [(lambda *x: True, v)]
+                 self.known_functions.update(userfuncs)
+ 
+-    doprint = StrPrinter.doprint
++    # Use CodePrinter.doprint so that the CodePrinter printing machinery is used
++    # (StrPrinter.doprint prints using Python-style parentheses for functions
++    # which leads to outputs like "Max(2, x)").  Using CodePrinter.doprint
++    # ensures Mathematica-style brackets are produced (e.g. "Max[2, x]").
++    doprint = CodePrinter.doprint
++
++    # Basic CodePrinter protocol implementations for formatting output
++    language = "Mathematica"
++
++    def _get_statement(self, codestring):
++        return codestring
++
++    def _get_comment(self, text):
++        # Mathematica comments are enclosed in (* ... *)
++        return "(* %s *)" % text
++
++    def _declare_number_const(self, name, value):
++        return "%s = %s" % (name, value)
++
++    def _format_code(self, lines):
++        return lines
++
++    def _get_loop_opening_ending(self, indices):
++        # Not needed for simple expression printing; return empty
++        return ([], [])
+ 
+     def _print_Pow(self, expr):
+         PREC = precedence(expr)
+@@ -117,6 +141,12 @@ def _print_Derivative(self, expr):
+         return "Hold[D[" + ', '.join(self.doprint(a) for a in [dexpr] + dvars) + "]]"
+ 
+ 
++    def _print_Max(self, expr):
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
++    def _print_Min(self, expr):
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code
+ 

@@ -1,0 +1,44 @@
+diff --git a/astropy/wcs/wcs.py b/astropy/wcs/wcs.py
+index d3a06f2b31..9f387921c2 100644
+--- a/astropy/wcs/wcs.py
++++ b/astropy/wcs/wcs.py
+@@ -1222,6 +1222,22 @@ reduce these to 2 dimensions using the naxis kwarg.
+ 
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
++
++            # If there are no coordinate rows, avoid calling into the
++            # underlying C implementation (wcslib) which does not accept
++            # zero-length inputs. Construct and return appropriately
++            # shaped empty outputs on the Python side instead.
++            if xy.shape[0] == 0:
++                # number of output axes is the number of columns
++                nout = xy.shape[1]
++                output = np.empty((0, nout), dtype=float)
++                if ra_dec_order and sky == 'output':
++                    output = self._normalize_sky(output)
++                    return (output[:, 0].reshape(axes[0].shape),
++                            output[:, 1].reshape(axes[0].shape))
++                return [output[:, i].reshape(axes[0].shape)
++                        for i in range(output.shape[1])]
++
+             output = func(xy, origin)
+             if ra_dec_order and sky == 'output':
+                 output = self._normalize_sky(output)
+@@ -1237,6 +1253,16 @@ reduce these to 2 dimensions using the naxis kwarg.
+                     "of shape (N, {0})".format(self.naxis))
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
++            # If there are no coordinate rows, avoid calling the C-level
++            # transform which expects positive counts. Construct an empty
++            # result array with shape (0, naxes) and apply any required
++            # normalization in Python.
++            if xy.shape[0] == 0:
++                result = np.empty((0, xy.shape[1]), dtype=float)
++                if ra_dec_order and sky == 'output':
++                    result = self._normalize_sky(result)
++                return result
++
+             result = func(xy, origin)
+             if ra_dec_order and sky == 'output':
+                 result = self._normalize_sky(result)

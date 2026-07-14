@@ -1,0 +1,34 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..99e2aa5751 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -384,16 +384,27 @@ def _eval_power(self, other):
+     def _sage_(self):
+         import sage.all as sage
+         return sage.sgn(self.args[0]._sage_())
++    
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        """
++        Symbolic rewrite of sign(z) in terms of Abs: z/Abs(z).
+ 
++        Note: this is a purely symbolic rewrite used by Basic.rewrite(Abs).
++        The identity sign(z) = z/Abs(z) holds for nonzero z; we return the
++        algebraic form for rewriting purposes without changing evaluation
++        semantics (sign(0) continues to evaluate to 0).
++        """
++        return arg / Abs(arg)
++    
+     def _eval_rewrite_as_Piecewise(self, arg, **kwargs):
+         if arg.is_extended_real:
+             return Piecewise((1, arg > 0), (-1, arg < 0), (0, True))
+-
++    
+     def _eval_rewrite_as_Heaviside(self, arg, **kwargs):
+         from sympy.functions.special.delta_functions import Heaviside
+         if arg.is_extended_real:
+             return Heaviside(arg, H0=S(1)/2) * 2 - 1
+-
++    
+     def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 

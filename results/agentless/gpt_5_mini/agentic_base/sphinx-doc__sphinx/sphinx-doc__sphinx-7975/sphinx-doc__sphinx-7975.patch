@@ -1,0 +1,27 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 44ea73a..115ceda 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -108,7 +108,15 @@ class IndexEntries:
+             lckey = unicodedata.normalize('NFD', key.lower())
+             if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 lckey = lckey[1:]
+-            if lckey[0:1].isalpha() or lckey.startswith('_'):
++            # Treat an explicit localized 'Symbols' category as a symbol group.
++            # If category_key equals the localized _('Symbols') (after
++            # normalization/lowercasing) do not classify it as a "letter" group
++            # by prefixing chr(127). This avoids creating two separate
++            # 'Symbols' groups (explicit vs implicit) that would get the same
++            # display title and anchor.
++            sym_label = unicodedata.normalize('NFD', _('Symbols').lower())
++            if not (category_key and lckey == sym_label) and (
++                    lckey[0:1].isalpha() or lckey.startswith('_')):
+                 lckey = chr(127) + lckey
+             # ensure a determinstic order *within* letters by also sorting on
+             # the entry itself
+@@ -173,4 +181,4 @@ class IndexEntries:
+             else:
+                 return v[2]
+         return [(key_, list(group))
+-                for (key_, group) in groupby(newlist, keyfunc3)]
++                for (key_, group) in groupby(newlist, keyfunc3)]

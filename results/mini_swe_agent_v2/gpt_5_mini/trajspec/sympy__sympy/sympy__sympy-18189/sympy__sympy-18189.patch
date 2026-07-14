@@ -1,0 +1,91 @@
+diff --git a/sympy/solvers/diophantine.py b/sympy/solvers/diophantine.py
+index 6092e35dab..9a6675e3b2 100644
+--- a/sympy/solvers/diophantine.py
++++ b/sympy/solvers/diophantine.py
+@@ -181,14 +181,20 @@ def diophantine(eq, param=symbols("t", integer=True), syms=None,
+             syms = [i for i in syms if i in var]
+             if syms != var:
+                 dict_sym_index = dict(zip(syms, range(len(syms))))
++                # propagate permute flag to inner diophantine call so that
++                # requested permutations are honored regardless of the
++                # ordering of `syms` passed by the user
+                 return {tuple([t[dict_sym_index[i]] for i in var])
+-                            for t in diophantine(eq, param)}
++                            for t in diophantine(eq, param, permute=permute)}
+         n, d = eq.as_numer_denom()
+         if n.is_number:
+             return set()
+         if not d.is_number:
+-            dsol = diophantine(d)
+-            good = diophantine(n) - dsol
++            # propagate permute so that filtering/removal of solutions
++            # accounts for any permutations requested by the top-level
++            # caller
++            dsol = diophantine(d, permute=permute)
++            good = diophantine(n, permute=permute) - dsol
+             return {s for s in good if _mexpand(d.subs(zip(var, s)))}
+         else:
+             eq = n
+@@ -303,7 +309,9 @@ def diophantine(eq, param=symbols("t", integer=True), syms=None,
+         base, _ = term
+         var_t, _, eq_type = classify_diop(base, _dict=False)
+         _, base = signsimp(base, evaluate=False).as_coeff_Mul()
+-        solution = diop_solve(base, param)
++        # pass along permute so that solvers which make internal
++        # diophantine calls can honor the top-level request
++        solution = diop_solve(base, param, permute=permute)
+ 
+         if eq_type in [
+                 "linear",
+@@ -383,7 +391,7 @@ def merge_solution(var, var_t, solution):
+     return tuple(sol)
+ 
+ 
+-def diop_solve(eq, param=symbols("t", integer=True)):
++def diop_solve(eq, param=symbols("t", integer=True), permute=False):
+     """
+     Solves the diophantine equation ``eq``.
+ 
+@@ -436,12 +444,12 @@ def diop_solve(eq, param=symbols("t", integer=True)):
+         return _diop_quadratic(var, coeff, param)
+ 
+     elif eq_type == "homogeneous_ternary_quadratic":
+-        x_0, y_0, z_0 = _diop_ternary_quadratic(var, coeff)
++        x_0, y_0, z_0 = _diop_ternary_quadratic(var, coeff, permute=permute)
+         return _parametrize_ternary_quadratic(
+             (x_0, y_0, z_0), var, coeff)
+ 
+     elif eq_type == "homogeneous_ternary_quadratic_normal":
+-        x_0, y_0, z_0 = _diop_ternary_quadratic_normal(var, coeff)
++        x_0, y_0, z_0 = _diop_ternary_quadratic_normal(var, coeff, permute=permute)
+         return _parametrize_ternary_quadratic(
+             (x_0, y_0, z_0), var, coeff)
+ 
+@@ -1963,7 +1971,7 @@ def diop_ternary_quadratic(eq):
+         return _diop_ternary_quadratic(var, coeff)
+ 
+ 
+-def _diop_ternary_quadratic(_var, coeff):
++def _diop_ternary_quadratic(_var, coeff, permute=False):
+ 
+     x, y, z = _var
+     var = [x, y, z]
+@@ -1979,7 +1987,8 @@ def _diop_ternary_quadratic(_var, coeff):
+ 
+     if not any(coeff[i**2] for i in var):
+         if coeff[x*z]:
+-            sols = diophantine(coeff[x*y]*x + coeff[y*z]*z - x*z)
++            sols = diophantine(coeff[x*y]*x + coeff[y*z]*z - x*z,
++                               permute=permute)
+             s = sols.pop()
+             min_sum = abs(s[0]) + abs(s[1])
+ 
+@@ -2300,7 +2309,7 @@ def diop_ternary_quadratic_normal(eq):
+         return _diop_ternary_quadratic_normal(var, coeff)
+ 
+ 
+-def _diop_ternary_quadratic_normal(var, coeff):
++def _diop_ternary_quadratic_normal(var, coeff, permute=False):
+ 
+     x, y, z = var
+ 

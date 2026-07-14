@@ -1,0 +1,46 @@
+diff --git a/sklearn/utils/multiclass.py b/sklearn/utils/multiclass.py
+index 5eaef2fde..237a33b6f 100644
+--- a/sklearn/utils/multiclass.py
++++ b/sklearn/utils/multiclass.py
+@@ -295,6 +295,41 @@ def type_of_target(y, input_name=""):
+     if sparse_pandas:
+         raise ValueError("y cannot be class 'SparseSeries' or 'SparseArray'")
+ 
++    # Support pandas nullable dtypes (e.g. "Int64", "Float64", "boolean").
++    # These dtypes may be converted to object when passed through
++    # xp.asarray which then leads to type_of_target returning "unknown" and
++    # causing a mix-type error in unique_labels. If pandas is available and
++    # y is a pandas Series/Index with a nullable extension dtype, try to
++    # convert it to the corresponding numpy dtype when possible. We perform
++    # a best-effort conversion and silently fall back if pandas is not
++    # available or the conversion fails (e.g. because of missing values).
++    try:
++        import pandas as _pd
++    except Exception:
++        _pd = None
++
++    if _pd is not None:
++        try:
++            _pd_nullable_to_numpy = {
++                "Int64": "int64",
++                "Float64": "float64",
++                "boolean": "bool",
++            }
++            if isinstance(y, (_pd.Series, _pd.Index)):
++                dtype_name = getattr(y.dtype, "name", None)
++                if dtype_name in _pd_nullable_to_numpy:
++                    try:
++                        y = y.to_numpy(dtype=_pd_nullable_to_numpy[dtype_name])
++                    except Exception:
++                        # Conversion may fail when missing values are
++                        # present; in that case we keep the original
++                        # object-like array and continue.
++                        pass
++        except Exception:
++            # Be conservative: if anything unexpected happens while
++            # probing pandas, we don't want to raise here.
++            pass
++
+     if is_multilabel(y):
+         return "multilabel-indicator"
+ 

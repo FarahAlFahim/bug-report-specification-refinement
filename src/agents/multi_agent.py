@@ -349,11 +349,11 @@ def run_pipeline(cfg):
 
     mkdirp(os.path.dirname(out_file) or ".")
 
-    # Auto-derive single-enhanced (before reviewer) output path if not set
+    # Auto-derive the pre-reviewer output path if not set.
     single_enhanced_file = cfg.single_enhanced_file
     if not single_enhanced_file:
-        enhanced_dir = os.path.join(cfg.output_dir, "enhanced")
-        single_enhanced_file = os.path.join(enhanced_dir, os.path.basename(out_file))
+        pre_reviewer_dir = os.path.join(cfg.output_dir, "wo_reviewer")
+        single_enhanced_file = os.path.join(pre_reviewer_dir, os.path.basename(out_file))
     mkdirp(os.path.dirname(single_enhanced_file) or ".")
 
     logger.info(f"Output (before reviewer): {single_enhanced_file}")

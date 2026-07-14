@@ -1,0 +1,22 @@
+diff --git a/sympy/geometry/entity.py b/sympy/geometry/entity.py
+index ee5c910268..1b9a66737c 100644
+--- a/sympy/geometry/entity.py
++++ b/sympy/geometry/entity.py
+@@ -138,8 +138,15 @@ def __repr__(self):
+         return type(self).__name__ + repr(self.args)
+ 
+     def __rmul__(self, a):
+-        """Implementation of reverse multiplication method."""
+-        return a.__mul__(self)
++        """Implementation of reverse multiplication method.
++
++        Reverse multiplication (e.g. scalar * geometry_object) should delegate
++        to the geometry object's __mul__ implementation so that scalar*Point
++        uses Point.__mul__ (which knows how to scale coordinates) instead of
++        delegating to numeric types (e.g. Float) whose __mul__ may produce a
++        generic Mul and not a GeometryEntity.
++        """
++        return self.__mul__(a)
+ 
+     def __rsub__(self, a):
+         """Implementation of reverse subtraction method."""

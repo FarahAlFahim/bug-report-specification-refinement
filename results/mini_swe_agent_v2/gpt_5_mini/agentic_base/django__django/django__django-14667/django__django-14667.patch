@@ -1,0 +1,42 @@
+--- /tmp/orig_query.py	2026-05-28 19:09:29.359840003 +0000
++++ django/db/models/sql/query.py	2026-05-28 19:08:56.246270001 +0000
+@@ -2068,6 +2068,15 @@
+         """Remove any fields from the deferred loading set."""
+         self.deferred_loading = (frozenset(), True)
+ 
++        # Invalidate any cached mapping of loaded field names.  The
++        # get_loaded_field_names() result depends on deferred_loading, so
++        # mutations to that state must clear the cache to avoid returning
++        # stale data (see #PR description).
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
++
+     def add_deferred_loading(self, field_names):
+         """
+         Add the given list of model field names to the set of fields to
+@@ -2087,6 +2096,11 @@
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+             self.deferred_loading = existing.difference(field_names), False
++        # Mutating deferred_loading invalidates the cached loaded-field map.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_immediate_loading(self, field_names):
+         """
+@@ -2111,6 +2125,11 @@
+         else:
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
++        # Mutating deferred_loading invalidates the cached loaded-field map.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def get_loaded_field_names(self):
+         """

@@ -1,0 +1,70 @@
+diff --git a/django/contrib/staticfiles/handlers.py b/django/contrib/staticfiles/handlers.py
+index 711d8864ad..8c7cac6f24 100644
+--- a/django/contrib/staticfiles/handlers.py
++++ b/django/contrib/staticfiles/handlers.py
+@@ -18,10 +18,32 @@ class StaticFilesHandlerMixin:
+     # request_finished signal)
+     handles_files = True
+ 
+-    def load_middleware(self):
+-        # Middleware are already loaded for self.application; no need to reload
+-        # them for self.
+-        pass
++    def load_middleware(self, is_async=False):
++        """
++        Populate middleware chain for this handler.
++
++        For wrapper handlers (that wrap another WSGI/ASGI application), the
++        wrapped application will already have its middleware chain built. In
++        that case reuse the wrapped application's middleware chain. Otherwise
++        fall back to the normal BaseHandler.load_middleware behaviour.
++        """
++        # If the wrapped application is a Django handler with a middleware
++        # chain already initialised, reuse it. This mirrors the WSGI
++        # behaviour where middleware are already loaded for self.application.
++        app = getattr(self, 'application', None)
++        if app is not None and getattr(app, '_middleware_chain', None) is not None:
++            # Respect async/sync adaptation already performed on the wrapped
++            # application's chain; BaseHandler.adapt_method_mode will
++            # normally wrap handlers appropriately when necessary.
++            self._middleware_chain = app._middleware_chain
++            # Also copy the middleware lists for completeness.
++            for attr in ('_view_middleware', '_template_response_middleware', '_exception_middleware'):
++                setattr(self, attr, getattr(app, attr, None))
++            return
++        # No wrapped application or no middleware chain available; behave like
++        # the default and let BaseHandler.build the middleware chain.
++        from django.core.handlers.base import BaseHandler
++        return BaseHandler.load_middleware(self, is_async=is_async)
+ 
+     def get_base_url(self):
+         utils.check_settings()
+@@ -77,6 +99,11 @@ class ASGIStaticFilesHandler(StaticFilesHandlerMixin, ASGIHandler):
+     def __init__(self, application):
+         self.application = application
+         self.base_url = urlparse(self.get_base_url())
++        # Ensure ASGIHandler.__init__ runs so that BaseHandler initialization
++        # (including middleware loading) occurs. load_middleware is
++        # overridden above to reuse the wrapped application's middleware
++        # chain where possible.
++        super().__init__()
+ 
+     async def __call__(self, scope, receive, send):
+         # Only even look at HTTP requests
+@@ -86,3 +113,15 @@ class ASGIStaticFilesHandler(StaticFilesHandlerMixin, ASGIHandler):
+             return await super().__call__(scope, receive, send)
+         # Hand off to the main app
+         return await self.application(scope, receive, send)
++
++    async def get_response_async(self, request):
++        """
++        Async response path for ASGI usage. Run the synchronous
++        get_response via sync_to_async and register the request.close
++        on the response so resources are cleaned up as for the normal
++        BaseHandler.get_response_async implementation.
++        """
++        from asgiref.sync import sync_to_async
++        response = await sync_to_async(self.get_response, thread_sensitive=True)(request)
++        response._resource_closers.append(request.close)
++        return response
+\ No newline at end of file

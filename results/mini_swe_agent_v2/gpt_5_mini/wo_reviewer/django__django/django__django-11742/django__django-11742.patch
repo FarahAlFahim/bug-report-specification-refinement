@@ -1,0 +1,41 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..e27192cb49 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -239,7 +239,35 @@ class Field(RegisterLookupMixin):
+                 )
+             ]
+         else:
+-            return []
++            # Additional check: if this Field exposes a max_length attribute,
++            # ensure that no stored choice key (the value stored in the DB)
++            # exceeds that max_length. Skip lazy translation Promises so
++            # that we don't force evaluation during system checks.
++            errors = []
++            max_length = getattr(self, 'max_length', None)
++            if isinstance(max_length, int):
++                # Iterate flattened choices and measure only actual str keys.
++                try:
++                    longest = max(
++                        (len(choice) for choice, _ in self.flatchoices if isinstance(choice, str)),
++                        default=0,
++                    )
++                except Exception:
++                    longest = 0
++                if longest > max_length:
++                    errors.append(
++                        checks.Error(
++                            "The max_length of the field is %d, but the longest "
++                            "choice value is %d." % (max_length, longest),
++                            hint=(
++                                "Increase the field's max_length to at least %d, "
++                                "or shorten the choice values." % longest
++                            ),
++                            obj=self,
++                            id='fields.E122',
++                        )
++                    )
++            return errors
+ 
+     def _check_choices(self):
+         if not self.choices:

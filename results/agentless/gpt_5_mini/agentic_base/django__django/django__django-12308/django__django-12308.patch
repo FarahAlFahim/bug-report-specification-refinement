@@ -1,0 +1,33 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index 07cdaa5..c4d506a 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -379,6 +379,7 @@ def help_text_for_field(name, model):
+ 
+ def display_for_field(value, field, empty_value_display):
+     from django.contrib.admin.templatetags.admin_list import _boolean_icon
++    import json as _json
+ 
+     if getattr(field, 'flatchoices', None):
+         return dict(field.flatchoices).get(value, empty_value_display)
+@@ -398,6 +399,20 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    # JSONField: present Python dict/list/tuple values as valid JSON text.
++    # Use the field's encoder if provided so the presentation matches form behavior.
++    elif isinstance(field, getattr(models, 'JSONField', type(None))):
++        # If the value is a container type that json.dumps supports, serialize
++        # it to JSON (this produces double-quoted JSON). For other types,
++        # fall back to the generic value display.
++        if isinstance(value, (dict, list, tuple)):
++            try:
++                return _json.dumps(value, cls=getattr(field, 'encoder', None))
++            except TypeError:
++                # If encoding fails for whatever reason, fall back to the generic
++                # display to avoid crashing the admin.
++                return display_for_value(value, empty_value_display)
++        return display_for_value(value, empty_value_display)
+     else:
+         return display_for_value(value, empty_value_display)
+ 

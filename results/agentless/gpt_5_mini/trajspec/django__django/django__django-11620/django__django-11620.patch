@@ -1,0 +1,58 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 37e3b61..fa526f1 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -239,6 +239,8 @@ def _route_to_regex(route, is_endpoint=False):
+     return ''.join(parts), converters
+ 
+ 
++from django.http import Http404
++
+ class RoutePattern(CheckURLMixin):
+     regex = LocaleRegexDescriptor('_route')
+ 
+@@ -258,7 +260,10 @@ class RoutePattern(CheckURLMixin):
+                 converter = self.converters[key]
+                 try:
+                     kwargs[key] = converter.to_python(value)
+-                except ValueError:
++                except (ValueError, Http404):
++                    # Treat a converter-raised Http404 as a "no match" so that
++                    # URL resolution continues trying other patterns instead of
++                    # propagating an Http404 during matching.
+                     return None
+             return path[match.end():], (), kwargs
+         return None
+@@ -540,8 +545,14 @@ class URLResolver:
+             for pattern in self.url_patterns:
+                 try:
+                     sub_match = pattern.resolve(new_path)
+-                except Resolver404 as e:
+-                    sub_tried = e.args[0].get('tried')
++                except (Resolver404, Http404) as e:
++                    # If a sub-resolution raises Http404 (for example, from a
++                    # converter), treat it like a non-match so resolution can
++                    # continue trying other patterns.
++                    if isinstance(e, Resolver404):
++                        sub_tried = e.args[0].get('tried')
++                    else:
++                        sub_tried = None
+                     if sub_tried is not None:
+                         tried.extend([pattern] + t for t in sub_tried)
+                     else:
+diff --git a/django/views/debug.py b/django/views/debug.py
+index fa06caa..39b2163 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -481,9 +481,10 @@ def technical_404_response(request, exception):
+         urlconf = urlconf.__name__
+ 
+     caller = ''
++    from django.http import Http404
+     try:
+         resolver_match = resolve(request.path)
+-    except Resolver404:
++    except (Resolver404, Http404):
+         pass
+     else:
+         obj = resolver_match.func

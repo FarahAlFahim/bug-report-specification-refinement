@@ -1,0 +1,19 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 7ecda40..618d8df 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -101,6 +101,14 @@ class MCodePrinter(CodePrinter):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_LatticeOp(self, expr):
++        # LatticeOp-derived classes (for example Max, Min) are not Function
++        # subclasses and therefore would otherwise be handled by the generic
++        # StrPrinter implementation which sorts arguments and uses parentheses.
++        # For Mathematica output we must preserve the original argument order
++        # and use square brackets like other function-like objects.
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

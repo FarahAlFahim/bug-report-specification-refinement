@@ -1,0 +1,64 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index d610dc86f0..a37492e2ef 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1,3 +1,4 @@
++import enum
+ import collections.abc
+ import copy
+ import datetime
+@@ -1008,6 +1009,8 @@ class CharField(Field):
+         return "CharField"
+ 
+     def to_python(self, value):
++        if isinstance(value, enum.Enum):
++            value = value.value
+         if isinstance(value, str) or value is None:
+             return value
+         return str(value)
+@@ -2023,6 +2026,8 @@ class TextField(Field):
+         return "TextField"
+ 
+     def to_python(self, value):
++        if isinstance(value, enum.Enum):
++            value = value.value
+         if isinstance(value, str) or value is None:
+             return value
+         return str(value)
+diff --git a/django/db/models/query_utils.py b/django/db/models/query_utils.py
+index 189fb4fa44..4befe14b61 100644
+--- a/django/db/models/query_utils.py
++++ b/django/db/models/query_utils.py
+@@ -6,6 +6,7 @@ large and/or so that they can be used by other modules without getting into
+ circular import difficulties.
+ """
+ import copy
++import enum
+ import functools
+ import inspect
+ from collections import namedtuple
+@@ -138,6 +139,24 @@ class DeferredAttribute:
+             data[field_name] = val
+         return data[field_name]
+ 
++    def __set__(self, instance, value):
++        """
++        Set the value on the instance. Convert the value using the field's
++        to_python method to ensure enum values are converted to their
++        primitive values.
++        """
++        # Convert enum values to their primitive values. This handles
++        # TextChoices and IntegerChoices which inherit from str/int.
++        if isinstance(value, enum.Enum):
++            value = value.value
++        instance.__dict__[self.field.attname] = value
++
++    def __delete__(self, instance):
++        """
++        Delete the value from the instance.
++        """
++        del instance.__dict__[self.field.attname]
++
+     def _check_parent_chain(self, instance):
+         """
+         Check if the field value can be fetched from a parent field already

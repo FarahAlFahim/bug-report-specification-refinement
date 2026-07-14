@@ -1,0 +1,43 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index f32ce64629..b84d7104f7 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1587,7 +1587,7 @@ class DurationField(Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+         'invalid': _("'%(value)s' value has an invalid format. It must be in "
+-                     "[DD] [HH:[MM:]]ss[.uuuuuu] format.")
++                     "[DD] [[HH:]MM:]ss[.uuuuuu] format.")
+     }
+     description = _("Duration")
+ 
+@@ -1631,6 +1631,10 @@ class DurationField(Field):
+         return '' if val is None else duration_string(val)
+ 
+     def formfield(self, **kwargs):
++        # Provide a helpful default help_text for forms generated from this
++        # model field so users know the expected input format. Allow callers
++        # to override help_text via kwargs.
++        kwargs.setdefault('help_text', _('[DD] [[HH:]MM:]ss[.uuuuuu]'))
+         return super().formfield(**{
+             'form_class': forms.DurationField,
+             **kwargs,
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index a977256525..3240825fa1 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -472,6 +472,14 @@ class DurationField(Field):
+         'overflow': _('The number of days must be between {min_days} and {max_days}.')
+     }
+ 
++    def __init__(self, *args, **kwargs):
++        # Provide a helpful default help_text so standalone form fields
++        # communicate the expected duration format to users. Allow callers
++        # to override via the help_text kwarg.
++        kwargs.setdefault('help_text', _('[DD] [[HH:]MM:]ss[.uuuuuu]'))
++        super().__init__(*args, **kwargs)
++
++
+     def prepare_value(self, value):
+         if isinstance(value, datetime.timedelta):
+             return duration_string(value)

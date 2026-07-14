@@ -1,0 +1,22 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..5a320b3eaf 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -15,6 +15,7 @@
+ 
+ from sympy.core import S
+ from sympy.core.compatibility import string_types, range
++import sympy
+ from sympy.codegen.ast import Assignment
+ from sympy.printing.codeprinter import CodePrinter
+ from sympy.printing.precedence import precedence
+@@ -251,6 +252,9 @@ def _print_For(self, expr):
+     def _print_sign(self, func):
+         return '((({0}) > 0) - (({0}) < 0))'.format(self._print(func.args[0]))
+ 
++    def _print_sinc(self, expr):
++        return self._print(expr.rewrite(sympy.sin))
++
+     def indent_code(self, code):
+         """Accepts a string of code or a list of code lines"""
+ 

@@ -1,0 +1,54 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..ce0d1d573d 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5890,6 +5890,39 @@ def key(obj):
+     return sorted(factors, key=key)
+ 
+ 
++def _combine_factors(factors, method):
++    """Combine factors with the same exponent.
++
++    This is used for square-free factorization to combine factors
++    with the same multiplicity into a single factor.
++    """
++    if method != 'sqf':
++        return factors
++
++    if not factors:
++        return factors
++
++    # Group factors by their exponent
++    from collections import defaultdict
++    combined = defaultdict(list)
++    for poly, exp in factors:
++        combined[exp].append(poly)
++
++    result = []
++    for exp in sorted(combined.keys()):
++        polys = combined[exp]
++        if len(polys) == 1:
++            result.append((polys[0], exp))
++        else:
++            # Multiply all polynomials with the same exponent
++            result_poly = polys[0]
++            for poly in polys[1:]:
++                result_poly = result_poly.mul(poly)
++            result.append((result_poly, exp))
++
++    return result
++
++
+ def _factors_product(factors):
+     """Multiply a list of ``(expr, exp)`` pairs. """
+     return Mul(*[f.as_expr()**k for f, k in factors])
+@@ -5996,7 +6029,9 @@ def _generic_factor_list(expr, gens, args, method):
+                     factors[i] = (f, k)
+ 
+         fp = _sorted_factors(fp, method)
++        fp = _combine_factors(fp, method)
+         fq = _sorted_factors(fq, method)
++        fq = _combine_factors(fq, method)
+ 
+         if not opt.polys:
+             fp = [(f.as_expr(), k) for f, k in fp]

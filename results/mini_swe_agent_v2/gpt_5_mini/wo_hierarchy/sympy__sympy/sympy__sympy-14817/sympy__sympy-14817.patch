@@ -1,0 +1,35 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..21c3d03953 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,7 +825,29 @@ def _print_MatAdd(self, expr):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine sign by inspecting the scalar coefficient of the
++                # matrix term instead of attempting to sympify internal
++                # attributes (like a MatrixSymbol's name).  Calling S on
++                # item.args[0] can fail for MatrixSymbol where args[0] may be
++                # an arbitrary Python object (e.g. a non-parseable string).
++                try:
++                    coeff = item.as_coeff_mmul()[0]
++                except Exception:
++                    coeff = None
++
++                is_neg = False
++                if coeff is not None:
++                    # Prefer SymPy's is_negative if available, otherwise
++                    # fall back to a safe Python comparison for plain numbers.
++                    if hasattr(coeff, 'is_negative'):
++                        is_neg = coeff.is_negative
++                    else:
++                        try:
++                            is_neg = coeff < 0
++                        except Exception:
++                            is_neg = False
++
++                if is_neg:
+                     s = prettyForm(*stringPict.next(s, ' '))
+                     pform = self._print(item)
+                 else:

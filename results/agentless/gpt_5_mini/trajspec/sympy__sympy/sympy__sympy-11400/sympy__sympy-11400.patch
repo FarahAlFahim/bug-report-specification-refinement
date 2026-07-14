@@ -1,0 +1,25 @@
+diff --git a/sympy/printing/codeprinter.py b/sympy/printing/codeprinter.py
+index 893edf7..6667334 100644
+--- a/sympy/printing/codeprinter.py
++++ b/sympy/printing/codeprinter.py
+@@ -307,6 +307,20 @@ class CodePrinter(StrPrinter):
+             return name
+ 
+     def _print_Function(self, expr):
++        # Special-case sinc: emit a portable C expression equivalent to
++        # sin(x)/x for x != 0 and 1 for x == 0. This preserves SymPy's
++        # sinc semantics (sinc(0) == 1) rather than emitting an unsupported
++        # function call in the target language.
++        if expr.func.__name__ == 'sinc':
++            # Import here to avoid module-level import cycles.
++            from sympy import Piecewise, sin, Ne
++            # sinc is unary; if no args, fallback to not-supported handling.
++            if not expr.args:
++                return self._print_not_supported(expr)
++            arg = expr.args[0]
++            pw = Piecewise((sin(arg)/arg, Ne(arg, 0)), (1, True))
++            return self._print(pw)
++
+         if expr.func.__name__ in self.known_functions:
+             cond_func = self.known_functions[expr.func.__name__]
+             func = None

@@ -1,0 +1,27 @@
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index 89e9d96487..e9162244a0 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -410,6 +410,22 @@ def _n2(e):
+                     s = None
+ 
+         if s is not None:
++            # Prevent unsound denesting of (b**e)**(1/2) -> b when e is even
++            # unless the base is provably nonnegative. In particular,
++            # sqrt(b**2) -> b is only valid when b.is_extended_nonnegative
++            # is True. See issue: incorrect simplification of
++            # cos(x) + sqrt(sin(x)**2) -> cos(x) + sin(x) for symbolic
++            # (potentially complex) bases.
++            try:
++                half_other = _half(other)
++            except NameError:
++                # _half may not be defined in some branches; in that case
++                # conservatively avoid denesting when unsure.
++                half_other = None
++            if half_other and e.is_even:
++                # only allow denesting when base is provably nonnegative
++                if b.is_extended_nonnegative is not True:
++                    return None
+             return s*Pow(b, e*other)
+ 
+     def _eval_Mod(self, q):

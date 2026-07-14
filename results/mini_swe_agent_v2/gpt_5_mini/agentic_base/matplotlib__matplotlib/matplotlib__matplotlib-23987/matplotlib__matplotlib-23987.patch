@@ -1,0 +1,46 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index 5bbb786984..8e0f346648 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -2406,18 +2406,28 @@ class Figure(FigureBase):
+         super().__init__(**kwargs)
+         self._layout_engine = None
+ 
++        def _is_layout_requested(val):
++            """Return True if the caller requested enabling a layout engine.
++
++            We treat truthy values and dicts as requests to enable the
++            corresponding layout engine. An explicit False (or other falsey
++            non-dict) means the user explicitly disabled the engine and we
++            should not enable it.
++            """
++            return isinstance(val, dict) or bool(val)
++
+         if layout is not None:
+-            if (tight_layout is not None):
++            if _is_layout_requested(tight_layout):
+                 _api.warn_external(
+                     "The Figure parameters 'layout' and 'tight_layout' cannot "
+                     "be used together. Please use 'layout' only.")
+-            if (constrained_layout is not None):
++            if _is_layout_requested(constrained_layout):
+                 _api.warn_external(
+                     "The Figure parameters 'layout' and 'constrained_layout' "
+                     "cannot be used together. Please use 'layout' only.")
+             self.set_layout_engine(layout=layout)
+-        elif tight_layout is not None:
+-            if constrained_layout is not None:
++        elif _is_layout_requested(tight_layout):
++            if _is_layout_requested(constrained_layout):
+                 _api.warn_external(
+                     "The Figure parameters 'tight_layout' and "
+                     "'constrained_layout' cannot be used together. Please use "
+@@ -2425,7 +2435,7 @@ class Figure(FigureBase):
+             self.set_layout_engine(layout='tight')
+             if isinstance(tight_layout, dict):
+                 self.get_layout_engine().set(**tight_layout)
+-        elif constrained_layout is not None:
++        elif _is_layout_requested(constrained_layout):
+             self.set_layout_engine(layout='constrained')
+             if isinstance(constrained_layout, dict):
+                 self.get_layout_engine().set(**constrained_layout)

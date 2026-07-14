@@ -1,0 +1,32 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 4247e29..a767d98 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -32,7 +32,10 @@ class SQLCompiler:
+         self.select = None
+         self.annotation_col_map = None
+         self.klass_info = None
+-        self.ordering_parts = re.compile(r'(.*)\s(ASC|DESC)(.*)')
++        # Match the whole SQL expression and capture everything before the
++        # ordering direction (ASC/DESC). Use DOTALL so '.' matches newlines
++        # and IGNORECASE to be robust to casing of ASC/DESC.
++        self.ordering_parts = re.compile(r'^(.*)\s+(ASC|DESC)\b(.*)$', re.IGNORECASE | re.DOTALL)
+         self._meta_ordering = None
+ 
+     def setup_query(self):
+@@ -353,7 +356,14 @@ class SQLCompiler:
+             # not taken into account so we strip it. When this entire method
+             # is refactored into expressions, then we can check each part as we
+             # generate it.
+-            without_ordering = self.ordering_parts.search(sql).group(1)
++            m = self.ordering_parts.search(sql)
++            if m:
++                # Use the full captured prefix (may include newlines) and strip
++                # incidental whitespace.
++                without_ordering = m.group(1).strip()
++            else:
++                # Fallback: remove any trailing ASC/DESC if present (defensive).
++                without_ordering = re.sub(r'\s+(ASC|DESC)\b', '', sql, flags=re.IGNORECASE).strip()
+             params_hash = make_hashable(params)
+             if (without_ordering, params_hash) in seen:
+                 continue

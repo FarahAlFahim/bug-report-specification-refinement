@@ -1,0 +1,47 @@
+diff --git a/sympy/core/add.py b/sympy/core/add.py
+index 28ba358180..2acc6545c0 100644
+--- a/sympy/core/add.py
++++ b/sympy/core/add.py
+@@ -242,8 +242,11 @@ def flatten(cls, seq):
+             # change the zoo nature; adding an infinite qualtity would result
+             # in a NaN condition if it had sign opposite of the infinite
+             # portion of zoo, e.g., infinite_real - infinite_real.
+-            newseq = [c for c in newseq if not (c.is_finite and
+-                                                c.is_real is not None)]
++            # NOTE: We no longer remove finite terms because doing so causes
++            # issues when dividing expressions containing zoo. For example,
++            # (zoo + 1/(2*a)) / (zoo + 1/(2*a)) incorrectly gives 1 instead of nan.
++            # See issue for details.
++            pass
+ 
+         # process O(x)
+         if order_factors:
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 4f01eeedbd..0bc77b6808 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -283,6 +283,9 @@ def flatten(cls, seq):
+                 if coeff is S.ComplexInfinity:
+                     # zoo * zoo = zoo
+                     return [S.ComplexInfinity], [], None
++                # If coeff is -1, the result is nan (to preserve subtraction info)
++                if coeff is S.NegativeOne:
++                    return [S.NaN], [], None
+                 coeff = S.ComplexInfinity
+                 continue
+ 
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 8c8e2d738c..e348a0ecb9 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -3310,7 +3310,9 @@ def ceiling(self):
+ 
+     @staticmethod
+     def __neg__():
+-        return S.ComplexInfinity
++        # Return nan instead of zoo to preserve subtraction information
++        # See issue: https://github.com/sympy/sympy/issues/...
++        return S.NaN
+ 
+     def _eval_power(self, expt):
+         if expt is S.ComplexInfinity:

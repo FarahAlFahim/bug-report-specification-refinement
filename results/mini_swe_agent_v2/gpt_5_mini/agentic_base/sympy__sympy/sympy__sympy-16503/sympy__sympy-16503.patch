@@ -1,0 +1,38 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 7a3de33522..0361f20430 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -617,9 +617,16 @@ def adjust(s, wid=None, how='<^>'):
+             prettySign = prettyForm(*prettySign.below(prettyLower))
+ 
+             if first:
+-                # change F baseline so it centers on the sign
+-                prettyF.baseline -= d - (prettyF.height()//2 -
+-                                         prettyF.baseline) - adjustment
++                # Do not modify the inner function's baseline here.
++                # Changing prettyF.baseline at this stage would move the
++                # semantic/inline baseline (the row corresponding to the
++                # summand) toward the visual center of the sign. That
++                # causes incorrect alignment when this Sum is used in
++                # further horizontal composition (for example when
++                # adding a trailing "+ 3"). Instead, leave prettyF
++                # unchanged and let stringPict.next compute the composed
++                # baseline. Visual centering of the summand inside the
++                # sign is achieved by the composition steps below.
+                 first = False
+ 
+             # put padding to the right
+@@ -629,7 +636,12 @@ def adjust(s, wid=None, how='<^>'):
+             # put the present prettyF to the right
+             prettyF = prettyForm(*prettySign.right(prettyF))
+ 
+-        prettyF.baseline = max_upper + sign_height//2
++        # Do not override the baseline with the sign-center. The
++        # baseline of the returned prettyForm should represent the
++        # semantic/inline baseline (the summand's row) so that further
++        # horizontal composition aligns adjacent inline elements with
++        # the summand. Leave the baseline as produced by the
++        # composition (stringPict.next) above.
+         prettyF.binding = prettyForm.MUL
+         return prettyF
+ 

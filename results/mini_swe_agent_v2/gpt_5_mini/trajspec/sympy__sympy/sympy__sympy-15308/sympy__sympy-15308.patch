@@ -1,0 +1,36 @@
+diff --git a/sympy/matrices/expressions/trace.py b/sympy/matrices/expressions/trace.py
+index 4a07d6a1f4..0dabc8a0a3 100644
+--- a/sympy/matrices/expressions/trace.py
++++ b/sympy/matrices/expressions/trace.py
+@@ -89,3 +89,31 @@ def trace(expr):
+         Trace
+     """
+     return Trace(expr).doit()
++
++# Printing hook for LaTeX printer.  The LatexPrinter looks for an
++# ``_latex`` method on objects before falling back to dispatching to
++# ``_print_<ClassName>``.  Providing this method ensures that
++# sympy.matrices.expressions.trace.Trace instances are rendered using
++# the LaTeX printer and that their inner argument is recursively
++# printed with LaTeX formatting (for example, powers become A^{2}).
++def _latex(self, printer=None):
++    """Return a LaTeX representation of the matrix Trace.
++
++    The printer parameter is provided by the printing machinery and
++    should be used to (recursively) print the inner argument.
++    """
++    # If no printer is provided, fall back to the string representation.
++    if printer is None:
++        try:
++            from sympy.printing.latex import LatexPrinter
++
++            return LatexPrinter().doprint(self)
++        except Exception:
++            return str(self)
++
++    inner = printer.doprint(self.arg)
++    return r'\\mbox{Tr}\\left(%s\\right)' % inner
++
++# Bind the _latex method onto the Trace class so that the Printer
++# dispatch mechanism (which calls expr._latex) will find it.
++Trace._latex = _latex

@@ -1,0 +1,39 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..c8ddd64132 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -867,10 +867,32 @@ class Poly3DCollection(PolyCollection):
+         self.stale = True
+ 
+     def get_facecolor(self):
+-        return self._facecolors2d
++        # If the 2D-projected facecolors have been computed during
++        # projection/draw, return them. Otherwise fall back to the
++        # stored 3D/unsorted facecolor state (or the base-class
++        # getter) so callers can query face colors before a draw.
++        if hasattr(self, "_facecolors2d"):
++            return self._facecolors2d
++        # Prefer the cached 3D facecolor if available
++        if hasattr(self, "_facecolor3d"):
++            return self._facecolor3d
++        # Last resort: defer to the base class implementation
++        return PolyCollection.get_facecolor(self)
+ 
+     def get_edgecolor(self):
+-        return self._edgecolors2d
++        # If the 2D-projected edgecolors have been computed during
++        # projection/draw, return them. Otherwise fall back to the
++        # stored 3D/unsorted edgecolor state (or the base-class
++        # getter) so callers can query edge colors before a draw.
++        if hasattr(self, "_edgecolors2d"):
++            return self._edgecolors2d
++        # If edge color is set to 'face', mirror face colors
++        if hasattr(self, "_edgecolor3d") and cbook._str_equal(
++                getattr(self, "_edgecolor3d"), 'face'):
++            return self.get_facecolor()
++        if hasattr(self, "_edgecolor3d"):
++            return self._edgecolor3d
++        return PolyCollection.get_edgecolor(self)
+ 
+ 
+ def poly_collection_2d_to_3d(col, zs=0, zdir='z'):

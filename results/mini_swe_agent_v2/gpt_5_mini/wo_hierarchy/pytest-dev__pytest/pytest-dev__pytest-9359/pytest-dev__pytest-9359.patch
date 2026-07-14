@@ -1,0 +1,22 @@
+diff --git a/src/_pytest/_code/source.py b/src/_pytest/_code/source.py
+index 6f54057c0..4cbc2be4c 100644
+--- a/src/_pytest/_code/source.py
++++ b/src/_pytest/_code/source.py
+@@ -209,4 +209,17 @@ def getstatementrange_ast(
+             end -= 1
+         else:
+             break
++    # Also trim trailing decorator lines (starting with '@') which can
++    # appear due to AST lineno semantics changes on newer Python versions
++    # where decorator line numbers may be attached to the following
++    # FunctionDef/ClassDef node. Decorators belonging to the next
++    # statement must not be included in the slice for the current
++    # statement (see issue with pytest printing decorator lines
++    # between the source line and assertion details).
++    while end > start:
++        line = source.lines[end - 1].lstrip()
++        if line.startswith("@"):
++            end -= 1
++        else:
++            break
+     return astnode, start, end

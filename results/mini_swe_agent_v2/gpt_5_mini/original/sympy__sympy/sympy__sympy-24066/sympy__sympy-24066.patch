@@ -1,0 +1,37 @@
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index 3daf84c108..44d4e42b42 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -190,10 +190,28 @@ def _collect_factor_and_dimension(self, expr):
+                 dim /= idim**count
+             return factor, dim
+         elif isinstance(expr, Function):
+-            fds = [self._collect_factor_and_dimension(
+-                arg) for arg in expr.args]
+-            return (expr.func(*(f[0] for f in fds)),
+-                    *(d[1] for d in fds))
++            # For functions, collect factors and dimensions for arguments.
++            # The returned value must be a tuple (factor, dimension).
++            fds = [self._collect_factor_and_dimension(arg) for arg in expr.args]
++            factors = [f[0] for f in fds]
++            dims = [d[1] for d in fds]
++
++            # The factor is the function applied to the collected factors.
++            factor = expr.func(*factors)
++
++            # If all argument dimensions are dimensionless then the
++            # function result is dimensionless. Otherwise build a
++            # Dimension from the function applied to the argument
++            # dimension names so that downstream checks can analyze
++            # the resulting dimension expression.
++            if all(self.get_dimension_system().is_dimensionless(d) for d in dims):
++                dim = Dimension(1)
++            else:
++                # Use the .name attribute of Dimension to get the underlying
++                # expression representing the dimension for each argument.
++                dim = Dimension(expr.func(*[d.name for d in dims]))
++
++            return factor, dim
+         elif isinstance(expr, Dimension):
+             return S.One, expr
+         else:

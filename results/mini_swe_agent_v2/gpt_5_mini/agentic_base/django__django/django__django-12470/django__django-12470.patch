@@ -1,0 +1,22 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 92213a4e67..a0c39d4cc7 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -726,8 +726,16 @@ class SQLCompiler:
+                 if isinstance(item, OrderBy):
+                     results.append((item, False))
+                     continue
++                # Pass the original default_order into the recursive call.
++                # get_order_dir interprets a leading '-' as "invert
++                # relative to default", so passing the already-resolved
++                # order (order) causes an explicit sign on the related
++                # model's ordering to be interpreted relative to that
++                # new default and can flip the intended direction. Use
++                # the incoming default_order to ensure explicit signs
++                # in the related model are interpreted absolutely.
+                 results.extend(self.find_ordering_name(item, opts, alias,
+-                                                       order, already_seen))
++                                                       default_order, already_seen))
+             return results
+         targets, alias, _ = self.query.trim_joins(targets, joins, path)
+         return [(OrderBy(transform_function(t, alias), descending=descending), False) for t in targets]

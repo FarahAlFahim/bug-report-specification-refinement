@@ -1,0 +1,63 @@
+diff --git a/sympy/integrals/intpoly.py b/sympy/integrals/intpoly.py
+index fc72bd206f..733a43494c 100644
+--- a/sympy/integrals/intpoly.py
++++ b/sympy/integrals/intpoly.py
+@@ -565,18 +565,29 @@ def decompose(expr, separate=False):
+         if expr.is_Symbol:
+             poly_dict[1] = expr
+         elif expr.is_Add:
+-            symbols = expr.atoms(Symbol)
+-            degrees = [(sum(degree_list(monom, *symbols)), monom)
+-                       for monom in expr.args]
++            # Determine a deterministic ordering for constituent monomials.
++            # We use a primary key of total degree (ascending) and a
++            # secondary key based on the exponents of the (sorted)
++            # symbols (higher exponents first) so that ordering is stable
++            # and independent of internal iteration/dict order.
++            symbols = sorted(list(expr.atoms(Symbol)), key=lambda s: str(s))
++            degrees = []
++            for monom in expr.args:
++                exps = list(degree_list(monom, *symbols))
++                total = sum(exps)
++                # secondary key: negative exponents to sort higher powers first
++                sec = tuple([-e for e in exps])
++                degrees.append((total, sec, monom))
+             if separate:
+-                return [monom[1] for monom in degrees]
++                # Preserve the original argument ordering for Add expressions
++                # to keep backwards compatibility with existing callers/tests.
++                return [monom for monom in expr.args]
+             else:
+-                for monom in degrees:
+-                    degree, term = monom
+-                    if poly_dict.get(degree):
+-                        poly_dict[degree] += term
++                for total, _, term in sorted(degrees, key=lambda t: (t[0], t[1])):
++                    if poly_dict.get(total):
++                        poly_dict[total] += term
+                     else:
+-                        poly_dict[degree] = term
++                        poly_dict[total] = term
+         elif expr.is_Pow:
+             _, degree = expr.args
+             poly_dict[degree] = expr
+@@ -593,7 +604,18 @@ def decompose(expr, separate=False):
+         poly_dict[0] = expr
+ 
+     if separate:
+-        return list(poly_dict.values())
++        # Return values in deterministic order: sort by degree (dict keys)
++        # ascending and break ties by the exponent tuple (higher exponents
++        # first) for reproducibility across Python versions and internal
++        # iteration order.
++        items = []
++        for degree, term in poly_dict.items():
++            # compute exponent tuple w.r.t. symbols in term for tie-breaking
++            syms = sorted(list(term.atoms(Symbol)), key=lambda s: str(s))
++            exps = tuple([-e for e in degree_list(term, *syms)]) if syms else ()
++            items.append((degree, exps, term))
++        items.sort(key=lambda t: (t[0], t[1]))
++        return [t[2] for t in items]
+     return poly_dict
+ 
+ 

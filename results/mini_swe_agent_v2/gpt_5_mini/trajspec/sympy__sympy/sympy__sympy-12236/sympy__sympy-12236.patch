@@ -1,0 +1,22 @@
+diff --git a/sympy/polys/constructor.py b/sympy/polys/constructor.py
+index f62532ef93..8e2414f0de 100644
+--- a/sympy/polys/constructor.py
++++ b/sympy/polys/constructor.py
+@@ -115,7 +115,16 @@ def _construct_composite(coeffs, opt):
+         numers.append(numer)
+         denoms.append(denom)
+ 
+-    polys, gens = parallel_dict_from_basic(numers + denoms)  # XXX: sorting
++    # Ensure that gens used for constructing the coefficient polynomial
++    # representation are constrained by the polynomial main generators
++    # (opt.gens). If opt.gens is provided, pass it through to
++    # parallel_dict_from_basic to avoid accidentally inferring symbols
++    # that are actually coefficient scalars (see issue with apart and
++    # symbolic multipliers).
++    if opt.gens:
++        polys, gens = parallel_dict_from_basic(numers + denoms, gens=opt.gens)
++    else:
++        polys, gens = parallel_dict_from_basic(numers + denoms)  # XXX: sorting
+     if not gens:
+         return None
+ 

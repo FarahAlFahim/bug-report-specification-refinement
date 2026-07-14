@@ -1,0 +1,34 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 1dee8a23d9..a7baf6b53c 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1514,6 +1514,29 @@ class DraggableBase:
+                 'button_release_event', self.on_release),
+         ]
+ 
++    def __getstate__(self):
++        """
++        Prepare state for pickling. Exclude non-picklable objects like the
++        canvas and connection ids. On unpickling, these will be restored to
++        None and should be reconnected if needed by calling
++        ``set_draggable`` again on the owning artist.
++        """
++        state = self.__dict__.copy()
++        # The canvas holds backend-specific state and is not picklable.
++        state['canvas'] = None
++        # Callback ids are tied to the canvas session; drop them.
++        state['cids'] = []
++        # Motion connection id may be present as _c1; drop it too.
++        if '_c1' in state:
++            del state['_c1']
++        return state
++
++    def __setstate__(self, state):
++        # Restore state; canvas and cids will be None/empty and need to be
++        # reconnected by the user if they intend to use dragging after
++        # unpickling.
++        self.__dict__.update(state)
++
+     def on_motion(self, evt):
+         if self._check_still_parented() and self.got_artist:
+             dx = evt.x - self.mouse_x

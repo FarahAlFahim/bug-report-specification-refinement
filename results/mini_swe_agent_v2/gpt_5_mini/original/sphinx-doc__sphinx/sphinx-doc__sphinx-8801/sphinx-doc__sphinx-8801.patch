@@ -1,0 +1,36 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index dc413b5c2..a5742a3b6 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -783,8 +783,29 @@ class Documenter:
+                         is_filtered_inherited_member(membername, obj)):
+                     keep = False
+                 else:
+-                    # ignore undocumented members if :undoc-members: is not given
+-                    keep = has_doc or self.options.undoc_members
++                    # If the member has no docstring, but the user requested
++                    # inherited members, include annotation-only attributes that
++                    # are defined on a superclass (PEP 526 annotations).
++                    if (not has_doc and self.options.inherited_members and
++                            inspect.isclass(self.object)):
++                        found = False
++                        for cls in self.object.__mro__[1:]:
++                            if membername in self.get_attr(cls, '__dict__', {}):
++                                found = True
++                                break
++                            if membername in self.get_attr(cls, '__annotations__', {}):
++                                found = True
++                                break
++                            if isinstance(obj, ObjectMember) and getattr(obj, 'class_', None) is cls:
++                                found = True
++                                break
++                        if found:
++                            keep = True
++                        else:
++                            keep = has_doc or self.options.undoc_members
++                    else:
++                        # ignore undocumented members if :undoc-members: is not given
++                        keep = has_doc or self.options.undoc_members
+ 
+             if isinstance(obj, ObjectMember) and obj.skipped:
+                 # forcedly skipped member (ex. a module attribute not defined in __all__)

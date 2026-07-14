@@ -1,0 +1,53 @@
+diff --git a/pylint/reporters/text.py b/pylint/reporters/text.py
+index 29bd46798..bae623aab 100644
+--- a/pylint/reporters/text.py
++++ b/pylint/reporters/text.py
+@@ -175,15 +175,42 @@ class TextReporter(BaseReporter):
+         self._template = template
+ 
+         # Check to see if all parameters in the template are attributes of the Message
+-        arguments = re.findall(r"\{(.+?)(:.*)?\}", template)
+-        for argument in arguments:
+-            if argument[0] not in MESSAGE_FIELDS:
++        # Use string.Formatter.parse to correctly handle escaped braces ({{ and }})
++        # and nested or complex field expressions. Rebuild the template by
++        # keeping literal text and only retaining placeholders that refer to
++        # known Message fields. Unknown fields are warned about and removed.
++        import string
++
++        formatter = string.Formatter()
++        parts = list(formatter.parse(template))
++        rebuilt: list[str] = []
++        for literal_text, field_name, format_spec, conversion in parts:
++            # literal_text already has escaped braces resolved by Formatter
++            # Re-escape literal braces so the resulting template can be
++            # used with str.format() and still display literal braces.
++            escaped_literal = literal_text.replace("{", "{{").replace("}", "}}")
++            rebuilt.append(escaped_literal)
++            # field_name is None when there's no replacement field at this position
++            if not field_name:
++                continue
++            # Only accept simple field names that match Message fields
++            if field_name in MESSAGE_FIELDS:
++                # Reconstruct the original placeholder so formatting still works
++                placeholder = "{"
++                placeholder += field_name
++                if conversion:
++                    placeholder += "!" + conversion
++                if format_spec:
++                    placeholder += ":" + format_spec
++                placeholder += "}"
++                rebuilt.append(placeholder)
++            else:
+                 warnings.warn(
+-                    f"Don't recognize the argument '{argument[0]}' in the --msg-template. "
++                    f"Don't recognize the argument '{field_name}' in the --msg-template. "
+                     "Are you sure it is supported on the current version of pylint?"
+                 )
+-                template = re.sub(r"\{" + argument[0] + r"(:.*?)?\}", "", template)
+-        self._fixed_template = template
++                # Skip adding the unrecognized field (effectively removing it)
++        template = "".join(rebuilt)
+ 
+     def write_message(self, msg: Message) -> None:
+         """Convenience method to write a formatted message with class default

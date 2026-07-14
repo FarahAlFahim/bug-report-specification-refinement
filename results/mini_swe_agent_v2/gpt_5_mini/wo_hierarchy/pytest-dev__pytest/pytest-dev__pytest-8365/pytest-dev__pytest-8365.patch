@@ -1,0 +1,36 @@
+diff --git a/src/_pytest/tmpdir.py b/src/_pytest/tmpdir.py
+index 29c7e19d7..add0cc112 100644
+--- a/src/_pytest/tmpdir.py
++++ b/src/_pytest/tmpdir.py
+@@ -115,7 +115,12 @@ class TempPathFactory:
+             # use a sub-directory in the temproot to speed-up
+             # make_numbered_dir() call
+             rootdir = temproot.joinpath(f"pytest-of-{user}")
+-            rootdir.mkdir(exist_ok=True)
++            # Ensure all intermediate directories are created. If the
++            # sanitized username contains characters that were path
++            # separators on the original platform, joinpath could have
++            # produced nested components; using parents=True guarantees
++            # the full path exists and avoids FileNotFoundError.
++            rootdir.mkdir(parents=True, exist_ok=True)
+             basetemp = make_numbered_dir_with_cleanup(
+                 prefix="pytest-", root=rootdir, keep=3, lock_timeout=LOCK_TIMEOUT
+             )
+@@ -154,7 +159,16 @@ def get_user() -> Optional[str]:
+     import getpass
+ 
+     try:
+-        return getpass.getuser()
++        user = getpass.getuser()
++        if user is None:
++            return None
++        # sanitize the username so it is safe to use as a single filesystem
++        # path component. Replace any character not in the set
++        # [A-Za-z0-9._-] with an underscore. This prevents path-separator
++        # characters (for example a Windows domain separator '\') from
++        # being interpreted as directory separators and avoids FileNotFoundError
++        # when creating the basetemp directory.
++        return re.sub(r"[^A-Za-z0-9._-]+", "_", user)
+     except (ImportError, KeyError):
+         return None
+ 

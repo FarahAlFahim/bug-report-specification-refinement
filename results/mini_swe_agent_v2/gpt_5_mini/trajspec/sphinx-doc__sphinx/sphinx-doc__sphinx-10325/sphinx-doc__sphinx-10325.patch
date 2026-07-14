@@ -1,0 +1,56 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..12204c278 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -110,11 +110,27 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :inherited-members: option to a canonical set.
++
++    The option historically used the string 'object' as a sentinel when the
++    flag/no-argument form was used.  Autodoc consumers often compared class
++    names against this value assuming a single string.  To support specifying
++    multiple class names (e.g. ``:inherited-members: list,tuple``) convert the
++    option to a set of class name strings.  Preserve the legacy flag behavior
++    by returning the set ``{'object'}`` when the option is given without an
++    explicit value.
++    """
+     if arg in (None, True):
+-        return 'object'
+-    else:
+-        return arg
++        # flag / no-arg form: sentinel to mean "ignore members inherited from
++        # builtin object" -- represent as a set for uniform handling.
++        return {'object'}
++    if arg is False:
++        return None
++    # If a sequence was passed (list/tuple/set), normalize elements to strings.
++    if isinstance(arg, (list, tuple, set)):
++        return {str(x).strip() for x in arg if str(x).strip()}
++    # Otherwise treat it as a comma-separated string.
++    return {x.strip() for x in str(arg).split(',') if x.strip()}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -681,8 +697,18 @@ class Documenter:
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+             if inspect.isclass(self.object):
++                # normalize option to a set of names for uniform handling
++                inherited = self.options.inherited_members
++                if not inherited:
++                    return False
++                if isinstance(inherited, (list, tuple, set)):
++                    inherited_names = {str(x) for x in inherited}
++                else:
++                    # may be a single string like 'object'
++                    inherited_names = {str(inherited)}
++
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
++                    if cls.__name__ in inherited_names and cls != self.object:
+                         # given member is a member of specified *super class*
+                         return True
+                     elif name in cls.__dict__:

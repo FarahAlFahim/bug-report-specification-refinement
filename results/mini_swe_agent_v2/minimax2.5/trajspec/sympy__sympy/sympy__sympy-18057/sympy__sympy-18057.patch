@@ -1,0 +1,25 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 24d89897f7..b198ff43c7 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -121,7 +121,7 @@ def _hashable_content(self):
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
++            other = _sympify(other)
+             if not isinstance(other, Expr):
+                 return False
+         except (SympifyError, SyntaxError):
+@@ -736,7 +736,10 @@ def equals(self, other, failing_expression=False):
+         from sympy.polys.polyerrors import NotAlgebraic
+         from sympy.polys.numberfields import minimal_polynomial
+ 
+-        other = sympify(other)
++        try:
++            other = _sympify(other)
++        except (SympifyError, SyntaxError):
++            return False
+         if self == other:
+             return True
+ 

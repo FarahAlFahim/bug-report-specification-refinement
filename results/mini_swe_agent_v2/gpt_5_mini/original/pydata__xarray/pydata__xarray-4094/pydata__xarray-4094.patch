@@ -1,0 +1,25 @@
+diff --git a/xarray/core/dataarray.py b/xarray/core/dataarray.py
+index b0df8749..5cab139d 100644
+--- a/xarray/core/dataarray.py
++++ b/xarray/core/dataarray.py
+@@ -1961,7 +1961,19 @@ class DataArray(AbstractArray, DataWithCoords):
+         # pull variables out of datarray
+         data_dict = {}
+         for k in variables:
+-            data_dict[k] = self.sel({variable_dim: k}).squeeze(drop=True)
++            # In the common case of a MultiIndex with multiple levels, each
++            # level is available as a coordinate with the level name and we
++            # can select by that name. However, when the stacked coordinate
++            # only has a single level, there may not be a separate level
++            # coordinate and selection by the level name will fail. In that
++            # case, fall back to selecting by the stacked dimension itself.
++            try:
++                sel_key = {variable_dim: k}
++                data = self.sel(sel_key)
++            except Exception:
++                # fallback: select on the stacked dimension 'dim'
++                data = self.sel({dim: k})
++            data_dict[k] = data.squeeze(drop=True)
+ 
+         # unstacked dataset
+         return Dataset(data_dict)

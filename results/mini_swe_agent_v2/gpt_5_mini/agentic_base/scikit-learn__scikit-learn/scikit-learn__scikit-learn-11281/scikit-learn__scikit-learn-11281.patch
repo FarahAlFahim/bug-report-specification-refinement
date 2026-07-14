@@ -1,0 +1,85 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..f697565e3 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -240,8 +240,38 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # For clusterer compatibility expose the training labels after fit
++        # as labels_ (labels_ == predict(X)). Use predict which relies on
++        # the fitted parameters we just set.
++        try:
++            # We compute and set labels_ for the training data
++            self.labels_ = self.predict(X)
++        except Exception:
++            # In case predict fails for some reason, ensure we don't
++            # break fit behavior. labels_ will simply not be set.
++            if hasattr(self, 'labels_'):
++                delattr(self, 'labels_')
++
+         return self
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the model to X and return the labels for X.
++
++        This mirrors the ClusterMixin.fit_predict behaviour: fit(X) then
++        return labels_.
++        """
++        self.fit(X)
++        return getattr(self, 'labels_', self.predict(X))
++
++    @property
++    def n_clusters(self):
++        """Alias for n_components for clusterer-compatible API."""
++        return self.n_components
++
++    @n_clusters.setter
++    def n_clusters(self, value):
++        self.n_components = value
++
+     def _e_step(self, X):
+         """E step.
+ 
+diff --git a/sklearn/mixture/bayesian_mixture.py b/sklearn/mixture/bayesian_mixture.py
+index aef6828fa..f295f3505 100644
+--- a/sklearn/mixture/bayesian_mixture.py
++++ b/sklearn/mixture/bayesian_mixture.py
+@@ -313,7 +313,15 @@ class BayesianGaussianMixture(BaseMixture):
+                  mean_precision_prior=None, mean_prior=None,
+                  degrees_of_freedom_prior=None, covariance_prior=None,
+                  random_state=None, warm_start=False, verbose=0,
+-                 verbose_interval=10):
++                 verbose_interval=10, **kwargs):
++        # Support clusterer-style API: allow n_clusters as an alias
++        # for n_components. If provided in kwargs, map it and remove
++        # it from kwargs to avoid unexpected keyword errors.
++        if 'n_clusters' in kwargs:
++            n_components = kwargs.pop('n_clusters')
++        if kwargs:
++            raise TypeError("Unexpected keyword arguments: %s" % (', '.join(sorted(kwargs.keys()))))
++
+         super(BayesianGaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,
+diff --git a/sklearn/mixture/gaussian_mixture.py b/sklearn/mixture/gaussian_mixture.py
+index d58a9e326..970c24268 100644
+--- a/sklearn/mixture/gaussian_mixture.py
++++ b/sklearn/mixture/gaussian_mixture.py
+@@ -584,7 +584,15 @@ class GaussianMixture(BaseMixture):
+                  reg_covar=1e-6, max_iter=100, n_init=1, init_params='kmeans',
+                  weights_init=None, means_init=None, precisions_init=None,
+                  random_state=None, warm_start=False,
+-                 verbose=0, verbose_interval=10):
++                 verbose=0, verbose_interval=10, **kwargs):
++        # Support clusterer-style API: allow n_clusters as an alias
++        # for n_components. If provided in kwargs, map it and remove
++        # it from kwargs to avoid unexpected keyword errors.
++        if 'n_clusters' in kwargs:
++            n_components = kwargs.pop('n_clusters')
++        if kwargs:
++            raise TypeError("Unexpected keyword arguments: %s" % (', '.join(sorted(kwargs.keys()))))
++
+         super(GaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,

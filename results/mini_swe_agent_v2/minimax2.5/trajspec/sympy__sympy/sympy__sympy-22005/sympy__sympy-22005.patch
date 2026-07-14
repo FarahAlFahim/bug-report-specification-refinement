@@ -1,0 +1,13 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..8b06a455b6 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -256,7 +256,7 @@ def _solve_reduced_system(system, gens, entry=False):
+         if not zeros:
+             return []
+ 
+-        if len(basis) == 1:
++        if len(basis) == 1 and len(gens) == 1:
+             return [(zero,) for zero in zeros]
+ 
+         solutions = []

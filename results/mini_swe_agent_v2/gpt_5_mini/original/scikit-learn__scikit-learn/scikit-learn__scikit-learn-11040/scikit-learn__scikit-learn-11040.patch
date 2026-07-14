@@ -1,0 +1,60 @@
+diff --git a/sklearn/neighbors/base.py b/sklearn/neighbors/base.py
+index 3e5e729c2..9a32a832c 100644
+--- a/sklearn/neighbors/base.py
++++ b/sklearn/neighbors/base.py
+@@ -270,6 +270,35 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+ class KNeighborsMixin(object):
+     """Mixin for k-neighbors searches"""
+ 
++    def _validate_n_neighbors(self, n_neighbors):
++        """Validate and coerce n_neighbors to an integer.
++
++        Accepts integer-like floats (e.g. 3.0) by casting to int. Raises a
++        ValueError for non-integer floats or non-numeric types.
++        """
++        if n_neighbors is None:
++            return None
++
++        # Accept integer-like floats (e.g. 3.0)
++        if isinstance(n_neighbors, float):
++            if n_neighbors.is_integer():
++                n_neighbors = int(n_neighbors)
++            else:
++                raise ValueError("n_neighbors must be an integer, got %r"
++                                 % (n_neighbors,))
++
++        try:
++            n_neighbors = int(n_neighbors)
++        except (TypeError, ValueError):
++            raise ValueError("n_neighbors must be an integer, got %r"
++                             % (n_neighbors,))
++
++        if n_neighbors <= 0:
++            raise ValueError("Expected n_neighbors > 0. Got %d" % n_neighbors)
++
++        return n_neighbors
++
++
+     def kneighbors(self, X=None, n_neighbors=None, return_distance=True):
+         """Finds the K-neighbors of a point.
+ 
+@@ -328,6 +357,9 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Validate and coerce n_neighbors to integer (accept 3.0 -> 3)
++        n_neighbors = self._validate_n_neighbors(n_neighbors)
++
+         if X is not None:
+             query_is_train = False
+             X = check_array(X, accept_sparse='csr')
+@@ -467,6 +499,9 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Validate and coerce n_neighbors to integer (accept 3.0 -> 3)
++        n_neighbors = self._validate_n_neighbors(n_neighbors)
++
+         # kneighbors does the None handling.
+         if X is not None:
+             X = check_array(X, accept_sparse='csr')

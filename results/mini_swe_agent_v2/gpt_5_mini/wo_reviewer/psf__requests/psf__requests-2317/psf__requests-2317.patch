@@ -1,0 +1,40 @@
+diff --git a/requests/models.py b/requests/models.py
+index 3f6a4f9..c3b4e7f 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -327,8 +327,16 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+ 
+     def prepare_method(self, method):
+         """Prepares the given HTTP method."""
++        # Ensure the HTTP method is a native text (str). If callers supply
++        # bytes (e.g. b'GET') decode using ASCII. Calling str() on bytes
++        # in Py3 produces a literal like "b'GET'" which is invalid.
+         self.method = method
+         if self.method is not None:
++            if isinstance(self.method, bytes):
++                self.method = self.method.decode('ascii')
++            else:
++                self.method = builtin_str(self.method)
++
+             self.method = self.method.upper()
+ 
+     def prepare_url(self, url, params):
+diff --git a/requests/sessions.py b/requests/sessions.py
+index d701ff2..12dd5fe 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -425,7 +425,13 @@ class Session(SessionRedirectMixin):
+             If Tuple, ('cert', 'key') pair.
+         """
+ 
+-        method = builtin_str(method)
++        # Ensure the HTTP method is a native string. If callers passed
++        # bytes (e.g. b'GET') decode using ASCII per RFC. On Py3 calling
++        # builtin_str on bytes produces "b'GET'" which is invalid.
++        if isinstance(method, bytes):
++            method = method.decode('ascii')
++        else:
++            method = builtin_str(method)
+ 
+         # Create the Request.
+         req = Request(

@@ -1,0 +1,51 @@
+diff --git a/sphinx/ext/napoleon/docstring.py b/sphinx/ext/napoleon/docstring.py
+index 11409e6f6..0bbadb1f7 100644
+--- a/sphinx/ext/napoleon/docstring.py
++++ b/sphinx/ext/napoleon/docstring.py
+@@ -328,6 +328,27 @@ class GoogleDocstring:
+         else:
+             return name
+ 
++    def _unescape_args_and_kwargs(self, name: str) -> str:
++        """Reverse the escaping applied by _escape_args_and_kwargs.
++
++        This is useful when emitting reStructuredText directive arguments
++        (such as the ``.. attribute::`` directive). Those take a literal
++        name and should not contain backslashes introduced for inline
++        markup escaping.
++        """
++        # Only undo the simple escapes we introduce: trailing "\_" and
++        # leading "\*" or "\*\*".
++        if name.endswith(r'\_'):
++            name = name[:-2] + '_'
++
++        if name.startswith(r'\*\*'):
++            name = '**' + name[4:]
++        elif name.startswith(r'\*'):
++            name = '*' + name[2:]
++
++        return name
++
++
+     def _fix_field_desc(self, desc: List[str]) -> List[str]:
+         if self._is_list(desc):
+             desc = [''] + desc
+@@ -580,12 +601,15 @@ class GoogleDocstring:
+         for _name, _type, _desc in self._consume_fields():
+             if self._config.napoleon_use_ivar:
+                 _name = self._qualify_name(_name, self._obj)
+-                field = ':ivar %s: ' % _name
++                # use an unescaped name for the field role/directive
++                display_name = self._unescape_args_and_kwargs(_name)
++                field = ':ivar %s: ' % display_name
+                 lines.extend(self._format_block(field, _desc))
+                 if _type:
+-                    lines.append(':vartype %s: %s' % (_name, _type))
++                    lines.append(':vartype %s: %s' % (display_name, _type))
+             else:
+-                lines.append('.. attribute:: ' + _name)
++                display_name = self._unescape_args_and_kwargs(_name)
++                lines.append('.. attribute:: ' + display_name)
+                 if self._opt and 'noindex' in self._opt:
+                     lines.append('   :noindex:')
+                 if _type:

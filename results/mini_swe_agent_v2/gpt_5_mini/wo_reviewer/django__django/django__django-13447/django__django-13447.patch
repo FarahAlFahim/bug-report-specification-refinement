@@ -1,0 +1,64 @@
+diff --git a/django/contrib/admin/sites.py b/django/contrib/admin/sites.py
+index 837dabfea8..caae308ef4 100644
+--- a/django/contrib/admin/sites.py
++++ b/django/contrib/admin/sites.py
+@@ -498,6 +498,59 @@ class AdminSite:
+             return app_dict.get(label)
+         return app_dict
+ 
++    def build_app_dict(self, request, label=None):
++        """
++        Public API to build the app dictionary similar to the private
++        ``_build_app_dict`` but which also includes the actual Model class
++        object on each per-model dictionary under the key ``'model'``.
++
++        The private ``_build_app_dict`` is left unchanged for backward
++        compatibility (so existing callers and templates continue to get
++        only simple, serializable values). Consumers that need access to the
++        Model class should call this public method. Note that including the
++        Model class makes the returned structure non-JSON-serializable.
++        """
++        app_dict = self._build_app_dict(request, label)
++
++        if not app_dict:
++            return app_dict
++
++        # Build a lookup of models by app_label and model name for quick
++        # matching. Use both model_name (lowercase) and object_name (class
++        # name) to match entries produced by _build_app_dict.
++        models_by_app = {}
++        for model in self._registry.keys():
++            app_label = model._meta.app_label
++            models_by_app.setdefault(app_label, {})[model._meta.model_name] = model
++            models_by_app.setdefault(app_label, {})[model._meta.object_name] = model
++
++        # If a single app dict was requested, ensure we operate on that
++        # structure uniformly (it contains 'models' list).
++        def _attach_models_to_app(app):
++            for m in app.get('models', []):
++                # Try to find the model by model_name (lowercase) first,
++                # then by object_name.
++                app_label = app.get('app_label')
++                model_obj = None
++                if app_label in models_by_app:
++                    model_obj = models_by_app[app_label].get(m.get('object_name'))
++                    if not model_obj:
++                        model_obj = models_by_app[app_label].get(m.get('object_name', '').lower())
++                # Attach the model class (or None when not found).
++                m['model'] = model_obj
++
++        if label:
++            # app_dict is a single app mapping or None
++            if app_dict is None:
++                return None
++            _attach_models_to_app(app_dict)
++            return app_dict
++
++        for app in app_dict.values():
++            _attach_models_to_app(app)
++
++        return app_dict
++
+     def get_app_list(self, request):
+         """
+         Return a sorted list of all the installed apps that have been

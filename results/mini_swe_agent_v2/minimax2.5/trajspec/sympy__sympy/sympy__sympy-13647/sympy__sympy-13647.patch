@@ -1,0 +1,56 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 056d9bc49..d91ba5c1d 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -86,9 +86,9 @@ def entry(i, j):
+                 return self[i, j]
+             elif pos <= j < pos + other.cols:
+                 return other[i, j - pos]
+-            return self[i, j - pos - other.cols]
++            return self[i, j - other.cols]
+ 
+-        return self._new(self.rows, self.cols + other.cols,
++        return classof(self, other)._new(self.rows, self.cols + other.cols,
+                          lambda i, j: entry(i, j))
+ 
+     def _eval_col_join(self, other):
+@@ -144,7 +144,7 @@ def _eval_row_insert(self, pos, other):
+         entries = list(self)
+         insert_pos = pos * self.cols
+         entries[insert_pos:insert_pos] = list(other)
+-        return self._new(self.rows + other.rows, self.cols, entries)
++        return classof(self, other)._new(self.rows + other.rows, self.cols, entries)
+ 
+     def _eval_row_join(self, other):
+         cols = self.cols
+diff --git a/sympy/matrices/sparse.py b/sympy/matrices/sparse.py
+index 7701cbc17..260f376a5 100644
+--- a/sympy/matrices/sparse.py
++++ b/sympy/matrices/sparse.py
+@@ -12,7 +12,7 @@
+ from sympy.functions.elementary.miscellaneous import sqrt
+ from sympy.utilities.iterables import uniq
+ 
+-from .matrices import MatrixBase, ShapeError, a2idx
++from .matrices import MatrixBase, ShapeError, a2idx, classof
+ from .dense import Matrix
+ import collections
+ 
+@@ -282,7 +282,7 @@ def _eval_col_insert(self, icol, other):
+         for key, val in other._smat.items():
+             row, col = key
+             new_smat[(row, col + icol)] = val
+-        return self._new(self.rows, self.cols + other.cols, new_smat)
++        return classof(self, other)._new(self.rows, self.cols + other.cols, new_smat)
+ 
+     def _eval_conjugate(self):
+         smat = {key: val.conjugate() for key,val in self._smat.items()}
+@@ -381,7 +381,7 @@ def _eval_row_insert(self, irow, other):
+         for key, val in other._smat.items():
+             row, col = key
+             new_smat[(row + irow, col)] = val
+-        return self._new(self.rows + other.rows, self.cols, new_smat)
++        return classof(self, other)._new(self.rows + other.rows, self.cols, new_smat)
+ 
+     def _eval_scalar_mul(self, other):
+         return self.applyfunc(lambda x: x*other)

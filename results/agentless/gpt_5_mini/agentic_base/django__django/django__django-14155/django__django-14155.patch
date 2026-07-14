@@ -1,0 +1,63 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 43e675a..242c28f 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -32,8 +32,6 @@ from .utils import get_callable
+ class ResolverMatch:
+     def __init__(self, func, args, kwargs, url_name=None, app_names=None, namespaces=None, route=None, tried=None):
+         self.func = func
+-        self.args = args
+-        self.kwargs = kwargs
+         self.url_name = url_name
+         self.route = route
+         self.tried = tried
+@@ -45,12 +43,45 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # Handle functools.partial specially so that the ResolverMatch shows the
++        # underlying callable and the effective args/kwargs (partial's args/keywords
++        # merged with URL-captured args/kwargs). URL-captured kwargs take precedence.
++        func_for_path = func
++        if isinstance(func, functools.partial):
++            # Keep the original partial object on self.func, but compute the path
++            # and effective args/kwargs from the underlying callable.
++            func_for_path = func.func
++
++            partial_args = func.args or ()
++            partial_keywords = func.keywords or {}
++
++            # Ensure args/kwargs are sequences/dicts we can merge.
++            url_args = tuple(args or ())
++            url_kwargs = dict(kwargs or {})
++
++            # Effective positional args: partial.args followed by URL-captured args.
++            args = tuple(partial_args) + url_args
++
++            # Effective keyword args: partial.keywords updated by URL-captured kwargs
++            # (URL-captured kwargs take precedence).
++            merged_kwargs = dict(partial_keywords)
++            merged_kwargs.update(url_kwargs)
++            kwargs = merged_kwargs
++        else:
++            # Ensure args/kwargs are at least empty structures for consistent repr.
++            args = tuple(args or ())
++            kwargs = dict(kwargs or {})
++
++        self.args = args
++        self.kwargs = kwargs
++
++        # Determine a dotted path for the underlying callable used for display.
++        if not hasattr(func_for_path, '__name__'):
++            # A class-based view (or callable object instance)
++            self._func_path = func_for_path.__class__.__module__ + '.' + func_for_path.__class__.__name__
+         else:
+             # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            self._func_path = func_for_path.__module__ + '.' + func_for_path.__name__
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])

@@ -1,0 +1,43 @@
+diff --git a/django/contrib/admin/options.py b/django/contrib/admin/options.py
+index dadd4acfa1..d424a4cb99 100644
+--- a/django/contrib/admin/options.py
++++ b/django/contrib/admin/options.py
+@@ -2037,10 +2037,37 @@ class InlineModelAdmin(BaseModelAdmin):
+         self.opts = self.model._meta
+         self.has_registered_model = admin_site.is_registered(self.model)
+         super().__init__()
++        # Determine whether verbose_name or verbose_name_plural were
++        # explicitly declared on the inline class or any of its base
++        # inline classes. We scan the MRO up to InlineModelAdmin so that
++        # verbose names defined on base inline classes are respected.
++        declared_verbose = False
++        declared_plural = False
++        for cls in self.__class__.__mro__:
++            if cls is InlineModelAdmin:
++                break
++            declared_verbose = declared_verbose or ('verbose_name' in cls.__dict__)
++            declared_plural = declared_plural or ('verbose_name_plural' in cls.__dict__)
++
++        # If no verbose_name was declared on the inline, default to the
++        # model's verbose_name.
+         if self.verbose_name is None:
+             self.verbose_name = self.model._meta.verbose_name
++
++        # If verbose_name_plural wasn't declared on the inline, derive it
++        # from the inline verbose_name if the inline declared a
++        # verbose_name. Otherwise, fall back to the model's verbose_name_plural.
+         if self.verbose_name_plural is None:
+-            self.verbose_name_plural = self.model._meta.verbose_name_plural
++            if declared_plural:
++                # A base inline class declared verbose_name_plural; leave the
++                # attribute as set by the class machinery (it should not be None).
++                pass
++            elif declared_verbose:
++                # Derive plural from the inline's verbose_name, mirroring
++                # django.db.models.options.Options behavior for models.
++                self.verbose_name_plural = format_lazy('{}s', self.verbose_name)
++            else:
++                self.verbose_name_plural = self.model._meta.verbose_name_plural
+ 
+     @property
+     def media(self):

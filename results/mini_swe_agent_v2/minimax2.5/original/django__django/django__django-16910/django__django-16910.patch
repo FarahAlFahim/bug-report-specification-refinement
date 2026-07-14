@@ -1,0 +1,25 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index b28dc925ba..f6549dc8af 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1245,12 +1245,17 @@ class SQLCompiler:
+ 
+         if restricted:
+             related_fields = [
+-                (o.field, o.related_model)
++                (o, o.field, o.related_model)
+                 for o in opts.related_objects
+                 if o.field.unique and not o.many_to_many
+             ]
+-            for related_field, model in related_fields:
+-                related_select_mask = select_mask.get(related_field) or {}
++            for reverse_rel, related_field, model in related_fields:
++                # For parent link fields, use the forward field as the lookup key.
++                # For other reverse relations, use the reverse relation object.
++                if getattr(related_field.remote_field, 'parent_link', False):
++                    related_select_mask = select_mask.get(related_field) or {}
++                else:
++                    related_select_mask = select_mask.get(reverse_rel) or {}
+                 if not select_related_descend(
+                     related_field,
+                     restricted,

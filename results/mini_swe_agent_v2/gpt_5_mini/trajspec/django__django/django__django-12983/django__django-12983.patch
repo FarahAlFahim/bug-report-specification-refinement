@@ -1,0 +1,17 @@
+diff --git a/django/utils/text.py b/django/utils/text.py
+index fb5f6298c4..6a866ef489 100644
+--- a/django/utils/text.py
++++ b/django/utils/text.py
+@@ -403,7 +403,11 @@ def slugify(value, allow_unicode=False):
+     else:
+         value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+     value = re.sub(r'[^\w\s-]', '', value.lower()).strip()
+-    return re.sub(r'[-\s]+', '-', value)
++    # Collapse runs of hyphens and whitespace to a single hyphen, then
++    # remove any leading/trailing separator characters (hyphens or
++    # underscores) that may have survived previous steps. This ensures
++    # slugs don't start with '_' or end with '-'.
++    return re.sub(r'[-\s]+', '-', value).strip('-_')
+ 
+ 
+ def camel_case_to_spaces(value):

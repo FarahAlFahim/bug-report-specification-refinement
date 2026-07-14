@@ -1,0 +1,22 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..18c030c8a7 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -38,8 +38,16 @@ def doit(p, q):
+ 
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
++            # treat p == q**n as divisible by q only when the exponent
++            # is a positive integer. Previously any Integer exponent
++            # (including 0 or negative values) was treated as making p
++            # divisible by q which is incorrect for numeric remainder
++            # semantics (e.g., x**0 == 1 is not divisible by x, and
++            # x**(-1) is 1/x). See issue: Mod(x**2, x) being simplified
++            # to 0 and blocking numeric remainder after substitution.
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    (p.is_Pow and p.exp.is_Integer and p.exp.is_positive is True
++                     and p.base == q) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

@@ -1,0 +1,68 @@
+diff --git a/django/contrib/admin/helpers.py b/django/contrib/admin/helpers.py
+index dd154f72ee..424d8e26b4 100644
+--- a/django/contrib/admin/helpers.py
++++ b/django/contrib/admin/helpers.py
+@@ -209,7 +209,13 @@ class AdminReadonlyField:
+             remote_field.model._meta.model_name,
+         )
+         try:
+-            url = reverse(url_name, args=[quote(remote_obj.pk)])
++            current_app = None
++            if self.model_admin is not None and hasattr(self.model_admin, 'admin_site'):
++                # Use the admin site's application namespace when available so
++                # that readonly related-object links resolve to the correct
++                # AdminSite instance (supports custom AdminSite names).
++                current_app = getattr(self.model_admin.admin_site, 'name', None)
++            url = reverse(url_name, args=[quote(remote_obj.pk)], current_app=current_app)
+             return format_html('<a href="{}">{}</a>', url, remote_obj)
+         except NoReverseMatch:
+             return str(remote_obj)
+diff --git a/django/contrib/admin/models.py b/django/contrib/admin/models.py
+index a0fbb02afd..b7f7735d57 100644
+--- a/django/contrib/admin/models.py
++++ b/django/contrib/admin/models.py
+@@ -137,14 +137,19 @@ class LogEntry(models.Model):
+         """Return the edited object represented by this log entry."""
+         return self.content_type.get_object_for_this_type(pk=self.object_id)
+ 
+-    def get_admin_url(self):
++    def get_admin_url(self, current_app=None):
+         """
+         Return the admin URL to edit the object represented by this log entry.
+         """
+         if self.content_type and self.object_id:
+             url_name = 'admin:%s_%s_change' % (self.content_type.app_label, self.content_type.model)
+             try:
+-                return reverse(url_name, args=(quote(self.object_id),))
++                # If current_app wasn't provided, check for an attribute set
++                # by the admin template rendering code which carries the
++                # current application namespace.
++                if current_app is None and hasattr(self, '_admin_current_app'):
++                    current_app = getattr(self, '_admin_current_app')
++                return reverse(url_name, args=(quote(self.object_id),), current_app=current_app)
+             except NoReverseMatch:
+                 pass
+         return None
+diff --git a/django/contrib/admin/templatetags/log.py b/django/contrib/admin/templatetags/log.py
+index 08c2345e7c..78c1d0e116 100644
+--- a/django/contrib/admin/templatetags/log.py
++++ b/django/contrib/admin/templatetags/log.py
+@@ -19,7 +19,17 @@ class AdminLogNode(template.Node):
+             if not user_id.isdigit():
+                 user_id = context[self.user].pk
+             entries = LogEntry.objects.filter(user__pk=user_id)
+-        context[self.varname] = entries.select_related('content_type', 'user')[:int(self.limit)]
++        entries_qs = entries.select_related('content_type', 'user')[:int(self.limit)]
++        # Attach the current_app from the template context to each LogEntry
++        # instance so that LogEntry.get_admin_url can resolve URLs using the
++        # correct AdminSite namespace when rendered in admin templates.
++        current_app = context.get('current_app')
++        for entry in entries_qs:
++            try:
++                setattr(entry, '_admin_current_app', current_app)
++            except Exception:
++                pass
++        context[self.varname] = entries_qs
+         return ''
+ 
+ 

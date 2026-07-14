@@ -1,0 +1,23 @@
+diff --git a/sklearn/decomposition/kernel_pca.py b/sklearn/decomposition/kernel_pca.py
+index bb91d0cbba..702470ea9c 100644
+--- a/sklearn/decomposition/kernel_pca.py
++++ b/sklearn/decomposition/kernel_pca.py
+@@ -220,6 +220,18 @@ class KernelPCA(BaseEstimator, TransformerMixin, _UnstableOn32BitMixin):
+             self.alphas_ = self.alphas_[:, self.lambdas_ > 0]
+             self.lambdas_ = self.lambdas_[self.lambdas_ > 0]
+ 
++        # Canonicalize eigenvector signs to remove ± ambiguity:
++        # For each eigenvector (column), ensure the entry with largest absolute
++        # value is positive. This makes the sign choice deterministic across runs.
++        if getattr(self, "alphas_", None) is not None and self.alphas_.size:
++            # index of max abs value in each column
++            max_abs_idx = np.argmax(np.abs(self.alphas_), axis=0)
++            # signs of those entries (+1 or -1). If zero, treat as +1.
++            signs = np.sign(self.alphas_[max_abs_idx, np.arange(self.alphas_.shape[1])])
++            signs[signs == 0] = 1.0
++            # broadcast multiply columns by their sign
++            self.alphas_ = self.alphas_ * signs
++
+         return K
+ 
+     def _fit_inverse_transform(self, X_transformed, X):

@@ -1,0 +1,72 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..30a03da732 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1213,6 +1213,7 @@ class ManyToManyField(RelatedField):
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
++            *self._check_symmetrical_self_related_name(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
+         ]
+ 
+@@ -1260,6 +1261,46 @@ class ManyToManyField(RelatedField):
+ 
+         return warnings
+ 
++    def _check_symmetrical_self_related_name(self, from_model=None, **kwargs):
++        """
++        Warn when a non-hidden related_name was supplied on a symmetrical,
++        self-referential ManyToManyField. In that case Django does not create
++        a reverse accessor and the provided related_name will have no effect.
++
++        This check only runs when from_model is available (i.e. not in
++        unresolved/abstract contexts) and ignores hidden related_name values
++        (those ending with '+').
++        """
++        errors = []
++        if from_model is None:
++            return errors
++
++        if not self.remote_field.symmetrical:
++            return errors
++
++        to_model = resolve_relation(from_model, self.remote_field.model)
++        # If relation is unresolved (string) keep quiet; only warn when it
++        # resolves to the owning model.
++        if to_model is from_model:
++            # _related_name holds the original developer-supplied value (may be None)
++            related_name = getattr(self, '_related_name', None)
++            if related_name is not None:
++                # Ignore intentionally hidden names (ending with '+').
++                if not (isinstance(related_name, str) and related_name.endswith('+')):
++                    errors.append(
++                        checks.Warning(
++                            "A related_name (%r) was supplied for a symmetrical "
++                            "self-referential ManyToManyField. Django does not "
++                            "create a reverse accessor for symmetrical self "
++                            "relations; the provided related_name will have no effect."
++                            % (related_name,),
++                            obj=self,
++                            id='fields.W342',
++                            hint="Remove the related_name argument or set symmetrical=False.",
++                        )
++                    )
++        return errors
++
+     def _check_relationship_model(self, from_model=None, **kwargs):
+         if hasattr(self.remote_field.through, '_meta'):
+             qualified_model_name = "%s.%s" % (
+@@ -1636,7 +1677,11 @@ class ManyToManyField(RelatedField):
+             self.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT or
+             self.remote_field.model == cls._meta.object_name
+         ):
+-            self.remote_field.related_name = "%s_rel_+" % name
++            # Only generate an internal hidden related_name when the developer
++            # did not supply one. Respect an explicit related_name so it is
++            # not silently overwritten.
++            if getattr(self, '_related_name', None) is None:
++                self.remote_field.related_name = "%s_rel_+" % name
+         elif self.remote_field.is_hidden():
+             # If the backwards relation is disabled, replace the original
+             # related_name with one generated from the m2m field name. Django

@@ -1,0 +1,42 @@
+diff --git a/src/_pytest/pathlib.py b/src/_pytest/pathlib.py
+index e43310ef0..47eaf3c28 100644
+--- a/src/_pytest/pathlib.py
++++ b/src/_pytest/pathlib.py
+@@ -2,6 +2,7 @@ import atexit
+ import contextlib
+ import fnmatch
+ import importlib.util
++import importlib.machinery
+ import itertools
+ import os
+ import shutil
+@@ -524,6 +525,10 @@ def import_path(
+     if mode is ImportMode.importlib:
+         module_name = module_name_from_path(path, root)
+ 
++        # If the given module name is already in sys.modules, do not import it again.
++        with contextlib.suppress(KeyError):
++            return sys.modules[module_name]
++
+         for meta_importer in sys.meta_path:
+             spec = meta_importer.find_spec(module_name, [str(path.parent)])
+             if spec is not None:
+@@ -651,8 +656,18 @@ def insert_missing_modules(modules: Dict[str, ModuleType], module_name: str) ->
+                     module_name,
+                     doc="Empty module created by pytest's importmode=importlib.",
+                 )
++                module.__spec__ = importlib.machinery.ModuleSpec(
++                    module_name,
++                    None,
++                )
+         else:
+             module = modules[module_name]
++            # Ensure __spec__ is set for existing modules too
++            if module.__spec__ is None:
++                module.__spec__ = importlib.machinery.ModuleSpec(
++                    module_name,
++                    None,
++                )
+         if child_module:
+             # Add child attribute to the parent that can reference the child
+             # modules.

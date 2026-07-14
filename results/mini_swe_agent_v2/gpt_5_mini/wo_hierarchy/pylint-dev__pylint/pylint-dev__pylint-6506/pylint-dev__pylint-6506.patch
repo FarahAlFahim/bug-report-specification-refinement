@@ -1,0 +1,34 @@
+diff --git a/pylint/__init__.py b/pylint/__init__.py
+index 3aa4b7f9d..696c6d788 100644
+--- a/pylint/__init__.py
++++ b/pylint/__init__.py
+@@ -24,7 +24,29 @@ def run_pylint(argv: Sequence[str] | None = None) -> None:
+     try:
+         PylintRun(argv or sys.argv[1:])
+     except KeyboardInterrupt:
++        # Respect keyboard interrupts with a non-zero exit code.
+         sys.exit(1)
++    except Exception:
++        # Import here to avoid a top-level import cycle when pylint is
++        # used as a library. We only catch the specific internal
++        # configuration parsing exception that results from
++        # unrecognized CLI options provided by the user. In that case
++        # a human-friendly message has already been emitted by the
++        # reporter; we should exit with a non-zero status instead of
++        # letting the raw traceback propagate to the console.
++        try:
++            from pylint.config.exceptions import _UnrecognizedOptionError
++
++            exc_info = sys.exc_info()[1]
++            if isinstance(exc_info, _UnrecognizedOptionError):
++                # Use the conventional usage/configuration exit code
++                # (32) to indicate a problem with provided options.
++                sys.exit(32)
++        except Exception:
++            # If anything unexpected happens while handling the
++            # exception, re-raise the original exception so that
++            # debugging information is not lost for library users.
++            raise
+ 
+ 
+ def run_epylint(argv: Sequence[str] | None = None) -> NoReturn:

@@ -1,0 +1,40 @@
+diff --git a/requests/models.py b/requests/models.py
+index d8456375..e22d2b2f 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -461,9 +461,33 @@ class Request(object):
+         return ''.join(url)
+ 
+     def register_hook(self, event, hook):
+-        """Properly register a hook."""
++        """Properly register a hook.
+ 
+-        self.hooks[event].append(hook)
++        Accept a single callable or an iterable of callables. Strings and
++        bytes are not treated as iterables of callables. Non-callable items
++        will raise a TypeError.
++        """
++
++        # Single callable
++        if hasattr(hook, '__call__'):
++            self.hooks[event].append(hook)
++            return
++
++        # Reject strings/bytes which are iterable but not collections of
++        # callables.
++        if isinstance(hook, (str, bytes)):
++            raise TypeError('Hook for event %r must be a callable or an iterable of callables.' % event)
++
++        # Iterable of callables
++        if hasattr(hook, '__iter__'):
++            for h in hook:
++                if not hasattr(h, '__call__'):
++                    raise TypeError('Hook for event %r contains non-callable: %r' % (event, h))
++                self.hooks[event].append(h)
++            return
++
++        # Fallback
++        raise TypeError('Hook for event %r must be a callable or an iterable of callables.' % event)
+ 
+     def deregister_hook(self, event, hook):
+         """Deregister a previously registered hook.

@@ -1,0 +1,107 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 978fd5df8..ee125f96f 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1266,6 +1266,10 @@ class FunctionDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # typ
+                 overload = evaluate_signature(overload, __globals__,
+                                               self.env.config.autodoc_type_aliases)
+ 
++                # honor autodoc_typehints when rendering overload signatures
++                if self.env.config.autodoc_typehints in ('none', 'description'):
++                    kwargs.setdefault('show_annotation', False)
++
+                 sig = stringify_signature(overload, **kwargs)
+                 sigs.append(sig)
+ 
+@@ -1485,6 +1489,9 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type:
+                 parameters = list(overload.parameters.values())
+                 overload = overload.replace(parameters=parameters[1:],
+                                             return_annotation=Parameter.empty)
++                # honor autodoc_typehints when rendering overload signatures
++                if self.env.config.autodoc_typehints in ('none', 'description'):
++                    kwargs.setdefault('show_annotation', False)
+                 sig = stringify_signature(overload, **kwargs)
+                 sigs.append(sig)
+         else:
+@@ -1914,6 +1921,9 @@ class MethodDocumenter(DocstringSignatureMixin, ClassLevelDocumenter):  # type:
+                                               name=self.object_name):
+                     parameters = list(overload.parameters.values())
+                     overload = overload.replace(parameters=parameters[1:])
++                # honor autodoc_typehints when rendering overload signatures
++                if self.env.config.autodoc_typehints in ('none', 'description'):
++                    kwargs.setdefault('show_annotation', False)
+                 sig = stringify_signature(overload, **kwargs)
+                 sigs.append(sig)
+ 
+diff --git a/sphinx/ext/autodoc/typehints.py b/sphinx/ext/autodoc/typehints.py
+index 4f81a6eae..b4bb76f88 100644
+--- a/sphinx/ext/autodoc/typehints.py
++++ b/sphinx/ext/autodoc/typehints.py
+@@ -18,7 +18,9 @@ from docutils.nodes import Element
+ 
+ from sphinx import addnodes
+ from sphinx.application import Sphinx
++from sphinx.pycode import ModuleAnalyzer
+ from sphinx.util import inspect, typing
++from sphinx.util.inspect import evaluate_signature
+ 
+ 
+ def record_typehints(app: Sphinx, objtype: str, name: str, obj: Any,
+@@ -28,12 +30,51 @@ def record_typehints(app: Sphinx, objtype: str, name: str, obj: Any,
+         if callable(obj):
+             annotations = app.env.temp_data.setdefault('annotations', {})
+             annotation = annotations.setdefault(name, OrderedDict())
+-            sig = inspect.signature(obj)
+-            for param in sig.parameters.values():
+-                if param.annotation is not param.empty:
+-                    annotation[param.name] = typing.stringify(param.annotation)
+-            if sig.return_annotation is not sig.empty:
+-                annotation['return'] = typing.stringify(sig.return_annotation)
++
++            # First, try to record annotations from parser-provided @overload
++            # stubs if available. This ensures that when autodoc_typehints is
++            # 'description' the overload annotations (extracted from source)
++            # are merged into the description. Fall back to runtime
++            # function signature if no overloads are found.
++            module_name = getattr(obj, '__module__', None)
++            recorded = False
++            if module_name:
++                try:
++                    analyzer = ModuleAnalyzer.for_module(module_name)
++                    analyzer.parse()
++                    overloads = analyzer.overloads.get(name)
++                    if overloads:
++                        # Try to import module to get globals for evaluation
++                        try:
++                            mod = __import__(module_name, fromlist=['*'])
++                            __globals__ = getattr(mod, '__dict__', {})
++                        except Exception:
++                            __globals__ = {}
++
++                        for overload in overloads:
++                            try:
++                                sig = evaluate_signature(overload, __globals__,
++                                                         app.config.autodoc_type_aliases)
++                            except Exception:
++                                # If evaluation fails, skip this overload
++                                continue
++                            for param in sig.parameters.values():
++                                if param.annotation is not param.empty:
++                                    annotation[param.name] = typing.stringify(param.annotation)
++                            if sig.return_annotation is not sig.empty:
++                                annotation['return'] = typing.stringify(sig.return_annotation)
++                        recorded = True
++                except Exception:
++                    # parsing or importing module failed: fall back below
++                    recorded = False
++
++            if not recorded:
++                sig = inspect.signature(obj)
++                for param in sig.parameters.values():
++                    if param.annotation is not param.empty:
++                        annotation[param.name] = typing.stringify(param.annotation)
++                if sig.return_annotation is not sig.empty:
++                    annotation['return'] = typing.stringify(sig.return_annotation)
+     except (TypeError, ValueError):
+         pass
+ 

@@ -1,0 +1,40 @@
+diff --git a/django/core/files/storage.py b/django/core/files/storage.py
+index 4c27fce605..6b09bd7a68 100644
+--- a/django/core/files/storage.py
++++ b/django/core/files/storage.py
+@@ -331,9 +331,11 @@ class FileSystemStorage(Storage):
+             raise ValueError("This file is not accessible via a URL.")
+         url = filepath_to_uri(name)
+         if url is not None:
+-            url = url.lstrip('/')
+-        return urljoin(self.base_url, url)
+-
++            url = url.lstrip("/")
++        from django.urls import get_script_prefix
++        # Build the full URL by combining script prefix with base_url
++        script_prefix = get_script_prefix().rstrip("/")
++        return urljoin(script_prefix + self.base_url, url)
+     def _datetime_from_timestamp(self, ts):
+         """
+         If timezone support is enabled, make an aware datetime object in UTC;
+diff --git a/django/templatetags/static.py b/django/templatetags/static.py
+index 39712aaba0..c7873052f7 100644
+--- a/django/templatetags/static.py
++++ b/django/templatetags/static.py
+@@ -38,13 +38,15 @@ class PrefixNode(template.Node):
+ 
+     @classmethod
+     def handle_simple(cls, name):
++        from django.urls import get_script_prefix
+         try:
+             from django.conf import settings
+         except ImportError:
+             prefix = ''
+         else:
+             prefix = iri_to_uri(getattr(settings, name, ''))
+-        return prefix
++        # Prepend the script prefix to the URL prefix
++        return get_script_prefix().rstrip('/') + prefix
+ 
+     def render(self, context):
+         prefix = self.handle_simple(self.name)

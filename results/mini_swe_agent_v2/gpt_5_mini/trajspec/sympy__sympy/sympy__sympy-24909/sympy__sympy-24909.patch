@@ -1,0 +1,66 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..59b6f02de3 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -85,15 +85,28 @@ def __mul__(self, other):
+ 
+         fact = self.scale_factor * other.scale_factor
+ 
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # If combining two prefixes, keep existing simplification behavior
++        if isinstance(other, Prefix):
+             # simplify prefix
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # other is a Quantity: prefer returning a canonical prefixed Quantity
++        # if one was registered (via prefix_unit). Only fall back to a
++        # numeric multiplication if no canonical prefixed Quantity exists.
++        try:
++            from sympy.physics.units import UnitSystem
++        except Exception:
++            UnitSystem = None
++
++        if UnitSystem is not None:
++            for q, val in UnitSystem._quantity_scale_factors_global.items():
++                # val is (prefix.scale_factor, base_unit)
++                if val == (self.scale_factor, other):
++                    return q
++
+         return self.scale_factor * other
+ 
+     def __truediv__(self, other):
+@@ -102,14 +115,26 @@ def __truediv__(self, other):
+ 
+         fact = self.scale_factor / other.scale_factor
+ 
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # If dividing by a Prefix, keep existing simplification behavior
++        if isinstance(other, Prefix):
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # other is a Quantity: prefer returning a canonical prefixed Quantity
++        # if one was registered (via prefix_unit). Only fall back to a
++        # numeric division if no canonical prefixed Quantity exists.
++        try:
++            from sympy.physics.units import UnitSystem
++        except Exception:
++            UnitSystem = None
++
++        if UnitSystem is not None:
++            for q, val in UnitSystem._quantity_scale_factors_global.items():
++                if val == (self.scale_factor, other):
++                    return q
++
+         return self.scale_factor / other
+ 
+     def __rtruediv__(self, other):

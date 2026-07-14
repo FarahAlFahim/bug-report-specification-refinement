@@ -1,0 +1,34 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 25c3b44250..5acb7cfc95 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -143,6 +143,15 @@ def iter_modules_and_files(modules, extra_files):
+             # The module could have been removed, don't fail loudly if this
+             # is the case.
+             continue
++        except ValueError as exc:
++            # Path.resolve can raise ValueError for malformed paths (for
++            # example, when the path contains an embedded NUL). Don't allow
++            # the autoreloader to crash in this case; ignore the entry and
++            # continue watching other files. Log at debug level since these
++            # issues are typically environment-specific and not actionable
++            # by the user from within Django.
++            logger.debug('Ignoring malformed module path %r (%s).', filename, exc)
++            continue
+         results.add(resolved_path)
+     return frozenset(results)
+ 
+@@ -189,6 +198,13 @@ def sys_path_directories():
+             resolved_path = path.resolve(strict=True).absolute()
+         except FileNotFoundError:
+             continue
++        except ValueError as exc:
++            # Similar reasoning as above: a sys.path entry may be malformed
++            # (for example containing an embedded NUL) which would cause
++            # pathlib/os to raise ValueError. Ignore such entries rather than
++            # letting the reloader crash.
++            logger.debug('Ignoring malformed sys.path entry %r (%s).', path, exc)
++            continue
+         # If the path is a file (like a zip file), watch the parent directory.
+         if resolved_path.is_file():
+             yield resolved_path.parent

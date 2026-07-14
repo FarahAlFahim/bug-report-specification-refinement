@@ -1,0 +1,32 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index 5bbb786984..49b864373b 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -2426,9 +2426,24 @@ class Figure(FigureBase):
+             if isinstance(tight_layout, dict):
+                 self.get_layout_engine().set(**tight_layout)
+         elif constrained_layout is not None:
+-            self.set_layout_engine(layout='constrained')
+-            if isinstance(constrained_layout, dict):
+-                self.get_layout_engine().set(**constrained_layout)
++            # The deprecated ``constrained_layout`` parameter can be a
++            # bool or a dict of parameters.  If it is provided explicitly
++            # and is falsy (e.g. ``False``), the user intends to disable
++            # constrained layout even if rcParams would enable it.  If it
++            # is truthy (or a dict), enable the constrained layout engine
++            # and pass any dict parameters through.
++            _constrained = bool(constrained_layout)
++            _parameters = (constrained_layout
++                           if isinstance(constrained_layout, dict)
++                           else {})
++            if _constrained:
++                self.set_layout_engine(layout='constrained')
++                if _parameters:
++                    self.get_layout_engine().set(**_parameters)
++            else:
++                # Explicitly disable layout engine instead of falling
++                # back to rcParams by using the 'none' sentinel.
++                self.set_layout_engine(layout='none')
+         else:
+             # everything is None, so use default:
+             self.set_layout_engine(layout=layout)

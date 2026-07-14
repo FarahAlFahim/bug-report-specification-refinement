@@ -1,0 +1,39 @@
+diff --git a/requests/models.py b/requests/models.py
+index d8456375..96f833c2 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -463,18 +463,29 @@ class Request(object):
+     def register_hook(self, event, hook):
+         """Properly register a hook."""
+ 
+-        self.hooks[event].append(hook)
++        if isinstance(hook, list):
++            self.hooks[event].extend(hook)
++        else:
++            self.hooks[event].append(hook)
+ 
+     def deregister_hook(self, event, hook):
+         """Deregister a previously registered hook.
+         Returns True if the hook existed, False if not.
+         """
+ 
+-        try:
+-            self.hooks[event].remove(hook)
++        if isinstance(hook, list):
++            for h in hook:
++                try:
++                    self.hooks[event].remove(h)
++                except ValueError:
++                    pass
+             return True
+-        except ValueError:
+-            return False
++        else:
++            try:
++                self.hooks[event].remove(hook)
++                return True
++            except ValueError:
++                return False
+ 
+     def send(self, anyway=False, prefetch=None):
+         """Sends the request. Returns True if successful, False if not.

@@ -1,0 +1,29 @@
+diff --git a/django/template/autoreload.py b/django/template/autoreload.py
+index cf1b20ba95..d99abdd82e 100644
+--- a/django/template/autoreload.py
++++ b/django/template/autoreload.py
+@@ -48,7 +48,22 @@ def watch_for_template_changes(sender, **kwargs):
+ 
+ @receiver(file_changed, dispatch_uid='template_loaders_file_changed')
+ def template_changed(sender, file_path, **kwargs):
++    """
++    When a file changes inside a template directory, reset the template
++    loaders. Return True to indicate the change was handled and prevent the
++    autoreloader from triggering a full reload only for changes that are
++    actually template files (e.g. .html, .txt). Changes to Python sources or
++    other non-template files under the same directory should not be
++    swallowed here because they should trigger a full reload.
++    """
++    TEMPLATE_FILE_SUFFIXES = {'.html', '.htm', '.txt'}
+     for template_dir in get_template_directories():
+         if template_dir in file_path.parents:
+-            reset_loaders()
+-            return True
++            # Only treat this as a template change if the file looks like a
++            # template based on its extension. Otherwise allow the autoreloader
++            # to handle it (which will trigger a restart).
++            if file_path.suffix.lower() in TEMPLATE_FILE_SUFFIXES:
++                reset_loaders()
++                return True
++            # Not a template file: do not swallow the change.
++            return False

@@ -1,0 +1,39 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..60eb7c4563 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -240,7 +240,13 @@ def _solve_reduced_system(system, gens, entry=False):
+ 
+         univariate = list(filter(_is_univariate, basis))
+ 
+-        if len(univariate) == 1:
++        # The univariate handling is only valid when we are solving for a
++        # single generator. If multiple generators were originally requested
++        # then a single univariate polynomial in the Groebner basis does not
++        # imply a zero-dimensional system (there may be free variables).
++        # In that case we must not take the univariate path and should
++        # indicate that only zero-dimensional systems are supported.
++        if len(univariate) == 1 and len(gens) == 1:
+             f = univariate.pop()
+         else:
+             raise NotImplementedError(filldedent('''
+@@ -256,8 +262,18 @@ def _solve_reduced_system(system, gens, entry=False):
+         if not zeros:
+             return []
+ 
++        # If the Groebner basis contains only the univariate polynomial then
++        # we can return the roots as 1-tuples only when the number of
++        # requested generators is exactly one. Otherwise the system still
++        # has free variables and should be treated as positive-dimensional.
+         if len(basis) == 1:
+-            return [(zero,) for zero in zeros]
++            if len(gens) == 1:
++                return [(zero,) for zero in zeros]
++            else:
++                raise NotImplementedError(filldedent('''
++                    only zero-dimensional systems supported
++                    (finite number of solutions)
++                    '''))
+ 
+         solutions = []
+ 

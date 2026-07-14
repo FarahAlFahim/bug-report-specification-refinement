@@ -1,0 +1,14 @@
+diff --git a/django/forms/formsets.py b/django/forms/formsets.py
+index 3adbc6979a..07f62e6cdc 100644
+--- a/django/forms/formsets.py
++++ b/django/forms/formsets.py
+@@ -48,6 +48,9 @@ class ManagementForm(Form):
+         cleaned_data.setdefault(INITIAL_FORM_COUNT, 0)
+         return cleaned_data
+ 
++    # RemovedInDjango50Warning: Use 'django/forms/div.html'.
++    template_name = "django/forms/div.html"
++
+ 
+ class BaseFormSet(RenderableFormMixin):
+     """

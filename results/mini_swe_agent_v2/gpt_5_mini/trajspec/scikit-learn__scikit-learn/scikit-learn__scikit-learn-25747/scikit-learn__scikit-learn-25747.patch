@@ -1,0 +1,66 @@
+diff --git a/sklearn/utils/_set_output.py b/sklearn/utils/_set_output.py
+index 335773c6a..d8a73d34a 100644
+--- a/sklearn/utils/_set_output.py
++++ b/sklearn/utils/_set_output.py
+@@ -53,13 +53,58 @@ def _wrap_in_pandas_container(
+     pd = check_pandas_support("Setting output container to 'pandas'")
+ 
+     if isinstance(data_to_wrap, pd.DataFrame):
++        # Only assign columns/index when they are compatible with the
++        # DataFrame's shape. Unconditionally assigning an index or columns
++        # that differ in length from the data will raise in pandas (for
++        # example when a transformer aggregates rows). In that case we
++        # preserve the transformer's own index/columns.
+         if columns is not None:
+-            data_to_wrap.columns = columns
++            try:
++                if hasattr(columns, "__len__") and len(columns) == data_to_wrap.shape[1]:
++                    data_to_wrap.columns = columns
++                else:
++                    # If columns is not length-compatible, skip assignment.
++                    pass
++            except Exception:
++                # If determining length of `columns` fails, skip assignment.
++                pass
+         if index is not None:
+-            data_to_wrap.index = index
++            try:
++                if len(index) == len(data_to_wrap):
++                    data_to_wrap.index = index
++                else:
++                    # Preserve the transformer's own index when row-counts differ.
++                    pass
++            except Exception:
++                # If determining length of `index` fails, skip assignment.
++                pass
+         return data_to_wrap
+ 
+-    return pd.DataFrame(data_to_wrap, index=index, columns=columns)
++    # For non-DataFrame outputs (e.g. ndarray, Series), only pass an index
++    # to the DataFrame constructor when its length matches the number of
++    # rows in the data. Otherwise, construct the DataFrame without forcing
++    # the original input's index and preserve the transformer's own index.
++    use_index = None
++    try:
++        if index is not None and len(index) == len(data_to_wrap):
++            use_index = index
++    except Exception:
++        # If len() fails for either, fall back to not using the provided index
++        use_index = None
++
++    df = pd.DataFrame(data_to_wrap, index=use_index)
++
++    # Assign columns only if they are length-compatible with the created
++    # DataFrame. If not, preserve existing columns.
++    if columns is not None:
++        try:
++            if hasattr(columns, "__len__") and len(columns) == df.shape[1]:
++                df.columns = columns
++        except Exception:
++            # If any error happens while determining lengths, skip assignment.
++            pass
++
++    return df
+ 
+ 
+ def _get_output_config(method, estimator=None):

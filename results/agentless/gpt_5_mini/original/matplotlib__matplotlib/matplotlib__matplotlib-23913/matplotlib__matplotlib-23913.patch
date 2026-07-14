@@ -1,0 +1,18 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index c34b2ad..277dbfe 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -539,6 +539,13 @@ class Legend(Artist):
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
+ 
++        # enable making legend draggable at creation if requested
++        if draggable is not None:
++            # set_draggable accepts bool or other toggles as implemented by
++            # Legend.set_draggable; calling here allows creating the legend
++            # already draggable when requested.
++            self.set_draggable(draggable)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

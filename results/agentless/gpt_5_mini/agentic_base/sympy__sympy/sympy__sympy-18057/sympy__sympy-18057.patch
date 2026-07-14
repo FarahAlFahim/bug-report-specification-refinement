@@ -1,0 +1,33 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index b5265ce..838875f 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -121,7 +121,12 @@ class Expr(Basic, EvalfMixin):
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
++            # Use the stricter internal sympification for operator-like APIs so
++            # that arbitrary object's repr/str is NOT parsed/evaluated as a
++            # last-resort. This prevents executing code or converting unrelated
++            # objects to SymPy expressions during simple equality checks.
++            from sympy.core.sympify import _sympify
++            other = _sympify(other)
+             if not isinstance(other, Expr):
+                 return False
+         except (SympifyError, SyntaxError):
+@@ -736,7 +741,13 @@ class Expr(Basic, EvalfMixin):
+         from sympy.polys.polyerrors import NotAlgebraic
+         from sympy.polys.numberfields import minimal_polynomial
+ 
+-        other = sympify(other)
++        # Use the internal strict sympifier to avoid parsing/evaluating
++        # arbitrary object's repr/str during equality testing.
++        from sympy.core.sympify import _sympify
++        try:
++            other = _sympify(other)
++        except SympifyError:
++            return False
+         if self == other:
+             return True
+ 

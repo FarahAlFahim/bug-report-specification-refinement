@@ -1,0 +1,66 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index 966eb0760b..450bfd3edd 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -1100,15 +1100,27 @@ class Colorbar:
+         if self._extend_upper():
+             b = np.hstack((b, b[-1] + 1))
+ 
+-        # transform from 0-1 to vmin-vmax:
++        # transform from 0-1 to vmin-vmax.
++        # Operate on a shallow copy of the norm when we need to temporarily
++        # override vmin/vmax so as not to mutate a shared Norm instance that
++        # may be concurrently used by other artists (e.g. the mappable).
++        norm_for_inverse = self.norm
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
+-        self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+-            self.norm.vmin, self.norm.vmax, expander=0.1)
++            # Work on a copy to avoid transiently setting invalid vmin/vmax
++            # (e.g. 0 for a LogNorm) on the shared norm instance.
++            import copy as _copy
++            norm_for_inverse = _copy.copy(self.norm)
++            norm_for_inverse.vmin = 0
++            norm_for_inverse.vmax = 1
++        # Ensure vmin/vmax are nonsingular for the temporary norm
++        vmin, vmax = mtransforms.nonsingular(
++            getattr(norm_for_inverse, 'vmin', None),
++            getattr(norm_for_inverse, 'vmax', None),
++            expander=0.1)
++        norm_for_inverse.vmin, norm_for_inverse.vmax = vmin, vmax
+         if (not isinstance(self.norm, colors.BoundaryNorm) and
+                 (self.boundaries is None)):
+-            b = self.norm.inverse(b)
++            b = norm_for_inverse.inverse(b)
+ 
+         self._boundaries = np.asarray(b, dtype=float)
+         self._values = 0.5 * (self._boundaries[:-1] + self._boundaries[1:])
+diff --git a/lib/matplotlib/image.py b/lib/matplotlib/image.py
+index 7b066bdaf7..957a7e2709 100644
+--- a/lib/matplotlib/image.py
++++ b/lib/matplotlib/image.py
+@@ -27,6 +27,7 @@ from matplotlib.transforms import (
+     IdentityTransform, TransformedBbox)
+ 
+ _log = logging.getLogger(__name__)
++import copy
+ 
+ # map interpolation strings to module constants
+ _interpd_ = {
+@@ -540,9 +541,12 @@ class _ImageBase(martist.Artist, cm.ScalarMappable):
+                     s_vmin = np.finfo(scaled_dtype).eps
+                 # Block the norm from sending an update signal during the
+                 # temporary vmin/vmax change
+-                with self.norm.callbacks.blocked(), \
+-                     cbook._setattr_cm(self.norm, vmin=s_vmin, vmax=s_vmax):
+-                    output = self.norm(resampled_masked)
++                import copy as _copy
++                temp_norm = _copy.copy(self.norm)
++                temp_norm.vmin = s_vmin
++                temp_norm.vmax = s_vmax
++                with self.norm.callbacks.blocked():
++                    output = temp_norm(resampled_masked)
+             else:
+                 if A.ndim == 2:  # _interpolation_stage == 'rgba'
+                     self.norm.autoscale_None(A)

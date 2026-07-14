@@ -1,0 +1,43 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index 8747844e5..1136a26e4 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -972,7 +972,37 @@ def check_scalar(x, name, target_type, min_val=None, max_val=None):
+         If the parameter's value violates the given bounds.
+     """
+ 
+-    if not isinstance(x, target_type):
++    # Allow numpy scalar types to be accepted for Python builtin types
++    def _is_acceptable_type(x, target_type):
++        # Direct isinstance check covers most cases
++        if isinstance(x, target_type):
++            return True
++
++        # Handle tuple of target types
++        if isinstance(target_type, tuple):
++            return any(_is_acceptable_type(x, t) for t in target_type)
++
++        # From here target_type is a single type object
++        # Accept numpy integer/floating scalars for int/float targets
++        if isinstance(x, np.generic):
++            # For int targets, accept numpy integer scalars
++            if target_type is int or (isinstance(target_type, type)
++                                      and issubclass(target_type, numbers.Integral)):
++                return np.issubdtype(type(x), np.integer)
++
++            # For float targets, accept both numpy floats and integers
++            if target_type is float or (isinstance(target_type, type)
++                                        and issubclass(target_type, numbers.Real)):
++                return (np.issubdtype(type(x), np.floating) or
++                        np.issubdtype(type(x), np.integer))
++
++            # For bool targets, accept numpy boolean scalars
++            if target_type is bool:
++                return np.issubdtype(type(x), np.bool_)
++
++        return False
++
++    if not _is_acceptable_type(x, target_type):
+         raise TypeError('`{}` must be an instance of {}, not {}.'
+                         .format(name, target_type, type(x)))
+ 

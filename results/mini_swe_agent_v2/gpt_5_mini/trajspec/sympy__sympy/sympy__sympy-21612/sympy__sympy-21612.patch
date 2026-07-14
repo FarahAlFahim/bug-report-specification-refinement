@@ -1,0 +1,60 @@
+diff --git a/sympy/parsing/latex/_parse_latex_antlr.py b/sympy/parsing/latex/_parse_latex_antlr.py
+index 2e4a45ad20..1dbff16a74 100644
+--- a/sympy/parsing/latex/_parse_latex_antlr.py
++++ b/sympy/parsing/latex/_parse_latex_antlr.py
+@@ -58,6 +58,37 @@ def syntaxError(self, recog, symbol, line, col, msg, e):
+             raise LaTeXParsingError(err)
+ 
+ 
++
++def _reciprocal(expr):
++    """Return a normalized reciprocal of expr.
++
++    - For Pow(base, exp) where base is Pow(b, e1): combine exponents to Pow(b, -(e1*exp)).
++    - For Pow(base, exp) where base is not Pow: return Pow(base, -exp).
++    - For Mul(*args): return Mul(_reciprocal(arg) for arg in args).
++    - Otherwise: return Pow(expr, -1).
++    All returned expressions use evaluate=False to preserve grouping.
++    """
++    # Pow
++    if isinstance(expr, sympy.Pow):
++        base = expr.base
++        exp = expr.exp
++        # combine nested powers: (b**e1)**e2 -> b**(e1*e2)
++        if isinstance(base, sympy.Pow):
++            inner_base = base.base
++            inner_exp = base.exp
++            total_exp = sympy.Mul(inner_exp, exp, evaluate=False)
++            return sympy.Pow(inner_base, sympy.Mul(-1, total_exp, evaluate=False), evaluate=False)
++        else:
++            return sympy.Pow(base, sympy.Mul(-1, exp, evaluate=False), evaluate=False)
++    # Mul
++    if isinstance(expr, sympy.Mul):
++        args = expr.args
++        recips = [ _reciprocal(a) for a in args ]
++        return sympy.Mul(*recips, evaluate=False)
++    # default
++    return sympy.Pow(expr, -1, evaluate=False)
++
++
+ def parse_latex(sympy):
+     antlr4 = import_module('antlr4', warn_not_installed=True)
+ 
+@@ -140,7 +171,7 @@ def convert_mp(mp):
+     elif mp.DIV() or mp.CMD_DIV() or mp.COLON():
+         lh = convert_mp(mp_left)
+         rh = convert_mp(mp_right)
+-        return sympy.Mul(lh, sympy.Pow(rh, -1, evaluate=False), evaluate=False)
++        return sympy.Mul(lh, _reciprocal(rh), evaluate=False)
+     else:
+         if hasattr(mp, 'unary'):
+             return convert_unary(mp.unary())
+@@ -382,7 +413,7 @@ def convert_frac(frac):
+ 
+     expr_top = convert_expr(frac.upper)
+     expr_bot = convert_expr(frac.lower)
+-    inverse_denom = sympy.Pow(expr_bot, -1, evaluate=False)
++    inverse_denom = _reciprocal(expr_bot)
+     if expr_top == 1:
+         return inverse_denom
+     else:

@@ -1,0 +1,24 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..beaa3013b2 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -396,6 +396,19 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value, field.decimal_places)
+     elif isinstance(field, (models.IntegerField, models.FloatField)):
+         return formats.number_format(value)
++    elif getattr(field, 'get_internal_type', None) and field.get_internal_type() == 'JSONField':
++        # Use the form field's prepare_value for JSONField so that values
++        # are rendered as valid JSON (double quotes) when readonly in the
++        # admin. This also preserves InvalidJSONInput instances returned
++        # by the form field's bound_data handling.
++        try:
++            form_field = field.formfield()
++            prepared = form_field.prepare_value(value)
++        except Exception:
++            # Fallback to the default display behaviour if anything goes
++            # wrong while preparing the value.
++            return display_for_value(value, empty_value_display)
++        return prepared if prepared is not None else empty_value_display
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
+     else:

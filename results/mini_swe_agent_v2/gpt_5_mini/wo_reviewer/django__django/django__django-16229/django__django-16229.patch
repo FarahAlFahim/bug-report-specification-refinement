@@ -1,0 +1,24 @@
+diff --git a/django/forms/boundfield.py b/django/forms/boundfield.py
+index 9f2ae59ab4..772851d455 100644
+--- a/django/forms/boundfield.py
++++ b/django/forms/boundfield.py
+@@ -96,9 +96,18 @@ class BoundField:
+             attrs.setdefault(
+                 "id", self.html_initial_id if only_initial else self.auto_id
+             )
++        value = self.value()
++        if only_initial:
++            # When rendering the hidden "initial-" input, use a widget-
++            # formatted representation of the original initial value
++            # (not the bound/submitted value). This ensures the hidden
++            # initial can be parsed back (via field.to_python) during
++            # change-detection (BoundField._has_changed).
++            value = self.field.prepare_value(self.initial)
++
+         return widget.render(
+             name=self.html_initial_name if only_initial else self.html_name,
+-            value=self.value(),
++            value=value,
+             attrs=attrs,
+             renderer=self.form.renderer,
+         )

@@ -1,0 +1,42 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..9511336503 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5998,6 +5998,37 @@ def _generic_factor_list(expr, gens, args, method):
+         fp = _sorted_factors(fp, method)
+         fq = _sorted_factors(fq, method)
+ 
++        # When aggregating factor lists from sub-expressions we can end up
++        # with multiple (Poly, exp) entries that share the same exponent.
++        # Those should be represented as a single entry whose polynomial is
++        # the product of the bases and whose exponent is that multiplicity.
++        # Since _sorted_factors orders by exponent (when method == 'sqf'),
++        # identical exponents are adjacent and can be safely grouped.
++        def _group_same_exponent(factors):
++            if not factors:
++                return factors
++            grouped = []
++            cur_f, cur_k = factors[0]
++            for f, k in factors[1:]:
++                if k == cur_k:
++                    # Multiply the polynomial bases; these are Poly objects
++                    # at this point (ensured above), so Poly.__mul__ yields
++                    # another Poly.
++                    cur_f = cur_f * f
++                else:
++                    grouped.append((cur_f, cur_k))
++                    cur_f, cur_k = f, k
++            grouped.append((cur_f, cur_k))
++            return grouped
++
++        # Group same-exponent factors only for the 'sqf' method where the
++        # sorting places exponent as the primary key; for other methods
++        # exponents may not be adjacent after sorting and grouping by
++        # adjacency would be unsafe.
++        if method == 'sqf':
++            fp = _group_same_exponent(fp)
++            fq = _group_same_exponent(fq)
++
+         if not opt.polys:
+             fp = [(f.as_expr(), k) for f, k in fp]
+             fq = [(f.as_expr(), k) for f, k in fq]

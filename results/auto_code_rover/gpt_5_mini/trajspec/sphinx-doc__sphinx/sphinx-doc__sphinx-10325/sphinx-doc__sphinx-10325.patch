@@ -1,0 +1,87 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..9b0011e01 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -110,11 +110,32 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :inherited-members: option to a canonical set.
++
++    Accepts:
++    - flag/no-argument (None or True) -> returns {'object'} as a sentinel set
++    - comma-separated string -> splits into a set of stripped names
++    - sequence (list/tuple/set) -> converts items to stripped strings in a set
++    - False (option absent) -> returns False unchanged
++
++    This preserves backwards compatibility while normalizing option shape
++    for downstream consumers.
++    """
+     if arg in (None, True):
+-        return 'object'
+-    else:
+-        return arg
++        return {'object'}
++    # keep False (option absent) as-is
++    if arg is False:
++        return False
++    # comma-separated string -> split
++    if isinstance(arg, str):
++        parts = [p.strip() for p in arg.split(',') if p.strip()]
++        return set(parts)
++    # sequence inputs -> convert items to stripped strings
++    if isinstance(arg, (list, tuple, set)):
++        parts = [str(p).strip() for p in arg if p is not None]
++        return set([p for p in parts if p])
++    # fallback: return as-is (preserve any other possible shapes)
++    return arg
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -680,19 +701,32 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
+-                    elif name in cls.__dict__:
+-                        return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
+-                        return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+-                        return False
+-
+-            return False
++                    if inspect.isclass(self.object):
++                        inherited_opt = self.options.inherited_members
++                        for cls in self.object.__mro__:
++                            # If inherited_opt is a collection of names, check membership;
++                            # if it's a single string, fall back to equality for backward
++                            # compatibility.
++                            if inherited_opt:
++                                if isinstance(inherited_opt, (set, list, tuple)):
++                                    if cls.__name__ in inherited_opt and cls is not self.object:
++                                        # given member is a member of specified *super class*
++                                        return True
++                                elif isinstance(inherited_opt, str):
++                                    if cls.__name__ == inherited_opt and cls is not self.object:
++                                        # given member is a member of specified *super class*
++                                        return True
++        
++                            # If this class defines the name, it's not considered filtered
++                            # as an inherited member from the ignored bases.
++                            if name in cls.__dict__:
++                                return False
++                            elif name in self.get_attr(cls, '__annotations__', {}):
++                                return False
++                            elif isinstance(obj, ObjectMember) and obj.class_ is cls:
++                                return False
++        
++                    return False
+ 
+         ret = []
+ 

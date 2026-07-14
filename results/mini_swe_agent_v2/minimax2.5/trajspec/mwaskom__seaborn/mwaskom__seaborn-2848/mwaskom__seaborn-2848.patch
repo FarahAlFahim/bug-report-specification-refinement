@@ -1,0 +1,14 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 8526f44b..1a1839f4 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1283,6 +1283,9 @@ class PairGrid(Grid):
+                 # Filter NA from the list of unique hue names
+                 hue_names = list(filter(pd.notnull, hue_names))
+             self.hue_names = hue_names
++            # Filter data to include only rows with hue values in hue_order
++            if hue_order is not None and len(hue_order) > 0:
++                data = data[data[hue].isin(hue_order)]
+             self.hue_vals = data[hue]
+ 
+         # Additional dict of kwarg -> list of values for mapping the hue var

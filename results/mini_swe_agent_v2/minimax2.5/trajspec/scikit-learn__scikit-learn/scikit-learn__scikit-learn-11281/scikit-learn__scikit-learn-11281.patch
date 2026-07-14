@@ -1,0 +1,92 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..bd3884582 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -14,7 +14,7 @@ import numpy as np
+ 
+ from .. import cluster
+ from ..base import BaseEstimator
+-from ..base import DensityMixin
++from ..base import DensityMixin, ClusterMixin
+ from ..externals import six
+ from ..exceptions import ConvergenceWarning
+ from ..utils import check_array, check_random_state
+@@ -64,7 +64,7 @@ def _check_X(X, n_components=None, n_features=None, ensure_min_samples=1):
+     return X
+ 
+ 
+-class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
++class BaseMixture(six.with_metaclass(ABCMeta, ClusterMixin, DensityMixin, BaseEstimator)):
+     """Base class for mixture models.
+ 
+     This abstract class specifies an interface for all mixture classes and
+@@ -85,6 +85,16 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self.verbose = verbose
+         self.verbose_interval = verbose_interval
+ 
++
++    @property
++    def n_clusters(self):
++        """Alias for n_components."""
++        return self.n_components
++
++    @n_clusters.setter
++    def n_clusters(self, value):
++        self.n_components = value
++
+     def _check_initial_parameters(self, X):
+         """Check values of the basic parameters.
+ 
+@@ -238,6 +248,9 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+                           % (init + 1), ConvergenceWarning)
+ 
+         self._set_parameters(best_params)
++        # Compute the labels and lower_bound_ for the best initialization
++        _, log_resp = self._estimate_log_prob_resp(X)
++        self.labels_ = log_resp.argmax(axis=1)
+         self.n_iter_ = best_n_iter
+ 
+         return self
+diff --git a/sklearn/mixture/bayesian_mixture.py b/sklearn/mixture/bayesian_mixture.py
+index aef6828fa..b4820cd0c 100644
+--- a/sklearn/mixture/bayesian_mixture.py
++++ b/sklearn/mixture/bayesian_mixture.py
+@@ -306,7 +306,7 @@ class BayesianGaussianMixture(BaseMixture):
+        <http://www.cs.princeton.edu/courses/archive/fall11/cos597C/reading/BleiJordan2005.pdf>`_
+     """
+ 
+-    def __init__(self, n_components=1, covariance_type='full', tol=1e-3,
++    def __init__(self, n_components=1, n_clusters=None, covariance_type='full', tol=1e-3,
+                  reg_covar=1e-6, max_iter=100, n_init=1, init_params='kmeans',
+                  weight_concentration_prior_type='dirichlet_process',
+                  weight_concentration_prior=None,
+@@ -314,6 +314,9 @@ class BayesianGaussianMixture(BaseMixture):
+                  degrees_of_freedom_prior=None, covariance_prior=None,
+                  random_state=None, warm_start=False, verbose=0,
+                  verbose_interval=10):
++        # Support n_clusters as alias for n_components
++        if n_clusters is not None:
++            n_components = n_clusters
+         super(BayesianGaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,
+diff --git a/sklearn/mixture/gaussian_mixture.py b/sklearn/mixture/gaussian_mixture.py
+index d58a9e326..7398386cc 100644
+--- a/sklearn/mixture/gaussian_mixture.py
++++ b/sklearn/mixture/gaussian_mixture.py
+@@ -580,11 +580,14 @@ class GaussianMixture(BaseMixture):
+         inference.
+     """
+ 
+-    def __init__(self, n_components=1, covariance_type='full', tol=1e-3,
++    def __init__(self, n_components=1, n_clusters=None, covariance_type='full', tol=1e-3,
+                  reg_covar=1e-6, max_iter=100, n_init=1, init_params='kmeans',
+                  weights_init=None, means_init=None, precisions_init=None,
+                  random_state=None, warm_start=False,
+                  verbose=0, verbose_interval=10):
++        # Support n_clusters as alias for n_components
++        if n_clusters is not None:
++            n_components = n_clusters
+         super(GaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,

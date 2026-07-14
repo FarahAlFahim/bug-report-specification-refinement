@@ -1,0 +1,21 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index ab763da..0448541 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1616,6 +1616,16 @@ class Derivative(Expr):
+     def _eval_is_commutative(self):
+         return self.expr.is_commutative
+ 
++    @property
++    def kind(self):
++        """
++        Propagate the 'kind' of the underlying expression.
++
++        For example, differentiating a MatrixSymbol should produce a
++        derivative with MatrixKind rather than UndefinedKind.
++        """
++        return self.expr.kind
++
+     def _eval_derivative(self, v):
+         # If v (the variable of differentiation) is not in
+         # self.variables, we might be able to take the derivative.

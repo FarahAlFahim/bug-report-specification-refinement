@@ -1,0 +1,35 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index 6ec7bd891c..368aeecaae 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -608,6 +608,9 @@ def _print_MatrixBase(self, expr):
+             func = self._module_format('numpy.array')
+         return "%s(%s)" % (func, self._print(expr.tolist()))
+ 
++    def _print_Identity(self, expr):
++        return '{0}({1})'.format(self._module_format('numpy.eye'), self._print(expr.rows))
++
+     def _print_BlockMatrix(self, expr):
+         return '{0}({1})'.format(self._module_format('numpy.block'),
+                                  self._print(expr.args[0].tolist()))
+@@ -754,3 +757,6 @@ def _print_Function(self, expr):
+         mod = expr.func.__module__ or ''
+         return '%s(%s)' % (self._module_format(mod + ('.' if mod else '') + expr.func.__name__),
+                            ', '.join(map(lambda arg: self._print(arg), expr.args)))
++
++    def _print_Identity(self, expr):
++        return '{0}({1})'.format(self._module_format('sympy.eye'), self._print(expr.rows))
+diff --git a/sympy/printing/tensorflow.py b/sympy/printing/tensorflow.py
+index 3b1c1d47f0..d1c6af2cb2 100644
+--- a/sympy/printing/tensorflow.py
++++ b/sympy/printing/tensorflow.py
+@@ -144,6 +144,9 @@ def _print_MatMul(self, expr):
+     def _print_MatPow(self, expr):
+         return self._expand_fold_binary_op("tensorflow.matmul", [expr.base]*expr.exp)
+ 
++    def _print_Identity(self, expr):
++        return '{0}({1})'.format(self._module_format('tensorflow.eye'), self._print(expr.rows))
++
+     def _print_Assignment(self, expr):
+         # TODO: is this necessary?
+         return "%s = %s" % (

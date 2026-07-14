@@ -1,0 +1,36 @@
+diff --git a/src/_pytest/_io/saferepr.py b/src/_pytest/_io/saferepr.py
+index 23af4d0bb..9d1de38f7 100644
+--- a/src/_pytest/_io/saferepr.py
++++ b/src/_pytest/_io/saferepr.py
+@@ -9,7 +9,10 @@ def _try_repr_or_str(obj):
+     except (KeyboardInterrupt, SystemExit):
+         raise
+     except BaseException:
+-        return '{}("{}")'.format(type(obj).__name__, obj)
++        # Avoid calling obj.__str__/obj.__repr__ here since that might
++        # re-enter user code and cause recursive failures. Use the type
++        # name and object id as a safe fallback.
++        return "{}(at 0x{:x})".format(type(obj).__name__, id(obj))
+ 
+ 
+ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+@@ -17,10 +20,16 @@ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+         exc_info = _try_repr_or_str(exc)
+     except (KeyboardInterrupt, SystemExit):
+         raise
+-    except BaseException as exc:
+-        exc_info = "unpresentable exception ({})".format(_try_repr_or_str(exc))
++    except BaseException:
++        # If formatting the exception itself fails, don't attempt to
++        # represent it by calling back into potentially unsafe repr/str
++        # functions. Use the exception class name and its id instead.
++        exc_info = "{}(at 0x{:x})".format(type(exc).__name__, id(exc))
++    # Use type(obj).__name__ instead of obj.__class__.__name__ to avoid
++    # calling the object's __getattribute__ which may be overridden by
++    # user code and raise during error reporting.
+     return "<[{} raised in repr()] {} object at 0x{:x}>".format(
+-        exc_info, obj.__class__.__name__, id(obj)
++        exc_info, type(obj).__name__, id(obj)
+     )
+ 
+ 

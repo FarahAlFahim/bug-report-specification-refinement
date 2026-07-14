@@ -1,0 +1,33 @@
+diff --git a/pylint/lint/run.py b/pylint/lint/run.py
+index 778e64441..3f7bea3eb 100644
+--- a/pylint/lint/run.py
++++ b/pylint/lint/run.py
+@@ -132,9 +132,25 @@ group are mutually exclusive.",
+         linter.disable("I")
+         linter.enable("c-extension-no-member")
+ 
+-        args = _config_initialization(
+-            linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
+-        )
++        # Call config initialization; if there are unrecognized options, the
++        # initializer will add an 'unrecognized-option' message and raise
++        # _UnrecognizedOptionError. Catch it here to render the message via the
++        # reporter and exit cleanly instead of emitting a traceback.
++        from pylint.config.exceptions import _UnrecognizedOptionError
++
++        try:
++            args = _config_initialization(
++                linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
++            )
++        except _UnrecognizedOptionError:
++            # Ensure any messages (including the unrecognized-option message)
++            # are emitted through the reporter.
++            try:
++                linter.generate_reports()
++            except Exception:
++                # If generating reports fails for any reason, still exit with error.
++                pass
++            sys.exit(32)
+ 
+         if linter.config.jobs < 0:
+             print(

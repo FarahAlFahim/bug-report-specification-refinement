@@ -1,0 +1,40 @@
+diff --git a/django/db/migrations/autodetector.py b/django/db/migrations/autodetector.py
+index 5f41053283..817fa543d1 100644
+--- a/django/db/migrations/autodetector.py
++++ b/django/db/migrations/autodetector.py
+@@ -1451,16 +1451,32 @@ class MigrationAutodetector:
+ 
+             if old_value != new_value:
+                 dependencies = []
+-                for foo_togethers in new_value:
++                # Collect dependencies for any fields mentioned in either the
++                # old or new foo_together/index_together values. Previously we
++                # only inspected the new value which meant removals (when
++                # new_value is empty) wouldn't yield dependencies. That could
++                # allow field-removal operations to run before the constraint
++                # drop, leading to the schema editor not finding the original
++                # constraint. Use the appropriate project state when the
++                # field comes from the old or new model state.
++                for foo_togethers in (old_value | new_value):
+                     for field_name in foo_togethers:
+-                        field = new_model_state.get_field(field_name)
++                        # Prefer the field from the new model state when it
++                        # exists there, otherwise fall back to the old model
++                        # state (accounting for renamed fields above).
++                        try:
++                            field = new_model_state.get_field(field_name)
++                            project_state = self.to_state
++                        except KeyError:
++                            field = old_model_state.get_field(field_name)
++                            project_state = self.from_state
+                         if field.remote_field and field.remote_field.model:
+                             dependencies.extend(
+                                 self._get_dependencies_for_foreign_key(
+                                     app_label,
+                                     model_name,
+                                     field,
+-                                    self.to_state,
++                                    project_state,
+                                 )
+                             )
+                 yield (

@@ -1,0 +1,62 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..a3fe2ad4 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -311,16 +311,49 @@ def _dataset_concat(
+     if variables_to_merge:
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
++        # find a template Variable for each variable name (the first dataset that has it)
++        templates = {}
++        for var in variables_to_merge:
++            for ds in datasets:
++                if var in ds.variables:
++                    templates[var] = ds.variables[var]
++                    break
+ 
++        # For each dataset, append the real variable if present, otherwise
++        # construct a placeholder variable that matches the template's dims
++        # and uses a promoted dtype + concrete fill value (when fill_value is dtypes.NA).
++        import numpy as np
++
++        for ds in datasets:
+             for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    tpl = templates.get(var)
++                    if tpl is None:
++                        # This should not happen: variable marked to merge but not present in any dataset
++                        # Keep behavior conservative and raise an error in that unexpected case.
++                        raise KeyError(var)
++                    # determine dtype and concrete fill value
++                    if fill_value is dtypes.NA:
++                        dtype_promoted, concrete_fill = dtypes.maybe_promote(tpl.dtype)
++                    else:
++                        dtype_promoted = tpl.dtype
++                        concrete_fill = fill_value
++
++                    # compute shape for the template's dims using dims_sizes
++                    shape = tuple(dims_sizes.get(d, 0) for d in tpl.dims)
++
++                    # construct array filled with the concrete fill value
++                    if shape == ():
++                        data = np.array(concrete_fill, dtype=dtype_promoted)
++                    else:
++                        data = np.full(shape, concrete_fill, dtype=dtype_promoted)
++
++                    # Construct the placeholder using the same Variable subclass as the template
++                    # (IndexVariable vs Variable)
++                    placeholder = type(tpl)(tpl.dims, data)
++                    to_merge[var].append(placeholder)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(

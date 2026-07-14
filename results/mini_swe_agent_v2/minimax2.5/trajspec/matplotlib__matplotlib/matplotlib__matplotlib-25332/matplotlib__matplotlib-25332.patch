@@ -1,0 +1,44 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..1bb2d67852 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -846,6 +846,39 @@ class Grouper:
+         siblings = self._mapping.get(weakref.ref(a), [weakref.ref(a)])
+         return [x() for x in siblings]
+ 
++    def __getstate__(self):
++        """
++        Get the state for pickling.
++
++        This converts weak references to actual object references since
++        weak references cannot be pickled by default.
++        """
++        # Clean up dead references first
++        self.clean()
++        # Convert weak refs to actual objects for serialization
++        # We need to track unique groups and their members
++        unique_groups = {id(group): group for group in self._mapping.values()}
++        state = []
++        for group in unique_groups.values():
++            # Convert weak refs in group to actual objects, filtering out None
++            group_members = [ref() for ref in group if ref() is not None]
++            if group_members:
++                state.append(group_members)
++        return {'_groups': state}
++
++    def __setstate__(self, state):
++        """
++        Restore state after unpickling.
++
++        This reconstructs the weak references from the actual object references.
++        """
++        self._mapping = {}
++        for group_members in state['_groups']:
++            # Create weak references for all members in this group
++            weak_refs = [weakref.ref(obj) for obj in group_members]
++            for ref in weak_refs:
++                self._mapping[ref] = weak_refs
++
+ 
+ class GrouperView:
+     """Immutable view over a `.Grouper`."""

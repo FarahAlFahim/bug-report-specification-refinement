@@ -1,0 +1,35 @@
+diff --git a/doc/faq/troubleshooting_faq.rst b/doc/faq/troubleshooting_faq.rst
+index f064400320..c4a868c85f 100644
+--- a/doc/faq/troubleshooting_faq.rst
++++ b/doc/faq/troubleshooting_faq.rst
+@@ -19,6 +19,15 @@ To find out your Matplotlib version number, import it and print the
+     >>> matplotlib.__version__
+     '0.98.0'
+ 
++For version comparisons, you can use ``version_info``, which is a tuple
++that can be compared to other version tuples::
++
++    >>> import matplotlib
++    >>> matplotlib.version_info
++    (3, 5, 0, 'dev1324', 'gb7d059198')
++    >>> matplotlib.version_info >= (3, 5, 0)
++    True
++
+ 
+ .. _locating-matplotlib-install:
+ 
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..6ca41f5582 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -148,6 +148,10 @@ def __getattr__(name):
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+         return __version__
++    if name == "version_info":
++        global version_info  # cache it.
++        version_info = _version.version_tuple
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

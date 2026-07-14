@@ -1,0 +1,38 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index d37d43d5c5..50af3a955b 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -286,10 +286,32 @@ class BaseCommand:
+         Create and return the ``ArgumentParser`` which will be used to
+         parse the arguments to this command.
+         """
++        # Decide which formatter to use. By default we use DjangoHelpFormatter
++        # which reorders common arguments to the end. However, if a command
++        # provides multi-line help text (or explicitly sets ``formatter_class``),
++        # preserve the formatting of the description (including newlines and
++        # indentation) by using argparse.RawDescriptionHelpFormatter behaviour.
++        formatter = getattr(self, "formatter_class", None)
++        if formatter is None:
++            # If help contains newlines, prefer a formatter that preserves
++            # the description formatting. Create a combined formatter that
++            # mixes RawDescriptionHelpFormatter and DjangoHelpFormatter so we
++            # keep Django's argument reordering while preserving raw
++            # description formatting.
++            if self.help and "\n" in self.help:
++                class DjangoRawDescriptionHelpFormatter(
++                    argparse.RawDescriptionHelpFormatter, DjangoHelpFormatter
++                ):
++                    pass
++
++                formatter = DjangoRawDescriptionHelpFormatter
++            else:
++                formatter = DjangoHelpFormatter
++
+         parser = CommandParser(
+             prog="%s %s" % (os.path.basename(prog_name), subcommand),
+             description=self.help or None,
+-            formatter_class=DjangoHelpFormatter,
++            formatter_class=formatter,
+             missing_args_message=getattr(self, "missing_args_message", None),
+             called_from_command_line=getattr(self, "_called_from_command_line", None),
+             **kwargs,

@@ -1,0 +1,67 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 379a2917aa..c378e9778b 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1973,7 +1973,31 @@ def __div__(self, other):
+ 
+     @call_highest_priority('__rmatmul__')
+     def __matmul__(self, other):
+-        return self.__mul__(other)
++        """Matrix multiplication using the '@' operator.
++
++        Only matrix-like operands are supported. Scalars are not accepted
++        for the matmul operator; users should use '*' for scalar
++        multiplication. This mirrors the behavior of MatrixExpr.__matmul__
++        which maps to MatMul.
++        """
++        other = _matrixify(other)
++        # Require a 2-D operand for matrix multiplication
++        if not (hasattr(other, 'shape') and len(other.shape) == 2):
++            raise TypeError('matmul ("@") only supports matrix operands; '
++                            'use "*" for scalar multiplication')
++
++        # Check dimensions: self.cols x other.rows
++        if self.shape[1] != other.shape[0]:
++            raise ShapeError("Matrix size mismatch: %s @ %s" % (self.shape, other.shape))
++
++        # honest sympy matrices defer to their class's routine
++        if getattr(other, 'is_Matrix', False):
++            return self._eval_matrix_mul(other)
++        if getattr(other, 'is_MatrixLike', False):
++            return MatrixArithmetic._eval_matrix_mul(self, other)
++
++        # Fallback: should not be reachable because of the earlier check
++        return NotImplemented
+ 
+     @call_highest_priority('__rmul__')
+     def __mul__(self, other):
+@@ -2068,7 +2092,28 @@ def __radd__(self, other):
+ 
+     @call_highest_priority('__matmul__')
+     def __rmatmul__(self, other):
+-        return self.__rmul__(other)
++        """Right-hand matrix multiplication for the '@' operator.
++
++        Only matrix-like left operands are supported. Scalars are not
++        accepted; users should use '*' for scalar multiplication.
++        """
++        other = _matrixify(other)
++        # Require a 2-D operand for matrix multiplication
++        if not (hasattr(other, 'shape') and len(other.shape) == 2):
++            raise TypeError('matmul ("@") only supports matrix operands; '
++                            'use "*" for scalar multiplication')
++
++        # Check dimensions: other.cols x self.rows => other.cols must equal self.rows
++        if other.shape[1] != self.shape[0]:
++            raise ShapeError("Matrix size mismatch: %s @ %s" % (other.shape, self.shape))
++
++        # honest sympy matrices defer to their class's routine
++        if getattr(other, 'is_Matrix', False):
++            return other._new(other.as_mutable() * self)
++        if getattr(other, 'is_MatrixLike', False):
++            return MatrixArithmetic._eval_matrix_rmul(self, other)
++
++        return NotImplemented
+ 
+     @call_highest_priority('__mul__')
+     def __rmul__(self, other):

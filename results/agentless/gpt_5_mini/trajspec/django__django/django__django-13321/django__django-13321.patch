@@ -1,0 +1,70 @@
+diff --git a/django/contrib/sessions/backends/base.py b/django/contrib/sessions/backends/base.py
+index 3174ba6..c30eaf9 100644
+--- a/django/contrib/sessions/backends/base.py
++++ b/django/contrib/sessions/backends/base.py
+@@ -132,7 +132,15 @@ class SessionBase:
+ 
+     def _legacy_decode(self, session_data):
+         # RemovedInDjango40Warning: pre-Django 3.1 format will be invalid.
+-        encoded_data = base64.b64decode(session_data.encode('ascii'))
++        # The legacy format is a base64-encoded value of b'<hash>:<serialized>'.
++        # Base64 decoding (or ASCII encoding of the input) can raise
++        # binascii.Error or UnicodeEncodeError for malformed/legacy data.
++        # Guard against those here and treat any such input as an empty session.
++        try:
++            encoded_data = base64.b64decode(session_data.encode('ascii'))
++        except Exception:
++            # Catch base64/binary/encoding related errors and treat as empty.
++            return {}
+         try:
+             # could produce ValueError if there is no ':'
+             hash, serialized = encoded_data.split(b':', 1)
+diff --git a/django/contrib/sessions/backends/cached_db.py b/django/contrib/sessions/backends/cached_db.py
+index 83c0d76..169867c 100644
+--- a/django/contrib/sessions/backends/cached_db.py
++++ b/django/contrib/sessions/backends/cached_db.py
+@@ -34,8 +34,17 @@ class SessionStore(DBStore):
+         if data is None:
+             s = self._get_session_from_db()
+             if s:
+-                data = self.decode(s.session_data)
+-                self._cache.set(self.cache_key, data, self.get_expiry_age(expiry=s.expire_date))
++                try:
++                    data = self.decode(s.session_data)
++                    self._cache.set(self.cache_key, data, self.get_expiry_age(expiry=s.expire_date))
++                except Exception as e:
++                    # If decoding fails for malformed/legacy session data, treat
++                    # the session as empty and do not cache invalid data.
++                    if isinstance(e, SuspiciousOperation):
++                        logger = logging.getLogger('django.security.%s' % e.__class__.__name__)
++                        logger.warning(str(e))
++                    data = {}
++                    self._session_key = None
+             else:
+                 data = {}
+         return data
+diff --git a/django/contrib/sessions/backends/db.py b/django/contrib/sessions/backends/db.py
+index 847ef33..95f2395 100644
+--- a/django/contrib/sessions/backends/db.py
++++ b/django/contrib/sessions/backends/db.py
+@@ -41,7 +41,19 @@ class SessionStore(SessionBase):
+ 
+     def load(self):
+         s = self._get_session_from_db()
+-        return self.decode(s.session_data) if s else {}
++        if not s:
++            return {}
++        try:
++            return self.decode(s.session_data)
++        except Exception as e:
++            # If session decoding fails (malformed/legacy session_data), don't
++            # let the exception bubble up and cause a 500. Treat the session as
++            # empty and reset the session key so a new session will be created.
++            if isinstance(e, SuspiciousOperation):
++                logger = logging.getLogger('django.security.%s' % e.__class__.__name__)
++                logger.warning(str(e))
++            self._session_key = None
++            return {}
+ 
+     def exists(self, session_key):
+         return self.model.objects.filter(session_key=session_key).exists()

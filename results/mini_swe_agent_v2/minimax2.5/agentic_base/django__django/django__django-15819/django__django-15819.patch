@@ -1,0 +1,27 @@
+diff --git a/django/core/management/commands/inspectdb.py b/django/core/management/commands/inspectdb.py
+index f33bcbdccf..de23df0bfc 100644
+--- a/django/core/management/commands/inspectdb.py
++++ b/django/core/management/commands/inspectdb.py
+@@ -100,6 +100,11 @@ class Command(BaseCommand):
+                         )
+                     except NotImplementedError:
+                         relations = {}
++                    # Find target tables referenced by multiple columns
++                    table_references = {}
++                    for ref_db_column, ref_db_table in relations.values():
++                        table_references.setdefault(ref_db_table, []).append(ref_db_column)
++                    rel_to_many = {table: cols for table, cols in table_references.items() if len(cols) > 1}
+                     try:
+                         constraints = connection.introspection.get_constraints(
+                             cursor, table_name
+@@ -186,6 +191,10 @@ class Command(BaseCommand):
+                             field_type = "%s(%s" % (rel_type, rel_to)
+                         else:
+                             field_type = "%s('%s'" % (rel_type, rel_to)
++                        if ref_db_table in rel_to_many:
++                            extra_params["related_name"] = "%s_%s" % (
++                                table_name, att_name
++                            )
+                     else:
+                         # Calling `get_field_type` to get the field type string and any
+                         # additional parameters and notes.

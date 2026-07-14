@@ -1,0 +1,38 @@
+diff --git a/sklearn/preprocessing/_encoders.py b/sklearn/preprocessing/_encoders.py
+index 1e05aba59..6baa0569e 100644
+--- a/sklearn/preprocessing/_encoders.py
++++ b/sklearn/preprocessing/_encoders.py
+@@ -45,7 +45,15 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
+ 
+         """
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        # If the data has a numpy string/bytes dtype (fixed-length
++        # 'S'/'U' types), convert to object dtype. Fixed-length numpy
++        # string dtypes will truncate assignments of longer Python
++        # strings which can lead to incorrect behavior when
++        # transformations replace unknown values with learned
++        # categories (see issue where OneHotEncoder(handle_unknown='ignore')
++        # truncates strings). Converting to object dtype preserves
++        # Python strings and avoids truncation.
++        if np.issubdtype(X_temp.dtype, np.str_):
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp
+@@ -555,7 +563,15 @@ class OneHotEncoder(_BaseEncoder):
+     def _transform_new(self, X):
+         """New implementation assuming categorical input"""
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        # If the data has a numpy string/bytes dtype (fixed-length
++        # 'S'/'U' types), convert to object dtype. Fixed-length numpy
++        # string dtypes will truncate assignments of longer Python
++        # strings which can lead to incorrect behavior when
++        # transformations replace unknown values with learned
++        # categories (see issue where OneHotEncoder(handle_unknown='ignore')
++        # truncates strings). Converting to object dtype preserves
++        # Python strings and avoids truncation.
++        if np.issubdtype(X_temp.dtype, np.str_):
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp

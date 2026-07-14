@@ -1,0 +1,80 @@
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+index 477aae247..2e6b997cb 100644
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -229,14 +229,29 @@ def get_object_members(subject: Any, objpath: List[str], attrgetter: Callable,
+     for i, cls in enumerate(getmro(subject)):
+         for name in getannotations(cls):
+             name = unmangle(cls, name)
+-            if name and name not in members:
++            if not name:
++                continue
++            if name in members:
++                # merge with existing placeholder: preserve directly_defined
++                # flag and prefer existing runtime value if present
++                existing = members[name]
++                directly_defined = existing.directly_defined or (i == 0)
++                value = existing.value if existing.value is not None else INSTANCEATTR
++                members[name] = Attribute(name, directly_defined, value)
++            else:
+                 members[name] = Attribute(name, i == 0, INSTANCEATTR)
+ 
+     if analyzer:
+         # append instance attributes (cf. self.attr1) if analyzer knows
+         namespace = '.'.join(objpath)
+         for (ns, name) in analyzer.find_attr_docs():
+-            if namespace == ns and name not in members:
++            if namespace != ns:
++                continue
++            if name in members:
++                existing = members[name]
++                members[name] = Attribute(name, existing.directly_defined or True,
++                                          INSTANCEATTR)
++            else:
+                 members[name] = Attribute(name, True, INSTANCEATTR)
+ 
+     return members
+@@ -297,7 +312,19 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+             # annotation only member (ex. attr: int)
+             for name in getannotations(cls):
+                 name = unmangle(cls, name)
+-                if name and name not in members:
++                if not name:
++                    continue
++                if name in members:
++                    # merge ownership info into existing placeholder
++                    om = members[name]
++                    try:
++                        if getattr(om, 'class_', None) is None:
++                            om.class_ = cls
++                    except Exception:
++                        # ObjectMember may be an immutable tuple-like; replace it
++                        members[name] = ObjectMember(name, om.object, class_=cls,
++                                                     docstring=getattr(om, 'docstring', None))
++                else:
+                     members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
+ 
+             # append instance attributes (cf. self.attr1) if analyzer knows
+@@ -307,9 +334,20 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+                 analyzer = ModuleAnalyzer.for_module(modname)
+                 analyzer.analyze()
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+-                    if ns == qualname and name not in members:
++                    if ns != qualname:
++                        continue
++                    text = '\n'.join(docstring)
++                    if name in members:
++                        om = members[name]
++                        try:
++                            om.docstring = text
++                            om.class_ = cls
++                        except Exception:
++                            members[name] = ObjectMember(name, getattr(om, 'object', INSTANCEATTR),
++                                                         class_=cls, docstring=text)
++                    else:
+                         members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+-                                                     docstring='\n'.join(docstring))
++                                                     docstring=text)
+             except (AttributeError, PycodeError):
+                 pass
+     except AttributeError:

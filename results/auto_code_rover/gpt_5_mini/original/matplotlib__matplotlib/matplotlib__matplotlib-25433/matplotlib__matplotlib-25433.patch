@@ -1,0 +1,111 @@
+diff --git a/lib/matplotlib/backend_bases.py b/lib/matplotlib/backend_bases.py
+index 2c54ecd087..f95733b38b 100644
+--- a/lib/matplotlib/backend_bases.py
++++ b/lib/matplotlib/backend_bases.py
+@@ -2038,25 +2038,30 @@ class FigureCanvasBase:
+ 
+         return axes
+ 
+-    def grab_mouse(self, ax):
++    def grab_mouse(self, owner):
+         """
+-        Set the child `~.axes.Axes` which is grabbing the mouse events.
++        Set the object which is grabbing the mouse events.
+ 
+-        Usually called by the widgets themselves. It is an error to call this
+-        if the mouse is already grabbed by another Axes.
++        Usually called by the widgets themselves. The *owner* can be any
++        object (commonly an Axes or a widget instance). It is an error
++        to call this if the mouse is already grabbed by another owner.
+         """
+-        if self.mouse_grabber not in (None, ax):
+-            raise RuntimeError("Another Axes already grabs mouse input")
+-        self.mouse_grabber = ax
++        if self.mouse_grabber not in (None, owner):
++            raise RuntimeError("Another object already grabs mouse input")
++        self.mouse_grabber = owner
+ 
+-    def release_mouse(self, ax):
++    def release_mouse(self, owner=None):
+         """
+-        Release the mouse grab held by the `~.axes.Axes` *ax*.
++        Release the mouse grab held by *owner*.
+ 
+-        Usually called by the widgets. It is ok to call this even if *ax*
+-        doesn't have the mouse grab currently.
++        Usually called by the widgets. If *owner* is None, this forces a
++        release of any current grab. If *owner* is provided, the grab is only
++        released if the stored owner is identical to the provided *owner*.
+         """
+-        if self.mouse_grabber is ax:
++        if owner is None:
++            # force release
++            self.mouse_grabber = None
++        elif self.mouse_grabber is owner:
+             self.mouse_grabber = None
+ 
+     def set_cursor(self, cursor):
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index ebe5da43e2..2466814f30 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -217,13 +217,15 @@ class Button(AxesWidget):
+     def _click(self, event):
+         if self.ignore(event) or event.inaxes != self.ax or not self.eventson:
+             return
+-        if event.canvas.mouse_grabber != self.ax:
+-            event.canvas.grab_mouse(self.ax)
++        # Compare against the widget instance (self) which is used as the grab
++        # owner. This avoids mismatches if axes are recreated during callbacks.
++        if event.canvas.mouse_grabber != self:
++            event.canvas.grab_mouse(self)
+ 
+     def _release(self, event):
+-        if self.ignore(event) or event.canvas.mouse_grabber != self.ax:
++        if self.ignore(event) or event.canvas.mouse_grabber != self:
+             return
+-        event.canvas.release_mouse(self.ax)
++        event.canvas.release_mouse(self)
+         if self.eventson and event.inaxes == self.ax:
+             self._observers.process('clicked', event)
+ 
+@@ -533,7 +535,9 @@ class Slider(SliderBase):
+ 
+         if event.name == 'button_press_event' and event.inaxes == self.ax:
+             self.drag_active = True
+-            event.canvas.grab_mouse(self.ax)
++            # Use the widget instance as the grab owner so that callbacks
++            # that replace axes do not leave the canvas in a grabbed state.
++            event.canvas.grab_mouse(self)
+ 
+         if not self.drag_active:
+             return
+@@ -542,7 +546,7 @@ class Slider(SliderBase):
+               (event.name == 'button_press_event' and
+                event.inaxes != self.ax)):
+             self.drag_active = False
+-            event.canvas.release_mouse(self.ax)
++            event.canvas.release_mouse(self)
+             return
+         if self.orientation == 'vertical':
+             val = self._value_in_bounds(event.ydata)
+@@ -871,7 +875,9 @@ class RangeSlider(SliderBase):
+ 
+         if event.name == "button_press_event" and event.inaxes == self.ax:
+             self.drag_active = True
+-            event.canvas.grab_mouse(self.ax)
++            # Use the widget instance as the grab owner so that callbacks
++            # that replace axes do not leave the canvas in a grabbed state.
++            event.canvas.grab_mouse(self)
+ 
+         if not self.drag_active:
+             return
+@@ -880,7 +886,7 @@ class RangeSlider(SliderBase):
+             event.name == "button_press_event" and event.inaxes != self.ax
+         ):
+             self.drag_active = False
+-            event.canvas.release_mouse(self.ax)
++            event.canvas.release_mouse(self)
+             self._active_handle = None
+             return
+ 

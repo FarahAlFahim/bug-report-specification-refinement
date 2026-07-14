@@ -1,0 +1,24 @@
+--- a/django/forms/models.py
++++ b/django/forms/models.py
+
+@@ -1171,6 +1171,20 @@
+             other = other.value
+         return self.value == other
+ 
++    def __hash__(self):
++        """
++        Provide a hash based on the wrapped prepared value so that
++        ModelChoiceIteratorValue instances can be used in hashed
++        collections (dict/set) and membership checks. This keeps the
++        hash/eq contract consistent: two instances that compare equal
++        will have the same hash.
++
++        If the underlying prepared value is itself unhashable, calling
++        hash(self.value) will raise TypeError — which is the expected
++        behavior in that case.
++        """
++        return hash(self.value)
++
+ 
+ class ModelChoiceIterator:
+     def __init__(self, field):

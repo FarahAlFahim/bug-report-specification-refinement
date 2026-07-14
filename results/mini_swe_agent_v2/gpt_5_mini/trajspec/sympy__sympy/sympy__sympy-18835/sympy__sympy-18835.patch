@@ -1,0 +1,43 @@
+diff --git a/sympy/utilities/iterables.py b/sympy/utilities/iterables.py
+index d96e76263b..aef8bfd553 100644
+--- a/sympy/utilities/iterables.py
++++ b/sympy/utilities/iterables.py
+@@ -2106,13 +2106,30 @@ def uniq(seq, result=None):
+     >>> list(uniq([[1], [2, 1], [1]]))
+     [[1], [2, 1]]
+     """
++    # record initial length if available so we can detect if the
++    # caller mutates the sequence (resizes) during iteration
++    can_check_len = hasattr(seq, '__len__')
++    try:
++        initial_len = len(seq) if can_check_len else None
++    except Exception:
++        # len() may raise for some objects; treat as not checkable
++        can_check_len = False
++        initial_len = None
++
+     try:
+         seen = set()
+         result = result or []
+         for i, s in enumerate(seq):
++            # before yielding, ensure the sequence size hasn't changed
++            if can_check_len and len(seq) != initial_len:
++                raise RuntimeError("sequence changed size during iteration")
+             if not (s in seen or seen.add(s)):
+                 yield s
+     except TypeError:
++        # In the unhashable-element control path we also must check that the
++        # sequence size hasn't changed before yielding/recursing.
++        if can_check_len and len(seq) != initial_len:
++            raise RuntimeError("sequence changed size during iteration")
+         if s not in result:
+             yield s
+             result.append(s)
+@@ -2123,7 +2140,6 @@ def uniq(seq, result=None):
+             for s in uniq(seq, result):
+                 yield s
+ 
+-
+ def generate_bell(n):
+     """Return permutations of [0, 1, ..., n - 1] such that each permutation
+     differs from the last by the exchange of a single pair of neighbors.

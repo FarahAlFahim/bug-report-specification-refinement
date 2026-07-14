@@ -1,0 +1,29 @@
+diff --git a/django/utils/numberformat.py b/django/utils/numberformat.py
+index 488d6a77cd..668c3cf4c6 100644
+--- a/django/utils/numberformat.py
++++ b/django/utils/numberformat.py
+@@ -32,7 +32,9 @@ def format(
+     use_grouping = use_grouping and grouping != 0
+     # Make the common case fast
+     if isinstance(number, int) and not use_grouping and not decimal_pos:
+-        return mark_safe(number)
++        # mark_safe expects a string-like object; coerce ints to str to avoid
++        # inconsistent input types being passed to the safety wrapper.
++        return mark_safe(str(number))
+     # sign
+     sign = ""
+     # Treat potentially very large/small floats as Decimals.
+@@ -68,6 +70,13 @@ def format(
+             str_number = "{:f}".format(number)
+     else:
+         str_number = str(number)
++    # Defensive: if the input string is empty, return an empty safe string
++    # rather than indexing into it and raising IndexError. This can occur
++    # when callers pass an empty string (for example, from model attributes
++    # or callables used by the admin) into the formatter.
++    if not str_number:
++        return mark_safe("")
++
+     if str_number[0] == "-":
+         sign = "-"
+         str_number = str_number[1:]

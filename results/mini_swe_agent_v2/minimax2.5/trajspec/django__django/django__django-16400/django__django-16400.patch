@@ -1,0 +1,56 @@
+diff --git a/django/contrib/contenttypes/management/__init__.py b/django/contrib/contenttypes/management/__init__.py
+index 903b9ab1a0..c2713bdc15 100644
+--- a/django/contrib/contenttypes/management/__init__.py
++++ b/django/contrib/contenttypes/management/__init__.py
+@@ -34,7 +34,7 @@ class RenameContentType(migrations.RunPython):
+             else:
+                 # Clear the cache as the `get_by_natural_key()` call will cache
+                 # the renamed ContentType instance by its old model name.
+-                ContentType.objects.clear_cache()
++                ContentType.objects.clear_cache(using=db)
+ 
+     def rename_forward(self, apps, schema_editor):
+         self._rename(apps, schema_editor, self.old_model, self.new_model)
+@@ -93,7 +93,7 @@ def get_contenttypes_and_models(app_config, using, ContentType):
+     if not router.allow_migrate_model(using, ContentType):
+         return None, None
+ 
+-    ContentType.objects.clear_cache()
++    ContentType.objects.clear_cache(using=using)
+ 
+     content_types = {
+         ct.model: ct
+diff --git a/django/contrib/contenttypes/management/commands/remove_stale_contenttypes.py b/django/contrib/contenttypes/management/commands/remove_stale_contenttypes.py
+index eccd3aa2c9..7010b6b22b 100644
+--- a/django/contrib/contenttypes/management/commands/remove_stale_contenttypes.py
++++ b/django/contrib/contenttypes/management/commands/remove_stale_contenttypes.py
+@@ -39,7 +39,7 @@ class Command(BaseCommand):
+ 
+         if not router.allow_migrate_model(db, ContentType):
+             return
+-        ContentType.objects.clear_cache()
++        ContentType.objects.clear_cache(using=db)
+ 
+         apps_content_types = itertools.groupby(
+             ContentType.objects.using(db).order_by("app_label", "model"),
+diff --git a/django/contrib/contenttypes/models.py b/django/contrib/contenttypes/models.py
+index 759a53ce67..3807616ff3 100644
+--- a/django/contrib/contenttypes/models.py
++++ b/django/contrib/contenttypes/models.py
+@@ -120,11 +120,14 @@ class ContentTypeManager(models.Manager):
+             self._add_to_cache(self.db, ct)
+         return ct
+ 
+-    def clear_cache(self):
++    def clear_cache(self, *, using=None):
+         """
+         Clear out the content-type cache.
+         """
+-        self._cache.clear()
++        if using is None:
++            self._cache.clear()
++        else:
++            self._cache.pop(using, None)
+ 
+     def _add_to_cache(self, using, ct):
+         """Insert a ContentType into the cache."""

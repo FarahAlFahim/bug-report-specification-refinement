@@ -1,0 +1,31 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 978fd5df8..5fa4d3c19 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1260,6 +1260,8 @@ class FunctionDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # typ
+                     documenter.object = func
+                     documenter.objpath = [None]
+                     sigs.append(documenter.format_signature())
++        if self.env.config.autodoc_typehints in ('none', 'description'):
++            kwargs.setdefault('show_annotation', False)
+         if overloaded:
+             __globals__ = safe_getattr(self.object, '__globals__', {})
+             for overload in self.analyzer.overloads.get('.'.join(self.objpath)):
+@@ -1473,6 +1475,8 @@ class ClassDocumenter(DocstringSignatureMixin, ModuleLevelDocumenter):  # type:
+         sig = super().format_signature()
+         sigs = []
+ 
++        if self.env.config.autodoc_typehints in ('none', 'description'):
++            kwargs.setdefault('show_annotation', False)
+         overloads = self.get_overloaded_signatures()
+         if overloads:
+             # Use signatures for overloaded methods instead of the implementation method.
+@@ -1904,6 +1908,8 @@ class MethodDocumenter(DocstringSignatureMixin, ClassLevelDocumenter):  # type:
+                     documenter.object = func
+                     documenter.objpath = [None]
+                     sigs.append(documenter.format_signature())
++        if self.env.config.autodoc_typehints in ('none', 'description'):
++            kwargs.setdefault('show_annotation', False)
+         if overloaded:
+             __globals__ = safe_getattr(self.object, '__globals__', {})
+             for overload in self.analyzer.overloads.get('.'.join(self.objpath)):

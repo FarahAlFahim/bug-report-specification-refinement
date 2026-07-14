@@ -1,0 +1,38 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..f078d68c3d 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -463,11 +463,31 @@ class IsNull(BuiltinLookup):
+     prepare_rhs = False
+ 
+     def as_sql(self, compiler, connection):
++        """
++        Produce SQL for IS NULL / IS NOT NULL.
++
++        For direct Python RHS values, only True and False are accepted.
++        Expressions are allowed to pass through (they are handled by the
++        query compiler). Any other direct RHS value raises a ValueError to
++        avoid surprising behavior caused by treating arbitrary values by
++        Python truthiness.
++        """
+         sql, params = compiler.compile(self.lhs)
+-        if self.rhs:
++
++        # If rhs is an expression (has resolve_expression / as_sql), let
++        # the compiler handle it.
++        if not self.rhs_is_direct_value():
++            # Defer to existing truthiness semantics for expression RHSes.
++            if self.rhs:
++                return "%s IS NULL" % sql, params
++            return "%s IS NOT NULL" % sql, params
++
++        # For direct Python values, only explicit booleans are allowed.
++        if self.rhs is True:
+             return "%s IS NULL" % sql, params
+-        else:
++        if self.rhs is False:
+             return "%s IS NOT NULL" % sql, params
++        raise ValueError("The RHS to an '__isnull' lookup must be a boolean (True or False) or an expression.")
+ 
+ 
+ @Field.register_lookup

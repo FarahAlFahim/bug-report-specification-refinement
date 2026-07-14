@@ -1,0 +1,24 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..37d966ba3d 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1991,6 +1991,9 @@ def simplify_intersection(args):
+     if S.EmptySet in args:
+         return S.EmptySet
+ 
++    # Remove duplicate sets
++    args = set(args)
++
+     # Handle Finite sets
+     rv = Intersection._handle_finite_sets(args)
+ 
+@@ -2007,6 +2010,9 @@ def simplify_intersection(args):
+             else:
+                 return Union(*[arg for arg in s.args])
+ 
++    # Convert back to list for Complement handling
++    args = list(args)
++
+     for s in args:
+         if s.is_Complement:
+             args.remove(s)

@@ -1,0 +1,65 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index 6151185..de07e60 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -509,6 +509,25 @@ class Colorbar:
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
+             self.norm = mappable.norm
++            # If the newly-assigned norm has not been scaled (vmin/vmax
++            # not set) attempt to initialise it from the mappable's data so
++            # non-linear norms (e.g. LogNorm) get valid vmin/vmax.
++            try:
++                if not self.norm.scaled():
++                    try:
++                        # Prefer autoscale_None so we don't override any
++                        # user-set vmin/vmax; some mappables (ScalarMappable)
++                        # implement this to initialize the norm.
++                        mappable.autoscale_None()
++                    except AttributeError:
++                        # mappable has no autoscale_None; leave initialization
++                        # to _process_values which will apply safe defaults.
++                        pass
++            except Exception:
++                # Be defensive: if scaled() or autoscale_None raise for some
++                # reason, ignore and continue; _process_values will handle
++                # fallbacks to avoid exceptions during drawing.
++                pass
+             self._reset_locator_formatter_scale()
+ 
+         self._draw_all()
+@@ -1102,8 +1121,32 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
++            # Try to initialize the norm from the mappable's data so that
++            # non-linear norms (LogNorm) get valid vmin/vmax. Fallback to a
++            # safe default if the mappable does not provide autoscale_None.
++            try:
++                if hasattr(self, 'mappable') and self.mappable is not None:
++                    try:
++                        self.mappable.autoscale_None()
++                    except AttributeError:
++                        # mappable does not support autoscale_None; ignore.
++                        pass
++            except Exception:
++                # Ignore any errors during autoscale_None to ensure we don't
++                # raise during colorbar drawing; fall back to defaults below.
++                pass
++
++            if not self.norm.scaled():
++                # Fall back to safe defaults. For log-like norms, avoid vmin==0
++                # which would cause division-by-zero in inverse().
++                if isinstance(self.norm, colors.LogNorm):
++                    tiny = np.finfo(float).tiny
++                    self.norm.vmin = tiny
++                    self.norm.vmax = 1.0
++                else:
++                    self.norm.vmin = 0.0
++                    self.norm.vmax = 1.0
++
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

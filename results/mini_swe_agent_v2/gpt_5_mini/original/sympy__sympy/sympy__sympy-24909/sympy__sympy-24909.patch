@@ -1,0 +1,64 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..f23d705f54 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -79,37 +79,48 @@ def __repr__(self):
+                 str(self.name), str(self.abbrev), self._exponent, self.base)
+ 
+     def __mul__(self, other):
++        # Multiplication with prefixes should only perform special
++        # simplifications when the other object is itself a Prefix.
++        # For Quantities we delegate to the Quantity multiplication
++        # so that prefix*unit and unit*prefix behave consistently
++        # (e.g. milli*W should give the same result as W*milli).
+         from sympy.physics.units import Quantity
+         if not isinstance(other, (Quantity, Prefix)):
+             return super().__mul__(other)
+ 
+-        fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # If combining two prefixes, try to simplify to a known prefix
++        if isinstance(other, Prefix):
++            fact = self.scale_factor * other.scale_factor
++            if fact == 1:
++                return 1
+             # simplify prefix
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
+-        return self.scale_factor * other
++        # For Quantity: delegate to Quantity * Prefix so that the
++        # resulting expression is the same regardless of operand order.
++        return other * self
+ 
+     def __truediv__(self, other):
++        # Only perform prefix-specific simplifications when dividing by
++        # another Prefix. If dividing by a Quantity, delegate to the
++        # Quantity behavior by returning a scaled Quantity expression.
+         if not hasattr(other, "scale_factor"):
+             return super().__truediv__(other)
+ 
+-        fact = self.scale_factor / other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        if isinstance(other, Prefix):
++            fact = self.scale_factor / other.scale_factor
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # For Quantity: return numeric scale factor divided by the quantity
++        # which will be handled by SymPy (e.g. milli / W -> (scale)/W).
+         return self.scale_factor / other
+ 
+     def __rtruediv__(self, other):

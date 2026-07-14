@@ -1,0 +1,105 @@
+diff --git a/sklearn/neighbors/base.py b/sklearn/neighbors/base.py
+index 3e5e729c2..2109672ed 100644
+--- a/sklearn/neighbors/base.py
++++ b/sklearn/neighbors/base.py
+@@ -107,6 +107,8 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+                  algorithm='auto', leaf_size=30, metric='minkowski',
+                  p=2, metric_params=None, n_jobs=1):
+ 
++        # internal storage for n_neighbors (use property for validation)
++        self._n_neighbors = None
+         self.n_neighbors = n_neighbors
+         self.radius = radius
+         self.algorithm = algorithm
+@@ -117,6 +119,40 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+         self.n_jobs = n_jobs
+         self._check_algorithm_metric()
+ 
++    @property
++    def n_neighbors(self):
++        """Number of neighbors to use by default for kneighbors queries.
++
++        This property validates that n_neighbors is an integer (or a float
++        that is integer-valued). Setting a non-integer float (e.g. 3.5)
++        will raise a ValueError. None is accepted.
++        """
++        return self._n_neighbors
++
++    @n_neighbors.setter
++    def n_neighbors(self, value):
++        # Allow None
++        if value is None:
++            self._n_neighbors = None
++            return
++        # Accept numpy integer types when available
++        try:
++            import numpy as _np
++        except Exception:
++            _np = None
++        if isinstance(value, float):
++            if value.is_integer():
++                value = int(value)
++            else:
++                raise ValueError("n_neighbors must be an integer, got %r" % value)
++        elif _np is not None and isinstance(value, (_np.integer,)):
++            value = int(value)
++        elif not isinstance(value, int):
++            raise ValueError("n_neighbors must be an integer, got %r" % value)
++        if value <= 0:
++            raise ValueError("Expected n_neighbors > 0. Got %d" % value)
++        self._n_neighbors = int(value)
++
+     def _check_algorithm_metric(self):
+         if self.algorithm not in ['auto', 'brute',
+                                   'kd_tree', 'ball_tree']:
+@@ -328,6 +364,25 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Validate n_neighbors: accept integer or integer-valued float
++        if n_neighbors is None:
++            raise ValueError("n_neighbors must be set")
++        if isinstance(n_neighbors, float):
++            if n_neighbors.is_integer():
++                n_neighbors = int(n_neighbors)
++            else:
++                raise ValueError("n_neighbors must be an integer, got %r" % n_neighbors)
++        elif not isinstance(n_neighbors, int):
++            # allow numpy integer types
++            try:
++                import numpy as _np
++            except Exception:
++                _np = None
++            if not (_np is not None and isinstance(n_neighbors, _np.integer)):
++                raise ValueError("n_neighbors must be an integer, got %r" % n_neighbors)
++        if n_neighbors <= 0:
++            raise ValueError("Expected n_neighbors > 0. Got %d" % n_neighbors)
++
+         if X is not None:
+             query_is_train = False
+             X = check_array(X, accept_sparse='csr')
+@@ -467,6 +522,24 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # Validate n_neighbors: accept integer or integer-valued float
++        if n_neighbors is None:
++            raise ValueError("n_neighbors must be set")
++        if isinstance(n_neighbors, float):
++            if n_neighbors.is_integer():
++                n_neighbors = int(n_neighbors)
++            else:
++                raise ValueError("n_neighbors must be an integer, got %r" % n_neighbors)
++        elif not isinstance(n_neighbors, int):
++            try:
++                import numpy as _np
++            except Exception:
++                _np = None
++            if not (_np is not None and isinstance(n_neighbors, _np.integer)):
++                raise ValueError("n_neighbors must be an integer, got %r" % n_neighbors)
++        if n_neighbors <= 0:
++            raise ValueError("Expected n_neighbors > 0. Got %d" % n_neighbors)
++
+         # kneighbors does the None handling.
+         if X is not None:
+             X = check_array(X, accept_sparse='csr')

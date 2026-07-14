@@ -1,0 +1,45 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index f32ce64629..afde5b69f0 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -1587,7 +1587,7 @@ class DurationField(Field):
+     empty_strings_allowed = False
+     default_error_messages = {
+         'invalid': _("'%(value)s' value has an invalid format. It must be in "
+-                     "[DD] [HH:[MM:]]ss[.uuuuuu] format.")
++                     "[DD] [[HH:]MM:]ss[.uuuuuu] format.")
+     }
+     description = _("Duration")
+ 
+@@ -1631,6 +1631,16 @@ class DurationField(Field):
+         return '' if val is None else duration_string(val)
+ 
+     def formfield(self, **kwargs):
++        # Ensure model->form conversion exposes the textual format to users
++        # when no explicit help_text is provided on the model field or via
++        # form kwargs. The canonical, parser-authoritative format is
++        # "[DD] [[HH:]MM:]ss[.uuuuuu]" (seconds required, minutes optional,
++        # hours optional only if minutes are present, microseconds up to 6
++        # digits).
++        if 'help_text' not in kwargs and not self.help_text:
++            kwargs['help_text'] = _(
++                "Enter a duration in '[DD] [[HH:]MM:]ss[.uuuuuu]' format."
++            )
+         return super().formfield(**{
+             'form_class': forms.DurationField,
+             **kwargs,
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index a977256525..e4161a21f9 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -468,7 +468,9 @@ class DateTimeField(BaseTemporalField):
+ 
+ class DurationField(Field):
+     default_error_messages = {
+-        'invalid': _('Enter a valid duration.'),
++        'invalid': _(
++            "Enter a valid duration. The expected format is '[DD] [[HH:]MM:]ss[.uuuuuu]'."
++        ),
+         'overflow': _('The number of days must be between {min_days} and {max_days}.')
+     }
+ 

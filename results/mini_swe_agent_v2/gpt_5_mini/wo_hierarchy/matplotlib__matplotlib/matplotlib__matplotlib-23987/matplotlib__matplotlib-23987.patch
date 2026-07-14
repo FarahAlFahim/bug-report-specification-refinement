@@ -1,0 +1,35 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index 5bbb786984..c4a7c15721 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -2422,13 +2422,24 @@ class Figure(FigureBase):
+                     "The Figure parameters 'tight_layout' and "
+                     "'constrained_layout' cannot be used together. Please use "
+                     "'layout' parameter")
+-            self.set_layout_engine(layout='tight')
+-            if isinstance(tight_layout, dict):
+-                self.get_layout_engine().set(**tight_layout)
++            # Only enable the tight layout engine if the caller passed a
++            # truthy value. Historically the constructor treated any
++            # non-None value as a request to install the engine which meant
++            # passing ``tight_layout=False`` would still install the engine
++            # and later cause spurious incompatibility warnings. Match the
++            # semantics of the setter which casts to bool.
++            if bool(tight_layout):
++                self.set_layout_engine(layout='tight')
++                if isinstance(tight_layout, dict):
++                    self.get_layout_engine().set(**tight_layout)
+         elif constrained_layout is not None:
+-            self.set_layout_engine(layout='constrained')
+-            if isinstance(constrained_layout, dict):
+-                self.get_layout_engine().set(**constrained_layout)
++            # Only enable constrained layout engine when requested.
++            # See comment above for rationale; None means defer to rcParams
++            # while False should not install the engine.
++            if bool(constrained_layout):
++                self.set_layout_engine(layout='constrained')
++                if isinstance(constrained_layout, dict):
++                    self.get_layout_engine().set(**constrained_layout)
+         else:
+             # everything is None, so use default:
+             self.set_layout_engine(layout=layout)

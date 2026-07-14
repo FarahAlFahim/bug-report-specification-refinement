@@ -1,0 +1,41 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 1edc712358..3b8e8228db 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -361,6 +361,23 @@ def _print_Mul(self, expr):
+         separator = self._settings['mul_symbol_latex']
+         numbersep = self._settings['mul_symbol_latex_numbers']
+ 
++        # Avoid moving exponential factors into the denominator based on
++        # assumptions about signs. If this Mul contains explicit exponential
++        # function terms (exp(...) / ExpBase) then prefer to print them in
++        # the original form (e^{...} or e^{-...}) rather than as 1/e^{...}.
++        # This keeps LaTeX output consistent with the pretty printer and
++        # avoids assumptions affecting rendering.
++        from sympy.functions.elementary.exponential import ExpBase, exp as _exp_func
++
++        def _contains_exp_terms(e):
++            for a in e.args:
++                if getattr(a, 'func', None) is _exp_func or isinstance(a, ExpBase):
++                    return True
++                # handle powers whose base is an exponential
++                if a.is_Pow and (getattr(a.base, 'func', None) is _exp_func or isinstance(a.base, ExpBase)):
++                    return True
++            return False
++
+         def convert(expr):
+             if not expr.is_Mul:
+                 return str(self._print(expr))
+@@ -390,7 +407,11 @@ def convert(expr):
+                     last_term_tex = term_tex
+                 return _tex
+ 
+-        if denom is S.One:
++        # If the original expression contains exp(...) terms then do not
++        # render the expression as a fraction even if fraction() produced
++        # a nontrivial denominator. Instead, print the original product
++        # which will preserve e^{...} and e^{-...} formatting.
++        if denom is S.One or _contains_exp_terms(expr):
+             # use the original expression here, since fraction() may have
+             # altered it when producing numer and denom
+             tex += convert(expr)

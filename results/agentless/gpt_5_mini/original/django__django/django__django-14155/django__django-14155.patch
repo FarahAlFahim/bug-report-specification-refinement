@@ -1,0 +1,45 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 43e675a..11c756d 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -23,6 +23,7 @@ from django.utils.functional import cached_property
+ from django.utils.http import RFC3986_SUBDELIMS, escape_leading_slashes
+ from django.utils.regex_helper import _lazy_re_compile, normalize
+ from django.utils.translation import get_language
++import functools
+ 
+ from .converters import get_converter
+ from .exceptions import NoReverseMatch, Resolver404
+@@ -31,6 +32,23 @@ from .utils import get_callable
+ 
+ class ResolverMatch:
+     def __init__(self, func, args, kwargs, url_name=None, app_names=None, namespaces=None, route=None, tried=None):
++        # Unwrap functools.partial to reveal the underlying callable and
++        # merge any pre-supplied positional/keyword arguments so that
++        # __repr__ and view resolution are more informative.
++        if isinstance(func, functools.partial):
++            partial_func = func
++            func = partial_func.func
++            # Ensure args is a tuple and merge partial positional args before resolver args.
++            partial_args = getattr(partial_func, 'args', ()) or ()
++            resolver_args = args or ()
++            args = tuple(partial_args) + tuple(resolver_args)
++            # Merge keyword args: partial's keywords are default, resolver kwargs override.
++            partial_kwargs = getattr(partial_func, 'keywords', None) or {}
++            merged_kwargs = {}
++            merged_kwargs.update(partial_kwargs)
++            merged_kwargs.update(kwargs or {})
++            kwargs = merged_kwargs
++
+         self.func = func
+         self.args = args
+         self.kwargs = kwargs
+@@ -46,7 +64,7 @@ class ResolverMatch:
+         self.namespace = ':'.join(self.namespaces)
+ 
+         if not hasattr(func, '__name__'):
+-            # A class-based view
++            # A class-based view or callable object
+             self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
+         else:
+             # A function-based view

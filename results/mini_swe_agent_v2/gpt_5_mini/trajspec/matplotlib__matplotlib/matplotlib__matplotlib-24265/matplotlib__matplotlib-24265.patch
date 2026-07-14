@@ -1,0 +1,27 @@
+diff --git a/lib/matplotlib/style/core.py b/lib/matplotlib/style/core.py
+index fb0a5426e6..2b14e34214 100644
+--- a/lib/matplotlib/style/core.py
++++ b/lib/matplotlib/style/core.py
+@@ -255,6 +255,22 @@ def reload_library():
+     """Reload the style library."""
+     global library
+     library = update_user_library(_base_library)
++
++    # Provide backward-compatible seaborn legacy-name aliases so that
++    # direct lookup in ``plt.style.library['seaborn-...']`` works the same
++    # as ``style.use('seaborn-...')`` which performs a legacy->canonical
++    # remapping (seaborn -> seaborn-v0_8) at call time.  We synthesize the
++    # legacy keys here by mapping any ``seaborn-v0_8-...`` (and
++    # ``seaborn-v0_8``) canonical names to their ``seaborn-...`` legacy
++    # equivalents if the legacy name is not already provided by the user.
++    seaborn_prefix = "seaborn-v0_8"
++    for key in list(library.keys()):
++        if key.startswith(seaborn_prefix):
++            legacy_key = key.replace(seaborn_prefix, "seaborn", 1)
++            # Do not override user-defined legacy names.
++            if legacy_key not in library:
++                library[legacy_key] = library[key]
++
+     available[:] = sorted(library.keys())
+ 
+ 

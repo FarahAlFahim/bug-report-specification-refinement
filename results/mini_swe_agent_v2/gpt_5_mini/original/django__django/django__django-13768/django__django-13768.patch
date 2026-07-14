@@ -1,0 +1,26 @@
+diff --git a/django/dispatch/dispatcher.py b/django/dispatch/dispatcher.py
+index b7d9d26389..7b78a936d8 100644
+--- a/django/dispatch/dispatcher.py
++++ b/django/dispatch/dispatcher.py
+@@ -1,6 +1,7 @@
+ import threading
+ import warnings
+ import weakref
++import logging
+ 
+ from django.utils.deprecation import RemovedInDjango40Warning
+ from django.utils.inspect import func_accepts_kwargs
+@@ -208,6 +209,13 @@ class Signal:
+             try:
+                 response = receiver(signal=self, sender=sender, **named)
+             except Exception as err:
++                # Log the exception so that errors in signal receivers are
++                # visible to logging/error reporting tools (e.g. Sentry).
++                logger = logging.getLogger('django.dispatch')
++                logger.exception(
++                    'Exception while calling receiver %r for signal %r',
++                    receiver, self
++                )
+                 responses.append((receiver, err))
+             else:
+                 responses.append((receiver, response))

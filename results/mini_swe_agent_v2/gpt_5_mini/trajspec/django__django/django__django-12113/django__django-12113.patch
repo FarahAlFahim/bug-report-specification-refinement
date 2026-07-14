@@ -1,0 +1,28 @@
+diff --git a/django/db/backends/sqlite3/creation.py b/django/db/backends/sqlite3/creation.py
+index d97052f52d..ea18d73aff 100644
+--- a/django/db/backends/sqlite3/creation.py
++++ b/django/db/backends/sqlite3/creation.py
+@@ -90,12 +90,19 @@ class DatabaseCreation(BaseDatabaseCreation):
+         """
+         Return a tuple that uniquely identifies a test database.
+ 
+-        This takes into account the special cases of ":memory:" and "" for
+-        SQLite since the databases will be distinct despite having the same
+-        TEST NAME. See https://www.sqlite.org/inmemorydb.html
++        Include the computed test database name (from _get_test_db_name()),
++        so that persistent per-alias TEST['NAME'] values are respected when
++        determining whether two aliases share the same underlying test
++        database. In-memory databases continue to be handled specially by
++        including the alias so separate in-memory URIs remain distinct.
+         """
+         test_database_name = self._get_test_db_name()
+-        sig = [self.connection.settings_dict['NAME']]
++        # BaseDatabaseCreation.test_db_signature includes the computed test
++        # DB name in the signature. Ensure sqlite3 uses the same approach to
++        # avoid grouping distinct persistent TEST['NAME'] files as mirrors.
++        sig = [self.connection.settings_dict['NAME'], test_database_name]
+         if self.is_in_memory_db(test_database_name):
++            # For in-memory DBs, also include the alias so each alias gets a
++            # distinct in-memory database URI.
+             sig.append(self.connection.alias)
+         return tuple(sig)

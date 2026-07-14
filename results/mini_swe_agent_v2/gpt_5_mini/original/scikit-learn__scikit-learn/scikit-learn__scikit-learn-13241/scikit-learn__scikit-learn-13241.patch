@@ -1,0 +1,32 @@
+diff --git a/sklearn/decomposition/kernel_pca.py b/sklearn/decomposition/kernel_pca.py
+index bb91d0cbb..9022a474f 100644
+--- a/sklearn/decomposition/kernel_pca.py
++++ b/sklearn/decomposition/kernel_pca.py
+@@ -8,6 +8,7 @@ from scipy import linalg
+ from scipy.sparse.linalg import eigsh
+ 
+ from ..utils import check_random_state
++from ..utils.extmath import svd_flip
+ from ..utils.validation import check_is_fitted, check_array
+ from ..exceptions import NotFittedError
+ from ..base import BaseEstimator, TransformerMixin, _UnstableOn32BitMixin
+@@ -220,6 +221,19 @@ class KernelPCA(BaseEstimator, TransformerMixin, _UnstableOn32BitMixin):
+             self.alphas_ = self.alphas_[:, self.lambdas_ > 0]
+             self.lambdas_ = self.lambdas_[self.lambdas_ > 0]
+ 
++        # Ensure deterministic sign for eigenvectors. Eigenvectors are
++        # defined up to a sign, which can differ across runs (e.g. when
++        # using ARPACK). Apply the same sign-flip heuristic as used for
++        # SVD-based decompositions to make the output reproducible.
++        if getattr(self, 'alphas_', None) is not None and self.alphas_.size:
++            # svd_flip expects two arrays (u, v). We only need the sign
++            # correction for ``alphas_`` (acting as ``u``). Provide a
++            # dummy ``v`` with a compatible first dimension so that
++            # svd_flip returns the flipped ``u``. The second returned
++            # value is ignored.
++            self.alphas_, _ = svd_flip(self.alphas_,
++                                      np.ones((self.alphas_.shape[1], 1)))
++
+         return K
+ 
+     def _fit_inverse_transform(self, X_transformed, X):

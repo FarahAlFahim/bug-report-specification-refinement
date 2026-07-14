@@ -1,0 +1,25 @@
+diff --git a/django/db/migrations/autodetector.py b/django/db/migrations/autodetector.py
+index 1c40161c7f..7a67f3479a 100644
+--- a/django/db/migrations/autodetector.py
++++ b/django/db/migrations/autodetector.py
+@@ -923,11 +923,19 @@ class MigrationAutodetector:
+                 if rename_key in self.renamed_models:
+                     new_field.remote_field.model = old_field.remote_field.model
+                 # Handle ForeignKey which can only have a single to_field.
++                # If the related model had a field renamed, adjust the *old*
++                # field representation to use the new name so that the
++                # comparison doesn't spuriously consider the relation changed
++                # and generate an AlterField that pins to_field to the old
++                # name. See PR: ensure to_field points to the new name when
++                # renaming a PrimaryKey.
+                 remote_field_name = getattr(new_field.remote_field, 'field_name', None)
+                 if remote_field_name:
+                     to_field_rename_key = rename_key + (remote_field_name,)
+                     if to_field_rename_key in self.renamed_fields:
+-                        new_field.remote_field.field_name = old_field.remote_field.field_name
++                        # Set the old_field's remote_field.field_name to the
++                        # new name so deep_deconstruct sees them as equal.
++                        old_field.remote_field.field_name = new_field.remote_field.field_name
+                 # Handle ForeignObjects which can have multiple from_fields/to_fields.
+                 from_fields = getattr(new_field, 'from_fields', None)
+                 if from_fields:

@@ -1,0 +1,25 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..90209cf576 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5897,7 +5897,19 @@ def _factors_product(factors):
+ 
+ def _symbolic_factor_list(expr, opt, method):
+     """Helper function for :func:`_symbolic_factor`. """
+-    coeff, factors = S.One, []
++    # If the whole expression can be viewed as a polynomial in the
++    # requested generators then perform the polynomial-level factor
++    # decomposition on the entire polynomial. This yields a canonical
++    # grouping of factors that is independent of the syntactic shape
++    # (product vs expanded) of the input. If polification fails we
++    # fall back to the previous per-multiplicand factoring behaviour.
++    try:
++        poly, _opt = _poly_from_expr(expr, opt)
++    except PolificationFailed:
++        coeff, factors = S.One, []
++    else:
++        func = getattr(poly, method + '_list')
++        return func()
+ 
+     args = [i._eval_factor() if hasattr(i, '_eval_factor') else i
+         for i in Mul.make_args(expr)]

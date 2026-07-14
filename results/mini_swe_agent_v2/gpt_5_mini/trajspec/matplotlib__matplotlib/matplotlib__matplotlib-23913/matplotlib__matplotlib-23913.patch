@@ -1,0 +1,44 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..bc78a44ccd 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -342,7 +342,10 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
+-        ncol=1  # synonym for ncols (backward compatibility)
++        ncol=1,  # synonym for ncols (backward compatibility)
++        draggable=False,
++        draggable_use_blit=False,
++        draggable_update="loc",
+     ):
+         """
+         Parameters
+@@ -537,8 +540,27 @@ class Legend(Artist):
+             title_prop_fp.set_size(title_fontsize)
+ 
+         self.set_title(title, prop=title_prop_fp)
++        # Initialize draggable helper to None first so that subsequent
++        # set_draggable calls behave correctly. If the caller requested the
++        # legend to be draggable at construction time, enable it now. We do
++        # this after the legend box and offsets have been initialized (see
++        # DraggableLegend dependencies on legend._legend_box and figure
++        # transforms).
+         self._draggable = None
+ 
++        # Enable dragging at construction time if requested. Use the
++        # parameters passed in as constructor kwargs. We call
++        # set_draggable() here so that the DraggableLegend helper (which
++        # requires the legend's offsetbox to be initialized) is created
++        # only after the legend has been fully initialized.
++        if draggable:
++            # Use the public API to enable dragging; this will create the
++            # DraggableLegend helper and attach the required event
++            # connections.
++            self.set_draggable(True,
++                               use_blit=draggable_use_blit,
++                               update=draggable_update)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

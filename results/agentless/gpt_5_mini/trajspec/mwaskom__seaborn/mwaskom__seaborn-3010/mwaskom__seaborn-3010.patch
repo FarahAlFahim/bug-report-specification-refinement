@@ -1,0 +1,41 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index a346227..4b09f2c 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -1,3 +1,4 @@
++
+ from __future__ import annotations
+ from dataclasses import dataclass
+ 
+@@ -23,12 +24,20 @@ class PolyFit(Stat):
+ 
+         x = data["x"]
+         y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
+-            xx = yy = []
++        # Drop any pairs with missing x or y values so numpy.polyfit does not
++        # receive NaNs/None (which can cause linear-algebra failures such as
++        # "SVD did not converge in Linear Least Squares").
++        df = pd.concat([x, y], axis=1).dropna()
++
++        # Make degeneracy decisions on the filtered, non-missing observations.
++        if df.empty or df["x"].nunique() <= self.order:
++            # Return empty arrays (not None) so downstream code receives a
++            # well-formed DataFrame even when there's insufficient data.
++            xx = np.array([])
++            yy = np.array([])
+         else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
++            p = np.polyfit(df["x"], df["y"], self.order)
++            xx = np.linspace(df["x"].min(), df["x"].max(), self.gridsize)
+             yy = np.polyval(p, xx)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+@@ -44,4 +53,4 @@ class PolyFit(Stat):
+ @dataclass
+ class OLSFit(Stat):
+ 
+-    ...
++    ...

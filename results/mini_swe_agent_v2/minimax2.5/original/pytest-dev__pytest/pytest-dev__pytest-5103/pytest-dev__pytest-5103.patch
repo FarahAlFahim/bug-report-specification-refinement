@@ -1,0 +1,216 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..51095ec6d 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -178,6 +178,28 @@ class AssertionRewritingHook(object):
+         self.modules[name] = co, pyc
+         return self
+ 
++    def find_spec(self, name, path=None, target=None):
++        # Check if find_module would return a loader
++        loader = self.find_module(name, path)
++        if loader is None:
++            return None
++        # Return a ModuleSpec with the loader set to self
++        from importlib.machinery import ModuleSpec
++        # Get the file path from find_module result
++        if name in self.modules:
++            co, pyc = self.modules[name]
++            return ModuleSpec(name, self, origin=co.co_filename)
++        return None
++
++    def create_module(self, spec):
++        # Python 3.5+ requires this method
++        return None
++
++    def exec_module(self, module):
++        # Python 3.5+ requires this method
++        # Load the module using the old load_module method
++        return self.load_module(module.__name__)
++
+     def _early_rewrite_bailout(self, name, state):
+         """
+         This is a fast way to get out of rewriting modules. Profiling has
+@@ -670,8 +692,8 @@ class AssertionRewriter(ast.NodeVisitor):
+         # Insert some special imports at the top of the module but after any
+         # docstrings and __future__ imports.
+         aliases = [
+-            ast.alias(six.moves.builtins.__name__, "@py_builtins"),
+-            ast.alias("_pytest.assertion.rewrite", "@pytest_ar"),
++            ast.alias(six.moves.builtins.__name__, "@py_builtins", lineno=0, col_offset=0),
++            ast.alias("_pytest.assertion.rewrite", "@pytest_ar", lineno=0, col_offset=0),
+         ]
+         doc = getattr(mod, "docstring", None)
+         expect_docstring = doc is None
+@@ -968,6 +990,19 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Check if this is a call to all() or any() with a single argument
++        # that is a generator expression or list comprehension
++        if len(call.args) == 1 and not call.keywords:
++            func_name = None
++            if isinstance(call.func, ast.Name):
++                func_name = call.func.id
++            
++            if func_name in ("all", "any"):
++                arg = call.args[0]
++                if isinstance(arg, (ast.GeneratorExp, ast.ListComp)):
++                    # Handle all()/any() with generator expression or list comprehension
++                    return self._visit_all_any_call(call, func_name, arg)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -991,6 +1026,109 @@ warn_explicit(
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+         return res, outer_expl
+ 
++    def _visit_all_any_call(self, call, func_name, gen_exp):
++        """
++        Handle all()/any() calls with generator expressions or list comprehensions.
++        
++        This "unrolls" the iterator to provide better assertion messages.
++        """
++        # For a generator expression like: all(predicate(x) for x in iterable)
++        # We want to generate code that calls a helper function which will
++        # iterate through the iterable and check each predicate, providing
++        # better assertion messages.
++        
++        # Get the iterable from the generator expression
++        if len(gen_exp.generators) != 1:
++            # Multiple generators - fall back to default behavior
++            return self._visit_all_any_call_fallback(call, func_name)
++        
++        generator = gen_exp.generators[0]
++        iter_expr, iter_expl = self.visit(generator.iter)
++        
++        # Get the iteration variable
++        if not isinstance(generator.target, ast.Name):
++            return self._visit_all_any_call_fallback(call, func_name)
++        
++        var_name = generator.target.id
++        
++        # Handle if conditions in the generator
++        if generator.ifs:
++            # Has conditions - fall back to default for now
++            return self._visit_all_any_call_fallback(call, func_name)
++        
++        # Get the predicate - we need to create a lambda that wraps it
++        # For is_even(number), we want to create: lambda number: is_even(number)
++        if isinstance(gen_exp.elt, ast.Call):
++            # This is a call like is_even(number)
++            # We need to create a lambda that takes the variable and calls the function
++            func = gen_exp.elt.func
++            args = gen_exp.elt.args
++            
++            # Create lambda x: func(x)
++            lambda_arg = ast.Name(id=var_name, ctx=ast.Load())
++            lambda_body = ast.Call(func=func, args=[lambda_arg], keywords=gen_exp.elt.keywords)
++            predicate_lambda = ast.Lambda(args=ast.arguments(
++                posonlyargs=[],
++                args=[ast.arg(arg=var_name, annotation=None)],
++                kwonlyargs=[],
++                kw_defaults=[],
++                defaults=[]
++            ), body=lambda_body)
++            
++            # Visit the lambda to get the expression
++            pred_res, pred_expl = self.visit(predicate_lambda)
++        elif isinstance(gen_exp.elt, ast.Name):
++            # This is just a name like "predicate" - use it directly
++            pred_res = ast.Name(id=var_name, ctx=ast.Load())
++            pred_expl = var_name
++        else:
++            # Other cases - fall back to default
++            return self._visit_all_any_call_fallback(call, func_name)
++        
++        # Generate a call to the helper function
++        # _all_any_helper(func_name, predicate, iterable)
++        helper_call = self.helper("_all_any_helper",
++            ast.Constant(value=func_name),  # "all" or "any"
++            pred_res,  # lambda x: is_even(x)
++            iter_expr  # the iterable
++        )
++        
++        res = self.assign(helper_call)
++        res_expl = self.explanation_param(self.display(res))
++        
++        if func_name == "all":
++            expl = "all(%s for %s in %s)" % (pred_expl, var_name, iter_expl)
++        else:
++            expl = "any(%s for %s in %s)" % (pred_expl, var_name, iter_expl)
++        
++        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++        return res, outer_expl
++
++    def _visit_all_any_call_fallback(self, call, func_name):
++        """Fallback to default call handling for all/any."""
++        new_func, func_expl = self.visit(call.func)
++        arg_expls = []
++        new_args = []
++        new_kwargs = []
++        for arg in call.args:
++            res, expl = self.visit(arg)
++            arg_expls.append(expl)
++            new_args.append(res)
++        for keyword in call.keywords:
++            res, expl = self.visit(keyword.value)
++            new_kwargs.append(ast.keyword(keyword.arg, res))
++            if keyword.arg:
++                arg_expls.append(keyword.arg + "=" + expl)
++            else:
++                arg_expls.append("**" + expl)
++
++        expl = "%s(%s)" % (func_name, ", ".join(arg_expls))
++        new_call = ast.Call(new_func, new_args, new_kwargs)
++        res = self.assign(new_call)
++        res_expl = self.explanation_param(self.display(res))
++        outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++        return res, outer_expl
++
+     def visit_Starred(self, starred):
+         # From Python 3.5, a Starred node can appear in a function call
+         res, expl = self.visit(starred.value)
+@@ -1082,3 +1220,41 @@ warn_explicit(
+         else:
+             res = load_names[0]
+         return res, self.explanation_param(self.pop_format_context(expl_call))
++
++
++def _all_any_helper(func_name, predicate, iterable):
++    """
++    Helper function for all()/any() calls that provides better assertion messages.
++    
++    This function iterates through the iterable and applies the predicate to each element.
++    If the assertion fails, it will show which element caused the failure.
++    """
++    failed_item = None
++    for item in iterable:
++        try:
++            result = predicate(item)
++        except Exception:
++            result = False
++        
++        if func_name == "all":
++            if not result:
++                # For all(), if any predicate is False, we raise an assertion error
++                # with a better message
++                raise AssertionError(
++                    f"Failed: {predicate.__name__}({item!r})"
++                )
++        else:  # any
++            if result:
++                # For any(), if any predicate is True, we succeed
++                return True
++            else:
++                failed_item = item
++    
++    # If we get here, all predicates failed (for any) or all were True (for all)
++    if func_name == "all":
++        return True
++    else:
++        # For any(), if we get here, no predicate was True
++        raise AssertionError(
++            f"Failed: no element matched {predicate.__name__}() in {iterable!r}"
++        )

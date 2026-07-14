@@ -1,0 +1,51 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index 778cb1c..3294b4c 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -244,6 +244,9 @@ class BaseCommand:
+ 
+     # Metadata about this command.
+     help = ""
++    # Allow per-command selection of the argparse formatter class. Defaults to
++    # DjangoHelpFormatter to preserve the historically expected behaviour.
++    formatter_class = DjangoHelpFormatter
+ 
+     # Configuration shortcuts that alter various logic.
+     _called_from_command_line = False
+@@ -286,10 +289,35 @@ class BaseCommand:
+         Create and return the ``ArgumentParser`` which will be used to
+         parse the arguments to this command.
+         """
++        # Allow per-command formatter selection. If a custom formatter_class is
++        # provided on the command, wrap it with a small subclass that preserves
++        # DjangoHelpFormatter's action reordering behaviour so that option
++        # ordering (command-specific args first, common args last) continues
++        # to work regardless of the formatter chosen (for example when using
++        # RawDescriptionHelpFormatter to preserve description newlines/indentation).
++        formatter_cls = getattr(self, "formatter_class", DjangoHelpFormatter)
++        if formatter_cls is DjangoHelpFormatter:
++            chosen_formatter = DjangoHelpFormatter
++        else:
++
++            class ReorderedFormatter(formatter_cls):
++                show_last = DjangoHelpFormatter.show_last
++
++                def _reordered_actions(self, actions):
++                    return DjangoHelpFormatter._reordered_actions(self, actions)
++
++                def add_usage(self, usage, actions, *args, **kwargs):
++                    super().add_usage(usage, self._reordered_actions(actions), *args, **kwargs)
++
++                def add_arguments(self, actions):
++                    super().add_arguments(self._reordered_actions(actions))
++
++            chosen_formatter = ReorderedFormatter
++
+         parser = CommandParser(
+             prog="%s %s" % (os.path.basename(prog_name), subcommand),
+             description=self.help or None,
+-            formatter_class=DjangoHelpFormatter,
++            formatter_class=chosen_formatter,
+             missing_args_message=getattr(self, "missing_args_message", None),
+             called_from_command_line=getattr(self, "_called_from_command_line", None),
+             **kwargs,

@@ -1,0 +1,22 @@
+diff --git a/lib/matplotlib/cbook/__init__.py b/lib/matplotlib/cbook/__init__.py
+index 34c6ddb861..dd1d531b78 100644
+--- a/lib/matplotlib/cbook/__init__.py
++++ b/lib/matplotlib/cbook/__init__.py
+@@ -1746,7 +1746,16 @@ def _safe_first_finite(obj, *, skip_nonfinite=True):
+         raise RuntimeError("matplotlib does not "
+                            "support generators as input")
+     else:
+-        return next(val for val in obj if safe_isfinite(val))
++        # Iterate and return the first value that is considered "finite"
++        # according to ``safe_isfinite``.  If no such value exists, return
++        # ``None`` instead of allowing a StopIteration to propagate.  Many
++        # callers use this function as a probe for the presence of a finite
++        # element and expect a falsy result rather than an exception when
++        # none exists (e.g. all-NaN sequences).
++        for val in obj:
++            if safe_isfinite(val):
++                return val
++        return None
+ 
+ 
+ def sanitize_sequence(data):

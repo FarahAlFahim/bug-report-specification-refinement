@@ -1,0 +1,22 @@
+diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py
+index a3ae1f048e..aafee2e7e6 100644
+--- a/django/db/backends/sqlite3/base.py
++++ b/django/db/backends/sqlite3/base.py
+@@ -196,7 +196,16 @@ class DatabaseWrapper(BaseDatabaseWrapper):
+                 'for controlling thread shareability.',
+                 RuntimeWarning
+             )
+-        kwargs.update({'check_same_thread': False, 'uri': True})
++        # Respect an explicit user-provided 'uri' option if present in OPTIONS.
++        # Otherwise, only enable URI parsing for database names that look like
++        # SQLite URIs (e.g. start with 'file:' or contain 'mode=memory'). This
++        # avoids treating plain filenames (including Windows paths) as URIs.
++        if 'uri' in kwargs:
++            uri = bool(kwargs['uri'])
++        else:
++            name = settings_dict['NAME']
++            uri = isinstance(name, str) and (name.startswith('file:') or 'mode=memory' in name)
++        kwargs.update({'check_same_thread': False, 'uri': uri})
+         return kwargs
+ 
+     @async_unsafe

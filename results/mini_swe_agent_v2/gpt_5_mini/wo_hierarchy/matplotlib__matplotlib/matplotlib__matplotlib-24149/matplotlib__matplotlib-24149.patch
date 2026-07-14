@@ -1,0 +1,94 @@
+diff --git a/lib/matplotlib/axes/_axes.py b/lib/matplotlib/axes/_axes.py
+index fdac0f3560..321b3014dd 100644
+--- a/lib/matplotlib/axes/_axes.py
++++ b/lib/matplotlib/axes/_axes.py
+@@ -2180,12 +2180,12 @@ class Axes(_AxesBase):
+             # wrap numpy arrays.
+             try:
+                 x0 = cbook._safe_first_finite(x0)
+-            except (TypeError, IndexError, KeyError):
++            except (TypeError, IndexError, KeyError, StopIteration):
+                 pass
+ 
+             try:
+                 x = cbook._safe_first_finite(xconv)
+-            except (TypeError, IndexError, KeyError):
++            except (TypeError, IndexError, KeyError, StopIteration):
+                 x = xconv
+ 
+             delist = False
+@@ -2829,11 +2829,17 @@ class Axes(_AxesBase):
+         """
+         # process the unit information
+         if len(xranges):
+-            xdata = cbook._safe_first_finite(xranges)
++            try:
++                xdata = cbook._safe_first_finite(xranges)
++            except StopIteration:
++                xdata = None
+         else:
+             xdata = None
+         if len(yrange):
+-            ydata = cbook._safe_first_finite(yrange)
++            try:
++                ydata = cbook._safe_first_finite(yrange)
++            except StopIteration:
++                ydata = None
+         else:
+             ydata = None
+         self._process_unit_info(
+@@ -3467,18 +3473,18 @@ class Axes(_AxesBase):
+             """
+ 
+             if (
+-                    # make sure it is not a scalar
+                     np.iterable(err) and
+-                    # and it is not empty
+-                    len(err) > 0 and
+-                    # and the first element is an array sub-class use
+-                    # safe_first_element because getitem is index-first not
+-                    # location first on pandas objects so err[0] almost always
+-                    # fails.
+-                    isinstance(cbook._safe_first_finite(err), np.ndarray)
++                    len(err) > 0
+             ):
+-                # Get the type of the first element
+-                atype = type(cbook._safe_first_finite(err))
++                try:
++                    first_err = cbook._safe_first_finite(err)
++                except StopIteration:
++                    first_err = None
++                if first_err is not None and isinstance(first_err, np.ndarray):
++                    # Get the type of the first element
++                    atype = type(first_err)
++                else:
++                    atype = None
+                 # Promote the outer container to match the inner container
+                 if atype is np.ndarray:
+                     # Converts using np.asarray, because data cannot
+@@ -4356,10 +4362,24 @@ class Axes(_AxesBase):
+             c = (facecolors if facecolors is not None
+                  else "b" if mpl.rcParams['_internal.classic_mode']
+                  else get_next_color_func())
++        # Determine if "c" is a string or sequence of strings using the
++        # first finite element, but guard StopIteration if there are no
++        # finite elements in the iterable.
++        try:
++            first_c = None
++            if np.iterable(c) and len(c) > 0:
++                try:
++                    first_c = cbook._safe_first_finite(c)
++                except StopIteration:
++                    first_c = None
++        except TypeError:
++            # Not iterable or len() not supported
++            first_c = None
++
+         c_is_string_or_strings = (
+             isinstance(c, str)
+             or (np.iterable(c) and len(c) > 0
+-                and isinstance(cbook._safe_first_finite(c), str)))
++                and isinstance(first_c, str)))
+ 
+         def invalid_shape_exception(csize, xsize):
+             return ValueError(

@@ -1,0 +1,80 @@
+diff --git a/sphinx/ext/inheritance_diagram.py b/sphinx/ext/inheritance_diagram.py
+index 9e38041df..f92a5dfbf 100644
+--- a/sphinx/ext/inheritance_diagram.py
++++ b/sphinx/ext/inheritance_diagram.py
+@@ -225,8 +225,24 @@ class InheritanceGraph:
+         completely general.
+         """
+         module = cls.__module__
++        # Only drop the module name for real builtins that are exported
++        # from the builtins module. Some classes (e.g. struct.Struct)
++        # may report their __module__ as 'builtins' on some platforms
++        # or due to other reasons; ensure the object is actually the
++        # one exported from builtins before omitting the module prefix.
+         if module in ('__builtin__', 'builtins'):
+-            fullname = cls.__name__
++            try:
++                if getattr(builtins, cls.__name__, None) is cls:
++                    fullname = cls.__name__
++                else:
++                    # fallback to the defining module if possible
++                    mod = inspect.getmodule(cls)
++                    if mod is not None and getattr(mod, '__name__', None):
++                        fullname = '%s.%s' % (mod.__name__, cls.__qualname__)
++                    else:
++                        fullname = '%s.%s' % (module, cls.__qualname__)
++            except Exception:
++                fullname = '%s.%s' % (module, cls.__qualname__)
+         else:
+             fullname = '%s.%s' % (module, cls.__qualname__)
+         if parts == 0:
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..c432f5a38 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -97,7 +97,23 @@ def restify(cls: Optional["Type"]) -> str:
+     elif inspect.isNewType(cls):
+         return ':class:`%s`' % cls.__name__
+     elif cls.__module__ in ('__builtin__', 'builtins'):
+-        return ':class:`%s`' % cls.__name__
++        # Only omit the module prefix when the object is actually the
++        # one exported from the builtins module (e.g. int, str). Some
++        # objects may report __module__ as 'builtins' but not be present
++        # in the builtins namespace (e.g. struct.Struct); in that case
++        # include the defining module to avoid producing unresolved
++        # bare names.
++        try:
++            import builtins as _builtins
++            if getattr(_builtins, cls.__name__, None) is cls:
++                return ':class:`%s`' % cls.__name__
++            # fallback: if we can find the module via inspect, use it
++            mod = inspect.getmodule(cls)
++            if mod is not None and getattr(mod, '__name__', None):
++                return ':class:`%s.%s`' % (mod.__name__, cls.__qualname__)
++        except Exception:
++            pass
++        return ':class:`%s.%s`' % (cls.__module__, cls.__qualname__)
+     else:
+         if sys.version_info >= (3, 7):  # py37+
+             return _restify_py37(cls)
+@@ -302,7 +318,19 @@ def stringify(annotation: Any) -> str:
+         return 'None'
+     elif (getattr(annotation, '__module__', None) == 'builtins' and
+           hasattr(annotation, '__qualname__')):
+-        return annotation.__qualname__
++        # Only return the bare qualname when the object is actually
++        # exported from the builtins module. Otherwise include the
++        # defining module to avoid unresolved bare names (see #).
++        try:
++            import builtins as _builtins
++            if getattr(_builtins, annotation.__name__, None) is annotation:
++                return annotation.__qualname__
++            mod = inspect.getmodule(annotation)
++            if mod is not None and getattr(mod, '__name__', None):
++                return '%s.%s' % (mod.__name__, annotation.__qualname__)
++        except Exception:
++            pass
++        return '%s.%s' % (getattr(annotation, '__module__', 'builtins'), annotation.__qualname__)
+     elif annotation is Ellipsis:
+         return '...'
+ 

@@ -1,0 +1,48 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..05a06df7fd 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -932,6 +932,43 @@ default: %(va)s
+         self.stale = True
+         self._localaxes.remove(ax)
+ 
++        # If the canvas has state that references this Axes (for example
++        # during an interactive drag the widget may have grabbed the mouse or
++        # hold the widgetlock), ensure we clear those references so that new
++        # widgets can obtain them after the Axes is removed.  See #PR.
++        try:
++            canvas = getattr(self, 'canvas', None) or getattr(self.figure, 'canvas', None)
++        except Exception:
++            canvas = None
++        if canvas is not None:
++            # Release mouse grab if this Axes currently holds it.
++            try:
++                if getattr(canvas, 'mouse_grabber', None) is ax:
++                    # Use the canvas API to release so any backend-specific
++                    # behavior is honored.
++                    canvas.release_mouse(ax)
++            except Exception:
++                # Be conservative: do not let widget cleanup interfere with
++                # axes removal. Ignore errors here.
++                pass
++
++            # Release widgetlock owner if it is a widget tied to this Axes.
++            wl = getattr(canvas, 'widgetlock', None)
++            if wl is not None:
++                owner = getattr(wl, '_owner', None)
++                try:
++                    if owner is not None and getattr(owner, 'ax', None) is ax:
++                        # Prefer the LockDraw.release API to maintain
++                        # invariants; fall back to clearing the owner attr
++                        # if release raises for any reason.
++                        try:
++                            wl.release(owner)
++                        except Exception:
++                            wl._owner = None
++                except Exception:
++                    # As above, don't let cleanup errors block delaxes.
++                    pass
++
+         # Break link between any shared axes
+         for name in ax._axis_names:
+             last_ax = _break_share_link(ax, ax._shared_axes[name])

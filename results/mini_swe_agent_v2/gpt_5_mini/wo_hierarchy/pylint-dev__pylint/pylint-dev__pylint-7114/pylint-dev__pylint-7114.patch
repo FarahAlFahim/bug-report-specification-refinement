@@ -1,0 +1,55 @@
+diff --git a/pylint/lint/expand_modules.py b/pylint/lint/expand_modules.py
+index 289e1afce..7bc000b60 100644
+--- a/pylint/lint/expand_modules.py
++++ b/pylint/lint/expand_modules.py
+@@ -91,7 +91,16 @@ def expand_modules(
+             except ImportError:
+                 modname = os.path.splitext(basename)[0]
+             if os.path.isdir(something):
+-                filepath = os.path.join(something, "__init__.py")
++                # Only consider an __init__.py file if it actually exists.
++                init_path = os.path.join(something, "__init__.py")
++                if os.path.isfile(init_path):
++                    filepath = init_path
++                else:
++                    # Treat the directory itself as the target for namespace
++                    # packages (no __init__.py). We will scan the directory
++                    # for module files below. Using the directory here avoids
++                    # constructing a non-existent __init__.py path.
++                    filepath = something
+             else:
+                 filepath = something
+         else:
+@@ -121,7 +130,9 @@ def expand_modules(
+         else:
+             is_namespace = modutils.is_namespace(spec)
+             is_directory = modutils.is_directory(spec)
+-        if not is_namespace:
++        # Only append a direct module entry when the filepath points to an
++        # actual file (avoid handing callers a non-existent __init__.py).
++        if not is_namespace and os.path.isfile(filepath):
+             result.append(
+                 {
+                     "path": filepath,
+@@ -134,10 +145,20 @@ def expand_modules(
+         has_init = (
+             not (modname.endswith(".__init__") or modname == "__init__")
+             and os.path.basename(filepath) == "__init__.py"
++            and os.path.isfile(filepath)
+         )
+         if has_init or is_namespace or is_directory:
++            # Determine directory to scan for submodules. If filepath is a
++            # directory (namespace package without __init__.py) scan it
++            # directly; otherwise, use the parent directory of the file
++            # (typical package with __init__.py).
++            if os.path.isdir(filepath):
++                scan_dir = filepath
++            else:
++                scan_dir = os.path.dirname(filepath)
++
+             for subfilepath in modutils.get_module_files(
+-                os.path.dirname(filepath), ignore_list, list_all=is_namespace
++                scan_dir, ignore_list, list_all=is_namespace
+             ):
+                 if filepath == subfilepath:
+                     continue

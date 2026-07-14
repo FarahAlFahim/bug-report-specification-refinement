@@ -1,0 +1,61 @@
+diff --git a/sympy/utilities/iterables.py b/sympy/utilities/iterables.py
+index d96e76263b..05744acac0 100644
+--- a/sympy/utilities/iterables.py
++++ b/sympy/utilities/iterables.py
+@@ -2085,7 +2085,7 @@ def has_variety(seq):
+     return False
+ 
+ 
+-def uniq(seq, result=None):
++def uniq(seq, result=None, _orig_seq=None, _orig_len=None):
+     """
+     Yield unique elements from ``seq`` as an iterator. The second
+     parameter ``result``  is used internally; it is not necessary to pass
+@@ -2106,24 +2106,44 @@ def uniq(seq, result=None):
+     >>> list(uniq([[1], [2, 1], [1]]))
+     [[1], [2, 1]]
+     """
++    # Internal parameters _orig_seq and _orig_len are used to detect
++    # mutation of the original sequence (e.g. a list) during iteration.
++    # They are passed through recursive calls and are not part of the
++    # public API.
++    if _orig_seq is None:
++        _orig_seq = seq
++        _orig_len = len(seq) if hasattr(seq, '__len__') else None
++
++    def _check_len():
++        if _orig_len is not None and hasattr(_orig_seq, '__len__'):
++            if len(_orig_seq) != _orig_len:
++                raise RuntimeError('sequence changed size during iteration')
++
+     try:
+         seen = set()
+         result = result or []
+         for i, s in enumerate(seq):
++            _check_len()
+             if not (s in seen or seen.add(s)):
++                _check_len()
+                 yield s
+     except TypeError:
++        # s and i are expected to be defined when TypeError is raised
++        # from the membership test on unhashable elements.
++        _check_len()
+         if s not in result:
++            _check_len()
+             yield s
+             result.append(s)
+         if hasattr(seq, '__getitem__'):
+-            for s in uniq(seq[i + 1:], result):
++            for s in uniq(seq[i + 1:], result, _orig_seq=_orig_seq, _orig_len=_orig_len):
++                _check_len()
+                 yield s
+         else:
+-            for s in uniq(seq, result):
++            for s in uniq(seq, result, _orig_seq=_orig_seq, _orig_len=_orig_len):
++                _check_len()
+                 yield s
+ 
+-
+ def generate_bell(n):
+     """Return permutations of [0, 1, ..., n - 1] such that each permutation
+     differs from the last by the exchange of a single pair of neighbors.

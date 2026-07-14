@@ -1,0 +1,48 @@
+diff --git a/django/db/backends/sqlite3/schema.py b/django/db/backends/sqlite3/schema.py
+index f0c81c123b..45e2564147 100644
+--- a/django/db/backends/sqlite3/schema.py
++++ b/django/db/backends/sqlite3/schema.py
+@@ -236,7 +236,31 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+                 if delete_field.name not in index.fields
+             ]
+ 
+-        constraints = list(model._meta.constraints)
++        # Filter out UniqueConstraints with expressions, conditions, include, or
++        # deferrable since they require deferred SQL execution.
++        constraints = [
++            constraint
++            for constraint in model._meta.constraints
++            if not (
++                isinstance(constraint, UniqueConstraint) and (
++                    constraint.condition or
++                    constraint.contains_expressions or
++                    constraint.include or
++                    constraint.deferrable
++                )
++            )
++        ]
++        # Store the complex constraints to re-add them after the table is recreated.
++        deferred_constraints = [
++            constraint
++            for constraint in model._meta.constraints
++            if isinstance(constraint, UniqueConstraint) and (
++                constraint.condition or
++                constraint.contains_expressions or
++                constraint.include or
++                constraint.deferrable
++            )
++        ]
+ 
+         # Provide isolated instances of the fields to the new model body so
+         # that the existing model's internals aren't interfered with when
+@@ -298,6 +322,10 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
+             disable_constraints=False,
+         )
+ 
++        # Re-add the complex constraints that were filtered out.
++        for constraint in deferred_constraints:
++            self.add_constraint(model, constraint)
++
+         # Run deferred SQL on correct table
+         for sql in self.deferred_sql:
+             self.execute(sql)

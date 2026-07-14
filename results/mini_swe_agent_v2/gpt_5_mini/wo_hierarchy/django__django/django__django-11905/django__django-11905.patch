@@ -1,0 +1,40 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..61231b45ad 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -462,6 +462,27 @@ class IsNull(BuiltinLookup):
+     lookup_name = 'isnull'
+     prepare_rhs = False
+ 
++    def get_prep_lookup(self):
++        """
++        Ensure that direct RHS values for the isnull lookup are coerced to
++        actual Python booleans. Historically IsNull set prepare_rhs = False
++        which allowed arbitrary truthy/falsy values (e.g. 1, "True") to
++        be used, causing inconsistent behavior between SQL generation
++        (which used truthiness) and join-promotion logic (which checks for
++        identity with the Python literal True). Coerce non-expression RHS
++        values to bool so both code paths observe the same semantics.
++        """
++        # Preserve expressions/queries as-is so they can be compiled by
++        # the query machinery. Only coerce direct Python values.
++        if hasattr(self.rhs, 'resolve_expression'):
++            return self.rhs
++        # Keep None as a special sentinel value rather than coercing it to
++        # False so that existing logic which checks for `is None` continues
++        # to work.
++        if self.rhs is None:
++            return None
++        return bool(self.rhs)
++
+     def as_sql(self, compiler, connection):
+         sql, params = compiler.compile(self.lhs)
+         if self.rhs:
+@@ -469,7 +490,6 @@ class IsNull(BuiltinLookup):
+         else:
+             return "%s IS NOT NULL" % sql, params
+ 
+-
+ @Field.register_lookup
+ class Regex(BuiltinLookup):
+     lookup_name = 'regex'

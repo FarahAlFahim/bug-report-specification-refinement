@@ -1,0 +1,40 @@
+diff --git a/sympy/utilities/iterables.py b/sympy/utilities/iterables.py
+index d96e76263b..c0855bb31d 100644
+--- a/sympy/utilities/iterables.py
++++ b/sympy/utilities/iterables.py
+@@ -2085,7 +2085,7 @@ def has_variety(seq):
+     return False
+ 
+ 
+-def uniq(seq, result=None):
++def uniq(seq, result=None, seq_len=None):
+     """
+     Yield unique elements from ``seq`` as an iterator. The second
+     parameter ``result``  is used internally; it is not necessary to pass
+@@ -2109,10 +2109,26 @@ def uniq(seq, result=None):
+     try:
+         seen = set()
+         result = result or []
++        if seq_len is None:
++            try:
++                seq_len = len(seq)
++            except TypeError:
++                seq_len = -1  # Indicate that length check is not possible
+         for i, s in enumerate(seq):
++            if seq_len > 0 and len(seq) != seq_len:
++                raise RuntimeError("seq size changed during iteration")
+             if not (s in seen or seen.add(s)):
+                 yield s
+     except TypeError:
++        # For unhashable elements, we need to track the original sequence
++        # Store original sequence on first call for length checking
++        if seq_len is None:
++            try:
++                seq_len = len(seq)
++            except TypeError:
++                seq_len = -1  # Indicate that length check is not possible
++        if seq_len > 0 and len(seq) != seq_len:
++            raise RuntimeError("seq size changed during iteration")
+         if s not in result:
+             yield s
+             result.append(s)

@@ -1,0 +1,54 @@
+diff --git a/src/_pytest/_io/saferepr.py b/src/_pytest/_io/saferepr.py
+index 23af4d0bb..24f50ae21 100644
+--- a/src/_pytest/_io/saferepr.py
++++ b/src/_pytest/_io/saferepr.py
+@@ -4,12 +4,27 @@ from typing import Any
+ 
+ 
+ def _try_repr_or_str(obj):
++    """Try to obtain a representation for obj.
++
++    This must never propagate user exceptions (other than
++    KeyboardInterrupt/SystemExit). If repr(obj) fails we try str(obj)
++    but guard that call as well; if that also fails we fall back to a
++    safe, non-calling representation using the object's type name and
++    id so that this function is always safe to call.
++    """
+     try:
+         return repr(obj)
+     except (KeyboardInterrupt, SystemExit):
+         raise
+     except BaseException:
+-        return '{}("{}")'.format(type(obj).__name__, obj)
++        # Try str(obj) but guard it; it may also raise.
++        try:
++            return str(obj)
++        except (KeyboardInterrupt, SystemExit):
++            raise
++        except BaseException:
++            # Final safe fallback that doesn't call into user code.
++            return "<{} object at 0x{:x}>".format(type(obj).__name__, id(obj))
+ 
+ 
+ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+@@ -17,10 +32,17 @@ def _format_repr_exception(exc: BaseException, obj: Any) -> str:
+         exc_info = _try_repr_or_str(exc)
+     except (KeyboardInterrupt, SystemExit):
+         raise
+-    except BaseException as exc:
+-        exc_info = "unpresentable exception ({})".format(_try_repr_or_str(exc))
++    except BaseException:
++        # If rendering the exception itself fails, avoid any further
++        # attempts that could call into user code. Use the exception
++        # type name as a safe fallback.
++        try:
++            exc_type_name = type(exc).__name__
++        except Exception:
++            exc_type_name = "UnknownException"
++        exc_info = "unpresentable exception ({})".format(exc_type_name)
+     return "<[{} raised in repr()] {} object at 0x{:x}>".format(
+-        exc_info, obj.__class__.__name__, id(obj)
++        exc_info, type(obj).__name__, id(obj)
+     )
+ 
+ 

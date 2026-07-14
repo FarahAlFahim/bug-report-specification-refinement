@@ -1,0 +1,45 @@
+diff --git a/lib/matplotlib/colors.py b/lib/matplotlib/colors.py
+index 2d3072da04..cdf898884e 100644
+--- a/lib/matplotlib/colors.py
++++ b/lib/matplotlib/colors.py
+@@ -706,12 +706,20 @@ class Colormap:
+         if not self._isinit:
+             self._init()
+ 
+-        # Take the bad mask from a masked array, or in all other cases defer
+-        # np.isnan() to after we have converted to an array.
++        # Take the bad mask from a masked array. For non-masked inputs,
++        # only use np.isnan for floating dtypes; calling np.isnan on
++        # integer/unsigned integer dtypes may behave differently across
++        # NumPy versions and can raise/emit warnings. For integer-like
++        # inputs we treat there-as-no-NaNs (they cannot represent NaN).
+         mask_bad = X.mask if np.ma.is_masked(X) else None
+         xa = np.array(X, copy=True)
+         if mask_bad is None:
+-            mask_bad = np.isnan(xa)
++            if xa.dtype.kind == "f":
++                mask_bad = np.isnan(xa)
++            else:
++                # Integer/unsigned/bool dtypes cannot contain NaN values;
++                # create a false mask of the same shape.
++                mask_bad = np.zeros(xa.shape, dtype=bool)
+         if not xa.dtype.isnative:
+             xa = xa.byteswap().newbyteorder()  # Native byteorder is faster.
+         if xa.dtype.kind == "f":
+@@ -725,6 +733,16 @@ class Colormap:
+                 # Avoid converting large positive values to negative integers.
+                 np.clip(xa, -1, self.N, out=xa)
+                 xa = xa.astype(int)
++        else:
++            # For integer-like inputs, ensure we have a signed integer
++            # dtype that can represent the sentinel indices
++            # (self.N, self.N+1, self.N+2) to avoid overflow/wrap and
++            # out-of-bounds integer-to-integer conversion warnings.
++            # Using Python's default int (np.int_) gives a safe, platform
++            # appropriate signed integer type.
++            if xa.dtype.kind in ("u", "i", "b"):
++                xa = xa.astype(np.int_, copy=False)
++
+         # Set the over-range indices before the under-range;
+         # otherwise the under-range values get converted to over-range.
+         xa[xa > self.N - 1] = self._i_over

@@ -1,0 +1,82 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..bad5d9e98e 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -242,10 +242,18 @@ def acc(self, frame):
+ 
+         _check_frame(frame)
+         if not (frame in self._acc_dict):
+-            if self._vel_dict[frame] != 0:
+-                return (self._vel_dict[frame]).dt(frame)
+-            else:
++            # Attempt to compute acceleration as time-derivative of the
++            # velocity in the requested frame. Use vel() so that the
++            # velocity can be derived from position relations if necessary.
++            try:
++                v = self.vel(frame)
++            except ValueError:
++                # No acceleration or velocity information available.
+                 return Vector(0)
++            else:
++                if v == 0:
++                    return Vector(0)
++                return v.dt(frame)
+         return self._acc_dict[frame]
+ 
+     def locatenew(self, name, value):
+@@ -518,10 +526,51 @@ def vel(self, frame):
+         """
+ 
+         _check_frame(frame)
+-        if not (frame in self._vel_dict):
+-            raise ValueError('Velocity of point ' + self.name + ' has not been'
+-                             ' defined in ReferenceFrame ' + frame.name)
+-        return self._vel_dict[frame]
++        # If an explicit velocity has been stored for this frame, return it.
++        if frame in self._vel_dict:
++            return self._vel_dict[frame]
++
++        # Otherwise, attempt to compute the velocity from stored position
++        # relations. The relationship is:
++        #   v_self(frame) = v_other(frame) + (d/dt)_frame [ pos_from(other) ]
++        # We perform a breadth-first search over the position graph to find
++        # a neighboring point for which a velocity in 'frame' can be
++        # determined (explicitly or recursively). Track visited points to
++        # avoid cycles.
++        visited = set()
++        try:
++            from collections import deque
++        except Exception:
++            # Fallback in very constrained environments
++            visited.add(self)
++        else:
++            queue = deque([self])
++            visited.add(self)
++            while queue:
++                node = queue.popleft()
++                for neighbor in list(node._pos_dict.keys()):
++                    if neighbor in visited:
++                        continue
++                    visited.add(neighbor)
++                    queue.append(neighbor)
++                    # If the neighbor has an explicit velocity in the
++                    # requested frame, use it as an anchor and return the
++                    # anchored velocity plus the time-derivative of the
++                    # position of self relative to that neighbor.
++                    if frame in neighbor._vel_dict:
++                        v_other = neighbor._vel_dict[frame]
++                        return v_other + (self.pos_from(neighbor)).dt(frame)
++
++        # If no anchor with a definable velocity was found but position
++        # relations exist, return the time-derivative of the stored
++        # relative position to any neighbor (best available information).
++        if len(self._pos_dict) > 0:
++            some_neighbor = next(iter(self._pos_dict))
++            return (self.pos_from(some_neighbor)).dt(frame)
++
++        # No velocity information available.
++        raise ValueError('Velocity of point ' + self.name + ' has not been'
++                         ' defined in ReferenceFrame ' + frame.name)
+ 
+     def partial_velocity(self, frame, *gen_speeds):
+         """Returns the partial velocities of the linear velocity vector of this

@@ -1,0 +1,29 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index bd34333c0..c4cddc48f 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -257,9 +257,13 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
+                 best_params = self._get_parameters()
+                 best_n_iter = n_iter
+ 
+-        # Always do a final e-step to guarantee that the labels returned by
+-        # fit_predict(X) are always consistent with fit(X).predict(X)
+-        # for any value of max_iter and tol (and any random_state).
++        # Ensure the estimator parameters correspond to the best found
++        # initialization before performing the final E-step. The final
++        # E-step must be done with the parameters that will be stored on
++        # the estimator so that fit_predict(X) returns labels consistent
++        # with fit(X).predict(X) for any value of max_iter and tol (and
++        # any random_state).
++        self._set_parameters(best_params)
+         _, log_resp = self._e_step(X)
+ 
+         if not self.converged_:
+@@ -269,7 +273,6 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
+                           'or check for degenerate data.'
+                           % (init + 1), ConvergenceWarning)
+ 
+-        self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+         self.lower_bound_ = max_lower_bound
+ 

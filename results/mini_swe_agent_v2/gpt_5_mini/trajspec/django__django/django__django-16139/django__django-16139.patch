@@ -1,0 +1,28 @@
+diff --git a/django/contrib/auth/forms.py b/django/contrib/auth/forms.py
+index b3cfc6723c..2b64225419 100644
+--- a/django/contrib/auth/forms.py
++++ b/django/contrib/auth/forms.py
+@@ -163,7 +163,22 @@ class UserChangeForm(forms.ModelForm):
+         super().__init__(*args, **kwargs)
+         password = self.fields.get("password")
+         if password:
+-            password.help_text = password.help_text.format("../password/")
++            try:
++                obj_pk = getattr(self.instance, "pk", None)
++            except Exception:
++                obj_pk = None
++
++            if obj_pk is not None:
++                # Build a link that targets the object's primary key so the
++                # admin password-change URL is correct even when the current
++                # path contains a non-PK segment (e.g. when _to_field is used).
++                password_link = "../../{}/password/".format(obj_pk)
++            else:
++                # Fall back to the previous behavior when there is no instance
++                # PK available.
++                password_link = "../password/"
++
++            password.help_text = password.help_text.format(password_link)
+         user_permissions = self.fields.get("user_permissions")
+         if user_permissions:
+             user_permissions.queryset = user_permissions.queryset.select_related(

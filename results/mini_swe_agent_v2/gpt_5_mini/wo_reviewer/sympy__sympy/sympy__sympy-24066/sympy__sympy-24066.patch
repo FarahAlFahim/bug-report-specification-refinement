@@ -1,0 +1,39 @@
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index 3daf84c108..9e52d92344 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -190,10 +190,30 @@ def _collect_factor_and_dimension(self, expr):
+                 dim /= idim**count
+             return factor, dim
+         elif isinstance(expr, Function):
+-            fds = [self._collect_factor_and_dimension(
+-                arg) for arg in expr.args]
+-            return (expr.func(*(f[0] for f in fds)),
+-                    *(d[1] for d in fds))
++            # Collect (factor, dimension) for each argument
++            fds = [self._collect_factor_and_dimension(arg) for arg in expr.args]
++            # factors are the numeric/scale parts of the arguments
++            factors = [f[0] for f in fds]
++            # arg_dims are Dimension instances for each argument
++            arg_dims = [d[1] for d in fds]
++
++            # The factor for the function is the function applied to the
++            # argument factors (e.g. exp(2) if args evaluate to 2)
++            factor = expr.func(*factors)
++
++            # The resulting Dimension follows DimensionSystem semantics:
++            # if all argument dimensions are dimensionless then the
++            # function result is dimensionless (Dimension(1)). Otherwise
++            # build a Dimension whose name is the function applied to the
++            # argument dimension names (mirroring get_dimensional_expr).
++            if all(self.get_dimension_system().is_dimensionless(d) for d in arg_dims):
++                dim = Dimension(1)
++            else:
++                # Use the underlying names of the Dimension objects to
++                # build the composed dimensional-expression.
++                dim = Dimension(expr.func(*[d.name for d in arg_dims]))
++
++            return factor, dim
+         elif isinstance(expr, Dimension):
+             return S.One, expr
+         else:

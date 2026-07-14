@@ -1,0 +1,62 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index 721709f..efcddbf 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -85,6 +85,15 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self.verbose = verbose
+         self.verbose_interval = verbose_interval
+ 
++    @property
++    def n_clusters(self):
++        """Alias for n_components for clusterer-compatible interface."""
++        return self.n_components
++
++    @n_clusters.setter
++    def n_clusters(self, n_clusters):
++        self.n_components = n_clusters
++
+     def _check_initial_parameters(self, X):
+         """Check values of the basic parameters.
+ 
+@@ -240,6 +249,16 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # For compatibility with clustering estimators, store the predicted
++        # labels for the training data on the fitted estimator as `labels_`.
++        # Try to use predict (which performs checks); if that fails, fall back
++        # to computing responsibilities directly.
++        try:
++            self.labels_ = self.predict(X)
++        except Exception:
++            _, log_resp = self._estimate_log_prob_resp(X)
++            self.labels_ = np.exp(log_resp).argmax(axis=1)
++
+         return self
+ 
+     def _e_step(self, X):
+@@ -360,6 +379,18 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         _, log_resp = self._estimate_log_prob_resp(X)
+         return np.exp(log_resp)
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the model and return the labels for X (clusterer-compatible).
++
++        This provides a clusterer-like interface so that mixture models can
++        be used interchangeably with other clustering estimators.
++        """
++        self.fit(X, y)
++        # fit should set labels_; if not, compute them from the fitted model
++        if hasattr(self, 'labels_'):
++            return self.labels_
++        return self.predict(X)
++
+     def sample(self, n_samples=1):
+         """Generate random samples from the fitted Gaussian distribution.
+ 
+@@ -500,4 +531,4 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+             print("Initialization converged: %s" % self.converged_)
+         elif self.verbose >= 2:
+             print("Initialization converged: %s\t time lapse %.5fs\t ll %.5f" %
+-                  (self.converged_, time() - self._init_prev_time, ll))
++                  (self.converged_, time() - self._init_prev_time, ll))

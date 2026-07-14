@@ -1,0 +1,28 @@
+diff --git a/xarray/core/variable.py b/xarray/core/variable.py
+index 64c1895d..123cb98f 100644
+--- a/xarray/core/variable.py
++++ b/xarray/core/variable.py
+@@ -217,6 +217,23 @@ def as_compatible_data(data, fastpath=False):
+     if isinstance(data, timedelta):
+         data = np.timedelta64(getattr(data, "value", data), "ns")
+ 
++    # If the input is an xarray.DataArray, prefer its underlying array
++    # object (Variable._data) rather than accessing .values which may
++    # eagerly convert lazy array types (e.g., dask.array) to numpy.
++    # Import locally to avoid circular imports at module import time.
++    try:
++        from .dataarray import DataArray
++
++        if isinstance(data, DataArray):
++            # use the DataArray's Variable._data to preserve duck array
++            # types (dask, cupy, etc.) instead of forcing evaluation via
++            # DataArray.values -> Variable.values -> np.asarray
++            data = data.variable._data
++    except Exception:
++        # If import fails for any reason, fall back to the generic
++        # behavior below.
++        pass
++
+     # we don't want nested self-described arrays
+     data = getattr(data, "values", data)
+ 

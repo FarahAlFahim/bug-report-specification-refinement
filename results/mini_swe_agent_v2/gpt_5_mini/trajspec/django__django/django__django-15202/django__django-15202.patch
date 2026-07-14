@@ -1,0 +1,45 @@
+diff --git a/django/core/validators.py b/django/core/validators.py
+index 72fbe15551..809c967ebd 100644
+--- a/django/core/validators.py
++++ b/django/core/validators.py
+@@ -126,8 +126,18 @@ class URLValidator(RegexValidator):
+             else:
+                 raise
+         else:
+-            # Now verify IPv6 in the netloc part
+-            host_match = re.search(r'^\[(.+)\](?::\d{1,5})?$', urlsplit(value).netloc)
++            # Now verify IPv6 in the netloc part. Parse the URL once and reuse
++            # the SplitResult to avoid multiple urlsplit() calls which may
++            # raise ValueError (for example, "Invalid IPv6 URL"). Any
++            # ValueError raised by urlsplit() represents a malformed input and
++            # should be converted to ValidationError to preserve the validator
++            # API contract.
++            try:
++                split_result = urlsplit(value)
++            except ValueError:
++                raise ValidationError(self.message, code=self.code, params={'value': value})
++
++            host_match = re.search(r'^\[(.+)\](?::\d{1,5})?$', split_result.netloc)
+             if host_match:
+                 potential_ip = host_match[1]
+                 try:
+@@ -135,12 +145,13 @@ class URLValidator(RegexValidator):
+                 except ValidationError:
+                     raise ValidationError(self.message, code=self.code, params={'value': value})
+ 
+-        # The maximum length of a full host name is 253 characters per RFC 1034
+-        # section 3.1. It's defined to be 255 bytes or less, but this includes
+-        # one byte for the length of the name and one byte for the trailing dot
+-        # that's used to indicate absolute names in DNS.
+-        if len(urlsplit(value).hostname) > 253:
+-            raise ValidationError(self.message, code=self.code, params={'value': value})
++            # The maximum length of a full host name is 253 characters per RFC 1034
++            # section 3.1. It's defined to be 255 bytes or less, but this includes
++            # one byte for the length of the name and one byte for the trailing dot
++            # that's used to indicate absolute names in DNS.
++            hostname = split_result.hostname
++            if hostname and len(hostname) > 253:
++                raise ValidationError(self.message, code=self.code, params={'value': value})
+ 
+ 
+ integer_validator = RegexValidator(

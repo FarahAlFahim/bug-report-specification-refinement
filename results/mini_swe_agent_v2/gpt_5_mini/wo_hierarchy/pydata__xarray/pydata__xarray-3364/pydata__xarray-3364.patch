@@ -1,0 +1,113 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..1e9549a7 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -1,4 +1,5 @@
+ import pandas as pd
++import numpy as np
+ 
+ from . import dtypes, utils
+ from .alignment import align
+@@ -311,16 +312,46 @@ def _dataset_concat(
+     if variables_to_merge:
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
++        # For variables to merge, synthesize placeholder Variables for
++        # datasets that do not contain the variable so that merge can take
++        # the union of variables and fill missing values with NA.
++        for var in variables_to_merge:
++            # find a sample variable to determine dims/dtype/attrs
++            sample = None
++            for ds in datasets:
++                if var in ds.variables:
++                    sample = ds.variables[var]
++                    break
++            if sample is None:
++                # shouldn't happen because variables_to_merge derived from
++                # datasets[0], but guard anyway
++                raise ValueError("variable %r not found in any dataset" % var)
++
++            to_merge[var] = []
++            for ds in datasets:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # create placeholder matching sample dims and dtype
++                    if fill_value is dtypes.NA:
++                        dtype, fv = dtypes.maybe_promote(sample.dtype)
++                    else:
++                        dtype = dtypes.result_type(sample.dtype, np.asarray(fill_value))
++                        fv = fill_value
++
++                    shape = tuple(dims_sizes.get(d, 1) for d in sample.dims)
++                    data = np.full(shape, fv, dtype=dtype)
+ 
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++                    # preserve attrs/encoding to avoid spurious compat errors
++                    attrs = dict(sample.attrs)
++                    encoding = dict(sample.encoding)
++
++                    if isinstance(sample, IndexVariable):
++                        placeholder = IndexVariable(sample.dims, data, attrs, encoding)
++                    else:
++                        placeholder = Variable(sample.dims, data, attrs, encoding)
++
++                    to_merge[var].append(placeholder)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(
+@@ -358,10 +389,42 @@ def _dataset_concat(
+     # n.b. this loop preserves variable order, needed for groupby.
+     for k in datasets[0].variables:
+         if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
++            # build per-dataset variable list, synthesizing placeholders
++            # for datasets missing this variable
++            # find a sample variable for dtype/dims
++            sample = None
++            for ds in datasets:
++                if k in ds.variables:
++                    sample = ds.variables[k]
++                    break
++            if sample is None:
++                # should not happen
++                raise ValueError("%r is not present in any datasets." % k)
++
++            vars_list = []
++            for ds in datasets:
++                if k in ds.variables:
++                    vars_list.append(ds.variables[k])
++                else:
++                    if fill_value is dtypes.NA:
++                        dtype, fv = dtypes.maybe_promote(sample.dtype)
++                    else:
++                        dtype = dtypes.result_type(sample.dtype, np.asarray(fill_value))
++                        fv = fill_value
++
++                    # create 1-length data along concat dim; ensure_common_dims
++                    # will expand shapes appropriately using concat_dim_lengths
++                    shape = tuple(dims_sizes.get(d, 1) for d in sample.dims)
++                    data = np.full(shape, fv, dtype=dtype)
++                    attrs = dict(sample.attrs)
++                    encoding = dict(sample.encoding)
++                    if isinstance(sample, IndexVariable):
++                        placeholder = IndexVariable(sample.dims, data, attrs, encoding)
++                    else:
++                        placeholder = Variable(sample.dims, data, attrs, encoding)
++                    vars_list.append(placeholder)
++
++            vars = ensure_common_dims(vars_list)
+             combined = concat_vars(vars, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined

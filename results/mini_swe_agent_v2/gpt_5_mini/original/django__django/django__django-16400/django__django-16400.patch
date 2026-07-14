@@ -1,0 +1,18 @@
+diff --git a/django/contrib/auth/management/__init__.py b/django/contrib/auth/management/__init__.py
+index 0b5a982617..87f6f09ce7 100644
+--- a/django/contrib/auth/management/__init__.py
++++ b/django/contrib/auth/management/__init__.py
+@@ -102,8 +102,12 @@ def create_permissions(
+     ]
+     Permission.objects.using(using).bulk_create(perms)
+     if verbosity >= 2:
++        # Avoid converting the Permission instance to string here as that
++        # can access the global app registry (ContentType.model_class())
++        # which may trigger database lookups through routers. Use the
++        # codename which is safe and does not require model loading.
+         for perm in perms:
+-            print("Adding permission '%s'" % perm)
++            print("Adding permission '%s'" % perm.codename)
+ 
+ 
+ def get_system_username():

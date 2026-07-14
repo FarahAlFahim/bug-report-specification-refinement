@@ -1,0 +1,45 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index 5ac2407ea3..07d00c6c60 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -812,8 +812,14 @@ class QuerySet(AltersData):
+                 connection = connections[self.db]
+                 if (
+                     connection.features.can_return_rows_from_bulk_insert
+-                    and on_conflict is None
++                    and on_conflict != OnConflict.IGNORE
+                 ):
++                    # When the backend supports returning rows from a bulk
++                    # insert, and the on_conflict mode isn't IGNORE, we
++                    # expect a returned row for each input value so that we
++                    # can populate primary keys / returning fields. Treat
++                    # INSERT ... ON CONFLICT DO UPDATE ... RETURNING as
++                    # producing a 1:1 mapping.
+                     assert len(returned_columns) == len(objs_without_pk)
+                 for obj_without_pk, results in zip(objs_without_pk, returned_columns):
+                     for result, field in zip(results, opts.db_returning_fields):
+@@ -1837,13 +1843,23 @@ class QuerySet(AltersData):
+         inserted_rows = []
+         bulk_return = connection.features.can_return_rows_from_bulk_insert
+         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
+-            if bulk_return and on_conflict is None:
++            # If the backend can return rows for bulk inserts, and the
++            # on_conflict mode isn't IGNORE, request returning fields so that
++            # database backends that support INSERT ... ON CONFLICT ... RETURNING
++            # (e.g. PostgreSQL) can populate returned rows (primary keys and
++            # other returning fields). Note that _insert accepts both
++            # returning_fields and on_conflict/update_fields/unique_fields, so
++            # pass them through together.
++            if bulk_return and on_conflict != OnConflict.IGNORE:
+                 inserted_rows.extend(
+                     self._insert(
+                         item,
+                         fields=fields,
+                         using=self.db,
+                         returning_fields=self.model._meta.db_returning_fields,
++                        on_conflict=on_conflict,
++                        update_fields=update_fields,
++                        unique_fields=unique_fields,
+                     )
+                 )
+             else:

@@ -1,0 +1,44 @@
+diff --git a/sympy/parsing/latex/_parse_latex_antlr.py b/sympy/parsing/latex/_parse_latex_antlr.py
+index 2e4a45ad20..6a255689f0 100644
+--- a/sympy/parsing/latex/_parse_latex_antlr.py
++++ b/sympy/parsing/latex/_parse_latex_antlr.py
+@@ -125,6 +125,21 @@ def convert_add(add):
+         return convert_mp(add.mp())
+ 
+ 
++
++def _invert_expr(expr):
++    """Return the inverse of expr but unwrap double reciprocals.
++    If expr is a Pow(base, -1) then return base (invert of reciprocal).
++    Otherwise return Pow(expr, -1, evaluate=False).
++    """
++    try:
++        # for sympy Pow, args are (base, exponent)
++        if isinstance(expr, sympy.Pow) and len(expr.args) == 2 and expr.args[1] == -1:
++            return expr.args[0]
++    except Exception:
++        pass
++    return sympy.Pow(expr, -1, evaluate=False)
++
++
+ def convert_mp(mp):
+     if hasattr(mp, 'mp'):
+         mp_left = mp.mp(0)
+@@ -140,7 +155,7 @@ def convert_mp(mp):
+     elif mp.DIV() or mp.CMD_DIV() or mp.COLON():
+         lh = convert_mp(mp_left)
+         rh = convert_mp(mp_right)
+-        return sympy.Mul(lh, sympy.Pow(rh, -1, evaluate=False), evaluate=False)
++        return sympy.Mul(lh, _invert_expr(rh), evaluate=False)
+     else:
+         if hasattr(mp, 'unary'):
+             return convert_unary(mp.unary())
+@@ -382,7 +397,7 @@ def convert_frac(frac):
+ 
+     expr_top = convert_expr(frac.upper)
+     expr_bot = convert_expr(frac.lower)
+-    inverse_denom = sympy.Pow(expr_bot, -1, evaluate=False)
++    inverse_denom = _invert_expr(expr_bot)
+     if expr_top == 1:
+         return inverse_denom
+     else:

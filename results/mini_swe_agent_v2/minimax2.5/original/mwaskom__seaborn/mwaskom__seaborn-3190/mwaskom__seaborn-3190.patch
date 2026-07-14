@@ -1,0 +1,15 @@
+diff --git a/seaborn/_core/scales.py b/seaborn/_core/scales.py
+index 6c9ecbc9..ef410e3d 100644
+--- a/seaborn/_core/scales.py
++++ b/seaborn/_core/scales.py
+@@ -323,6 +323,10 @@ class ContinuousBase(Scale):
+         self, data: Series, prop: Property, axis: Axis | None = None,
+     ) -> Scale:
+ 
++        # Handle boolean data by converting to float to enable arithmetic operations
++        if data.dtype == 'bool':
++            data = data.astype(float)
++
+         new = copy(self)
+         if new._tick_params is None:
+             new = new.tick()

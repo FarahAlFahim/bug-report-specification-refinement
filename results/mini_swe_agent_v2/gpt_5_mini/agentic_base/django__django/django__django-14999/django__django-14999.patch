@@ -1,0 +1,30 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index 982816be3a..e3d32a224d 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -319,6 +319,25 @@ class RenameModel(ModelOperation):
+     def database_forwards(self, app_label, schema_editor, from_state, to_state):
+         new_model = to_state.apps.get_model(app_label, self.new_name)
+         if self.allow_migrate_model(schema_editor.connection.alias, new_model):
++            # If either the from_state or to_state has an explicit db_table
++            # set for the renamed model, the table name is independent of the
++            # model name and the RenameModel operation should be a noop at
++            # the database level. Check the migration states' ModelState
++            # options for an explicit 'db_table' key and skip schema editor
++            # operations if present.
++            old_key = (app_label, self.old_name_lower)
++            new_key = (app_label, self.new_name_lower)
++            old_state_has_db_table = (
++                old_key in from_state.models and
++                'db_table' in from_state.models[old_key].options
++            )
++            new_state_has_db_table = (
++                new_key in to_state.models and
++                'db_table' in to_state.models[new_key].options
++            )
++            if old_state_has_db_table or new_state_has_db_table:
++                # No DB-level changes required when db_table is explicit.
++                return
+             old_model = from_state.apps.get_model(app_label, self.old_name)
+             # Move the main table
+             schema_editor.alter_db_table(

@@ -1,0 +1,19 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..ed9d9710a0 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -181,6 +181,14 @@ def _print_Infinity(self, expr):
+     def _print_NegativeInfinity(self, expr):
+         return '-HUGE_VAL'
+ 
++    def _print_sinc(self, expr):
++        # Represent sinc(x) as sin(x)/x in C.
++        # Use self._print on the argument to allow correct printing of
++        # complex subexpressions and to respect user overrides.
++        a = expr.args[0]
++        pa = self._print(a)
++        return "(sin(%s)/(%s))" % (pa, pa)
++
+     def _print_Piecewise(self, expr):
+         if expr.args[-1].cond != True:
+             # We need the last conditional to be a True, otherwise the resulting

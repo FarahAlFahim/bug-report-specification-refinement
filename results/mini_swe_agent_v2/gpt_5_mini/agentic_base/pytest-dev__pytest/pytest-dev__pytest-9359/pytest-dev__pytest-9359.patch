@@ -1,0 +1,24 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 456681ab2..e7c9be5c2 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -600,7 +600,18 @@ def _get_assertion_exprs(src: bytes) -> Dict[int, str]:
+                 else:
+                     lines.append(line[:offset])
+                 _write_and_reset()
+-            elif tp in {tokenize.NEWLINE, tokenize.ENDMARKER}:
++            # On some Python versions the tokenizer emits tokenize.NL for
++            # physical newlines (for example the blank line before a
++            # decorator). We must treat NL as a terminator of the
++            # assertion expression only when we are not nested inside
++            # parentheses/brackets/braces (i.e. depth == 0).  This keeps
++            # subsequent unrelated physical lines (like a following
++            # decorator) from being collected as part of the assertion
++            # expression. See issue describing differing tokenizer
++            # semantics between Python versions.
++            elif tp in {tokenize.NEWLINE, tokenize.ENDMARKER} or (
++                tp == tokenize.NL and depth == 0
++            ):
+                 _write_and_reset()
+             elif lines and lineno not in seen_lines:
+                 lines.append(line)

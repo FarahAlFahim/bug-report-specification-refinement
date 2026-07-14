@@ -1,0 +1,46 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..7072bb20 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -21,15 +21,35 @@ class PolyFit(Stat):
+ 
+     def _fit_predict(self, data):
+ 
++        # Filter to rows where both x and y are present.  Numpy's polynomial
++        # fitting routines do not accept NaN/None values and can raise
++        # LinAlgError (SVD did not converge) or ValueError when given
++        # degenerate or missing data.  Operate on the filtered pairs to
++        # decide whether a fit is possible and to perform the fit.
+         x = data["x"]
+         y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
+-            xx = yy = []
++
++        valid = x.notna() & y.notna()
++        x_valid = x[valid].astype(float)
++        y_valid = y[valid].astype(float)
++
++        # Need at least (order + 1) distinct x values to fit a polynomial of
++        # degree `order`.  Check uniqueness on the filtered x values.
++        if x_valid.nunique() <= self.order:
++            # Return empty numeric arrays so downstream code can infer
++            # numeric dtypes and handle empty results gracefully.
++            xx = np.array([], dtype=float)
++            yy = np.array([], dtype=float)
+         else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++            try:
++                p = np.polyfit(x_valid.values, y_valid.values, self.order)
++                xx = np.linspace(x_valid.min(), x_valid.max(), self.gridsize)
++                yy = np.polyval(p, xx)
++            except (np.linalg.LinAlgError, ValueError):
++                # If fitting fails for numerical reasons, return empty
++                # numeric arrays rather than propagating the exception.
++                xx = np.array([], dtype=float)
++                yy = np.array([], dtype=float)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 

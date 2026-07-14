@@ -1,0 +1,24 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0ddba33..20a112b 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,9 +825,17 @@ class PrettyPrinter(Printer):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Avoid sympifying arbitrary sub-objects (e.g. string names from
++                # MatrixSymbol). If the addend is a MatMul, its leading factor
++                # may be a scalar whose is_negative attribute we can check.
++                from sympy import MatMul
++                neg = False
++                if isinstance(item, MatMul) and item.args:
++                    first = item.args[0]
++                    # many Expr/Number classes expose is_negative; default to False
++                    neg = getattr(first, 'is_negative', False)
++                if neg:
+                     s = prettyForm(*stringPict.next(s, ' '))
+-                    pform = self._print(item)
+                 else:
+                     s = prettyForm(*stringPict.next(s, ' + '))
+                 s = prettyForm(*stringPict.next(s, pform))

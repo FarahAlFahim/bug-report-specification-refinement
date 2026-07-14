@@ -1,0 +1,51 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..c2971b5804 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -508,6 +508,21 @@ class Colorbar:
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
++            # If the new norm is not yet scaled (vmin/vmax unset), try to
++            # initialize it from the mappable's data so that non-linear norms
++            # (e.g. LogNorm) get valid vmin/vmax before we draw. Use
++            # autoscale_None to preserve any user-set limits. Wrap in
++            # try/except to be defensive against possible TypeError.
++            if (not mappable.norm.scaled()
++                    and getattr(mappable, "get_array", None) is not None
++                    and mappable.get_array() is not None):
++                try:
++                    mappable.autoscale_None()
++                except TypeError:
++                    # Be conservative: if autoscale_None cannot run, fall back
++                    # to leaving the norm uninitialized and let subsequent
++                    # logic handle it.
++                    pass
+             self.norm = mappable.norm
+             self._reset_locator_formatter_scale()
+ 
+@@ -1101,9 +1116,24 @@ class Colorbar:
+             b = np.hstack((b, b[-1] + 1))
+ 
+         # transform from 0-1 to vmin-vmax:
++        if not self.norm.scaled():
++            # Try to initialize the norm from the mappable's data if possible.
++            # This avoids forcing invalid vmin/vmax (e.g. vmin==0 for LogNorm).
++            mappable = getattr(self, "mappable", None)
++            if (mappable is not None and getattr(mappable, "get_array", None) is not None
++                    and mappable.get_array() is not None):
++                try:
++                    mappable.autoscale_None()
++                except TypeError:
++                    # Be conservative: if autoscale_None cannot run, we will
++                    # fall back to the 0..1 default below.
++                    pass
++        # If after attempting to autoscale the norm is still not scaled,
++        # fall back to 0..1 as before.
+         if not self.norm.scaled():
+             self.norm.vmin = 0
+             self.norm.vmax = 1
++
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

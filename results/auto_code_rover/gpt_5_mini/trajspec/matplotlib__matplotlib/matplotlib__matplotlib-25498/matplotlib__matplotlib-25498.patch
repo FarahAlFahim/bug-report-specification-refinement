@@ -1,0 +1,25 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..e76b2135cd 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -507,6 +507,20 @@ class Colorbar:
+         self.mappable = mappable
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap
++
++        # Ensure the given mappable's norm has appropriate vmin and vmax set
++        # from the mappable's data before adopting a new norm. This mirrors the
++        # initialization done in __init__, and prevents uninitialized Norm
++        # subclasses (e.g., LogNorm) from later causing errors when the
++        # colorbar fabricates a 0..1 fallback.
++        if getattr(mappable, "get_array", None) is not None and mappable.get_array() is not None:
++            # ScalarMappable.autoscale_None will call norm.autoscale_None(self._A)
++            # when an array exists; it's safe to call and will no-op if there's
++            # nothing to do.
++            autoscale = getattr(mappable, "autoscale_None", None)
++            if callable(autoscale):
++                autoscale()
++
+         if mappable.norm != self.norm:
+             self.norm = mappable.norm
+             self._reset_locator_formatter_scale()

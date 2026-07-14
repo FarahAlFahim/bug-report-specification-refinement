@@ -1,0 +1,47 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..3d50e9e32a 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -475,6 +475,17 @@ def trigsimp(expr, **opts):
+ 
+     expr = sympify(expr)
+ 
++    # First try to convert pure-exponential forms to trig/hyperbolic
++    # representations.  This ensures inputs like
++    #   (-I*exp(I*k) + I*exp(-I*k))/2
++    # are converted to sin(k) before further trig simplification.
++    try:
++        expr = exptrigsimp(expr)
++    except Exception:
++        # Be conservative: if exptrigsimp fails for some custom object,
++        # fall back to the original expression.
++        expr = expr
++
+     try:
+         return expr._eval_trigsimp(**opts)
+     except AttributeError:
+@@ -533,11 +544,21 @@ def exptrigsimp(expr):
+ 
+     def exp_trig(e):
+         # select the better of e, and e rewritten in terms of exp or trig
+-        # functions
++        # functions.  Consider both rewrites (to/from exp/trig) so that
++        # pure-exponential inputs can be converted to trigonometric
++        # representations when that yields a simpler form.
+         choices = [e]
+-        if e.has(*_trigs):
++        # always consider rewriting to exponentials and to trig forms;
++        # the minimal expression (by operation count) will be chosen.
++        try:
+             choices.append(e.rewrite(exp))
+-        choices.append(e.rewrite(cos))
++        except Exception:
++            # Some expressions may not support rewrite to exp; ignore
++            pass
++        try:
++            choices.append(e.rewrite(cos))
++        except Exception:
++            pass
+         return min(*choices, key=count_ops)
+     newexpr = bottom_up(expr, exp_trig)
+ 

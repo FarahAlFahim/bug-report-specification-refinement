@@ -1,0 +1,18 @@
+diff --git a/django/utils/numberformat.py b/django/utils/numberformat.py
+index 488d6a77cd..15b8b1f1a7 100644
+--- a/django/utils/numberformat.py
++++ b/django/utils/numberformat.py
+@@ -68,6 +68,13 @@ def format(
+             str_number = "{:f}".format(number)
+     else:
+         str_number = str(number)
++    # Handle empty-string inputs gracefully. Converting certain values
++    # (for example, '') to str yields an empty string which would cause
++    # an IndexError when the code later inspects str_number[0] to detect
++    # a leading sign. Return an empty (safe) string in this case so
++    # callers aren't exposed to an unhandled exception.
++    if not str_number:
++        return mark_safe(str_number)
+     if str_number[0] == "-":
+         sign = "-"
+         str_number = str_number[1:]

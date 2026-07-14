@@ -1,0 +1,18 @@
+diff --git a/lib/mpl_toolkits/mplot3d/axes3d.py b/lib/mpl_toolkits/mplot3d/axes3d.py
+index 9db44b7994..8c89b28e0c 100644
+--- a/lib/mpl_toolkits/mplot3d/axes3d.py
++++ b/lib/mpl_toolkits/mplot3d/axes3d.py
+@@ -387,6 +387,13 @@ class Axes3D(Axes):
+ 
+     @martist.allow_rasterization
+     def draw(self, renderer):
++        # Honor Axes visibility like other Artists: if the Axes is not
++        # visible, nothing should be drawn.  Historically Axes3D did not
++        # respect Artist.set_visible which meant calling ``ax.set_visible(False)``
++        # had no effect.  Check visibility here and skip drawing when False.
++        if not self.get_visible():
++            return
++
+         self._unstale_viewLim()
+ 
+         # draw the background patch

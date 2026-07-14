@@ -1,0 +1,31 @@
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..118ce8b5d 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -363,7 +363,25 @@ def doit(self, **kwargs):
+             args = [arg.doit(**kwargs) for arg in self.args]
+         else:
+             args = self.args
+-        return args[0][args[1], args[2]]
++        parent, i, j = args[0], args[1], args[2]
++
++        # Special-case Identity parents: when indices are symbolic and
++        # their equality is undecidable we must return a symbolic
++        # KroneckerDelta rather than eagerly returning 0. This allows
++        # summation machinery to properly evaluate sums over identity
++        # entries.
++        from sympy import KroneckerDelta
++        # Use the is_Identity flag if available (Identity class sets this),
++        # otherwise fall back to isinstance check when MatrixBase is used.
++        if getattr(parent, 'is_Identity', False):
++            eq = (i == j)
++            if eq is True:
++                return S.One
++            if eq is False:
++                return S.Zero
++            return KroneckerDelta(i, j)
++
++        return parent[i, j]
+ 
+     def _eval_derivative(self, v):
+         if not isinstance(v, MatrixElement):

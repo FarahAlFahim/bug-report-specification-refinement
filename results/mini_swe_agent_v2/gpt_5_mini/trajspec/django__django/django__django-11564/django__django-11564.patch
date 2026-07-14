@@ -1,0 +1,252 @@
+diff --git a/django/conf/urls/static.py b/django/conf/urls/static.py
+index fa83645b9d..0b17c21254 100644
+--- a/django/conf/urls/static.py
++++ b/django/conf/urls/static.py
+@@ -5,6 +5,7 @@ from django.conf import settings
+ from django.core.exceptions import ImproperlyConfigured
+ from django.urls import re_path
+ from django.views.static import serve
++from django.urls import get_script_prefix
+ 
+ 
+ def static(prefix, view=serve, **kwargs):
+@@ -20,9 +21,17 @@ def static(prefix, view=serve, **kwargs):
+     """
+     if not prefix:
+         raise ImproperlyConfigured("Empty static prefix not permitted")
++    # Compute effective prefix including runtime script prefix for
++    # site-root paths (e.g. "/static/").
++    effective_prefix = prefix
++    if effective_prefix and effective_prefix.startswith('/') and not effective_prefix.startswith('//'):
++        sp = get_script_prefix()
++        if not effective_prefix.startswith(sp):
++            effective_prefix = sp.rstrip('/') + effective_prefix
++
+     elif not settings.DEBUG or urlsplit(prefix).netloc:
+         # No-op if not in debug mode or a non-local prefix.
+         return []
+     return [
+-        re_path(r'^%s(?P<path>.*)$' % re.escape(prefix.lstrip('/')), view, kwargs=kwargs),
++        re_path(r'^%s(?P<path>.*)$' % re.escape(effective_prefix.lstrip('/')), view, kwargs=kwargs),
+     ]
+diff --git a/django/contrib/staticfiles/handlers.py b/django/contrib/staticfiles/handlers.py
+index 711d8864ad..03744c9d41 100644
+--- a/django/contrib/staticfiles/handlers.py
++++ b/django/contrib/staticfiles/handlers.py
+@@ -3,6 +3,7 @@ from urllib.request import url2pathname
+ 
+ from django.conf import settings
+ from django.contrib.staticfiles import utils
++from django.urls import get_script_prefix
+ from django.contrib.staticfiles.views import serve
+ from django.core.handlers.asgi import ASGIHandler
+ from django.core.handlers.exception import response_for_exception
+@@ -25,7 +26,17 @@ class StaticFilesHandlerMixin:
+ 
+     def get_base_url(self):
+         utils.check_settings()
+-        return settings.STATIC_URL
++        base = settings.STATIC_URL
++        if not base:
++            return base
++        if base.startswith('//'):
++            return base
++        if base.startswith('/'):
++            prefix = get_script_prefix()
++            if base.startswith(prefix):
++                return base
++            return prefix.rstrip('/') + base
++        return base
+ 
+     def _should_handle(self, path):
+         """
+@@ -33,13 +44,15 @@ class StaticFilesHandlerMixin:
+         * the host is provided as part of the base_url
+         * the request's path isn't under the media path (or equal)
+         """
+-        return path.startswith(self.base_url[2]) and not self.base_url[1]
++        parsed = urlparse(self.get_base_url())
++        return path.startswith(parsed.path) and not parsed.netloc
+ 
+     def file_path(self, url):
+         """
+         Return the relative path to the media file on disk for the given URL.
+         """
+-        relative_url = url[len(self.base_url[2]):]
++        parsed = urlparse(self.get_base_url())
++        relative_url = url[len(parsed.path):]
+         return url2pathname(relative_url)
+ 
+     def serve(self, request):
+@@ -60,7 +73,6 @@ class StaticFilesHandler(StaticFilesHandlerMixin, WSGIHandler):
+     """
+     def __init__(self, application):
+         self.application = application
+-        self.base_url = urlparse(self.get_base_url())
+         super().__init__()
+ 
+     def __call__(self, environ, start_response):
+@@ -76,7 +88,6 @@ class ASGIStaticFilesHandler(StaticFilesHandlerMixin, ASGIHandler):
+     """
+     def __init__(self, application):
+         self.application = application
+-        self.base_url = urlparse(self.get_base_url())
+ 
+     async def __call__(self, scope, receive, send):
+         # Only even look at HTTP requests
+diff --git a/django/contrib/staticfiles/storage.py b/django/contrib/staticfiles/storage.py
+index ba3b62620d..28f7770b96 100644
+--- a/django/contrib/staticfiles/storage.py
++++ b/django/contrib/staticfiles/storage.py
+@@ -24,7 +24,8 @@ class StaticFilesStorage(FileSystemStorage):
+         if location is None:
+             location = settings.STATIC_ROOT
+         if base_url is None:
+-            base_url = settings.STATIC_URL
++            # Defer to FileSystemStorage.base_url which computes the effective URL at access time.
++            base_url = None
+         check_settings(base_url)
+         super().__init__(location, base_url, *args, **kwargs)
+         # FileSystemStorage fallbacks to MEDIA_ROOT when location
+@@ -169,7 +170,19 @@ class HashedFilesMixin:
+ 
+             # Ignore absolute URLs that don't point to a static file (dynamic
+             # CSS / JS?). Note that STATIC_URL cannot be empty.
+-            if url.startswith('/') and not url.startswith(settings.STATIC_URL):
++            # Compute effective STATIC_URL including any runtime script prefix.
++            try:
++                from django.urls import get_script_prefix
++            except ImportError:
++                effective_static = settings.STATIC_URL
++            else:
++                effective_static = settings.STATIC_URL
++                if effective_static and effective_static.startswith('/') and not effective_static.startswith('//'):
++                    prefix = get_script_prefix()
++                    if not effective_static.startswith(prefix):
++                        effective_static = prefix.rstrip('/') + effective_static
++
++            if url.startswith('/') and not url.startswith(effective_static):
+                 return matched
+ 
+             # Strip off the fragment so a path-like fragment won't interfere.
+@@ -177,8 +190,8 @@ class HashedFilesMixin:
+ 
+             if url_path.startswith('/'):
+                 # Otherwise the condition above would have returned prematurely.
+-                assert url_path.startswith(settings.STATIC_URL)
+-                target_name = url_path[len(settings.STATIC_URL):]
++                assert url_path.startswith(effective_static)
++                target_name = url_path[len(effective_static):]
+             else:
+                 # We're using the posixpath module to mix paths and URLs conveniently.
+                 source_name = name if os.sep == '/' else name.replace(os.sep, '/')
+diff --git a/django/core/files/storage.py b/django/core/files/storage.py
+index 4c27fce605..b1e7de1cfc 100644
+--- a/django/core/files/storage.py
++++ b/django/core/files/storage.py
+@@ -12,7 +12,8 @@ from django.utils._os import safe_join
+ from django.utils.crypto import get_random_string
+ from django.utils.deconstruct import deconstructible
+ from django.utils.encoding import filepath_to_uri
+-from django.utils.functional import LazyObject, cached_property
++from django.utils.functional import LazyObject
++from django.urls import get_script_prefix
+ from django.utils.module_loading import import_string
+ from django.utils.text import get_valid_filename
+ 
+@@ -213,11 +214,26 @@ class FileSystemStorage(Storage):
+     def location(self):
+         return os.path.abspath(self.base_location)
+ 
+-    @cached_property
+     def base_url(self):
++        # Determine the configured base URL (could be instance override or settings)
+         if self._base_url is not None and not self._base_url.endswith('/'):
+-            self._base_url += '/'
+-        return self._value_or_setting(self._base_url, settings.MEDIA_URL)
++            base = self._base_url + '/'
++        else:
++            base = self._value_or_setting(self._base_url, settings.MEDIA_URL)
++        # Apply runtime script prefix when the configured base is a site-root path
++        # (starts with '/' but not with protocol-relative '//').
++        if not base:
++            return base
++        if base.startswith('//'):
++            return base
++        if base.startswith('/'):
++            prefix = get_script_prefix()
++            # Avoid duplicating the prefix if already present.
++            if base.startswith(prefix):
++                return base
++            # Ensure proper joining of prefix and base path
++            return prefix.rstrip('/') + base
++        return base
+ 
+     @cached_property
+     def file_permissions_mode(self):
+diff --git a/django/template/context_processors.py b/django/template/context_processors.py
+index 0e9efb2f69..73adf53a3b 100644
+--- a/django/template/context_processors.py
++++ b/django/template/context_processors.py
+@@ -11,6 +11,7 @@ import itertools
+ 
+ from django.conf import settings
+ from django.middleware.csrf import get_token
++from django.urls import get_script_prefix
+ from django.utils.functional import SimpleLazyObject, lazy
+ 
+ 
+@@ -67,14 +68,24 @@ def static(request):
+     """
+     Add static-related context variables to the context.
+     """
+-    return {'STATIC_URL': settings.STATIC_URL}
++    prefix = settings.STATIC_URL
++    if prefix and prefix.startswith('/') and not prefix.startswith('//'):
++        sp = get_script_prefix()
++        if not prefix.startswith(sp):
++            prefix = sp.rstrip('/') + prefix
++    return {'STATIC_URL': prefix}
+ 
+ 
+ def media(request):
+     """
+     Add media-related context variables to the context.
+     """
+-    return {'MEDIA_URL': settings.MEDIA_URL}
++    prefix = settings.MEDIA_URL
++    if prefix and prefix.startswith('/') and not prefix.startswith('//'):
++        sp = get_script_prefix()
++        if not prefix.startswith(sp):
++            prefix = sp.rstrip('/') + prefix
++    return {'MEDIA_URL': prefix}
+ 
+ 
+ def request(request):
+diff --git a/django/templatetags/static.py b/django/templatetags/static.py
+index 39712aaba0..d6efdd27b6 100644
+--- a/django/templatetags/static.py
++++ b/django/templatetags/static.py
+@@ -3,6 +3,7 @@ from urllib.parse import quote, urljoin
+ from django import template
+ from django.apps import apps
+ from django.utils.encoding import iri_to_uri
++from django.urls import get_script_prefix
+ from django.utils.html import conditional_escape
+ 
+ register = template.Library()
+@@ -43,7 +44,13 @@ class PrefixNode(template.Node):
+         except ImportError:
+             prefix = ''
+         else:
+-            prefix = iri_to_uri(getattr(settings, name, ''))
++            prefix = getattr(settings, name, '')
++            # Apply runtime script prefix for site-root paths starting with '/'.
++            if prefix and prefix.startswith('/') and not prefix.startswith('//'):
++                sp = get_script_prefix()
++                if not prefix.startswith(sp):
++                    prefix = sp.rstrip('/') + prefix
++            prefix = iri_to_uri(prefix)
+         return prefix
+ 
+     def render(self, context):

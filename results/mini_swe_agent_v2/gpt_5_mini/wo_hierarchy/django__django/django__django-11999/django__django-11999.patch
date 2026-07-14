@@ -1,0 +1,52 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index ee45bb941e..a8cc76ab7a 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -763,8 +763,14 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            setattr(cls, 'get_%s_display' % self.name,
+-                    partialmethod(cls._get_FIELD_display, field=self))
++            # Only install the generated get_<field>_display accessor if the
++            # model (or its parents) don't already define one. Do not
++            # unconditionally overwrite a user-defined method with the
++            # generated accessor.
++            display_name = 'get_%s_display' % self.name
++            if not hasattr(cls, display_name):
++                setattr(cls, display_name,
++                        partialmethod(cls._get_FIELD_display, field=self))
+ 
+     def get_filter_kwargs_for_object(self, obj):
+         """
+@@ -1189,14 +1195,22 @@ class DateField(DateTimeCheckMixin, Field):
+     def contribute_to_class(self, cls, name, **kwargs):
+         super().contribute_to_class(cls, name, **kwargs)
+         if not self.null:
+-            setattr(
+-                cls, 'get_next_by_%s' % self.name,
+-                partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=True)
+-            )
+-            setattr(
+-                cls, 'get_previous_by_%s' % self.name,
+-                partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=False)
+-            )
++            # As with get_<field>_display, do not overwrite user-defined
++            # next/previous accessors on the model class. Only install the
++            # generated accessors when the canonical names are not already
++            # present on the class or its bases.
++            next_name = 'get_next_by_%s' % self.name
++            prev_name = 'get_previous_by_%s' % self.name
++            if not hasattr(cls, next_name):
++                setattr(
++                    cls, next_name,
++                    partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=True)
++                )
++            if not hasattr(cls, prev_name):
++                setattr(
++                    cls, prev_name,
++                    partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=False)
++                )
+ 
+     def get_prep_value(self, value):
+         value = super().get_prep_value(value)

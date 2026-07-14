@@ -1,0 +1,53 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..d1d8456ed 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -219,6 +219,21 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+                             public.append(name)
+         return public, items
+ 
++    def _filter_members(obj: Any, imported: bool) -> List[str]:
++        members = []  # type: List[str]
++        for name in dir(obj):
++            try:
++                value = safe_getattr(obj, name)
++            except AttributeError:
++                continue
++            # keep module/class metadata (dunder names) always
++            if name.startswith('__') and name.endswith('__'):
++                members.append(name)
++            else:
++                if imported or getattr(value, '__module__', None) == getattr(obj, '__name__', None):
++                    members.append(name)
++        return members
++
+     def get_module_attrs(members: Any) -> Tuple[List[str], List[str]]:
+         """Find module attributes with docstrings."""
+         attrs, public = [], []
+@@ -246,7 +261,7 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        ns['members'] = _filter_members(obj, imported_members)
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \
+@@ -259,13 +274,14 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+         if ispackage and recursive:
+             ns['modules'], ns['all_modules'] = get_modules(obj)
+     elif doc.objtype == 'class':
+-        ns['members'] = dir(obj)
++        ns['members'] = _filter_members(obj, imported_members)
+         ns['inherited_members'] = \
+             set(dir(obj)) - set(obj.__dict__.keys())
+         ns['methods'], ns['all_methods'] = \
+-            get_members(obj, {'method'}, ['__init__'])
++            get_members(obj, {'method'}, ['__init__'], imported=imported_members)
+         ns['attributes'], ns['all_attributes'] = \
+-            get_members(obj, {'attribute', 'property'})
++            get_members(obj, {'attribute', 'property'}, imported=imported_members)
++
+ 
+     modname, qualname = split_full_qualified_name(name)
+     if doc.objtype in ('method', 'attribute', 'property'):

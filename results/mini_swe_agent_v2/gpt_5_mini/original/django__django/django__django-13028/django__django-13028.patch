@@ -1,0 +1,39 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index ce18098fd2..596fe4c89f 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1123,12 +1123,33 @@ class Query(BaseExpression):
+                     self.check_query_object_type(v, opts, field)
+ 
+     def check_filterable(self, expression):
+-        """Raise an error if expression cannot be used in a WHERE clause."""
++        """Raise an error if expression cannot be used in a WHERE clause.
++
++        Historically this method checked the presence of a ``filterable``
++        attribute on any object. That caused false positives when a user
++        model instance happened to define an attribute named ``filterable``
++        (for example, a model field named ``filterable``). In that case the
++        ORM raised NotSupportedError while the value was intended to be a
++        plain model/field instance used as a right-hand side in filters.
++
++        Only objects that represent SQL expressions should be considered for
++        the ``filterable`` check. We therefore only honor the attribute for
++        objects that expose ``resolve_expression`` (i.e. are expressions) or
++        expose ``get_source_expressions``. Other objects are ignored.
++        """
++        # Only expression-like objects are relevant for this check. Plain
++        # Python/model instances that happen to have an attribute called
++        # ``filterable`` must not influence SQL WHERE clause validation.
++        if not (hasattr(expression, 'resolve_expression') or
++                hasattr(expression, 'get_source_expressions')):
++            return
++
+         if not getattr(expression, 'filterable', True):
+             raise NotSupportedError(
+                 expression.__class__.__name__ + ' is disallowed in the filter '
+                 'clause.'
+             )
++
+         if hasattr(expression, 'get_source_expressions'):
+             for expr in expression.get_source_expressions():
+                 self.check_filterable(expr)

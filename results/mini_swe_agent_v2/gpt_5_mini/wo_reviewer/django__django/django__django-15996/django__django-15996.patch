@@ -1,0 +1,50 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 38da1e6ecc..a7a366b42a 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -125,11 +125,41 @@ class EnumSerializer(BaseSerializer):
+     def serialize(self):
+         enum_class = self.value.__class__
+         module = enum_class.__module__
+-        return (
+-            "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
+-            {"import %s" % module},
+-        )
+ 
++        # For regular Enums with a name, keep the simple name-based format.
++        if getattr(self.value, "name", None) is not None:
++            return (
++                "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
++                {"import %s" % module},
++            )
++
++        # Handle Flag/IntFlag combined values by decomposing into named
++        # members and joining them with the bitwise OR operator. This
++        # reproduces the original combined value when evaluated.
++        try:
++            is_flag = issubclass(enum_class, enum.Flag)
++        except Exception:
++            is_flag = False
++
++        if is_flag:
++            parts = []
++            for member in enum_class:
++                # Include zero-valued member only when it exactly matches
++                # the value. For non-zero members, include when all bits of
++                # the member are present in the value.
++                member_value = member.value
++                if member_value == 0:
++                    if self.value == member:
++                        parts.append("%s.%s[%r]" % (module, enum_class.__qualname__, member.name))
++                else:
++                    if (self.value & member) == member:
++                        parts.append("%s.%s[%r]" % (module, enum_class.__qualname__, member.name))
++
++            if parts:
++                return (" | ".join(parts), {"import %s" % module})
++
++        # Fallback: emit a literal representation that should round-trip.
++        return (repr(self.value), set())
+ 
+ class FloatSerializer(BaseSimpleSerializer):
+     def serialize(self):

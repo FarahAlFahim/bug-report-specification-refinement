@@ -1,0 +1,82 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index 38da1e6ecc..b72c3b804a 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -125,10 +125,73 @@ class EnumSerializer(BaseSerializer):
+     def serialize(self):
+         enum_class = self.value.__class__
+         module = enum_class.__module__
+-        return (
+-            "%s.%s[%r]" % (module, enum_class.__qualname__, self.value.name),
+-            {"import %s" % module},
+-        )
++        # When the value corresponds to a single named member, use the
++        # existing <module>.<EnumClass>['NAME'] form. Some Flag/IntFlag
++        # combinations don't have a single member name (value.name may be
++        # None). In that case, decompose the value into named members and
++        # construct an expression that ORs them together (e.g.
++        # EnumClass['A'] | EnumClass['B']).
++        name = getattr(self.value, "name", None)
++        if name:
++            # For Flag-like enums, a composed value may have a name like
++            # 'A|B'. Prefer to serialize that as an OR of the individual
++            # members (EnumClass['A'] | EnumClass['B']) instead of using
++            # the combined name directly.
++            if isinstance(self.value, enum.Flag) and "|" in name:
++                parts = name.split("|")
++                imports = {f"import {module}"}
++                members = [
++                    "%s.%s[%r]" % (module, enum_class.__qualname__, part)
++                    for part in parts
++                ]
++                return (" | ".join(members), imports)
++            return (
++                "%s.%s[%r]" % (module, enum_class.__qualname__, name),
++                {"import %s" % module},
++            )
++
++        # Try to handle Flag-like enums by decomposing into constituent
++        # named members. We iterate over the explicit members defined on
++        # the enum class and pick those that are present in the value.
++        try:
++            members = []
++            imports = set()
++            for member in enum_class:
++                # Skip the zero value member if present.
++                try:
++                    member_value = int(member)
++                    value_int = int(self.value)
++                except Exception:
++                    member_value = None
++                    value_int = None
++                if member_value is not None and member_value == 0:
++                    continue
++                # If the member bits are all present in the value, include it.
++                included = False
++                if member_value is not None and value_int is not None:
++                    if (member_value & value_int) == member_value:
++                        included = True
++                else:
++                    # Fallback: use membership testing for Flags (value & member == member)
++                    try:
++                        if (self.value & member) == member:
++                            included = True
++                    except Exception:
++                        included = False
++                if included:
++                    member_str, member_imports = serializer_factory(member).serialize()
++                    members.append(member_str)
++                    imports.update(member_imports)
++
++            if members:
++                return (" | ".join(members), imports)
++        except Exception:
++            # Fall through to a last-resort representation below.
++            pass
++
++        # As a fallback, represent the enum value by its repr (numeric or
++        # whatever the Enum implements) and import the module.
++        return ("%r" % (self.value,), {"import %s" % module})
+ 
+ 
+ class FloatSerializer(BaseSimpleSerializer):

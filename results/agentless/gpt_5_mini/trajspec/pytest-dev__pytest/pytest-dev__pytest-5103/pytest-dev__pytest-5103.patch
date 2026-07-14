@@ -1,0 +1,34 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 4810cdd..a6050d8 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -997,6 +997,23 @@ warn_explicit(
+         new_starred = ast.Starred(res, starred.ctx)
+         return new_starred, "*" + expl
+ 
++    def visit_GeneratorExp(self, gen):
++        """Handle generator expressions specially to avoid showing the generator object.
++
++        We must not materialize the generator during normal evaluation (that would
++        change semantics / side-effects). Instead, return the generator expression
++        itself for runtime use, and provide an explanation expression that will
++        materialize the generator into a list only in the on_failure formatting
++        context so the assertion message can show the evaluated contents.
++        """
++        # Build a call to built-in list(gen) to materialize the generator for display.
++        # Use self.builtin("list") so that we reference the injected safe builtins.
++        list_call = ast.Call(self.builtin("list"), [gen], [])
++        # Return the generator expression for execution (keeps laziness),
++        # and an explanation placeholder that will saferepr(list(gen)) when formatting
++        # the failure message (executed only in on_failure).
++        return gen, self.explanation_param(self.display(list_call))
++
+     def visit_Call_legacy(self, call):
+         """
+         visit `ast.Call nodes on 3.4 and below`
+@@ -1081,4 +1098,4 @@ warn_explicit(
+             res = ast.BoolOp(ast.And(), load_names)
+         else:
+             res = load_names[0]
+-        return res, self.explanation_param(self.pop_format_context(expl_call))
++        return res, self.explanation_param(self.pop_format_context(expl_call))

@@ -1,0 +1,61 @@
+diff --git a/sympy/polys/factortools.py b/sympy/polys/factortools.py
+index 93298f47e6..8d5bb5416a 100644
+--- a/sympy/polys/factortools.py
++++ b/sympy/polys/factortools.py
+@@ -71,7 +71,7 @@
+ from sympy.polys.polyerrors import (
+     ExtraneousFactors, DomainError, CoercionFailed, EvaluationFailed)
+ 
+-from sympy.ntheory import nextprime, isprime, factorint
++from sympy.ntheory import nextprime, isprime, factorint, binomial_coefficients_list
+ from sympy.utilities import subsets
+ 
+ from math import ceil as _ceil, log as _log
+@@ -124,21 +124,40 @@ def dmp_trial_division(f, factors, u, K):
+ 
+ 
+ def dup_zz_mignotte_bound(f, K):
+-    """Mignotte bound for univariate polynomials in `K[x]`. """
+-    a = dup_max_norm(f, K)
++    """Knuth-Cohen bound for univariate polynomials in `K[x]`. """
+     b = abs(dup_LC(f, K))
+     n = dup_degree(f)
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    # Knuth-Cohen bound: b * sum(C(n,i) * |a_i|)
++    # f is in descending order: [a_n, a_{n-1}, ..., a_0]
++    A = binomial_coefficients_list(n)
++    a = [abs(c) for c in f]  # a = [a_n, a_{n-1}, ..., a_0]
++
++    return b * sum([A[i] * a[i] for i in range(n + 1)])
+ 
+ 
+ def dmp_zz_mignotte_bound(f, u, K):
+-    """Mignotte bound for multivariate polynomials in `K[X]`. """
+-    a = dmp_max_norm(f, u, K)
++    """Knuth-Cohen bound for multivariate polynomials in `K[X]`. """
+     b = abs(dmp_ground_LC(f, u, K))
+-    n = sum(dmp_degree_list(f, u))
++    # Use the degree in the main variable (x_0) for the binomial coefficients
++    n = dmp_degree_in(f, 0, u)
++
++    # Knuth-Cohen bound: b * sum(C(n,i) * |a_i|)
++    # f is in descending order: [a_n, a_{n-1}, ..., a_0]
++    # Each a_i is a polynomial in the remaining variables
++    A = binomial_coefficients_list(n)
++    
++    # Extract norm values from each coefficient
++    # For the multivariate case, use the max norm of each coefficient polynomial
++    if u == 0:
++        # Univariate case: coefficients are just numbers
++        a = [abs(c) for c in f]
++    else:
++        # Multivariate case: coefficients are polynomials
++        # Use the max norm of each coefficient
++        a = [dmp_max_norm(c, u-1, K) for c in f]
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    return b * sum([A[i] * a[i] for i in range(n + 1)])
+ 
+ 
+ def dup_zz_hensel_step(m, f, g, h, s, t, K):

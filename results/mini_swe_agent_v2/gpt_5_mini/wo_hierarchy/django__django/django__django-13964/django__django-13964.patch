@@ -1,0 +1,36 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 2428218696..db35d8932d 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -933,10 +933,29 @@ class Model(metaclass=ModelBase):
+                         "%s() prohibited to prevent data loss due to unsaved "
+                         "related object '%s'." % (operation_name, field.name)
+                     )
+-                elif getattr(self, field.attname) is None:
++                else:
+                     # Use pk from related object if it has been saved after
+                     # an assignment.
+-                    setattr(self, field.attname, obj.pk)
++                    #
++                    # Historically this code only treated None as a "missing"
++                    # local FK value. However, some field types (notably
++                    # CharField) may default to the empty string (''), and
++                    # other parts of the ORM/database layer treat '' as a
++                    # NULL equivalent depending on the field and database
++                    # features (see ForeignKey.get_db_prep_save). Mirror
++                    # that logic here so that an empty-string local FK will
++                    # be considered "missing" when the DB would interpret it
++                    # as NULL, and thus be updated with the related object's
++                    # saved PK.
++                    current_val = getattr(self, field.attname)
++                    empty_string_is_missing = (
++                        current_val == '' and (
++                            not field.target_field.empty_strings_allowed or
++                            connection.features.interprets_empty_strings_as_nulls
++                        )
++                    )
++                    if current_val is None or empty_string_is_missing:
++                        setattr(self, field.attname, obj.pk)
+                 # If the relationship's pk/to_field was changed, clear the
+                 # cached relationship.
+                 if getattr(obj, field.target_field.attname) != getattr(self, field.attname):

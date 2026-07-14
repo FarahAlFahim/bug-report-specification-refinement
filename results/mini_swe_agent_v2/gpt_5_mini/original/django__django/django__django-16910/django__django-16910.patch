@@ -1,0 +1,28 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 781dfd5499..f042efb03e 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -778,8 +778,21 @@ class Query(BaseExpression):
+         select_mask[opts.pk] = {}
+         # Only include fields mentioned in the mask.
+         for field_name, field_mask in mask.items():
+-            field = opts.get_field(field_name)
+-            field_select_mask = select_mask.setdefault(field, {})
++            # Handle filtered relations (only apply on top-level) and
++            # reverse relations similarly to _get_defer_select_mask so that
++            # keys in the select_mask match what get_related_selections
++            # expects (either a field or a (name, relation) tuple).
++            if filtered_relation := self._filtered_relations.get(field_name):
++                relation = opts.get_field(filtered_relation.relation_name)
++                field_select_mask = select_mask.setdefault((field_name, relation), {})
++                field = relation.field
++            else:
++                reverse_rel = opts.get_field(field_name)
++                # Ignore virtual fields that don't have a .field attribute.
++                if not hasattr(reverse_rel, "field"):
++                    continue
++                field = reverse_rel.field
++                field_select_mask = select_mask.setdefault(field, {})
+             if field_mask:
+                 if not field.is_relation:
+                     raise FieldError(next(iter(field_mask)))

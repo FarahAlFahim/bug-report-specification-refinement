@@ -1,0 +1,51 @@
+diff --git a/sympy/assumptions/refine.py b/sympy/assumptions/refine.py
+index e1f97190c0..7d0d8f223d 100644
+--- a/sympy/assumptions/refine.py
++++ b/sympy/assumptions/refine.py
+@@ -350,6 +350,39 @@ def refine_sign(expr, assumptions):
+     return expr
+ 
+ 
++def refine_arg(expr, assumptions):
++    """
++    Handler for the argument (phase) of a complex number.
++
++    Examples
++    ========
++
++    >>> from sympy import refine, arg, Q
++    >>> from sympy.abc import x
++    >>> refine(arg(x), Q.positive(x))
++    0
++    >>> refine(arg(x), Q.negative(x))
++    pi
++
++    """
++    arg = expr.args[0]
++    if ask(Q.positive(arg), assumptions):
++        return S.Zero
++    if ask(Q.negative(arg), assumptions):
++        return S.Pi
++    if ask(Q.imaginary(arg), assumptions):
++        # For purely imaginary numbers, we need to determine the sign
++        # of the imaginary part. arg(z) = pi/2 for positive imaginary,
++        # arg(z) = -pi/2 for negative imaginary.
++        from sympy import im
++        arg_im = refine(im(arg), assumptions)
++        if ask(Q.positive(arg_im), assumptions):
++            return S.Pi / 2
++        if ask(Q.negative(arg_im), assumptions):
++            return -S.Pi / 2
++    return expr
++
++
+ def refine_matrixelement(expr, assumptions):
+     """
+     Handler for symmetric part.
+@@ -380,5 +413,6 @@ def refine_matrixelement(expr, assumptions):
+     're': refine_re,
+     'im': refine_im,
+     'sign': refine_sign,
++    'arg': refine_arg,
+     'MatrixElement': refine_matrixelement
+ }  # type: Dict[str, Callable[[Expr, Boolean], Expr]]

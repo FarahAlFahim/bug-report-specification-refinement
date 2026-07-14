@@ -1,0 +1,55 @@
+diff --git a/sympy/assumptions/refine.py b/sympy/assumptions/refine.py
+index e1f97190c0..075290e871 100644
+--- a/sympy/assumptions/refine.py
++++ b/sympy/assumptions/refine.py
+@@ -373,10 +373,50 @@ def refine_matrixelement(expr, assumptions):
+             return expr
+         return MatrixElement(matrix, j, i)
+ 
++
++
++def refine_arg(expr, assumptions):
++    """
++    Handler for argument (arg).
++
++    Simplify arg(z) to principal-branch constants when assumptions
++    determine the sign/real/imag parts of the argument. Falls back to
++    rewriting as atan2(im(z), re(z)) and delegating to refine_atan2.
++    """
++    from sympy import S
++    from sympy.assumptions import ask, Q
++    # expr is arg(z)
++    z = expr.args[0]
++    # If z is known real
++    if ask(Q.real(z), assumptions):
++        if ask(Q.zero(z), assumptions):
++            return S.NaN
++        if ask(Q.positive(z), assumptions) or ask(Q.nonnegative(z), assumptions):
++            return S.Zero
++        if ask(Q.negative(z), assumptions):
++            return S.Pi
++    # If z is known imaginary (pure imaginary a*I)
++    if ask(Q.imaginary(z), assumptions):
++        from sympy.functions.elementary.complexes import im
++        arg_im = im(z)
++        if ask(Q.positive(arg_im), assumptions):
++            return S.Pi/2
++        if ask(Q.negative(arg_im), assumptions):
++            return -S.Pi/2
++    # Fallback: rewrite as atan2(im(z), re(z)) and use existing logic
++    try:
++        atan2_expr = expr._eval_rewrite_as_atan2(z)
++    except Exception:
++        atan2_expr = None
++    if atan2_expr is not None:
++        return refine_atan2(atan2_expr, assumptions)
++    return expr
++
+ handlers_dict = {
+     'Abs': refine_abs,
+     'Pow': refine_Pow,
+     'atan2': refine_atan2,
++    'arg': refine_arg,
+     're': refine_re,
+     'im': refine_im,
+     'sign': refine_sign,

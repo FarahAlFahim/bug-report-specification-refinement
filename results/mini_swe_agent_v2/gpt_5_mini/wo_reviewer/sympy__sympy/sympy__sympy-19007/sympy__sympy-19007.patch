@@ -1,0 +1,71 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index b821c42845..efbfc98893 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -7,7 +7,7 @@
+ from sympy.utilities import sift
+ from sympy.utilities.misc import filldedent
+ 
+-from sympy.matrices.expressions.matexpr import MatrixExpr, ZeroMatrix, Identity
++from sympy.matrices.expressions.matexpr import MatrixExpr, ZeroMatrix, Identity, MatrixElement
+ from sympy.matrices.expressions.matmul import MatMul
+ from sympy.matrices.expressions.matadd import MatAdd
+ from sympy.matrices.expressions.matpow import MatPow
+@@ -233,18 +233,49 @@ def transpose(self):
+         return self._eval_transpose()
+ 
+     def _entry(self, i, j, **kwargs):
+-        # Find row entry
++        # Conservative block selection: only descend into a sub-block when
++        # membership of the global indices to that block is provably True.
++        # If membership is ambiguous (not provably True), return a
++        # MatrixElement referring to this BlockMatrix so that further
++        # evaluation won't incorrectly pick a child block.
++
++        # Select row block
++        low = 0
++        selected_row = None
++        local_i = None
+         for row_block, numrows in enumerate(self.rowblocksizes):
+-            if (i < numrows) != False:
++            high = low + numrows
++            # provable membership: low <= i < high
++            if ask(Q.is_true(i >= low)) and ask(Q.is_true(i < high)):
++                selected_row = row_block
++                local_i = i - low
+                 break
+-            else:
+-                i -= numrows
++            # if provably not in this block, continue
++            if ask(Q.is_true(i < low)) or ask(Q.is_true(i >= high)):
++                low = high
++                continue
++            # ambiguous membership: can't decide which block i belongs to
++            return MatrixElement(self, i, j)
++
++        # Select column block
++        low = 0
++        selected_col = None
++        local_j = None
+         for col_block, numcols in enumerate(self.colblocksizes):
+-            if (j < numcols) != False:
++            high = low + numcols
++            if ask(Q.is_true(j >= low)) and ask(Q.is_true(j < high)):
++                selected_col = col_block
++                local_j = j - low
+                 break
+-            else:
+-                j -= numcols
+-        return self.blocks[row_block, col_block][i, j]
++            if ask(Q.is_true(j < low)) or ask(Q.is_true(j >= high)):
++                low = high
++                continue
++            return MatrixElement(self, i, j)
++
++        if selected_row is None or selected_col is None:
++            return MatrixElement(self, i, j)
++
++        return self.blocks[selected_row, selected_col][local_i, local_j]
+ 
+     @property
+     def is_Identity(self):

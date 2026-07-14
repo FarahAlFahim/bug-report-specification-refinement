@@ -1,0 +1,123 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..54874bfb56 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1707,6 +1707,118 @@ def free_symbols(self):
+             ret.update(count.free_symbols)
+         return ret
+ 
++    @property
++    def kind(self):
++        """
++        Infer the mathematical Kind of an unevaluated Derivative without
++        evaluating it. The inference uses the wrapped expression's kind and
++        the kinds or types of differentiation variables.
++
++        Algorithm:
++        1. expr_kind = getattr(self.expr, 'kind', UndefinedKind)
++        2. element_kind = getattr(expr_kind, 'element_kind', expr_kind)
++        3. Inspect self._wrt_variables for array-like or matrix-like signals:
++           - prefer explicit v.kind when available (ArrayKind/MatrixKind)
++           - else use isinstance checks and shape attribute checks
++        4. If any variable is array-like -> ArrayKind(element_kind)
++           elif any variable is matrix-like -> MatrixKind(element_kind)
++           else if expr_kind is already an ArrayKind/MatrixKind -> expr_kind
++           else return expr_kind (may be UndefinedKind)
++        """
++        # local imports to avoid import-time cycles
++        from sympy.core.kind import UndefinedKind
++        from sympy.matrices.common import MatrixKind, MatrixCommon
++        from sympy import MatrixExpr
++
++        # ArrayKind and NDimArray live in tensor.array modules
++        try:
++            # preferred: specific module for the kind class
++            from sympy.tensor.array.ndim_array import ArrayKind
++        except Exception:
++            # fallback if packaging is different
++            from sympy.tensor.array import ArrayKind  # type: ignore
++
++        try:
++            from sympy.tensor.array import NDimArray
++        except Exception:
++            NDimArray = tuple  # type: ignore
++
++        expr_kind = getattr(self.expr, 'kind', None)
++        if expr_kind is None:
++            expr_kind = UndefinedKind
++
++        element_kind = getattr(expr_kind, 'element_kind', expr_kind)
++
++        array_like = False
++        matrix_like = False
++
++        for v in self._wrt_variables:
++            # If variable exposes a kind, use it
++            vkind = getattr(v, 'kind', None)
++            if vkind is not None:
++                # Prefer ArrayKind over MatrixKind if mixed
++                try:
++                    if isinstance(vkind, ArrayKind):
++                        array_like = True
++                        break
++                except Exception:
++                    pass
++                try:
++                    if isinstance(vkind, MatrixKind):
++                        matrix_like = True
++                        # continue searching in case an ArrayKind appears
++                        continue
++                except Exception:
++                    pass
++
++            # Fallback: use structural/type checks
++            if hasattr(v, 'shape'):
++                shape = getattr(v, 'shape', None)
++                if shape is not None:
++                    try:
++                        # treat non-2D shapes as array-like
++                        if len(shape) != 2:
++                            array_like = True
++                            break
++                        else:
++                            matrix_like = True
++                            continue
++                    except Exception:
++                        # unknown shape, be conservative and continue
++                        pass
++
++            # NDimArray indicates array-like
++            if isinstance(v, NDimArray):
++                array_like = True
++                break
++
++            # MatrixCommon or MatrixExpr indicate matrix-like
++            if isinstance(v, (MatrixCommon, MatrixExpr)):
++                matrix_like = True
++                continue
++
++            # scalar signal: continue checking others
++            if getattr(v, 'is_scalar', False):
++                continue
++
++            # otherwise unknown: be conservative and do not assert container kind
++
++        if array_like:
++            return ArrayKind(element_kind)
++        if matrix_like:
++            return MatrixKind(element_kind)
++
++        # If all wrt variables are scalar-like: preserve expr kind if it's a container
++        try:
++            if isinstance(expr_kind, (ArrayKind, MatrixKind)):
++                return expr_kind
++        except Exception:
++            # If checking isinstance failed for any reason, ignore and fallthrough
++            pass
++
++        # else return what we know about expr_kind (may be UndefinedKind)
++        return expr_kind
++
+     def _eval_subs(self, old, new):
+         # The substitution (old, new) cannot be done inside
+         # Derivative(expr, vars) for a variety of reasons

@@ -1,0 +1,41 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index 07cdaa5..63e0f92 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,5 +1,7 @@
++
+ import datetime
+ import decimal
++import json
+ from collections import defaultdict
+ 
+ from django.core.exceptions import FieldDoesNotExist
+@@ -388,6 +390,15 @@ def display_for_field(value, field, empty_value_display):
+         return _boolean_icon(value)
+     elif value is None:
+         return empty_value_display
++    # JSONField should be rendered as JSON using the field's encoder when available.
++    elif isinstance(field, getattr(models, 'JSONField', type(None))):
++        try:
++            encoder = getattr(field, 'encoder', None)
++            # json.dumps accepts cls=None, so this is safe if no encoder is set.
++            return json.dumps(value, cls=encoder, ensure_ascii=False)
++        except Exception:
++            # Fall back to a Python string representation if JSON serialization fails.
++            return str(value)
+     elif isinstance(field, models.DateTimeField):
+         return formats.localize(timezone.template_localtime(value))
+     elif isinstance(field, (models.DateField, models.TimeField)):
+@@ -417,6 +428,12 @@ def display_for_value(value, empty_value_display, boolean=False):
+         return formats.localize(value)
+     elif isinstance(value, (int, decimal.Decimal, float)):
+         return formats.number_format(value)
++    elif isinstance(value, dict):
++        # Render dicts as JSON for a valid, consistent display.
++        try:
++            return json.dumps(value, ensure_ascii=False)
++        except Exception:
++            return str(value)
+     elif isinstance(value, (list, tuple)):
+         return ', '.join(str(v) for v in value)
+     else:

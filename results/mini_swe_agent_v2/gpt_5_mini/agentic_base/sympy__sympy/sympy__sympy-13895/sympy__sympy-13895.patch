@@ -1,0 +1,129 @@
+diff --git a/sympy/simplify/powsimp.py b/sympy/simplify/powsimp.py
+index a7fd30e118..6f7c3b188b 100644
+--- a/sympy/simplify/powsimp.py
++++ b/sympy/simplify/powsimp.py
+@@ -203,7 +203,24 @@ def recurse(arg, **kwargs):
+         _n = S.NegativeOne
+         for i, (b, e) in enumerate(be):
+             if ((-b).is_Symbol or b.is_Add) and -b in c_powers:
+-                if (b.is_positive in (0, 1) or e.is_integer):
++                # Only move a negative sign into S.NegativeOne when it is
++                # safe to do so. It is safe when the exponent is an
++                # integer (so (-1)**n is ±1), or when the exponent is a
++                # Rational with an odd denominator (so (-1)**(p/q) is
++                # real ±1). Also allow when the base is known positive.
++                do_move = False
++                if b.is_positive is True:
++                    do_move = True
++                elif e.is_integer:
++                    do_move = True
++                elif e.is_Rational:
++                    try:
++                        # e = p/q
++                        if int(e.q) % 2 == 1:
++                            do_move = True
++                    except Exception:
++                        pass
++                if do_move:
+                     c_powers[-b] += c_powers.pop(b)
+                     if _n in c_powers:
+                         c_powers[_n] += e
+@@ -444,8 +461,42 @@ def update(b):
+                         if p.is_integer and d.is_integer:
+                             israt = True
+                     if israt:
+-                        neg = [-w for w in neg]
+-                        unk.extend([S.NegativeOne]*len(neg))
++                        # If the exponent is a rational p/q with an odd
++                        # denominator, then (-b)^(p/q) has a real value that
++                        # can be represented as +/- b^(p/q) (the sign is
++                        # (-1)**p which is an integer +/-1). In that case
++                        # avoid introducing (-1)**(p/q) (which evaluates on
++                        # the principal complex branch) and instead absorb
++                        # the sign as an integer coefficient. For even
++                        # denominators we keep the existing behavior which
++                        # introduces S.NegativeOne**exponent.
++                        try:
++                            if e.is_Rational:
++                                p = Integer(e.p)
++                                d = Integer(e.q)
++                            else:
++                                p, d = e.as_numer_denom()
++                        except Exception:
++                            # if we can't determine numerator/denominator
++                            # fall back to original behaviour
++                            neg = [-w for w in neg]
++                            unk.extend([S.NegativeOne]*len(neg))
++                        else:
++                            # only when denominator is an odd integer can we
++                            # safely convert the sign into an integer factor
++                            # (±1). Otherwise preserve original behaviour.
++                            if d.is_integer and int(d) % 2 == 1:
++                                sign_mul = S.One
++                                # p may be any integer; (-1)**p is ±1
++                                if int(p) % 2 != 0:
++                                    sign_mul = S.NegativeOne
++                                # make negative parts positive and absorb sign
++                                neg = [-w for w in neg]
++                                if sign_mul is not S.One:
++                                    nonneg.append(sign_mul)
++                            else:
++                                neg = [-w for w in neg]
++                                unk.extend([S.NegativeOne]*len(neg))
+                     else:
+                         unk.extend(neg)
+                         neg = []
+diff --git a/sympy/simplify/simplify.py b/sympy/simplify/simplify.py
+index 1acc00be3a..0937efa62e 100644
+--- a/sympy/simplify/simplify.py
++++ b/sympy/simplify/simplify.py
+@@ -554,7 +554,12 @@ def shorter(*choices):
+         expr = nsimplify(expr, rational=True)
+ 
+     expr = bottom_up(expr, lambda w: w.normal())
+-    expr = Mul(*powsimp(expr).as_content_primitive())
++    # Use powsimp to combine exponents but avoid combining bases here
++    # because moving negative factors out of bases can introduce
++    # explicit powers of -1 with non-integer exponents which evaluate
++    # on the complex principal branch. Combining bases is deferred to
++    # later, safer simplification passes.
++    expr = Mul(*powsimp(expr, combine='exp').as_content_primitive())
+     _e = cancel(expr)
+     expr1 = shorter(_e, _mexpand(_e).cancel())  # issue 6829
+     expr2 = shorter(together(expr, deep=True), together(expr1, deep=True))
+@@ -593,7 +598,34 @@ def shorter(*choices):
+     if expr.has(Product):
+         expr = product_simplify(expr)
+ 
+-    short = shorter(powsimp(expr, combine='exp', deep=True), powsimp(expr), expr)
++    # Avoid using the aggressive powsimp combine='all' when there are
++    # potentially unsafe powers (e.g. negative or additive bases with
++    # non-integer exponents) since that can introduce explicit
++    # S.NegativeOne**exponent factors which evaluate on the complex
++    # principal branch and change numeric results for non-integer
++    # exponents. Prefer the safer combine='exp' result in such cases.
++    pows_exp = powsimp(expr, combine='exp', deep=True)
++    def _has_risky_pow(e):
++        # Return True if e contains a Pow with a base that is an Add or
++        # explicitly negative and an exponent that is not an integer.
++        for p in e.atoms(Pow):
++            b, ex = p.as_base_exp()
++            if (b.is_Add or b.is_Symbol or b.is_negative or b.is_Add) and not ex.is_integer:
++                return True
++        return False
++
++    pows_all = None
++    try:
++        if not _has_risky_pow(expr):
++            pows_all = powsimp(expr)
++    except Exception:
++        # if safety check fails, don't use powsimp combine='all'
++        pows_all = None
++
++    if pows_all is None:
++        short = shorter(pows_exp, expr)
++    else:
++        short = shorter(pows_exp, pows_all, expr)
+     short = shorter(short, cancel(short))
+     short = shorter(short, factor_terms(short), expand_power_exp(expand_mul(short)))
+     if short.has(TrigonometricFunction, HyperbolicFunction, ExpBase):

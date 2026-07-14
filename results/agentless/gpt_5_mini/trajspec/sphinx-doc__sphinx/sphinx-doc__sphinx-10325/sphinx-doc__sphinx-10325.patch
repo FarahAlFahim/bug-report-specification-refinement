@@ -1,0 +1,56 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 53e783e..e2d1c7f 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -109,12 +109,24 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+     return {x.strip() for x in arg.split(',') if x.strip()}
+ 
+ 
+-def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++def inherited_members_option(arg: Any) -> Set[str]:
++    """Used to convert the :inherited-members: option to a set of names.
++
++    Accepts no-arg/flag (treated as the sentinel 'object'), a comma-separated
++    string, or a sequence (list/tuple/set) of names. Always returns a set
++    of strings for canonical handling elsewhere.
++    """
+     if arg in (None, True):
+-        return 'object'
+-    else:
+-        return arg
++        # preserve the old sentinel behavior as an element of the set
++        return {'object'}
++    # comma-separated string
++    if isinstance(arg, str):
++        return {x.strip() for x in arg.split(',') if x.strip()}
++    # sequence input
++    if isinstance(arg, (list, tuple, set)):
++        return {str(x).strip() for x in arg if str(x).strip()}
++    # fallback: coerce to string
++    return {str(arg).strip()}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -680,10 +692,18 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
++            if inspect.isclass(self.object) and self.options.inherited_members:
++                # support both legacy single-string and the canonical collection
++                # returned by inherited_members_option()
++                inherited_opt = self.options.inherited_members
++                if isinstance(inherited_opt, str):
++                    names = {inherited_opt}
++                else:
++                    names = set(inherited_opt)
++
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
++                    if cls.__name__ in names and cls != self.object:
++                        # given member is a member of a specified super class
+                         return True
+                     elif name in cls.__dict__:
+                         return False

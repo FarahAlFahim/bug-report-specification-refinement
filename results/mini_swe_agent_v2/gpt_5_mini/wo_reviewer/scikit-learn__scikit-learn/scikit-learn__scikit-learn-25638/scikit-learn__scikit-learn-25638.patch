@@ -1,0 +1,110 @@
+diff --git a/sklearn/utils/multiclass.py b/sklearn/utils/multiclass.py
+index 5eaef2fde..af05b4fc7 100644
+--- a/sklearn/utils/multiclass.py
++++ b/sklearn/utils/multiclass.py
+@@ -23,7 +23,51 @@ from ..utils._array_api import get_namespace
+ def _unique_multiclass(y):
+     xp, is_array_api = get_namespace(y)
+     if hasattr(y, "__array__") or is_array_api:
+-        return xp.unique_values(xp.asarray(y))
++        arr = xp.asarray(y)
++        # If we materialized an object-dtype array coming from pandas
++        # extension scalars (including pd.NA), try to coerce it to a
++        # numpy-friendly representation so that unique_values behaves
++        # consistently with check_array conversions (pd.NA -> np.nan,
++        # numeric extension -> numeric numpy dtype).
++        if arr.dtype == object and xp is np:
++            try:
++                import pandas as pd
++                from pandas.api.types import (
++                    is_extension_array_dtype,
++                    is_integer_dtype,
++                    is_float_dtype,
++                    is_bool_dtype,
++                )
++
++                # If the original input has a pandas dtype that is an
++                # extension dtype, use pandas conversion routines which map
++                # pd.NA to np.nan and pick a sensible numpy dtype.
++                pd_dtype = getattr(y, "dtype", None)
++                if pd_dtype is not None and is_extension_array_dtype(pd_dtype):
++                    s = pd.Series(y)
++                    if is_integer_dtype(pd_dtype) or is_float_dtype(pd_dtype):
++                        # map integers/floats (with missing) to float64
++                        arr = s.to_numpy(dtype="float64")
++                    elif is_bool_dtype(pd_dtype):
++                        # keep object dtype but replace pd.NA with np.nan
++                        tmp = s.to_numpy(dtype=object)
++                        arr = np.array([np.nan if pd.isna(v) else bool(v) for v in tmp], dtype=object)
++                    else:
++                        arr = s.to_numpy()
++                else:
++                    # For object arrays that may contain pandas scalar values
++                    # (e.g. materialized extension scalars), coerce pd.NA to
++                    # np.nan so that numpy unique treats missing values
++                    # consistently.
++                    s = pd.Series(y)
++                    tmp = s.to_numpy()
++                    arr = np.array([np.nan if pd.isna(v) else v for v in tmp], dtype=object)
++            except Exception:
++                # pandas not available or conversion failed; fall back to
++                # the raw array
++                arr = xp.asarray(y)
++
++        return xp.unique_values(arr)
+     else:
+         return set(y)
+ 
+@@ -340,9 +384,49 @@ def type_of_target(y, input_name=""):
+             return "binary"  # []
+         # 2-D empty array: [[]]
+         return "unknown"
+-    if not issparse(y) and y.dtype == object and not isinstance(y.flat[0], str):
+-        # [obj_1] and not ["label_1"]
+-        return "unknown"
++    if not issparse(y) and y.dtype == object:
++        # Object-dtype arrays can come from pandas extension dtypes and may
++        # have pandas scalar values or pd.NA. Instead of naively looking at
++        # the very first element, find the first non-missing element and
++        # classify based on its semantic type. If all elements are missing
++        # or the representative element is an unsupported object, return
++        # "unknown".
++        try:
++            from .fixes import _object_dtype_isnan
++        except Exception:
++            def _object_dtype_isnan(x):
++                return x != x
++
++        first_elem = None
++        try:
++            it = iter(y.flat)
++        except Exception:
++            it = iter(y)
++
++        for el in it:
++            try:
++                if _object_dtype_isnan(el):
++                    continue
++            except Exception:
++                # If nan detection fails for this element, assume it's
++                # non-missing and use it as representative
++                pass
++            first_elem = el
++            break
++
++        if first_elem is None:
++            return "unknown"
++
++        # Accept strings, numbers and numpy scalar types as valid
++        import numbers
++
++        if isinstance(first_elem, str) or isinstance(first_elem, numbers.Number) or isinstance(
++            first_elem, (np.generic, bool)
++        ):
++            # treat as a normal array-like and continue classification
++            pass
++        else:
++            return "unknown"
+ 
+     # Check if multioutput
+     if y.ndim == 2 and y.shape[1] > 1:

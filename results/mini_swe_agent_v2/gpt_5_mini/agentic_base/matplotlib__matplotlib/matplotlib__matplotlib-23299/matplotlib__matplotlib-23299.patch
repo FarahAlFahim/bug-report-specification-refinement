@@ -1,0 +1,61 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index c268a56724..3fff7e2f2b 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -1095,7 +1095,23 @@ def rc_context(rc=None, fname=None):
+             rcParams.update(rc)
+         yield
+     finally:
+-        dict.update(rcParams, orig)  # Revert to the original rcs.
++        # Similar to pyplot._xkcd, avoid restoring the auto-backend
++        # sentinel over a concrete backend.  If the snapshot taken on
++        # entry contained the sentinel, prefer the currently-resolved
++        # backend to avoid triggering lazy backend resolution later
++        # which would close all figures.
++        if ("backend" in orig and
++                orig.get("backend") is rcsetup._auto_backend_sentinel):
++            tmp = dict(orig)
++            try:
++                cur_backend = dict.__getitem__(rcParams, "backend")
++            except Exception:
++                cur_backend = None
++            if cur_backend is not rcsetup._auto_backend_sentinel:
++                tmp["backend"] = cur_backend
++            dict.update(rcParams, tmp)
++        else:
++            dict.update(rcParams, orig)  # Revert to the original rcs.
+ 
+ 
+ def use(backend, *, force=True):
+diff --git a/lib/matplotlib/pyplot.py b/lib/matplotlib/pyplot.py
+index e3c66ea67c..6e68254d17 100644
+--- a/lib/matplotlib/pyplot.py
++++ b/lib/matplotlib/pyplot.py
+@@ -688,7 +688,26 @@ class _xkcd:
+         return self
+ 
+     def __exit__(self, *args):
+-        dict.update(rcParams, self._orig)
++        # When restoring rcParams from the snapshot taken on entry, avoid
++        # clobbering a concrete, resolved backend with the auto-backend
++        # sentinel that may have been present in the original snapshot.
++        # Restoring the sentinel can later trigger lazy backend resolution
++        # via rcParams.__getitem__ -> pyplot.switch_backend, which closes
++        # all figures.  To avoid destroying user figures, prefer the
++        # currently-resolved backend over an original sentinel.
++        if ("backend" in self._orig and
++                self._orig.get("backend") is rcsetup._auto_backend_sentinel):
++            # Copy the snapshot but keep the current concrete backend.
++            tmp = dict(self._orig)
++            try:
++                cur_backend = dict.__getitem__(rcParams, "backend")
++            except Exception:
++                cur_backend = None
++            if cur_backend is not rcsetup._auto_backend_sentinel:
++                tmp["backend"] = cur_backend
++            dict.update(rcParams, tmp)
++        else:
++            dict.update(rcParams, self._orig)
+ 
+ 
+ ## Figures ##

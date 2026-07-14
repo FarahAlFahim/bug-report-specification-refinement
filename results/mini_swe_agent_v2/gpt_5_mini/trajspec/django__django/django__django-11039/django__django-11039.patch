@@ -1,0 +1,17 @@
+diff --git a/django/core/management/commands/sqlmigrate.py b/django/core/management/commands/sqlmigrate.py
+index f0b663222a..bd07ae8536 100644
+--- a/django/core/management/commands/sqlmigrate.py
++++ b/django/core/management/commands/sqlmigrate.py
+@@ -56,7 +56,11 @@ class Command(BaseCommand):
+         targets = [(app_label, migration.name)]
+ 
+         # Show begin/end around output only for atomic migrations
+-        self.output_transaction = migration.atomic
++        # Show begin/end around output only when the migration is atomic
++        # and the current database backend supports rolling back DDL. This
++        # mirrors the runtime behaviour (BaseDatabaseSchemaEditor.atomic_migration)
++        # which executes migrations transactionally only when both are true.
++        self.output_transaction = migration.atomic and connection.features.can_rollback_ddl
+ 
+         # Make a plan that represents just the requested migrations and show SQL
+         # for it

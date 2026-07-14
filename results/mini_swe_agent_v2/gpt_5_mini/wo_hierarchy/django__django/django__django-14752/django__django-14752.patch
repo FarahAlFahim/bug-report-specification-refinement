@@ -1,0 +1,54 @@
+diff --git a/django/contrib/admin/views/autocomplete.py b/django/contrib/admin/views/autocomplete.py
+index 3903e4c98c..7da7ab3c20 100644
+--- a/django/contrib/admin/views/autocomplete.py
++++ b/django/contrib/admin/views/autocomplete.py
+@@ -18,6 +18,10 @@ class AutocompleteJsonView(BaseListView):
+         }
+         """
+         self.term, self.model_admin, self.source_field, to_field_name = self.process_request(request)
++        # Expose the resolved to_field_name on the view instance so that
++        # subclasses/overrides have easy access without needing the local
++        # variable returned by process_request().
++        self.to_field_name = to_field_name
+ 
+         if not self.has_perm(request):
+             raise PermissionDenied
+@@ -26,7 +30,7 @@ class AutocompleteJsonView(BaseListView):
+         context = self.get_context_data()
+         return JsonResponse({
+             'results': [
+-                {'id': str(getattr(obj, to_field_name)), 'text': str(obj)}
++                self.serialize_result(obj, to_field_name)
+                 for obj in context['object_list']
+             ],
+             'pagination': {'more': context['page_obj'].has_next()},
+@@ -89,14 +93,28 @@ class AutocompleteJsonView(BaseListView):
+                 '%s must have search_fields for the autocomplete_view.' %
+                 type(model_admin).__qualname__
+             )
+-
+         to_field_name = getattr(source_field.remote_field, 'field_name', remote_model._meta.pk.attname)
+         to_field_name = remote_model._meta.get_field(to_field_name).attname
+         if not model_admin.to_field_allowed(request, to_field_name):
+             raise PermissionDenied
+ 
++        # Store the resolved to_field_name on the view instance to make it
++        # available to small extension points (e.g. serialize_result) without
++        # requiring callers to capture a locally returned value.
++        self.to_field_name = to_field_name
++
+         return term, model_admin, source_field, to_field_name
+ 
++    def serialize_result(self, obj, to_field_name):
++        """Return the JSON-serializable dict for a single result object.
++
++        Subclasses can override this method to add extra per-result fields.
++        The default implementation preserves the historical contract used by
++        the admin autocomplete widget: returning exactly the ``id`` and
++        ``text`` keys with the same string semantics.
++        """
++        return {'id': str(getattr(obj, to_field_name)), 'text': str(obj)}
++
+     def has_perm(self, request, obj=None):
+         """Check if user has permission to access the related model."""
+         return self.model_admin.has_view_permission(request, obj=obj)

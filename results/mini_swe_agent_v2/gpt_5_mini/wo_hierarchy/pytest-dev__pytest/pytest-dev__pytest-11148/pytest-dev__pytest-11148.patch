@@ -1,0 +1,58 @@
+diff --git a/src/_pytest/logging.py b/src/_pytest/logging.py
+index ea856837c..cae38f8b0 100644
+--- a/src/_pytest/logging.py
++++ b/src/_pytest/logging.py
+@@ -916,3 +916,53 @@ class _LiveLoggingNullHandler(logging.NullHandler):
+     def handleError(self, record: logging.LogRecord) -> None:
+         # Handled by LogCaptureHandler.
+         pass
++
++# When the same source file is imported multiple times under different
++# module names (possible with importlib + namespace packages), the
++# module objects are distinct and so are the class objects defined in
++# them. Some external code mutates attributes on the Logger class (for
++# example setting ``Logger.store``) assuming a single import; that
++# mutation then isn't visible on the Logger class object held by this
++# module. To mitigate that, copy the ``store`` attribute (if present)
++# between any Logger class objects defined in modules that point to the
++# same source file as this module. This keeps the attribute visible
++# regardless of which module object received the original mutation.
++try:
++    import sys
++
++    _this_module_file = globals().get("__file__")
++    if _this_module_file:
++        _our_logger = globals().get("Logger")
++        if _our_logger is not None:
++            for _mod_name, _mod in list(sys.modules.items()):
++                if _mod is None:
++                    continue
++                _mod_file = getattr(_mod, "__file__", None)
++                if _mod_file is None:
++                    continue
++                # Normalize paths to avoid minor differences.
++                try:
++                    if os.path.samefile(_mod_file, _this_module_file):
++                        _their_logger = getattr(_mod, "Logger", None)
++                        if _their_logger is None:
++                            continue
++                        # If either side has a 'store' attribute, copy it
++                        # to the other so both class objects expose it.
++                        _their_has = hasattr(_their_logger, "store")
++                        _our_has = hasattr(_our_logger, "store")
++                        if _their_has and not _our_has:
++                            setattr(_our_logger, "store", getattr(_their_logger, "store"))
++                        elif _our_has and not _their_has:
++                            try:
++                                setattr(_their_logger, "store", getattr(_our_logger, "store"))
++                            except Exception:
++                                # Be conservative: don't fail import if some module
++                                # disallows attribute assignment.
++                                pass
++                except FileNotFoundError:
++                    # os.path.samefile may raise if files don't exist anymore,
++                    # ignore such entries.
++                    continue
++except Exception:
++    # Never allow this synchronization attempt to break module import.
++    pass

@@ -1,0 +1,95 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..ac740aaaf2 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,90 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def _canonical_params(self, params):
++        """Return a stable, hashable representation of params for equality.
++
++        Converts dicts to tuples of sorted (key, value) pairs, lists/tuples to
++        tuples, sets to sorted tuples, and recursively canonicalizes nested
++        structures. For other objects, fall back to their repr().
++        """
++        if params is None:
++            return None
++        if isinstance(params, dict):
++            return tuple((k, self._canonical_params(v)) for k, v in sorted(params.items()))
++        if isinstance(params, (list, tuple)):
++            return tuple(self._canonical_params(v) for v in params)
++        if isinstance(params, set):
++            return tuple(sorted(self._canonical_params(v) for v in params))
++        # Immutable/primitive types
++        if isinstance(params, (str, bytes, int, float, bool)) or params is None:
++            return params
++        # Fallback: use repr to try to get a stable representation
++        try:
++            return repr(params)
++        except Exception:
++            return str(params)
++
++    def _atomic_canonical(self, error):
++        """Return a canonical tuple describing an atomic ValidationError.
++
++        The tuple contains (visible_message, code, canonical_params). The
++        visible_message is produced the same way __iter__ formats messages so
++        that equality follows the same presentation semantics.
++        """
++        message = error.message
++        # Format with params only when truthy, mirroring __iter__.
++        if getattr(error, 'params', None):
++            try:
++                message = message % error.params
++            except Exception:
++                # If formatting fails, fall back to original message and params
++                pass
++        return (str(message), getattr(error, 'code', None), self._canonical_params(getattr(error, 'params', None)))
++
++    def __eq__(self, other):
++        """Value-based equality for ValidationError.
++
++        Two ValidationError instances are equal when they represent the same
++        set/multiset of atomic errors. For error_dict-based errors, the keys
++        (fields) must be the same and, for each field, the multiset of atomic
++        errors must be equal (order-independent). For non-field errors (the
++        top-level error_list), the multiset of atomic errors must be equal.
++        Equality compares each atomic error by its visible message, code, and
++        a canonical representation of params.
++        """
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++
++        # Both dict-based
++        if hasattr(self, 'error_dict') or hasattr(other, 'error_dict'):
++            if not (hasattr(self, 'error_dict') and hasattr(other, 'error_dict')):
++                return False
++            # Compare keys
++            if set(self.error_dict.keys()) != set(other.error_dict.keys()):
++                return False
++            # For each field, compare multisets of canonical atomic errors
++            for key in self.error_dict:
++                self_list = [self._atomic_canonical(e) for e in self.error_dict[key]]
++                other_list = [self._atomic_canonical(e) for e in other.error_dict[key]]
++                # Compare as multisets (counts matter)
++                from collections import Counter
++
++                if Counter(self_list) != Counter(other_list):
++                    return False
++            return True
++
++        # Both list-based (non-field errors)
++        if hasattr(self, 'error_list') and hasattr(other, 'error_list'):
++            self_list = [self._atomic_canonical(e) for e in self.error_list]
++            other_list = [self._atomic_canonical(e) for e in other.error_list]
++            from collections import Counter
++
++            return Counter(self_list) == Counter(other_list)
++
++        # Fallback to identity if structure differs
++        return False
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

@@ -1,0 +1,19 @@
+diff --git a/pylint/utils/pragma_parser.py b/pylint/utils/pragma_parser.py
+index 121bb9f..29764ea 100644
+--- a/pylint/utils/pragma_parser.py
++++ b/pylint/utils/pragma_parser.py
+@@ -41,9 +41,12 @@ ALL_KEYWORDS = "|".join(
+ 
+ TOKEN_SPECIFICATION = [
+     ("KEYWORD", rf"\b({ALL_KEYWORDS:s})\b"),
+-    ("MESSAGE_STRING", r"[0-9A-Za-z\-\_]{2,}"),  # Identifiers
+-    ("ASSIGN", r"="),  # Assignment operator
++    # Message numbers (like E1101) should be recognized before generic strings
+     ("MESSAGE_NUMBER", r"[CREIWF]{1}\d*"),
++    # Accept any non-whitespace, non-comma, non-'=' sequence as a message/string token.
++    # This allows punctuation-only tags (e.g. '???') to be recognized.
++    ("MESSAGE_STRING", r"[^,\s=]+"),
++    ("ASSIGN", r"="),  # Assignment operator
+ ]
+ 
+ TOK_REGEX = "|".join(

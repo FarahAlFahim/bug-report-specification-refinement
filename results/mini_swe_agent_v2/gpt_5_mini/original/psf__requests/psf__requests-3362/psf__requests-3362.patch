@@ -1,0 +1,43 @@
+diff --git a/requests/utils.py b/requests/utils.py
+index 8d17b6b2..8896a3b1 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -357,15 +357,32 @@ def get_encoding_from_headers(headers):
+ 
+ 
+ def stream_decode_response_unicode(iterator, r):
+-    """Stream decodes a iterator."""
++    """Stream decodes a iterator.
++
++    When decode_unicode is requested, ensure that text is yielded.
++    If the response has no explicit encoding, try to use the charset
++    from the response headers, and fall back to UTF-8. This avoids
++    forcing evaluation of r.content (which would consume the stream)
++    while still returning unicode strings to callers that requested
++    decoded text.
++    """
+ 
+-    if r.encoding is None:
+-        for item in iterator:
+-            yield item
+-        return
++    # Determine the encoding to use. Prefer r.encoding, then header
++    # charset, then UTF-8 as a sensible default. We avoid using
++    # r.apparent_encoding because it accesses r.content.
++    encoding = r.encoding
++    if encoding is None:
++        encoding = get_encoding_from_headers(r.headers)
++    if encoding is None:
++        encoding = 'utf-8'
+ 
+-    decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
++    decoder = codecs.getincrementaldecoder(encoding)(errors='replace')
+     for chunk in iterator:
++        # If the chunk is already text, yield as-is.
++        if isinstance(chunk, str):
++            yield chunk
++            continue
++
+         rv = decoder.decode(chunk)
+         if rv:
+             yield rv

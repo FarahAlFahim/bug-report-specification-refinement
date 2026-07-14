@@ -1,0 +1,21 @@
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -926,6 +926,18 @@
+                     if ax is not last_ax:
+                         return last_ax
+             return None
++
++        # If the Axes being removed currently has the canvas mouse grab,
++        # make sure to release it so the canvas does not remain in an
++        # inconsistent state pointing to a removed Axes.
++        canvas = getattr(self, 'canvas', None)
++        if canvas is not None:
++            try:
++                canvas.release_mouse(ax)
++            except Exception:
++                # delaxes should not fail due to backend mouse handling;
++                # swallow any unexpected errors.
++                pass
+ 
+         self._axstack.remove(ax)
+         self._axobservers.process("_axes_change_event", self)

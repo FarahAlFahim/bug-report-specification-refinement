@@ -1,0 +1,39 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index ff6abdb958..9813202bf8 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -338,6 +338,18 @@ class Legend(Artist):
+     def __str__(self):
+         return "Legend"
+ 
++    def __getstate__(self):
++        """
++        Ensure that the draggable helper (if present) is not pickled.
++
++        Draggable helpers hold references to the live FigureCanvas which is
++        not picklable. Clear any _draggable attribute from the saved state so
++        that pickling a Figure containing draggable legends does not fail.
++        """
++        d = super().__getstate__()
++        d['_draggable'] = None
++        return d
++
+     @_api.make_keyword_only("3.6", "loc")
+     @_docstring.dedent_interpd
+     def __init__(
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 0f874ba33d..b8350b4750 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,11 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++        # Draggable helpers hold references to live GUI objects (canvas)
++        # which are not picklable. Ensure we don't attempt to pickle the
++        # draggable helper attached to Text/Annotation instances by
++        # clearing it from the saved state.
++        d['_draggable'] = None
+         return d
+ 
+     def contains(self, mouseevent):

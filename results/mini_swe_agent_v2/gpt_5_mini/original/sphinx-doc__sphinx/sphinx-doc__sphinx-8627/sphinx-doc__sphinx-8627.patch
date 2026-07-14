@@ -1,0 +1,37 @@
+diff --git a/sphinx/util/typing.py b/sphinx/util/typing.py
+index 2d4f67bba..dd2167342 100644
+--- a/sphinx/util/typing.py
++++ b/sphinx/util/typing.py
+@@ -99,6 +99,32 @@ def restify(cls: Optional["Type"]) -> str:
+     elif cls.__module__ in ('__builtin__', 'builtins'):
+         return ':class:`%s`' % cls.__name__
+     else:
++        # Some extension types (C implemented) live in private modules
++        # (for example struct.Struct.__module__ == '_struct') but are
++        # exposed via a public module (struct). Prefer the public module
++        # name for nicer cross-references when possible.
++        try:
++            import importlib
++            modname = getattr(cls, '__module__', None)
++            if isinstance(modname, str) and modname.startswith('_'):
++                public = modname.lstrip('_')
++                try:
++                    mod = importlib.import_module(public)
++                except Exception:
++                    mod = None
++                else:
++                    # verify the public module exposes the same object
++                    if hasattr(mod, cls.__name__):
++                        public_obj = getattr(mod, cls.__name__)
++                        # It may be a wrapper, but comparing names is better than
++                        # exposing the private module to users.
++                        if public_obj is cls or getattr(public_obj, '__name__', None) == cls.__name__:
++                            # temporarily shadow the module name on the class
++                            # for downstream restify/_restify functions
++                            cls = type(cls.__name__, (cls,), {'__module__': public})
++        except Exception:
++            # be conservative: if anything goes wrong, fall back to original
++            pass
+         if sys.version_info >= (3, 7):  # py37+
+             return _restify_py37(cls)
+         else:

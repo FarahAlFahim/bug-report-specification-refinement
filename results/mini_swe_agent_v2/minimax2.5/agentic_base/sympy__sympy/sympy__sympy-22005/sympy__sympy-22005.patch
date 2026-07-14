@@ -1,0 +1,18 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..af2d090f32 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -257,6 +257,13 @@ def _solve_reduced_system(system, gens, entry=False):
+             return []
+ 
+         if len(basis) == 1:
++            # Check if the univariate polynomial only involves one variable
++            # If not, the system is underdetermined (infinite solutions)
++            if len(gens) != 1:
++                raise NotImplementedError(filldedent('''
++                    only zero-dimensional systems supported
++                    (finite number of solutions)
++                    '''))
+             return [(zero,) for zero in zeros]
+ 
+         solutions = []

@@ -1,0 +1,32 @@
+diff --git a/sympy/ntheory/residue_ntheory.py b/sympy/ntheory/residue_ntheory.py
+index 9a3052d4c3..bc42cc447a 100644
+--- a/sympy/ntheory/residue_ntheory.py
++++ b/sympy/ntheory/residue_ntheory.py
+@@ -692,6 +692,12 @@ def _nthroot_mod2(s, q, p):
+     v = []
+     for b, e in f.items():
+         v.extend([b]*e)
++    # If s is divisible by p then the trivial root x == 0 (mod p)
++    # is always a solution. Avoid invoking multiplicative-group
++    # algorithms (which assume s is a unit mod p) on the zero
++    # residue as that would lead to incorrect behaviour or errors.
++    if s % p == 0:
++        return 0
+     for qx in v:
+         s = _nthroot_mod1(s, qx, p, False)
+     return s
+@@ -707,6 +713,14 @@ def _nthroot_mod1(s, q, p, all_roots):
+     .. [1] A. M. Johnston "A Generalized qth Root Algorithm"
+ 
+     """
++    # Handle the trivial zero residue early: multiplicative-group
++    # based algorithms (primitive roots, discrete logs) are only
++    # valid for units mod p. If s % p == 0 then x == 0 is a root.
++    if s % p == 0:
++        if all_roots:
++            return [0]
++        return 0
++
+     g = primitive_root(p)
+     if not isprime(q):
+         r = _nthroot_mod2(s, q, p)

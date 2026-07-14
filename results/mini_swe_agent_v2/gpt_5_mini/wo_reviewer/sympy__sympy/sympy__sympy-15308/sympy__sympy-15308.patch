@@ -1,0 +1,44 @@
+diff --git a/sympy/matrices/expressions/trace.py b/sympy/matrices/expressions/trace.py
+index 4a07d6a1f4..91b14c375d 100644
+--- a/sympy/matrices/expressions/trace.py
++++ b/sympy/matrices/expressions/trace.py
+@@ -66,6 +66,23 @@ def doit(self, **kwargs):
+             else:
+                 return Trace(self.arg)
+ 
++    def _latex(self, printer=None):
++        """Return a LaTeX representation for this Trace.
++
++        The printer passed in should be used to print the inner argument so
++        that nested expressions are formatted correctly (for example powers
++        become superscripts).
++        """
++        # Use printer.doprint / printer._print depending on availability.
++        if printer is None:
++            # fallback to simple string form
++            return r"\mbox{Tr}\left(%s\right)" % (str(self.arg))
++        try:
++            inner = printer.doprint(self.arg)
++        except Exception:
++            inner = printer._print(self.arg)
++        return r"\mbox{Tr}\left(%s\right)" % (inner)
++
+ 
+     def _eval_rewrite_as_Sum(self, **kwargs):
+         from sympy import Sum, Dummy
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..453a687872 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -2190,6 +2190,11 @@ def _print_Tr(self, p):
+         contents = self._print(p.args[0])
+         return r'\mbox{Tr}\left(%s\right)' % (contents)
+ 
++    def _print_Trace(self, expr):
++        "Print matrix Trace objects."
++        contents = self._print(expr.args[0])
++        return r'\mbox{Tr}\left(%s\right)' % (contents)
++
+     def _print_totient(self, expr, exp=None):
+         if exp is not None:
+             return r'\left(\phi\left(%s\right)\right)^{%s}' % (self._print(expr.args[0]),

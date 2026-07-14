@@ -1,0 +1,45 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 6d1043b..b14e1ff 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -463,12 +463,38 @@ class IsNull(BuiltinLookup):
+     prepare_rhs = False
+ 
+     def as_sql(self, compiler, connection):
++        """
++        Only accept explicit boolean True/False when a direct Python value
++        is used as the RHS. Expression objects (those exposing
++        resolve_expression) are allowed to pass through (they are handled
++        differently by the query compiler). This prevents accepting arbitrary
++        truthy/falsy Python values (ints, strings, None, etc.) which led to
++        surprising behavior.
++        """
+         sql, params = compiler.compile(self.lhs)
+-        if self.rhs:
++        rhs = self.rhs
++
++        # Allow expressions (they are handled by the query/compiler elsewhere).
++        # Don't try to coerce or validate expression objects here.
++        if hasattr(rhs, 'resolve_expression'):
++            # Preserve previous behavior for expressions (truthiness check),
++            # but do not accept arbitrary direct Python values below.
++            if rhs:
++                return "%s IS NULL" % sql, params
++            else:
++                return "%s IS NOT NULL" % sql, params
++
++        # For direct Python values only accept explicit booleans.
++        if rhs is True:
+             return "%s IS NULL" % sql, params
+-        else:
++        if rhs is False:
+             return "%s IS NOT NULL" % sql, params
+ 
++        raise ValueError(
++            "The '__isnull' lookup only accepts True or False as a direct "
++            "RHS value (or an expression). Got: %r" % (rhs,)
++        )
++
+ 
+ @Field.register_lookup
+ class Regex(BuiltinLookup):

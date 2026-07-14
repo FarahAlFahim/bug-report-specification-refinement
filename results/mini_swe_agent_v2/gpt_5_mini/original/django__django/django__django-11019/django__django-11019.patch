@@ -1,0 +1,137 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 02aa32b207..c60ff59b1c 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -70,9 +70,49 @@ class Media:
+ 
+     @property
+     def _js(self):
+-        js = self._js_lists[0]
+-        # filter(None, ...) avoids calling merge() with empty lists.
+-        for obj in filter(None, self._js_lists[1:]):
++        # Merge all js lists together by building ordering constraints from
++        # each list and performing a topological sort. This avoids spurious
++        # ordering constraints that can arise when merging pairwise.
++        lists = [lst for lst in self._js_lists if lst]
++        if not lists:
++            return []
++
++        # Collect nodes in first-seen order for determinism.
++        nodes = []
++        for lst in lists:
++            for item in lst:
++                if item not in nodes:
++                    nodes.append(item)
++
++        # Build adjacency sets from consecutive pairs in each list.
++        graph = {n: set() for n in nodes}
++        for lst in lists:
++            for a, b in zip(lst, lst[1:]):
++                graph[a].add(b)
++
++        # Compute indegrees.
++        indegree = {n: 0 for n in nodes}
++        for u in graph:
++            for v in graph[u]:
++                indegree[v] += 1
++
++        # Kahn's algorithm.
++        queue = [n for n in nodes if indegree[n] == 0]
++        result = []
++        while queue:
++            node = queue.pop(0)
++            result.append(node)
++            for succ in list(graph[node]):
++                indegree[succ] -= 1
++                if indegree[succ] == 0:
++                    queue.append(succ)
++
++        if len(result) == len(nodes):
++            return result
++
++        # Fall back to pairwise merge which will emit warnings as before.
++        js = lists[0]
++        for obj in lists[1:]:
+             js = self.merge(js, obj)
+         return js
+ 
+@@ -125,17 +165,61 @@ class Media:
+         in a certain order. In JavaScript you may not be able to reference a
+         global or in CSS you might want to override a style.
+         """
+-        # Start with a copy of list_1.
++        # Try to produce an ordering that preserves the relative order of
++        # elements as specified in both lists. Build a graph of ordering
++        # constraints by adding an edge from each item to the item that
++        # immediately follows it in each list. Then perform a topological
++        # sort of the resulting graph. If the constraints are contradictory
++        # (a cycle is detected), fall back to the original insertion-based
++        # algorithm and emit a MediaOrderConflictWarning.
++
++        # Collect nodes in first-seen order to make the output deterministic.
++        nodes = []
++        for item in list_1 + list_2:
++            if item not in nodes:
++                nodes.append(item)
++
++        # Build adjacency sets.
++        graph = {n: set() for n in nodes}
++
++        def add_edges(lst):
++            for a, b in zip(lst, lst[1:]):
++                if b not in graph[a]:
++                    graph[a].add(b)
++
++        add_edges(list_1)
++        add_edges(list_2)
++
++        # Compute indegrees.
++        indegree = {n: 0 for n in nodes}
++        for u in graph:
++            for v in graph[u]:
++                indegree[v] += 1
++
++        # Kahn's algorithm for topological sorting. Use the original
++        # first-seen node order when choosing nodes with zero indegree so
++        # that the result is deterministic and stable.
++        queue = [n for n in nodes if indegree[n] == 0]
++        result = []
++        while queue:
++            node = queue.pop(0)
++            result.append(node)
++            for succ in list(graph[node]):
++                indegree[succ] -= 1
++                if indegree[succ] == 0:
++                    queue.append(succ)
++
++        if len(result) == len(nodes):
++            return result
++
++        # A cycle was detected. Fall back to the previous insertion-based
++        # algorithm and emit a warning about the conflicting pair.
+         combined_list = list(list_1)
+         last_insert_index = len(list_1)
+-        # Walk list_2 in reverse, inserting each element into combined_list if
+-        # it doesn't already exist.
+         for path in reversed(list_2):
+             try:
+-                # Does path already exist in the list?
+                 index = combined_list.index(path)
+             except ValueError:
+-                # Add path to combined_list since it doesn't exist.
+                 combined_list.insert(last_insert_index, path)
+             else:
+                 if index > last_insert_index:
+@@ -144,11 +228,10 @@ class Media:
+                         '%s\n%s' % (combined_list[last_insert_index], combined_list[index]),
+                         MediaOrderConflictWarning,
+                     )
+-                # path already exists in the list. Update last_insert_index so
+-                # that the following elements are inserted in front of this one.
+                 last_insert_index = index
+         return combined_list
+ 
++
+     def __add__(self, other):
+         combined = Media()
+         combined._css_lists = self._css_lists + other._css_lists

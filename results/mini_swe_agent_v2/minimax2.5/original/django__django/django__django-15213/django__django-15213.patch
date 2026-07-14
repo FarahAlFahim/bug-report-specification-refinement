@@ -1,0 +1,46 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..d60240a5cc 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -981,6 +981,10 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+     def as_sql(self, compiler, connection):
+         return compiler.compile(self.expression)
+ 
++    @property
++    def empty_result_set_value(self):
++        return getattr(self.expression, 'empty_result_set_value', NotImplemented)
++
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)
+ 
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 69a2d9298f..8e3f92323f 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -280,6 +280,11 @@ class SQLCompiler:
+                 else:
+                     sql, params = self.compile(Value(empty_result_set_value))
+             else:
++                if not sql:
++                    # Handle empty SQL strings (e.g., from negated WhereNodes that match everything)
++                    empty_result_set_value = getattr(col, 'empty_result_set_value', NotImplemented)
++                    if empty_result_set_value is not NotImplemented:
++                        sql, params = self.compile(Value(empty_result_set_value))
+                 sql, params = col.select_format(self, sql, params)
+             ret.append((col, (sql, params), alias))
+         return ret, klass_info, annotations
+diff --git a/django/db/models/sql/where.py b/django/db/models/sql/where.py
+index 50ff13be75..cdbc32304c 100644
+--- a/django/db/models/sql/where.py
++++ b/django/db/models/sql/where.py
+@@ -210,6 +210,10 @@ class WhereNode(tree.Node):
+         from django.db.models import BooleanField
+         return BooleanField()
+ 
++    @property
++    def empty_result_set_value(self):
++        return 1 if self.negated else 0
++
+     def select_format(self, compiler, sql, params):
+         # Wrap filters with a CASE WHEN expression if a database backend
+         # (e.g. Oracle) doesn't support boolean expression in SELECT or GROUP

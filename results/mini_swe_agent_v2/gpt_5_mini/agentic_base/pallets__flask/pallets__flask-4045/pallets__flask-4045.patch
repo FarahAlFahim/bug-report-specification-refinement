@@ -1,0 +1,15 @@
+diff --git a/src/flask/blueprints.py b/src/flask/blueprints.py
+index 5fb84d86..b50525ae 100644
+--- a/src/flask/blueprints.py
++++ b/src/flask/blueprints.py
+@@ -188,6 +188,10 @@ class Blueprint(Scaffold):
+             template_folder=template_folder,
+             root_path=root_path,
+         )
++        # Blueprint names are used as namespace separators (dots are used
++        # to indicate nesting). Disallow dots in a blueprint's own name to
++        # avoid ambiguous dotted keys and broken nesting semantics.
++        assert ("." not in name), "Blueprint name should not contain dots"
+         self.name = name
+         self.url_prefix = url_prefix
+         self.subdomain = subdomain

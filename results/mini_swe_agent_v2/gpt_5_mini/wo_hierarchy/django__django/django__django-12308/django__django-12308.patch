@@ -1,0 +1,120 @@
+diff --git a/django/contrib/admin/helpers.py b/django/contrib/admin/helpers.py
+index 09dbd090fc..0874643707 100644
+--- a/django/contrib/admin/helpers.py
++++ b/django/contrib/admin/helpers.py
+@@ -198,11 +198,25 @@ class AdminReadonlyField:
+             result_repr = self.empty_value_display
+         else:
+             if field in self.form.fields:
+-                widget = self.form[field].field.widget
++                # Prefer the form's prepared value when available. This ensures
++                # that form-level JSONField behavior (e.g. preserving
++                # InvalidJSONInput or using the form field's prepare_value)
++                # is respected when rendering readonly fields.
++                bound = self.form[field]
++                widget = bound.field.widget
+                 # This isn't elegant but suffices for contrib.auth's
+                 # ReadOnlyPasswordHashWidget.
+                 if getattr(widget, 'read_only', False):
+                     return widget.render(field, value)
++                try:
++                    # BoundField.value() returns the form-prepared value
++                    # (calls field.prepare_value and preserves
++                    # InvalidJSONInput for JSONField).
++                    value = bound.value()
++                except Exception:
++                    # If anything goes wrong getting the bound value,
++                    # fall back to the model-derived value.
++                    pass
+             if f is None:
+                 if getattr(attr, 'boolean', False):
+                     result_repr = _boolean_icon(value)
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..335e639f5f 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,5 +1,6 @@
+ import datetime
+ import decimal
++import json
+ from collections import defaultdict
+ 
+ from django.core.exceptions import FieldDoesNotExist
+@@ -379,6 +380,11 @@ def help_text_for_field(name, model):
+ 
+ def display_for_field(value, field, empty_value_display):
+     from django.contrib.admin.templatetags.admin_list import _boolean_icon
++    # Local import to avoid circular imports at module load time
++    try:
++        from django.forms.fields import InvalidJSONInput, JSONString
++    except Exception:  # pragma: no cover - defensive
++        InvalidJSONInput = JSONString = None
+ 
+     if getattr(field, 'flatchoices', None):
+         return dict(field.flatchoices).get(value, empty_value_display)
+@@ -399,11 +405,43 @@ def display_for_field(value, field, empty_value_display):
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
+     else:
++        # Special-case JSONField so that model JSON values are rendered as
++        # JSON text (honoring any field.encoder) rather than Python
++        # representations (which use single quotes). This also ensures that
++        # form-level JSON inputs that are preserved as InvalidJSONInput are
++        # left untouched by the generic display logic.
++        if getattr(field, '__class__', None) and field.__class__.__name__ == 'JSONField':
++            # Import by name to avoid import-time dependencies; also allow
++            # subclasses of JSONField.
++            try:
++                is_json_field = isinstance(field, models.JSONField)
++            except Exception:
++                is_json_field = False
++            if is_json_field:
++                if value is None:
++                    return empty_value_display
++                # Preserve InvalidJSONInput/JSONString instances from the
++                # forms layer (they are already JSON text or the raw input).
++                if InvalidJSONInput is not None and isinstance(value, InvalidJSONInput):
++                    return str(value)
++                if JSONString is not None and isinstance(value, JSONString):
++                    return str(value)
++                # For model-derived Python structures, serialize to JSON
++                # using the field's encoder.
++                try:
++                    return json.dumps(value, cls=getattr(field, 'encoder', None))
++                except TypeError:
++                    # Fall back to the generic representation if not JSON
++                    return str(value)
+         return display_for_value(value, empty_value_display)
+ 
+ 
+ def display_for_value(value, empty_value_display, boolean=False):
+     from django.contrib.admin.templatetags.admin_list import _boolean_icon
++    try:
++        from django.forms.fields import InvalidJSONInput, JSONString
++    except Exception:  # pragma: no cover - defensive
++        InvalidJSONInput = JSONString = None
+ 
+     if boolean:
+         return _boolean_icon(value)
+@@ -417,8 +455,19 @@ def display_for_value(value, empty_value_display, boolean=False):
+         return formats.localize(value)
+     elif isinstance(value, (int, decimal.Decimal, float)):
+         return formats.number_format(value)
+-    elif isinstance(value, (list, tuple)):
+-        return ', '.join(str(v) for v in value)
++    # Render native JSON-like Python structures as JSON text so that
++    # readonly displays show valid JSON rather than Python repr.
++    elif isinstance(value, (list, tuple, dict)):
++        # Preserve form-level InvalidJSONInput/JSONString which should be
++        # displayed as provided.
++        if InvalidJSONInput is not None and isinstance(value, InvalidJSONInput):
++            return str(value)
++        if JSONString is not None and isinstance(value, JSONString):
++            return str(value)
++        try:
++            return json.dumps(value)
++        except TypeError:
++            return str(value)
+     else:
+         return str(value)
+ 

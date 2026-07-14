@@ -1,0 +1,58 @@
+diff --git a/sklearn/svm/base.py b/sklearn/svm/base.py
+index 64cebe837..17614e736 100644
+--- a/sklearn/svm/base.py
++++ b/sklearn/svm/base.py
+@@ -280,18 +280,46 @@ class BaseLibSVM(BaseEstimator, metaclass=ABCMeta):
+ 
+         self._warn_from_fit_status()
+ 
++        # Determine number of classes for constructing dual coefficients.
++        # For classifiers, n_class is (n_classes - 1) when there are at
++        # least two classes. In degenerate cases where classes_ exists
++        # but has length 1, fall back to 1 to avoid zero division.
+         if hasattr(self, "classes_"):
+-            n_class = len(self.classes_) - 1
++            if len(self.classes_) > 1:
++                n_class = len(self.classes_) - 1
++            else:
++                # Degenerate single-class case: treat as one output row to
++                # keep shapes consistent and avoid division by zero.
++                n_class = 1
+         else:  # regression
+             n_class = 1
++
+         n_SV = self.support_vectors_.shape[0]
+ 
+-        dual_coef_indices = np.tile(np.arange(n_SV), n_class)
+-        dual_coef_indptr = np.arange(0, dual_coef_indices.size + 1,
+-                                     dual_coef_indices.size / n_class)
+-        self.dual_coef_ = sp.csr_matrix(
+-            (dual_coef_data, dual_coef_indices, dual_coef_indptr),
+-            (n_class, n_SV))
++        # Ensure dual_coef_data is an ndarray of the right dtype
++        dual_coef_data = np.asarray(dual_coef_data, dtype=np.float64)
++
++        if n_SV == 0:
++            # No support vectors: build an explicit empty CSR matrix with
++            # shape (n_class, 0). indptr must have length n_class + 1.
++            dual_coef_indices = np.array([], dtype=np.int32)
++            dual_coef_indptr = np.zeros(n_class + 1, dtype=np.int32)
++            self.dual_coef_ = sp.csr_matrix((dual_coef_data,
++                                            dual_coef_indices,
++                                            dual_coef_indptr),
++                                           shape=(n_class, 0))
++        else:
++            # Build index and indptr arrays. Use integer step to avoid
++            # float-step issues and guarantee well-formed CSR structures.
++            dual_coef_indices = np.tile(np.arange(n_SV, dtype=np.int32), n_class)
++            # integer step: number of entries per row
++            step = dual_coef_indices.size // n_class
++            dual_coef_indptr = np.arange(0,
++                                         dual_coef_indices.size + 1,
++                                         step, dtype=np.int32)
++            self.dual_coef_ = sp.csr_matrix(
++                (dual_coef_data, dual_coef_indices, dual_coef_indptr),
++                shape=(n_class, n_SV))
+ 
+     def predict(self, X):
+         """Perform regression on samples in X.

@@ -1,0 +1,63 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..bf4a4a5719 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,21 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    # ax.axis may be an AxisDict (supports indexing) for the toolkit-provided
++    # Axes, but for normal Matplotlib Axes ax.axis is a callable (not
++    # subscriptable). Use the AxisDict toggle if available; otherwise fall back
++    # to the public Matplotlib API (tick_params and set_visible).
++    axis_attr = getattr(ax, "axis", None)
++    if axis_attr is not None and hasattr(axis_attr, "__getitem__") and not callable(axis_attr):
++        axis_attr["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
++        axis_attr["left"].toggle(ticklabels=left_off, label=left_off)
++    else:
++        # For standard Axes, use tick_params to control ticklabel visibility
++        # and the x/y axis label visibility directly.
++        ax.tick_params(axis="x", labelbottom=bottom_on)
++        ax.xaxis.label.set_visible(bottom_on)
++        ax.tick_params(axis="y", labelleft=left_on)
++        ax.yaxis.label.set_visible(left_on)
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +41,32 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        # self.axis may be an AxisDict (supports indexing) for the toolkit's
++        # CbarAxes; for other Axes self.axis is likely a callable and not
++        # subscriptable. Use AxisDict.toggle when available; otherwise fall
++        # back to tick_params and set_visible on the appropriate axis/label.
++        axis_attr = getattr(self, "axis", None)
++        if axis_attr is not None and hasattr(axis_attr, "__getitem__") and not callable(axis_attr):
++            axis = axis_attr[self.orientation]
++            axis.toggle(ticklabels=b, label=b)
++            return
++
++        # Fallback for standard Axes: use tick_params and set_visible
++        if self.orientation == "bottom":
++            self.tick_params(axis="x", labelbottom=b)
++            self.xaxis.label.set_visible(b)
++        elif self.orientation == "top":
++            self.tick_params(axis="x", labeltop=b)
++            self.xaxis.label.set_visible(b)
++        elif self.orientation == "left":
++            self.tick_params(axis="y", labelleft=b)
++            self.yaxis.label.set_visible(b)
++        elif self.orientation == "right":
++            self.tick_params(axis="y", labelright=b)
++            self.yaxis.label.set_visible(b)
++        else:
++            # Unknown orientation: attempt a safe no-op
++            pass
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

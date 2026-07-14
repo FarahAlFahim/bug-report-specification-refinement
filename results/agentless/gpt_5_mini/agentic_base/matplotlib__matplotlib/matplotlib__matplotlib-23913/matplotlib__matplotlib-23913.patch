@@ -1,0 +1,26 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index c34b2ad..5010e71 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -342,6 +342,7 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
++        draggable=None,  # Enable/disable dragging at construction time
+         ncol=1  # synonym for ncols (backward compatibility)
+     ):
+         """
+@@ -539,6 +540,13 @@ class Legend(Artist):
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
+ 
++        # If the caller passed a draggable flag at construction time,
++        # honor it immediately so the legend is draggable upon creation.
++        if draggable is not None:
++            # Delegate to set_draggable which handles the necessary setup.
++            # The default arguments for use_blit and update are fine here.
++            self.set_draggable(draggable)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

@@ -1,0 +1,106 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 3a599ad..10a5b92 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1498,6 +1498,12 @@ class DraggableBase:
+     `DraggableAnnotation`, `update_offset` places the artists in display
+     coordinates, and `finalize_offset` recalculates their position in axes
+     coordinate and set a relevant attribute.
++
++    Note: instances of this helper hold runtime-only references to the
++    interactive canvas and callback ids which are backend-specific and
++    not picklable.  To allow pickling Figures/Artists that reference a
++    draggable helper, we strip those runtime-only attributes in
++    __getstate__ and attempt a lightweight restoration in __setstate__.
+     """
+ 
+     def __init__(self, ref_artist, use_blit=False):
+@@ -1505,6 +1511,7 @@ class DraggableBase:
+         if not ref_artist.pickable():
+             ref_artist.set_picker(True)
+         self.got_artist = False
++        # Runtime-only attributes:
+         self.canvas = self.ref_artist.figure.canvas
+         self._use_blit = use_blit and self.canvas.supports_blit
+         self.cids = [
+@@ -1514,6 +1521,46 @@ class DraggableBase:
+                 'button_release_event', self.on_release),
+         ]
+ 
++    def __getstate__(self):
++        """
++        Return a picklable state for the helper by removing runtime-only
++        backend-specific references (canvas and connected callback ids,
++        temporary animation state).
++        """
++        state = self.__dict__.copy()
++        # Remove or neutralize runtime-only attributes that are not
++        # meaningful/available across pickle boundaries.
++        state['canvas'] = None
++        state['cids'] = []
++        # Remove any transient attributes used during an active drag.
++        state.pop('_c1', None)
++        state.pop('background', None)
++        # Keep ref_artist so that the helper remains associated with the
++        # Artist, but do not attempt to serialize backend canvas.
++        return state
++
++    def __setstate__(self, state):
++        """
++        Restore state. If the referenced artist is attached to a figure,
++        restore a canvas reference to allow future re-connection; however,
++        do not re-connect callbacks automatically (that is a runtime
++        operation that should be triggered by user code).
++        """
++        self.__dict__.update(state)
++        # Try to re-acquire a canvas reference if possible.
++        try:
++            self.canvas = (self.ref_artist.figure.canvas
++                           if self.ref_artist is not None and
++                           getattr(self.ref_artist, "figure", None) is not None
++                           else None)
++        except Exception:
++            self.canvas = None
++        # Ensure cids is a list (no connected callbacks on unpickling).
++        self.cids = []
++        # Recompute whether blitting is supported given the restored canvas.
++        self._use_blit = bool(getattr(self, '_use_blit', False)) and (
++            getattr(self.canvas, "supports_blit", False) if self.canvas else False)
++
+     def on_motion(self, evt):
+         if self._check_still_parented() and self.got_artist:
+             dx = evt.x - self.mouse_x
+@@ -1563,13 +1610,16 @@ class DraggableBase:
+     def disconnect(self):
+         """Disconnect the callbacks."""
+         for cid in self.cids:
+-            self.canvas.mpl_disconnect(cid)
++            # Only attempt to disconnect if we have a canvas reference.
++            if self.canvas is not None:
++                self.canvas.mpl_disconnect(cid)
+         try:
+             c1 = self._c1
+         except AttributeError:
+             pass
+         else:
+-            self.canvas.mpl_disconnect(c1)
++            if self.canvas is not None:
++                self.canvas.mpl_disconnect(c1)
+ 
+     def save_offset(self):
+         pass
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 4dd9259..c43b75c 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,10 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++        # runtime-only draggable helper (may reference Figure.canvas) should
++        # not be pickled as part of the Text state.
++        if '_draggable' in d:
++            d['_draggable'] = None
+         return d
+ 
+     def contains(self, mouseevent):

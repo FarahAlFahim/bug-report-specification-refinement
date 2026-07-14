@@ -1,0 +1,28 @@
+diff --git a/django/core/files/storage.py b/django/core/files/storage.py
+index cbdab1de47..0f162a6f8c 100644
+--- a/django/core/files/storage.py
++++ b/django/core/files/storage.py
+@@ -280,8 +280,21 @@ class FileSystemStorage(Storage):
+                 # OK, the file save worked. Break out of the loop.
+                 break
+ 
+-        if self.file_permissions_mode is not None:
+-            os.chmod(full_path, self.file_permissions_mode)
++        # Ensure uploaded files have consistent permissions. If the
++        # FILE_UPLOAD_PERMISSIONS setting is provided, use that value.
++        # Otherwise, apply a sensible default (0o644) so files created
++        # from temporary uploaded files don't inherit restrictive
++        # temporary-file modes (e.g. 0o600) while streamed uploads use
++        # the process umask-derived mode. Applying an explicit mode here
++        # makes upload behavior consistent across upload backends.
++        file_mode = self.file_permissions_mode if self.file_permissions_mode is not None else 0o644
++        try:
++            os.chmod(full_path, file_mode)
++        except PermissionError:
++            # If the filesystem or OS forbids changing permissions, don't
++            # let that break the upload. Similar code paths elsewhere in
++            # the codebase swallow permission errors when appropriate.
++            pass
+ 
+         # Store filenames with forward slashes, even on Windows.
+         return name.replace('\\', '/')

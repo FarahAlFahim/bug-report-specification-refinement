@@ -1,0 +1,26 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..d154104c51 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -121,6 +121,21 @@ def __new__(cls, *args, **kwargs):
+                 return coords
+ 
+         if not is_sequence(coords):
++            # Handle expressions like Mul(scalar, Point) (e.g. 2*Point(1, 1))
++            # by detecting a Point factor inside the Mul and treating the
++            # expression as a scaled Point. This allows left-multiplication
++            # by scalars to be accepted here.
++            if getattr(coords, 'is_Mul', False):
++                for f in coords.args:
++                    if getattr(f, 'is_Point', False):
++                        # coords = scalar * f  =>  scalar = coords / f
++                        scalar = coords / f
++                        # Build coordinate sequence by scaling the underlying
++                        # point's coordinates and re-enter the normal Point
++                        # constructor flow so validation and 2D/3D dispatch
++                        # remain unchanged.
++                        scaled_coords = [simplify(a*scalar) for a in f.args]
++                        return Point(scaled_coords, evaluate=evaluate)
+             raise TypeError(filldedent('''
+                 Expecting sequence of coordinates, not `{}`'''
+                                        .format(func_name(coords))))

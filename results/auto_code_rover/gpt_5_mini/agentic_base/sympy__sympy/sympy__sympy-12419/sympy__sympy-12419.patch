@@ -1,0 +1,28 @@
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836e..172bd379e0 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,11 +476,22 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
++        from sympy import KroneckerDelta, Integer
++
++        # If equality is decidable at this point, return the concrete value.
+         if i == j:
+             return S.One
+-        else:
++
++        # If both indices are concrete integer objects and are different,
++        # then the entry is definitively zero.
++        if isinstance(i, Integer) and isinstance(j, Integer):
+             return S.Zero
+ 
++        # For symbolic or otherwise undecidable index equality, represent the
++        # identity entry symbolically as a KroneckerDelta so that summation
++        # and substitution can correctly simplify later.
++        return KroneckerDelta(i, j)
++
+     def _eval_determinant(self):
+         return S.One
+ 

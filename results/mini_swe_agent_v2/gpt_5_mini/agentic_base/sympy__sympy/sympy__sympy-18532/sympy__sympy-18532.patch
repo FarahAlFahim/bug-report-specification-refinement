@@ -1,0 +1,56 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 6866648d4e..c42691fd92 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -500,14 +500,22 @@ def atoms(self, *types):
+         {I*pi, 2*sin(y + I*pi)}
+ 
+         """
+-        if types:
+-            types = tuple(
+-                [t if isinstance(t, type) else type(t) for t in types])
+-        else:
+-            types = (Atom,)
+         result = set()
++        # If explicit types are provided, normalize them to classes and
++        # select nodes that are instances of those types (preserve
++        # historical behavior when types are given).
++        if types:
++            types = tuple(t if isinstance(t, type) else type(t) for t in types)
++            for expr in preorder_traversal(self):
++                if isinstance(expr, types):
++                    result.add(expr)
++            return result
++
++        # No types were provided: select structural leaves, i.e. nodes
++        # whose .args is an empty tuple. This is the intended default
++        # definition of an "atom" in terms of the expression tree.
+         for expr in preorder_traversal(self):
+-            if isinstance(expr, types):
++            if getattr(expr, 'args', ()) == ():
+                 result.add(expr)
+         return result
+ 
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 5b3c244b1c..deccca36cb 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1172,10 +1172,14 @@ def atoms(self, *types):
+         {x}
+         """
+ 
+-        types = tuple(t if isinstance(t, type) else type(t) for t in types)
+-        if not types:
+-            types = (Atom,)
+-        return self._eval_atoms(*types)
++        # If types are given, normalize them to types and delegate.
++        # If no types are provided, pass through empty so that the
++        # structural definition of atoms (objects with no .args)
++        # is used by the underlying .atoms implementations.
++        if types:
++            types = tuple(t if isinstance(t, type) else type(t) for t in types)
++            return self._eval_atoms(*types)
++        return self._eval_atoms()
+ 
+     @property
+     def free_symbols(self):

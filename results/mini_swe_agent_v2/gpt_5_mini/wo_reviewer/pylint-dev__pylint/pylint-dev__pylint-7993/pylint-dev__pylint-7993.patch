@@ -1,0 +1,45 @@
+diff --git a/pylint/reporters/text.py b/pylint/reporters/text.py
+index 29bd46798..ba179d0fb 100644
+--- a/pylint/reporters/text.py
++++ b/pylint/reporters/text.py
+@@ -175,14 +175,35 @@ class TextReporter(BaseReporter):
+         self._template = template
+ 
+         # Check to see if all parameters in the template are attributes of the Message
+-        arguments = re.findall(r"\{(.+?)(:.*)?\}", template)
+-        for argument in arguments:
+-            if argument[0] not in MESSAGE_FIELDS:
++        # Use string.Formatter.parse to properly handle escaped braces ({{ and }})
++        # and to follow Python str.format semantics. This avoids treating
++        # literal/escaped braces as fields and supports complex field names.
++        from string import Formatter
++
++        parsed = Formatter().parse(template)
++        for parsed_item in parsed:
++            # parsed_item can be a 3- or 4-tuple depending on Python version
++            # (literal_text, field_name, format_spec[, conversion]). The
++            # field_name is always at index 1.
++            field_name = parsed_item[1]
++            if not field_name:
++                continue
++
++            # The root of the field (before attribute access or indexing)
++            # should be a valid Message field name.
++            root = re.split(r"[.\[]", field_name)[0]
++            if root not in MESSAGE_FIELDS:
+                 warnings.warn(
+-                    f"Don't recognize the argument '{argument[0]}' in the --msg-template. "
++                    f"Don't recognize the argument '{field_name}' in the --msg-template. "
+                     "Are you sure it is supported on the current version of pylint?"
+                 )
+-                template = re.sub(r"\{" + argument[0] + r"(:.*?)?\}", "", template)
++
++                # Remove the unknown field occurrences from the template.
++                # Use re.escape to avoid accidental regex interpretation of
++                # field names and allow optional conversion (!...) and
++                # optional format spec (:{...}).
++                pattern = r"\{" + re.escape(field_name) + r"(?:![^:}]*)?(?:\:.*)?\}"
++                template = re.sub(pattern, "", template)
+         self._fixed_template = template
+ 
+     def write_message(self, msg: Message) -> None:

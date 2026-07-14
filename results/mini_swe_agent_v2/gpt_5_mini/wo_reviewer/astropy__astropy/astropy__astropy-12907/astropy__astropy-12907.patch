@@ -1,0 +1,17 @@
+--- /tmp/orig_separable.py	2026-05-11 15:40:04.748701005 +0000
++++ astropy/modeling/separable.py	2026-05-11 15:39:06.521195006 +0000
+@@ -242,7 +242,13 @@
+         cright = _coord_matrix(right, 'right', noutp)
+     else:
+         cright = np.zeros((noutp, right.shape[1]))
+-        cright[-right.shape[0]:, -right.shape[1]:] = 1
++        # If ``right`` is a coord_matrix ndarray produced by recursion,
++        # preserve its internal structure. Previously this wrote literal
++        # ones into the right-bottom block which could overwrite the
++        # coord_matrix of a nested CompoundModel and produce incorrect
++        # separability results when reusing a pre-built CompoundModel as
++        # the right operand. Assign the array values instead of ones.
++        cright[-right.shape[0]:, -right.shape[1]:] = right
+ 
+     return np.hstack([cleft, cright])
+ 

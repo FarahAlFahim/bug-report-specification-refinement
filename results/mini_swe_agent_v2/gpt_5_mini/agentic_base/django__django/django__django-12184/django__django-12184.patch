@@ -1,0 +1,33 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2d4610aac4..dda82b0515 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -155,11 +155,23 @@ class RegexPattern(CheckURLMixin):
+     def match(self, path):
+         match = self.regex.search(path)
+         if match:
+-            # If there are any named groups, use those as kwargs, ignoring
+-            # non-named groups. Otherwise, pass all non-named arguments as
+-            # positional arguments.
+-            kwargs = {k: v for k, v in match.groupdict().items() if v is not None}
+-            args = () if kwargs else match.groups()
++            # If the pattern defines any named groups, return those as kwargs
++            # (filtering out groups that didn't participate in the match by
++            # removing None values). If the pattern does not define any named
++            # groups, return all positional groups as args. Crucially, the
++            # decision about returning positional args vs kwargs must be
++            # based on whether the pattern defines named groups (i.e.
++            # whether match.groupdict() is non-empty), not on whether any
++            # named group actually matched. An optional named group that does
++            # not match should result in no positional None args being passed
++            # to the view.
++            groupdict = match.groupdict()
++            if groupdict:
++                kwargs = {k: v for k, v in groupdict.items() if v is not None}
++                args = ()
++            else:
++                kwargs = {}
++                args = match.groups()
+             return path[match.end():], args, kwargs
+         return None
+ 

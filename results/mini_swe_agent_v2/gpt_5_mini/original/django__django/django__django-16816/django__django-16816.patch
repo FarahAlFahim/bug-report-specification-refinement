@@ -1,0 +1,98 @@
+diff --git a/django/contrib/admin/checks.py b/django/contrib/admin/checks.py
+index 0fefe65e48..e3a07eef63 100644
+--- a/django/contrib/admin/checks.py
++++ b/django/contrib/admin/checks.py
+@@ -3,7 +3,12 @@ from itertools import chain
+ 
+ from django.apps import apps
+ from django.conf import settings
+-from django.contrib.admin.utils import NotRelationField, flatten, get_fields_from_path
++from django.contrib.admin.utils import (
++    NotRelationField,
++    flatten,
++    get_fields_from_path,
++    label_for_field,
++)
+ from django.core import checks
+ from django.core.exceptions import FieldDoesNotExist
+ from django.db import models
+@@ -891,42 +896,50 @@ class ModelAdminChecks(BaseModelAdminChecks):
+             )
+ 
+     def _check_list_display_item(self, obj, item, label):
+-        if callable(item):
+-            return []
+-        elif hasattr(obj, item):
+-            return []
++        # Use label_for_field to emulate the runtime resolution logic and
++        # catch cases that would raise at render time (e.g. attributes that
++        # are only available on instances). If label_for_field can't resolve
++        # the name, it raises AttributeError and we report admin.E108.
+         try:
+-            field = obj.model._meta.get_field(item)
+-        except FieldDoesNotExist:
++            _label, attr = label_for_field(item, obj.model, obj, return_attr=True)
++        except AttributeError:
++            return [
++                checks.Error(
++                    "The value of '%s' refers to '%s', which is not a "
++                    "callable, an attribute of '%s', or an attribute or "
++                    "method on '%s'."
++                    % (
++                        label,
++                        item,
++                        obj.__class__.__name__,
++                        obj.model._meta.label,
++                    ),
++                    obj=obj.__class__,
++                    id="admin.E108",
++                )
++            ]
++
++        # If attr is None, the name referred to a model field. Ensure it's
++        # not a many-to-many or a reverse foreign key (which aren't valid
++        # in list_display).
++        if attr is None:
+             try:
+-                field = getattr(obj.model, item)
+-            except AttributeError:
++                field = obj.model._meta.get_field(item)
++            except FieldDoesNotExist:
++                # Shouldn't happen because label_for_field returned attr=None
++                # only for real fields, but be defensive.
++                return []
++            if isinstance(field, models.ManyToManyField) or (
++                getattr(field, "rel", None) and field.rel.field.many_to_one
++            ):
+                 return [
+                     checks.Error(
+-                        "The value of '%s' refers to '%s', which is not a "
+-                        "callable, an attribute of '%s', or an attribute or "
+-                        "method on '%s'."
+-                        % (
+-                            label,
+-                            item,
+-                            obj.__class__.__name__,
+-                            obj.model._meta.label,
+-                        ),
++                        f"The value of '{label}' must not be a many-to-many field or a "
++                        f"reverse foreign key.",
+                         obj=obj.__class__,
+-                        id="admin.E108",
++                        id="admin.E109",
+                     )
+                 ]
+-        if isinstance(field, models.ManyToManyField) or (
+-            getattr(field, "rel", None) and field.rel.field.many_to_one
+-        ):
+-            return [
+-                checks.Error(
+-                    f"The value of '{label}' must not be a many-to-many field or a "
+-                    f"reverse foreign key.",
+-                    obj=obj.__class__,
+-                    id="admin.E109",
+-                )
+-            ]
+         return []
+ 
+     def _check_list_display_links(self, obj):

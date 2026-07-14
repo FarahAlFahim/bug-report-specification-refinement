@@ -1,0 +1,51 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index d37d43d5c5..f15743dce8 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -244,6 +244,13 @@ class BaseCommand:
+ 
+     # Metadata about this command.
+     help = ""
++    # The argparse formatter class to use for this command's ArgumentParser.
++    # Subclasses may override this to change formatting behavior (for
++    # example, to use argparse.RawDescriptionHelpFormatter to preserve
++    # whitespace in multi-line help text). The default preserves Django's
++    # option-reordering behaviour while allowing per-command formatters.
++    formatter_class = DjangoHelpFormatter
++
+ 
+     # Configuration shortcuts that alter various logic.
+     _called_from_command_line = False
+@@ -286,10 +293,31 @@ class BaseCommand:
+         Create and return the ``ArgumentParser`` which will be used to
+         parse the arguments to this command.
+         """
++        # Allow commands to specify a formatter_class. To retain Django's
++        # behaviour of showing command-specific options before the common
++        # ones, we combine the chosen formatter with DjangoHelpFormatter so
++        # that reordering behaviour is preserved while description/paragraph
++        # handling can come from the chosen formatter (e.g. RawDescriptionHelpFormatter).
++        chosen_formatter = getattr(self, "formatter_class", DjangoHelpFormatter)
++        # If the chosen formatter already provides DjangoHelpFormatter's
++        # behaviour, use it directly. Otherwise create a combined class that
++        # mixes in the reordering behaviour.
++        if chosen_formatter is DjangoHelpFormatter or issubclass(
++            chosen_formatter, DjangoHelpFormatter
++        ):
++            formatter = chosen_formatter
++        else:
++            # Create a combined formatter with MRO such that
++            # DjangoHelpFormatter.add_usage/add_arguments take effect, but
++            # other formatting behaviour (like description handling) is
++            # inherited from the chosen formatter.
++            formatter_name = "_ManagementFormatter_%s" % chosen_formatter.__name__
++            formatter = type(formatter_name, (DjangoHelpFormatter, chosen_formatter), {})
++
+         parser = CommandParser(
+             prog="%s %s" % (os.path.basename(prog_name), subcommand),
+             description=self.help or None,
+-            formatter_class=DjangoHelpFormatter,
++            formatter_class=formatter,
+             missing_args_message=getattr(self, "missing_args_message", None),
+             called_from_command_line=getattr(self, "_called_from_command_line", None),
+             **kwargs,

@@ -1,0 +1,46 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index da5b40a5ef..52c0f27436 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -897,20 +897,29 @@ class RangeSlider(SliderBase):
+         _api.check_shape((2,), val=val)
+         val[0] = self._min_in_bounds(val[0])
+         val[1] = self._max_in_bounds(val[1])
+-        xy = self.poly.xy
++        # Construct the polygon vertices explicitly from the new values
++        # instead of mutating the existing self.poly.xy in-place.  This
++        # avoids assumptions about whether the Polygon has an explicit
++        # duplicate closing vertex (len(xy) may be 4 or 5 depending on
++        # whether the first and last points are equal).  Passing the core
++        # rectangle vertices lets Polygon.set_xy handle closure correctly.
+         if self.orientation == "vertical":
+-            xy[0] = .25, val[0]
+-            xy[1] = .25, val[1]
+-            xy[2] = .75, val[1]
+-            xy[3] = .75, val[0]
+-            xy[4] = .25, val[0]
++            new_xy = [
++                (0.25, val[0]),
++                (0.25, val[1]),
++                (0.75, val[1]),
++                (0.75, val[0]),
++            ]
+         else:
+-            xy[0] = val[0], .25
+-            xy[1] = val[0], .75
+-            xy[2] = val[1], .75
+-            xy[3] = val[1], .25
+-            xy[4] = val[0], .25
+-        self.poly.xy = xy
++            new_xy = [
++                (val[0], 0.25),
++                (val[0], 0.75),
++                (val[1], 0.75),
++                (val[1], 0.25),
++            ]
++        # Assigning the core vertices; Polygon will append a closing
++        # vertex if appropriate.
++        self.poly.xy = new_xy
+         self.valtext.set_text(self._format(val))
+         if self.drawon:
+             self.ax.figure.canvas.draw_idle()

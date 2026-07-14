@@ -1,0 +1,44 @@
+diff --git a/src/_pytest/tmpdir.py b/src/_pytest/tmpdir.py
+index 29c7e19d7..a615cbe7c 100644
+--- a/src/_pytest/tmpdir.py
++++ b/src/_pytest/tmpdir.py
+@@ -115,7 +115,12 @@ class TempPathFactory:
+             # use a sub-directory in the temproot to speed-up
+             # make_numbered_dir() call
+             rootdir = temproot.joinpath(f"pytest-of-{user}")
+-            rootdir.mkdir(exist_ok=True)
++            # Ensure any intermediate directories are created. On Windows,
++            # a username may contain path-separator characters (for
++            # example a domain\username) which would otherwise create
++            # multiple path components and make mkdir fail. Using
++            # parents=True is defensive and harmless for normal cases.
++            rootdir.mkdir(parents=True, exist_ok=True)
+             basetemp = make_numbered_dir_with_cleanup(
+                 prefix="pytest-", root=rootdir, keep=3, lock_timeout=LOCK_TIMEOUT
+             )
+@@ -154,10 +159,24 @@ def get_user() -> Optional[str]:
+     import getpass
+ 
+     try:
+-        return getpass.getuser()
++        raw = getpass.getuser()
+     except (ImportError, KeyError):
+         return None
+ 
++    if raw is None:
++        return None
++
++    # sanitize the username so it is safe to use as a single filesystem
++    # path component. This prevents path-separator or other filesystem-unsafe
++    # characters (for example Windows domain usernames like "CONTOSO\john")
++    # from being interpreted as directory separators. The sanitization
++    # mirrors the intended behaviour used elsewhere: replace any character
++    # not in A-Za-z0-9._- with an underscore.
++    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", str(raw))
++    # If sanitization produced an empty string, treat as unknown.
++    if not sanitized:
++        return None
++    return sanitized
+ 
+ def pytest_configure(config: Config) -> None:
+     """Create a TempdirFactory and attach it to the config object.

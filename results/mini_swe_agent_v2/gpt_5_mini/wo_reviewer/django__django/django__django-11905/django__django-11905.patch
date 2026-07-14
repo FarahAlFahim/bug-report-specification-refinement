@@ -1,0 +1,49 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..6a803b8e6c 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -462,9 +462,43 @@ class IsNull(BuiltinLookup):
+     lookup_name = 'isnull'
+     prepare_rhs = False
+ 
++    def get_prep_lookup(self):
++        """
++        Validate the RHS for the isnull lookup.
++
++        Only literal booleans (True/False) and expression objects
++        (objects with resolve_expression/as_sql) are accepted. Some
++        subclasses may allow None as a valid RHS by setting
++        can_use_none_as_rhs = True; in that case None is accepted.
++        Any other direct Python value (ints, strings, etc.) is invalid
++        and results in a TypeError. This ensures consistency with the
++        query builder which expects the RHS to be the literal True
++        to trigger OUTER join promotion.
++        """
++        # Preserve expressions untouched.
++        if hasattr(self.rhs, 'resolve_expression'):
++            return self.rhs
++
++        # Allow None only for lookups that explicitly opt-in.
++        if self.rhs is None:
++            if self.can_use_none_as_rhs:
++                return None
++            raise TypeError("isnull lookup received None as RHS; pass True/False or use a lookup that allows None")
++
++        # Only accept literal booleans for direct values.
++        if isinstance(self.rhs, bool):
++            return self.rhs
++
++        raise TypeError(
++            "'isnull' lookup received non-boolean RHS (%r). "
++            "Pass True/False or an expression." % (self.rhs,)
++        )
++
+     def as_sql(self, compiler, connection):
+         sql, params = compiler.compile(self.lhs)
+-        if self.rhs:
++        # Only the literal True means IS NULL; literal False means IS NOT NULL.
++        # Expression RHSs are handled elsewhere during SQL compilation.
++        if self.rhs is True:
+             return "%s IS NULL" % sql, params
+         else:
+             return "%s IS NOT NULL" % sql, params

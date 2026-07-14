@@ -1,0 +1,36 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index ab763da..8a367a6 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1265,6 +1265,15 @@ class Derivative(Expr):
+         """
+         return self.expr._diff_wrt and isinstance(self.doit(), Derivative)
+ 
++    @property
++    def kind(self):
++        """Forward the kind from the contained expression.
++
++        Unevaluated Derivative should report the same kind as the
++        expression being differentiated (e.g. MatrixKind for MatrixSymbol).
++        """
++        return self.expr.kind
++
+     def __new__(cls, expr, *variables, **kwargs):
+ 
+         from sympy.matrices.common import MatrixCommon
+@@ -2337,6 +2346,15 @@ class Subs(Expr):
+         """The expression on which the substitution operates"""
+         return self._args[0]
+ 
++    @property
++    def kind(self):
++        """Forward the kind from the contained expression.
++
++        Subs represents an unevaluated substitution on an expression; its
++        kind should match the wrapped expression's kind.
++        """
++        return self.expr.kind
++
+     @property
+     def point(self):
+         """The values for which the variables are to be substituted"""

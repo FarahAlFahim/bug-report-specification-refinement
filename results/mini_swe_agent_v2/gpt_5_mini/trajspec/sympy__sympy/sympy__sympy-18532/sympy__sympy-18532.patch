@@ -1,0 +1,52 @@
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -500,15 +500,20 @@
+         {I*pi, 2*sin(y + I*pi)}
+ 
+         """
++        # If explicit types are provided, preserve the current behavior
++        # of collecting instances of those types.  Otherwise (no types),
++        # collect true leaves of the expression tree: objects whose
++        # ``.args`` attribute is empty.
++        result = set()
+         if types:
+-            types = tuple(
+-                [t if isinstance(t, type) else type(t) for t in types])
++            types = tuple([t if isinstance(t, type) else type(t) for t in types])
++            for expr in preorder_traversal(self):
++                if isinstance(expr, types):
++                    result.add(expr)
+         else:
+-            types = (Atom,)
+-        result = set()
+-        for expr in preorder_traversal(self):
+-            if isinstance(expr, types):
+-                result.add(expr)
++            for expr in preorder_traversal(self):
++                if not getattr(expr, 'args', ()):  # true leaf nodes
++                    result.add(expr)
+         return result
+ 
+     @property
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1172,10 +1172,15 @@
+         {x}
+         """
+ 
+-        types = tuple(t if isinstance(t, type) else type(t) for t in types)
+-        if not types:
+-            types = (Atom,)
+-        return self._eval_atoms(*types)
++        # Preserve the explicit-type behavior: when types are supplied,
++        # convert any instances to their types and pass them through.
++        # However, when no types are supplied we must defer to the
++        # element-level _eval_atoms so that the Basic.atoms no-arg
++        # behavior (selecting true leaves) is used.
++        if types:
++            types = tuple(t if isinstance(t, type) else type(t) for t in types)
++            return self._eval_atoms(*types)
++        return self._eval_atoms()
+ 
+     @property
+     def free_symbols(self):

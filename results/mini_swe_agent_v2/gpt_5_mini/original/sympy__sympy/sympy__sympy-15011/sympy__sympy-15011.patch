@@ -1,0 +1,29 @@
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index f71bea25f5..a3938d93f4 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -718,6 +718,8 @@ def _preprocess(self, args, expr):
+         if not dummify:
+             dummify = any(isinstance(arg, Dummy) for arg in flatten(args))
+ 
++        from sympy.matrices.expressions.matexpr import MatrixExpr
++
+         argstrs = []
+         for arg in args:
+             if iterable(arg):
+@@ -725,7 +727,14 @@ def _preprocess(self, args, expr):
+                 argstrs.append(nested_argstrs)
+             elif isinstance(arg, DeferredVector):
+                 argstrs.append(str(arg))
+-            elif isinstance(arg, Symbol):
++            elif isinstance(arg, Symbol) or isinstance(arg, MatrixExpr):
++                # Treat MatrixExpr (e.g. MatrixSymbol) like Symbol: use
++                # its printed representation as the argument name, and
++                # dummify or validate it as an identifier. This ensures
++                # that matrix symbols with names that are not valid
++                # Python identifiers (for example names containing
++                # curly braces) are replaced with Dummy symbols when
++                # dummify is requested or necessary.
+                 argrep = self._argrepr(arg)
+ 
+                 if dummify or not self._is_safe_ident(argrep):

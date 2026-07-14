@@ -1,0 +1,48 @@
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+index 477aae247..53a2d555c 100644
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -297,8 +297,18 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+             # annotation only member (ex. attr: int)
+             for name in getannotations(cls):
+                 name = unmangle(cls, name)
+-                if name and name not in members:
++                if not name:
++                    continue
++                if name not in members:
+                     members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
++                else:
++                    # If an ObjectMember for this name already exists (e.g. created
++                    # from other code paths), make sure to record the class that
++                    # provided the annotation. Do not overwrite an existing
++                    # docstring or runtime object; only set class_ when missing.
++                    existing = members[name]
++                    if getattr(existing, 'class_', None) is None:
++                        existing.class_ = cls
+ 
+             # append instance attributes (cf. self.attr1) if analyzer knows
+             try:
+@@ -307,9 +317,22 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+                 analyzer = ModuleAnalyzer.for_module(modname)
+                 analyzer.analyze()
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+-                    if ns == qualname and name not in members:
++                    if ns != qualname:
++                        continue
++                    if name not in members:
+                         members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+                                                      docstring='\n'.join(docstring))
++                    else:
++                        # Merge analyzer-provided attribute docstrings and
++                        # class ownership into any pre-existing ObjectMember
++                        # entry instead of skipping when the name already
++                        # exists. Do not clobber an existing docstring or
++                        # runtime object; only set values when absent.
++                        existing = members[name]
++                        if getattr(existing, 'docstring', None) is None:
++                            existing.docstring = '\n'.join(docstring)
++                        if getattr(existing, 'class_', None) is None:
++                            existing.class_ = cls
+             except (AttributeError, PycodeError):
+                 pass
+     except AttributeError:

@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 66461181d0..d592f7e228 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -1150,6 +1150,35 @@ def _print_BasisDependent(self, expr):
+                         if tempstr[paren] == '\N{right parenthesis extension}':
+                             tempstr = tempstr[:paren] + '\N{right parenthesis extension}'\
+                                          + ' '  + vectstrs[i] + tempstr[paren + 1:]
++                            # Extend the horizontal line to cover the basis vector
++                            # Find the line with the horizontal line (the main fraction line)
++                            lines = tempstr.split('\n')
++                            horiz_line_idx = -1
++                            for idx, line in enumerate(lines):
++                                # Check if the line is the horizontal line
++                                # It should contain ─ characters and possibly box drawing characters
++                                # at the edges (like ⎜ or ⎟)
++                                if '─' in line:
++                                    # Check if this is the main horizontal line (not just a bracket line)
++                                    # The main horizontal line typically has ─ characters in the middle
++                                    # and may have box drawing characters at the edges
++                                    stripped = line.replace('─', '')
++                                    # If after removing ─, we only have box drawing chars or nothing,
++                                    # then this is the horizontal line
++                                    if stripped == '' or all(c in '⎜⎝⎞⎟' for c in stripped):
++                                        # Extend the horizontal line by the length of the basis vector + 1 (for space)
++                                        ext = '─' * (len(vectstrs[i]) + 1)
++                                        lines[idx] = lines[idx] + ext
++                                        horiz_line_idx = idx
++                                        break
++                            
++                            # If we extended the horizontal line, we need to pad all lines to match
++                            if horiz_line_idx >= 0:
++                                max_len = max(len(line) for line in lines)
++                                for idx, line in enumerate(lines):
++                                    if len(line) < max_len:
++                                        lines[idx] = line + ' ' * (max_len - len(line))
++                                tempstr = '\n'.join(lines)
+                             break
+                 elif '\N{RIGHT PARENTHESIS LOWER HOOK}' in tempstr:
+                     flag[i] = 1

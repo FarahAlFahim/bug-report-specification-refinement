@@ -1,0 +1,26 @@
+diff --git a/sympy/utilities/iterables.py b/sympy/utilities/iterables.py
+index d96e76263b..5b8e4e3caf 100644
+--- a/sympy/utilities/iterables.py
++++ b/sympy/utilities/iterables.py
+@@ -2106,13 +2106,21 @@ def uniq(seq, result=None):
+     >>> list(uniq([[1], [2, 1], [1]]))
+     [[1], [2, 1]]
+     """
++    # Check if seq has __len__ (e.g., list, tuple) but not generators
++    seq_has_len = hasattr(seq, '__len__')
+     try:
+         seen = set()
+         result = result or []
++        # Record the size at the start to detect modifications during iteration
++        size = len(seq) if seq_has_len else None
+         for i, s in enumerate(seq):
++            if seq_has_len and len(seq) != size:
++                raise RuntimeError("sequence changed size during iteration")
+             if not (s in seen or seen.add(s)):
+                 yield s
+     except TypeError:
++        # TypeError is raised if seq doesn't support len() or
++        # if the elements are not hashable (unhashable type)
+         if s not in result:
+             yield s
+             result.append(s)

@@ -1,0 +1,43 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..06ade19590 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -31,7 +31,37 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
+-    return res_exponents
++
++    # Ensure the solution exactly (or within a small tolerance when
++    # floating point values are involved) satisfies the linear system.
++    # solve_least_squares may return an approximate solution that does
++    # not fulfill camat * res_exponents == exprmat; in that case the
++    # decomposition into the requested target units is not exact and
++    # should be rejected.
++    residual = camat * res_exponents - exprmat
++
++    # Exact zero check for symbolic/rational cases
++    try:
++        if all(ri == 0 for ri in residual):
++            return res_exponents
++    except Exception:
++        # Fall through to numeric check if equality comparison fails
++        pass
++
++    # Numeric tolerance for floating point ingredients. If all residual
++    # entries are sufficiently small, accept the solution; otherwise
++    # indicate non-convertibility by returning None.
++    tol = 1e-12
++    try:
++        # convert residual entries to complex numbers to get magnitude
++        max_err = max(abs(complex(ri.evalf(15))) for ri in residual)
++    except Exception:
++        return None
++
++    if max_err < tol:
++        return res_exponents
++
++    return None
+ 
+ 
+ def convert_to(expr, target_units, unit_system="SI"):

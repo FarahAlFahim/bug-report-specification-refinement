@@ -1,0 +1,160 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index 1ac1b8e..e6dd1a5 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -304,67 +304,99 @@ def _dataset_concat(
+         datasets, dim, dim_names, data_vars, coords, compat
+     )
+ 
+-    # determine which variables to merge, and then merge them according to compat
+-    variables_to_merge = (coord_names | data_names) - concat_over - dim_names
+-
++    # Build an ordered list of variable names preserving first-seen order
++    ordered_vars = []
++    for ds in datasets:
++        for k in ds.variables:
++            if k not in ordered_vars:
++                ordered_vars.append(k)
++
++    # determine which variables to merge (non-concatenated), preserving order
++    variables_to_merge_set = (coord_names | data_names) - concat_over - dim_names
++    merge_vars_order = [v for v in ordered_vars if v in variables_to_merge_set]
++
++    # helper to construct a placeholder Variable for a missing variable in a dataset
++    def _make_placeholder(ref_var, ds_index, is_concat):
++        # determine dtype and filler
++        if fill_value is dtypes.NA:
++            dtype, filler = dtypes.maybe_promote(ref_var.dtype)
++        else:
++            dtype = ref_var.dtype
++            filler = fill_value
++
++        # determine shape: for concat placeholders, use concat_dim_lengths[ds_index]
++        # for other dims, use dims_sizes where available
++        shape = []
++        for d in ref_var.dims:
++            if is_concat and d == dim:
++                length = concat_dim_lengths[ds_index]
++            else:
++                length = dims_sizes.get(d, concat_dim_lengths[ds_index] if is_concat else None)
++                if length is None:
++                    # fallback to 1 to create a placeholder if size is unknown
++                    length = 1
++            shape.append(length)
++        arr = np.full(tuple(shape), filler, dtype=dtype)
++        return Variable(ref_var.dims, arr)
++
++    # Merge non-concatenated variables (unique_variable) but create placeholders
++    # for datasets that do not contain a particular variable.
+     result_vars = {}
+-    if variables_to_merge:
+-        to_merge = {var: [] for var in variables_to_merge}
+-
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++    if merge_vars_order:
++        merged = {}
++        for var in merge_vars_order:
++            to_merge = []
++            # find a reference variable to infer dims/dtype if needed
++            ref_var = None
++            for ds in datasets:
++                if var in ds.variables:
++                    ref_var = ds.variables[var]
++                    break
++            if ref_var is None:
++                # This shouldn't happen, but guard against it
++                raise ValueError("Variable %r not found in any dataset." % var)
++
++            for i, ds in enumerate(datasets):
++                if var in ds.variables:
++                    to_merge.append(ds.variables[var])
++                else:
++                    # create placeholder with shape based on ref_var and dims_sizes
++                    to_merge.append(_make_placeholder(ref_var, i, is_concat=False))
+ 
+-        for var in variables_to_merge:
+-            result_vars[var] = unique_variable(
+-                var, to_merge[var], compat=compat, equals=equals.get(var, None)
++            merged[var] = unique_variable(
++                var, to_merge, compat=compat, equals=equals.get(var, None)
+             )
++        result_vars.update(merged)
+     else:
+         result_vars = {}
+-    result_vars.update(dim_coords)
+-
+-    # assign attrs and encoding from first dataset
+-    result_attrs = datasets[0].attrs
+-    result_encoding = datasets[0].encoding
+-
+-    # check that global attributes are fixed across all datasets if necessary
+-    for ds in datasets[1:]:
+-        if compat == "identical" and not utils.dict_equiv(ds.attrs, result_attrs):
+-            raise ValueError("Dataset global attributes not equal.")
+-
+-    # we've already verified everything is consistent; now, calculate
+-    # shared dimension sizes so we can expand the necessary variables
+-    def ensure_common_dims(vars):
+-        # ensure each variable with the given name shares the same
+-        # dimensions and the same shape for all of them except along the
+-        # concat dimension
+-        common_dims = tuple(pd.unique([d for v in vars for d in v.dims]))
+-        if dim not in common_dims:
+-            common_dims = (dim,) + common_dims
+-        for var, dim_len in zip(vars, concat_dim_lengths):
+-            if var.dims != common_dims:
+-                common_shape = tuple(dims_sizes.get(d, dim_len) for d in common_dims)
+-                var = var.set_dims(common_dims, common_shape)
+-            yield var
+-
+-    # stack up each variable to fill-out the dataset (in order)
+-    # n.b. this loop preserves variable order, needed for groupby.
+-    for k in datasets[0].variables:
+-        if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
+-            combined = concat_vars(vars, dim, positions)
+-            assert isinstance(combined, Variable)
+-            result_vars[k] = combined
++
++    # Now handle concatenated variables. Preserve ordered_vars order when
++    # stacking variables so the final dataset has deterministic ordering.
++    concat_vars_order = [v for v in ordered_vars if v in concat_over]
++    for k in concat_vars_order:
++        # build list of Variable objects for each dataset, creating placeholders
++        # for datasets missing the variable (placeholders must include the concat dim)
++        # find a reference variable to infer dims/dtype
++        ref_var = None
++        for ds in datasets:
++            if k in ds.variables:
++                ref_var = ds.variables[k]
++                break
++        if ref_var is None:
++            # shouldn't happen, but raise a helpful error
++            raise ValueError("%r is not present in any dataset." % k)
++
++        vars_for_concat = []
++        for i, ds in enumerate(datasets):
++            if k in ds.variables:
++                vars_for_concat.append(ds.variables[k])
++            else:
++                vars_for_concat.append(_make_placeholder(ref_var, i, is_concat=True))
++
++        # ensure common dims (this will expand dims as needed except along concat dim)
++        combined = concat_vars(ensure_common_dims(vars_for_concat), dim, positions)
++        assert isinstance(combined, Variable)
++        result_vars[k] = combined
+ 
+     result = Dataset(result_vars, attrs=result_attrs)
+     absent_coord_names = coord_names - set(result.variables)

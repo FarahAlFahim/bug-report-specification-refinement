@@ -1,0 +1,64 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 379a2917aa..42c37937ce 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -1973,7 +1973,28 @@ def __div__(self, other):
+ 
+     @call_highest_priority('__rmatmul__')
+     def __matmul__(self, other):
+-        return self.__mul__(other)
++        """Matrix multiplication (self @ other).
++
++        Only matrix-like operands are supported for '@'. Scalars are not
++        accepted; use '*' for scalar (elementwise) multiplication.
++        """
++        other = _matrixify(other)
++        # matrix-like objects can have shapes.  This is our first sanity check.
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            if self.shape[1] != other.shape[0]:
++                raise ShapeError("Matrix size mismatch: %s @ %s" % (
++                    self.shape, other.shape))
++
++        # honest sympy matrices defer to their class's routine
++        if getattr(other, 'is_Matrix', False):
++            return self._eval_matrix_mul(other)
++        # Matrix-like objects can be passed to CommonMatrix routines directly.
++        if getattr(other, 'is_MatrixLike', False):
++            return MatrixArithmetic._eval_matrix_mul(self, other)
++
++        # Scalars are not valid operands for matrix multiplication.
++        raise TypeError("'@' is not defined between Matrix and %s; use '*' for scalar multiplication"
++                        % (type(other),))
+ 
+     @call_highest_priority('__rmul__')
+     def __mul__(self, other):
+@@ -2068,7 +2089,28 @@ def __radd__(self, other):
+ 
+     @call_highest_priority('__matmul__')
+     def __rmatmul__(self, other):
+-        return self.__rmul__(other)
++        """Matrix multiplication (other @ self) where self is the right operand.
++
++        Only matrix-like operands are supported for '@'. Scalars are not
++        accepted; use '*' for scalar (elementwise) multiplication.
++        """
++        other = _matrixify(other)
++        # matrix-like objects can have shapes.  This is our first sanity check.
++        if hasattr(other, 'shape') and len(other.shape) == 2:
++            if other.shape[1] != self.shape[0]:
++                raise ShapeError("Matrix size mismatch: %s @ %s" % (
++                    other.shape, self.shape))
++
++        # honest sympy matrices defer to their class's routine
++        if getattr(other, 'is_Matrix', False):
++            return MatrixArithmetic._eval_matrix_rmul(self, other)
++        # Matrix-like objects can be passed to CommonMatrix routines directly.
++        if getattr(other, 'is_MatrixLike', False):
++            return MatrixArithmetic._eval_matrix_rmul(self, other)
++
++        # Scalars are not valid operands for matrix multiplication.
++        raise TypeError("'@' is not defined between %s and Matrix; use '*' for scalar multiplication"
++                        % (type(other),))
+ 
+     @call_highest_priority('__mul__')
+     def __rmul__(self, other):

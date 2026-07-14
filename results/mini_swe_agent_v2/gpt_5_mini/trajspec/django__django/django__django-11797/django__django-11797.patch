@@ -1,0 +1,77 @@
+diff --git a/django/db/models/fields/related_lookups.py b/django/db/models/fields/related_lookups.py
+index c20e220141..b62514f846 100644
+--- a/django/db/models/fields/related_lookups.py
++++ b/django/db/models/fields/related_lookups.py
+@@ -86,7 +86,10 @@ class RelatedIn(In):
+         else:
+             if (not getattr(self.rhs, 'has_select_fields', True) and
+                     not getattr(self.lhs.field.target_field, 'primary_key', False)):
+-                self.rhs.clear_select_clause()
++                # Avoid mutating the caller-supplied Query in-place; operate
++                # on a clone so that select/group_by state is preserved.
++                rhs = self.rhs.clone()
++                rhs.clear_select_clause()
+                 if (getattr(self.lhs.output_field, 'primary_key', False) and
+                         self.lhs.output_field.model == self.rhs.model):
+                     # A case like Restaurant.objects.filter(place__in=restaurant_qs),
+@@ -95,7 +98,8 @@ class RelatedIn(In):
+                     target_field = self.lhs.field.name
+                 else:
+                     target_field = self.lhs.field.target_field.name
+-                self.rhs.add_fields([target_field], True)
++                rhs.add_fields([target_field], True)
++                self.rhs = rhs
+             return super().as_sql(compiler, connection)
+ 
+ 
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 105dc93251..b4880253bd 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -262,9 +262,13 @@ class Exact(FieldGetDbPrepValueMixin, BuiltinLookup):
+         from django.db.models.sql.query import Query
+         if isinstance(self.rhs, Query):
+             if self.rhs.has_limit_one():
+-                # The subquery must select only the pk.
+-                self.rhs.clear_select_clause()
+-                self.rhs.add_fields(['pk'])
++                # The subquery must select only the pk. Operate on a clone
++                # of the caller-provided Query to avoid mutating the original
++                # Query object's select/group_by state.
++                rhs = self.rhs.clone()
++                rhs.clear_select_clause()
++                rhs.add_fields(['pk'])
++                self.rhs = rhs
+             else:
+                 raise ValueError(
+                     'The QuerySet value for an exact lookup must be limited to '
+@@ -354,8 +358,10 @@ class In(FieldGetDbPrepValueIterableMixin, BuiltinLookup):
+             return (placeholder, sqls_params)
+         else:
+             if not getattr(self.rhs, 'has_select_fields', True):
+-                self.rhs.clear_select_clause()
+-                self.rhs.add_fields(['pk'])
++                rhs = self.rhs.clone()
++                rhs.clear_select_clause()
++                rhs.add_fields(['pk'])
++                self.rhs = rhs
+             return super().process_rhs(compiler, connection)
+ 
+     def get_rhs_op(self, connection, rhs):
+diff --git a/django/db/models/sql/where.py b/django/db/models/sql/where.py
+index bf0828dc8b..c942d9f58c 100644
+--- a/django/db/models/sql/where.py
++++ b/django/db/models/sql/where.py
+@@ -239,7 +239,11 @@ class SubqueryConstraint:
+         self.query_object = query_object
+ 
+     def as_sql(self, compiler, connection):
+-        query = self.query_object
++        # Do not mutate the caller-supplied Query instance in-place when
++        # preparing it for compilation as a subquery. Use a clone so that
++        # modifications performed here (for example via set_values) do not
++        # change the original Query object's select/group_by state.
++        query = self.query_object.clone()
+         query.set_values(self.targets)
+         query_compiler = query.get_compiler(connection=connection)
+         return query_compiler.as_subquery_condition(self.alias, self.columns, compiler)

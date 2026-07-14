@@ -1,0 +1,18 @@
+diff --git a/xarray/core/variable.py b/xarray/core/variable.py
+index 64c1895d..86be8e7d 100644
+--- a/xarray/core/variable.py
++++ b/xarray/core/variable.py
+@@ -117,6 +117,13 @@ def as_variable(obj, name=None) -> "Union[Variable, IndexVariable]":
+         # extract the primary Variable from DataArrays
+         obj = obj.variable
+ 
++    # If given a tuple like (dims, data, ...), and the data is a DataArray,
++    # extract its underlying Variable to avoid accessing .values on the
++    # DataArray (which can trigger computation for dask-backed arrays).
++    if isinstance(obj, tuple) and len(obj) >= 2 and isinstance(obj[1], DataArray):
++        # replace the DataArray with its Variable in-place in the tuple
++        obj = (obj[0], obj[1].variable) + tuple(obj[2:])
++
+     if isinstance(obj, Variable):
+         obj = obj.copy(deep=False)
+     elif isinstance(obj, tuple):

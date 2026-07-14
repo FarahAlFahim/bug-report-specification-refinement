@@ -1,0 +1,51 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index da5b40a5ef..73684cc729 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -897,20 +897,35 @@ class RangeSlider(SliderBase):
+         _api.check_shape((2,), val=val)
+         val[0] = self._min_in_bounds(val[0])
+         val[1] = self._max_in_bounds(val[1])
++        # Construct the 4 main vertices of the polygon representing the
++        # selected range. Some backends/versions of the Polygon store a
++        # repeated first vertex as the 5th point to explicitly close the
++        # polygon; guard against both possibilities by building the 4
++        # vertices and appending the first if the existing polygon was
++        # closed.
+         xy = self.poly.xy
+         if self.orientation == "vertical":
+-            xy[0] = .25, val[0]
+-            xy[1] = .25, val[1]
+-            xy[2] = .75, val[1]
+-            xy[3] = .75, val[0]
+-            xy[4] = .25, val[0]
++            new_xy = np.array([
++                (.25, val[0]),
++                (.25, val[1]),
++                (.75, val[1]),
++                (.75, val[0]),
++            ])
+         else:
+-            xy[0] = val[0], .25
+-            xy[1] = val[0], .75
+-            xy[2] = val[1], .75
+-            xy[3] = val[1], .25
+-            xy[4] = val[0], .25
+-        self.poly.xy = xy
++            new_xy = np.array([
++                (val[0], .25),
++                (val[0], .75),
++                (val[1], .75),
++                (val[1], .25),
++            ])
++
++        # Preserve closure if the existing polygon included the repeated
++        # first vertex as the last entry.
++        if len(xy) >= 5:
++            closed_xy = np.vstack([new_xy, new_xy[0]])
++            self.poly.xy = closed_xy
++        else:
++            self.poly.xy = new_xy
+         self.valtext.set_text(self._format(val))
+         if self.drawon:
+             self.ax.figure.canvas.draw_idle()

@@ -1,0 +1,26 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 5af213932..bfb58a0bc 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -102,13 +102,19 @@ class IndexEntries:
+         # following the letters in ASCII, this is where the chr(127) comes from
+         def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
+             key, (void, void, category_key) = entry
++            orig_key = key
+             if category_key:
+-                # using specified category key to sort
++                # using specified category key to sort; keep orig_key for classification
+                 key = category_key
++            # normalized key used for sorting (may be the category key)
+             lckey = unicodedata.normalize('NFD', key.lower())
+             if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 lckey = lckey[1:]
+-            if lckey[0:1].isalpha() or lckey.startswith('_'):
++            # classification (symbol vs letter) must be based on the original entry text
++            cls_key = unicodedata.normalize('NFD', orig_key.lower())
++            if cls_key.startswith('\N{RIGHT-TO-LEFT MARK}'):
++                cls_key = cls_key[1:]
++            if cls_key[0:1].isalpha() or cls_key.startswith('_'):
+                 lckey = chr(127) + lckey
+             # ensure a determinstic order *within* letters by also sorting on
+             # the entry itself

@@ -1,0 +1,32 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 4c2ffd81e1..600c22296d 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -99,6 +99,27 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_Derivative(self, expr):
++        """Print Derivative expressions using Mathematica's D[..., ...]
++
++        Examples
++        --------
++        Derivative(f(t), t) -> D[f[t], t]
++        """
++        return "D[%s]" % self.stringify(expr.args, ", ")
++
++    def _print_Float(self, expr):
++        """Print floating point numbers using Mathematica's scientific
++        notation '*^' instead of Python/Fortran 'e' notation.
++
++        This reuses the StrPrinter float formatting and then converts the
++        exponent marker.
++        """
++        # reuse StrPrinter's formatting for the mantissa etc.
++        res = StrPrinter._print_Float(self, expr)
++        # convert both 'e' and 'E' exponent markers to Mathematica '*^'
++        return res.replace('e', '*^').replace('E', '*^')
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

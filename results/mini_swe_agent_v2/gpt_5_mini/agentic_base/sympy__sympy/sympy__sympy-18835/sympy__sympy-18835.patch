@@ -1,0 +1,69 @@
+diff --git a/sympy/utilities/iterables.py b/sympy/utilities/iterables.py
+index d96e76263b..695a2048c7 100644
+--- a/sympy/utilities/iterables.py
++++ b/sympy/utilities/iterables.py
+@@ -2106,24 +2106,60 @@ def uniq(seq, result=None):
+     >>> list(uniq([[1], [2, 1], [1]]))
+     [[1], [2, 1]]
+     """
++    # Record initial length if available so that mutations that change
++    # the size of the sequence during iteration can be detected. This
++    # protects callers from silently getting partial/incorrect results
++    # when they mutate mutable sequences while uniq is iterating over
++    # them.
++    initial_len = None
++    try:
++        initial_len = len(seq)
++    except Exception:
++        # len may not be supported for all iterables; in that case we
++        # cannot perform size-change detection and proceed as before.
++        initial_len = None
++
+     try:
+         seen = set()
+         result = result or []
+         for i, s in enumerate(seq):
++            # If we can measure length, ensure it hasn't changed since
++            # iteration began. If it has, raise a clear RuntimeError.
++            if initial_len is not None and len(seq) != initial_len:
++                raise RuntimeError("%s changed size during iteration" % type(seq).__name__)
+             if not (s in seen or seen.add(s)):
+                 yield s
+     except TypeError:
+-        if s not in result:
+-            yield s
+-            result.append(s)
++        # In the fallback for unhashable elements we may have used the
++        # last seen 's' from the loop above (or not have one). Before
++        # yielding or recursing, ensure the sequence length is still the
++        # same as at the start of iteration.
++        if initial_len is not None and len(seq) != initial_len:
++            raise RuntimeError("%s changed size during iteration" % type(seq).__name__)
++
++        # 's' may not be defined if the TypeError happened immediately;
++        # guard access by using a try/except NameError.
++        try:
++            current_s = s
++        except NameError:
++            # No element seen yet; fall back to treating seq as iterator
++            current_s = None
++
++        if current_s is not None and current_s not in result:
++            yield current_s
++            result.append(current_s)
+         if hasattr(seq, '__getitem__'):
++            # When recursing on a sequence slice, ensure that the
++            # original sequence length still matches expected before
++            # making the recursive call.
++            if initial_len is not None and len(seq) != initial_len:
++                raise RuntimeError("%s changed size during iteration" % type(seq).__name__)
+             for s in uniq(seq[i + 1:], result):
+                 yield s
+         else:
+             for s in uniq(seq, result):
+                 yield s
+ 
+-
+ def generate_bell(n):
+     """Return permutations of [0, 1, ..., n - 1] such that each permutation
+     differs from the last by the exchange of a single pair of neighbors.

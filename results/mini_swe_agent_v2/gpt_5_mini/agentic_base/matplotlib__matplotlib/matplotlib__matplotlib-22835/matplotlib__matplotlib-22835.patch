@@ -1,0 +1,30 @@
+diff --git a/lib/matplotlib/artist.py b/lib/matplotlib/artist.py
+index 1f33b9d3ec..4fe48febda 100644
+--- a/lib/matplotlib/artist.py
++++ b/lib/matplotlib/artist.py
+@@ -1303,11 +1303,20 @@ class Artist:
+                 return "[]"
+             normed = self.norm(data)
+             if np.isfinite(normed):
+-                # Midpoints of neighboring color intervals.
+-                neighbors = self.norm.inverse(
+-                    (int(self.norm(data) * n) + np.array([0, 1])) / n)
+-                delta = abs(neighbors - data).max()
+-                g_sig_digits = cbook._g_sig_digits(data, delta)
++                # Midpoints of neighboring color intervals.  Some norms
++                # (e.g. BoundaryNorm) are intentionally not invertible and
++                # raise from ``inverse``.  Guard against that here and
++                # fall back to a safe default number of significant digits
++                # so that interactive cursor behavior does not crash.
++                try:
++                    neighbors = self.norm.inverse(
++                        (int(self.norm(data) * n) + np.array([0, 1])) / n)
++                    delta = abs(neighbors - data).max()
++                    g_sig_digits = cbook._g_sig_digits(data, delta)
++                except Exception:
++                    # If the norm is not invertible, default to 3 digits
++                    # which is consistent with the non-finite branch below.
++                    g_sig_digits = 3
+             else:
+                 g_sig_digits = 3  # Consistent with default below.
+             return "[{:-#.{}g}]".format(data, g_sig_digits)

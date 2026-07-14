@@ -1,0 +1,97 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..883cddebd6 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1177,6 +1177,11 @@ class ManyToManyField(RelatedField):
+                     )
+                 )
+ 
++        # Remember whether the caller explicitly provided the symmetrical
++        # argument. This allows the system check to avoid flagging cases where
++        # symmetrical=False was explicitly set.
++        _symmetrical_explicit = (symmetrical is not None)
++
+         if symmetrical is None:
+             symmetrical = (to == RECURSIVE_RELATIONSHIP_CONSTANT)
+ 
+@@ -1204,6 +1209,11 @@ class ManyToManyField(RelatedField):
+             **kwargs,
+         )
+ 
++        # Persist whether symmetrical was explicitly provided by the developer.
++        # This is used by the checks to avoid false positives when symmetrical=False
++        # was explicitly set.
++        self._symmetrical_explicit = _symmetrical_explicit
++
+         self.db_table = db_table
+         self.swappable = swappable
+ 
+@@ -1213,6 +1223,7 @@ class ManyToManyField(RelatedField):
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
++            *self._check_related_name_for_symmetrical(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
+         ]
+ 
+@@ -1260,6 +1271,60 @@ class ManyToManyField(RelatedField):
+ 
+         return warnings
+ 
++    def _check_related_name_for_symmetrical(self, **kwargs):
++        """
++        Error if the developer explicitly provided related_name or
++        related_query_name but Django will suppress the backwards relation.
++
++        Detection uses the same logic used elsewhere:
++        - remote_field.symmetrical is True and the relation is self-referential
++          (remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT or
++           remote_field.model == the model where the field is defined), or
++        - remote_field.is_hidden() is True.
++
++        Use self._related_name / self._related_query_name to detect explicit
++        provision. Do not flag when symmetrical=False was explicitly set.
++        """
++        # Only consider cases where the user explicitly provided a related name.
++        if self._related_name is None and self._related_query_name is None:
++            return []
++
++        # If the user explicitly provided symmetrical=False, do not flag.
++        if getattr(self, '_symmetrical_explicit', False) and not self.remote_field.symmetrical:
++            return []
++
++        from_model = kwargs.get('from_model')
++        suppressed = False
++
++        # Symmetrical self-referential relations suppress the backwards relation.
++        if self.remote_field.symmetrical:
++            if (self.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT or
++                    (from_model is not None and self.remote_field.model == from_model._meta.object_name)):
++                suppressed = True
++
++        # Hidden backwards relations (e.g. related_name ends with '+' or swapped models)
++        # also suppress the backwards relation.
++        if self.remote_field.is_hidden():
++            suppressed = True
++
++        if suppressed:
++            return [
++                checks.Error(
++                    "The ManyToManyField defines a related_name or related_query_name, "
++                    "but Django will suppress the backward relation for this field. "
++                    "Remove the related_name/related_query_name, or set symmetrical=False "
++                    "if you intended a non-symmetrical relation. See the ManyToManyField "
++                    "documentation for details.",
++                    hint=(
++                        "Remove the related_name/related_query_name parameter or set "
++                        "symmetrical=False. See https://docs.djangoproject.com/en/stable/ref/models/fields/#manytomany for details."
++                    ),
++                    obj=self,
++                    id='fields.E342',
++                )
++            ]
++        return []
++
+     def _check_relationship_model(self, from_model=None, **kwargs):
+         if hasattr(self.remote_field.through, '_meta'):
+             qualified_model_name = "%s.%s" % (

@@ -1,0 +1,18 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index 7ecda40..6c78b98 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -101,6 +101,13 @@ class MCodePrinter(CodePrinter):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_Max(self, expr):
++        # Ensure Mathematica uses square brackets for Max and keeps argument order
++        # formatting (Mathematica uses Max[args...]). SymPy may canonicalize
++        # argument order (e.g. Max(2, x)) so we just format the args with
++        # Mathematica's bracket style.
++        return "Max[%s]" % self.stringify(expr.args, ", ")
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

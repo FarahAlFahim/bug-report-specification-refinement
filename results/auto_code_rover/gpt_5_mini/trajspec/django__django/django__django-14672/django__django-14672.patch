@@ -1,0 +1,65 @@
+diff --git a/django/db/migrations/utils.py b/django/db/migrations/utils.py
+index 97bd96a90a..57e95071a3 100644
+--- a/django/db/migrations/utils.py
++++ b/django/db/migrations/utils.py
+@@ -65,6 +65,8 @@ def field_references(
+     incurs. This should not be an issue when this function is used to determine
+     whether or not an optimization can take place.
+     """
++    from django.utils.hashable import make_hashable
++
+     remote_field = field.remote_field
+     if not remote_field:
+         return False
+@@ -92,7 +94,7 @@ def field_references(
+             # Reference to field.
+             reference_field_name in through_fields
+         ):
+-            references_through = (remote_field, through_fields)
++            references_through = (remote_field, make_hashable(through_fields))
+     if not (references_to or references_through):
+         return False
+     return FieldReference(references_to, references_through)
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index f208067aae..191e30fc7f 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1393,6 +1393,8 @@ class Model(metaclass=ModelBase):
+         """ Check if no relationship model is used by more than one m2m field.
+         """
+ 
++        from django.utils.hashable import make_hashable
++
+         errors = []
+         seen_intermediary_signatures = []
+ 
+@@ -1405,7 +1407,12 @@ class Model(metaclass=ModelBase):
+         fields = (f for f in fields if isinstance(f.remote_field.through, ModelBase))
+ 
+         for f in fields:
+-            signature = (f.remote_field.model, cls, f.remote_field.through, f.remote_field.through_fields)
++            signature = (
++                f.remote_field.model,
++                cls,
++                f.remote_field.through,
++                make_hashable(f.remote_field.through_fields),
++            )
+             if signature in seen_intermediary_signatures:
+                 errors.append(
+                     checks.Error(
+diff --git a/django/db/models/fields/reverse_related.py b/django/db/models/fields/reverse_related.py
+index ccc2223a5f..1f1ee6a9a7 100644
+--- a/django/db/models/fields/reverse_related.py
++++ b/django/db/models/fields/reverse_related.py
+@@ -308,9 +308,10 @@ class ManyToManyRel(ForeignObjectRel):
+ 
+     @property
+     def identity(self):
++        from django.utils.hashable import make_hashable
+         return super().identity + (
+             self.through,
+-            self.through_fields,
++            make_hashable(self.through_fields),
+             self.db_constraint,
+         )
+ 

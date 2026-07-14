@@ -1,0 +1,22 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..cd8d408711 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -2190,6 +2190,17 @@ def _print_Tr(self, p):
+         contents = self._print(p.args[0])
+         return r'\mbox{Tr}\left(%s\right)' % (contents)
+ 
++    def _print_Trace(self, expr):
++        """
++        LaTeX printer for Trace objects (sympy.matrices.expressions.trace.Trace).
++
++        Delegate to _print_Tr to keep consistent formatting. This ensures the
++        Trace argument is recursively printed via self._print so inner matrix
++        expressions (e.g., A**2) are rendered as LaTeX (e.g., A^{2}).
++        """
++        # Trace and Tr share the same representation; reuse existing logic.
++        return self._print_Tr(expr)
++
+     def _print_totient(self, expr, exp=None):
+         if exp is not None:
+             return r'\left(\phi\left(%s\right)\right)^{%s}' % (self._print(expr.args[0]),

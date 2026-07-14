@@ -1,0 +1,25 @@
+diff --git a/django/core/cache/backends/filebased.py b/django/core/cache/backends/filebased.py
+index 631da49444..86c7a7ff22 100644
+--- a/django/core/cache/backends/filebased.py
++++ b/django/core/cache/backends/filebased.py
+@@ -89,10 +89,18 @@ class FileBasedCache(BaseCache):
+         return True
+ 
+     def has_key(self, key, version=None):
++        # Avoid a race between exists() and open(): treat a missing file as
++        # a benign cache miss. This mirrors the behaviour of get() which
++        # already treats FileNotFoundError as a cache miss.
+         fname = self._key_to_file(key, version)
+         if os.path.exists(fname):
+-            with open(fname, "rb") as f:
+-                return not self._is_expired(f)
++            try:
++                with open(fname, "rb") as f:
++                    return not self._is_expired(f)
++            except FileNotFoundError:
++                # The file may have been removed by another process after
++                # the exists() check. Treat this as a cache miss.
++                return False
+         return False
+ 
+     def _cull(self):

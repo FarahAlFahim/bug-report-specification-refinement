@@ -1,0 +1,42 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index c55864243a..d16397d4fc 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -3030,11 +3030,25 @@ class Figure(FigureBase):
+         from matplotlib import _pylab_helpers
+         if self.canvas.manager in _pylab_helpers.Gcf.figs.values():
+             state['_restore_to_pylab'] = True
++        # Store the original (unscaled) dpi so that backends that adjust
++        # the figure dpi based on device pixel ratio do not double-scale
++        # the dpi when the figure is unpickled and a new canvas is created.
++        # If _original_dpi is not set, fall back to the current dpi.
++        state['_original_dpi'] = getattr(self, '_original_dpi', self.dpi)
+         return state
+ 
+     def __setstate__(self, state):
+         version = state.pop('__mpl_version__')
+         restore_to_pylab = state.pop('_restore_to_pylab', False)
++        # Pop out the original dpi we saved in __getstate__ so that we can
++        # re-apply it after creating a new canvas.  We do this because
++        # FigureCanvasBase.__init__ will set figure._original_dpi based on
++        # the current figure.dpi, but on HiDPI backends (e.g. macOS) the
++        # backend may subsequently call _set_device_pixel_ratio which scales
++        # the dpi by figure._original_dpi.  Restoring the saved
++        # _original_dpi prevents the dpi from being scaled multiple times
++        # when unpickling.
++        original_dpi = state.pop('_original_dpi', None)
+ 
+         if version != mpl.__version__:
+             _api.warn_external(
+@@ -3045,6 +3059,11 @@ class Figure(FigureBase):
+ 
+         # re-initialise some of the unstored state information
+         FigureCanvasBase(self)  # Set self.canvas.
++        if original_dpi is not None:
++            # Reset the _original_dpi to the saved value.  Backends that
++            # subsequently call _set_device_pixel_ratio will compute the
++            # displayed dpi from this value.
++            self._original_dpi = original_dpi
+ 
+         if restore_to_pylab:
+             # lazy import to avoid circularity

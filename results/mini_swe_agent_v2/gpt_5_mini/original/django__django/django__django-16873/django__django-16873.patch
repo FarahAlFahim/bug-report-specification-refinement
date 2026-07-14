@@ -1,0 +1,19 @@
+diff --git a/django/template/defaultfilters.py b/django/template/defaultfilters.py
+index 03676533b7..3cc646c425 100644
+--- a/django/template/defaultfilters.py
++++ b/django/template/defaultfilters.py
+@@ -586,8 +586,13 @@ def join(value, arg, autoescape=True):
+     """Join a list with a string, like Python's ``str.join(list)``."""
+     try:
+         if autoescape:
++            # Escape list items and the joining string when autoescaping is enabled.
+             value = [conditional_escape(v) for v in value]
+-        data = conditional_escape(arg).join(value)
++            joining = conditional_escape(arg)
++        else:
++            # When autoescape is off, don't escape the joining string.
++            joining = arg
++        data = joining.join(value)
+     except TypeError:  # Fail silently if arg isn't iterable.
+         return value
+     return mark_safe(data)

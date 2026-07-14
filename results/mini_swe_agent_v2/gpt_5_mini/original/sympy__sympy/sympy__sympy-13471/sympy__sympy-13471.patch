@@ -1,0 +1,22 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 7bc96e68eb..8bc69705ed 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1040,9 +1040,15 @@ def __new__(cls, num, dps=None, prec=None, precision=None):
+         elif isinstance(num, tuple) and len(num) in (3, 4):
+             if type(num[1]) is str:
+                 # it's a hexadecimal (coming from a pickled object)
+-                # assume that it is in standard form
++                # Python 2 pickles of mpf mantissas sometimes include the
++                # long integer suffix 'L' (e.g. '1L').  int(..., 16)
++                # on Python 3 does not accept that suffix, so strip it if
++                # present.  Also strip surrounding whitespace just in case.
+                 num = list(num)
+-                num[1] = long(num[1], 16)
++                s = num[1].strip()
++                if s.endswith(('L', 'l')):
++                    s = s[:-1]
++                num[1] = long(s, 16)
+                 _mpf_ = tuple(num)
+             else:
+                 if len(num) == 4:

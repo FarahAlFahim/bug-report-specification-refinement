@@ -1,0 +1,74 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index b28dc925ba..ddd8c9756f 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -1210,7 +1210,21 @@ class SQLCompiler:
+ 
+             if not select_related_descend(f, restricted, requested, select_mask):
+                 continue
+-            related_select_mask = select_mask.get(f) or {}
++            # Check if select_mask has the forward field key (for reverse relations).
++            # This is needed for backwards compatibility when the select_mask
++            # uses the forward field as the key.
++            related_select_mask = select_mask.get(f)
++            if related_select_mask is None:
++                # Check if there's a reverse relation that points to this field.
++                # This can happen when the select_mask uses the forward field as the key.
++                for rel in opts.related_objects:
++                    if rel.field == f:
++                        related_select_mask = select_mask.get(rel.field)
++                        break
++            if related_select_mask is None and hasattr(f, 'field'):
++                related_select_mask = select_mask.get(f.field)
++            if related_select_mask is None:
++                related_select_mask = {}
+             klass_info = {
+                 "model": f.remote_field.model,
+                 "field": f,
+@@ -1250,7 +1264,21 @@ class SQLCompiler:
+                 if o.field.unique and not o.many_to_many
+             ]
+             for related_field, model in related_fields:
+-                related_select_mask = select_mask.get(related_field) or {}
++                # Check if select_mask has the forward field key (for reverse relations).
++                # This is needed for backwards compatibility when the select_mask
++                # uses the forward field as the key.
++                related_select_mask = select_mask.get(related_field)
++                if related_select_mask is None:
++                    # Check if there's a reverse relation that points to this field.
++                    # This can happen when the select_mask uses the forward field as the key.
++                    for rel in opts.related_objects:
++                        if rel.field == related_field:
++                            related_select_mask = select_mask.get(rel.field)
++                            break
++                if related_select_mask is None and hasattr(related_field, 'field'):
++                    related_select_mask = select_mask.get(related_field.field)
++                if related_select_mask is None:
++                    related_select_mask = {}
+                 if not select_related_descend(
+                     related_field,
+                     restricted,
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 781dfd5499..3fb2105aa7 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -783,7 +783,18 @@ class Query(BaseExpression):
+             if field_mask:
+                 if not field.is_relation:
+                     raise FieldError(next(iter(field_mask)))
+-                related_model = field.remote_field.model._meta.concrete_model
++                # Check if this is a reverse OneToOne relation (e.g., 'userprofile'
++                # for a OneToOneField on UserProfile.user). For reverse relations,
++                # we need to use field.field to get the forward field and recurse
++                # with the correct model.
++                if hasattr(field, "field"):
++                    # This is a reverse relation (e.g., OneToOneRel).
++                    # Use the forward field as the key in select_mask.
++                    forward_field = field.field
++                    field_select_mask = select_mask.setdefault(forward_field, {})
++                    related_model = forward_field.model._meta.concrete_model
++                else:
++                    related_model = field.remote_field.model._meta.concrete_model
+                 self._get_only_select_mask(
+                     related_model._meta, field_mask, field_select_mask
+                 )

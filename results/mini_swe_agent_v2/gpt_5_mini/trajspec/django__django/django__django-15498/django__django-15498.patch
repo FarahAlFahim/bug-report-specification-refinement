@@ -1,0 +1,50 @@
+diff --git a/django/views/static.py b/django/views/static.py
+index 1c558a53ff..ff978acd14 100644
+--- a/django/views/static.py
++++ b/django/views/static.py
+@@ -111,6 +111,7 @@ def directory_index(path, fullpath):
+     return HttpResponse(t.render(c))
+ 
+ 
++
+ def was_modified_since(header=None, mtime=0, size=0):
+     """
+     Was something modified since the user last downloaded it?
+@@ -125,16 +126,30 @@ def was_modified_since(header=None, mtime=0, size=0):
+     size
+       This is the size of the item we're talking about.
+     """
++    # Treat missing or empty/whitespace-only headers as not provided
++    if not header:
++        return True
++
++    # Parse the If-Modified-Since header. The expected format is a HTTP
++    # date optionally followed by "; length=<size>". Use a regex to extract
++    # the date and optional size. If the header doesn't match, treat it as
++    # invalid (i.e. consider the resource modified).
++    matches = re.match(r"^([^;]+)(; length=([0-9]+))?$", header, re.IGNORECASE)
++    if not matches:
++        return True
++
+     try:
+-        if header is None:
+-            raise ValueError
+-        matches = re.match(r"^([^;]+)(; length=([0-9]+))?$", header, re.IGNORECASE)
+         header_mtime = parse_http_date(matches[1])
+-        header_len = matches[3]
++    except (ValueError, OverflowError):
++        return True
++
++    header_len = matches[3]
++    try:
+         if header_len and int(header_len) != size:
+-            raise ValueError
++            return True
+         if int(mtime) > header_mtime:
+-            raise ValueError
+-    except (AttributeError, ValueError, OverflowError):
++            return True
++    except (ValueError, OverflowError):
+         return True
++
+     return False

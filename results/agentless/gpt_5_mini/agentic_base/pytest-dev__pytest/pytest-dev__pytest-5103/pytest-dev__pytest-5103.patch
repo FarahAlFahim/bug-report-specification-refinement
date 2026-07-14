@@ -1,0 +1,44 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 4810cdd..1b260f0 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,6 +968,33 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Special-case builtin all()/any() when their single positional
++        # argument is a comprehension (generator or list).  In that case
++        # visit the comprehension first so that any specialized
++        # comprehension visitor (which may unroll elements for
++        # explanation) gets a chance to produce a detailed explanation.
++        # Compose the call explanation from the function explanation and
++        # the comprehension explanation rather than treating the
++        # comprehension as an opaque single value.
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            # visit the function name (builtin) and the comprehension arg
++            new_func, func_expl = self.visit(call.func)
++            arg = call.args[0]
++            # Let the comprehension visitor run and produce its res/expl
++            arg_res, arg_expl = self.visit(arg)
++            # No keyword args expected in this special-case (comprehension is single positional)
++            expl = "%s(%s)" % (func_expl, arg_expl)
++            new_call = ast.Call(new_func, [arg_res], [])
++            res = self.assign(new_call)
++            res_expl = self.explanation_param(self.display(res))
++            outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
++            return res, outer_expl
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1081,4 +1108,4 @@ warn_explicit(
+             res = ast.BoolOp(ast.And(), load_names)
+         else:
+             res = load_names[0]
+-        return res, self.explanation_param(self.pop_format_context(expl_call))
++        return res, self.explanation_param(self.pop_format_context(expl_call))

@@ -1,0 +1,21 @@
+diff --git a/pylint/lint/pylinter.py b/pylint/lint/pylinter.py
+index e2bbf061..bb8927cb 100644
+--- a/pylint/lint/pylinter.py
++++ b/pylint/lint/pylinter.py
+@@ -771,11 +771,15 @@ class PyLinter(
+ 
+     def _expand_files(self, modules: Sequence[str]) -> list[ModuleDescriptionDict]:
+         """Get modules and errors from a list of modules and handle errors."""
++        # Use the compiled ignore_paths from the parsed configuration here.
++        # _ignore_paths may not be initialized yet at this point in the
++        # lifecycle, so prefer the authoritative value on self.config which
++        # is produced by the regexp_paths_csv transformer.
+         result, errors = expand_modules(
+             modules,
+             self.config.ignore,
+             self.config.ignore_patterns,
+-            self._ignore_paths,
++            self.config.ignore_paths,
+         )
+         for error in errors:
+             message = modname = error["mod"]

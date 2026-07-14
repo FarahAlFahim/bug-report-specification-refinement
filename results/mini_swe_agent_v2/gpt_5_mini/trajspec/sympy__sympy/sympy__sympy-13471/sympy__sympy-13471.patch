@@ -1,0 +1,31 @@
+diff --git a/sympy/core/numbers.py b/sympy/core/numbers.py
+index 7bc96e68eb..b286dd7445 100644
+--- a/sympy/core/numbers.py
++++ b/sympy/core/numbers.py
+@@ -1038,11 +1038,23 @@ def __new__(cls, num, dps=None, prec=None, precision=None):
+             else:
+                 raise ValueError("unexpected decimal value %s" % str(num))
+         elif isinstance(num, tuple) and len(num) in (3, 4):
+-            if type(num[1]) is str:
++            # The mantissa component of an mpf tuple may be a string when
++            # coming from a pickled representation (mlib.to_pickable). In
++            # Python-2 this string could include the long literal suffix
++            # 'L' (for example: '1L'), which would make int(..., 16)
++            # fail under Python 3. Be permissive about string types and
++            # sanitize a trailing L/l before parsing as hexadecimal.
++            if isinstance(num[1], string_types):
+                 # it's a hexadecimal (coming from a pickled object)
+-                # assume that it is in standard form
++                # assume that it is in standard form, but tolerate a
++                # trailing Python-2 long suffix
+                 num = list(num)
+-                num[1] = long(num[1], 16)
++                s = num[1]
++                if s and (s[-1] == 'L' or s[-1] == 'l'):
++                    s = s[:-1]
++                # allow compatibility.long (which is int on Py3) to parse
++                # the hexadecimal mantissa
++                num[1] = long(s, 16)
+                 _mpf_ = tuple(num)
+             else:
+                 if len(num) == 4:

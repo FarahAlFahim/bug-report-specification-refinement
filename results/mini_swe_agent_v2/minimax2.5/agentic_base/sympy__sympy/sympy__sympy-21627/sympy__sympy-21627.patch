@@ -1,0 +1,49 @@
+diff --git a/sympy/functions/elementary/hyperbolic.py b/sympy/functions/elementary/hyperbolic.py
+index 892e19cabb..19f624be16 100644
+--- a/sympy/functions/elementary/hyperbolic.py
++++ b/sympy/functions/elementary/hyperbolic.py
+@@ -434,8 +434,13 @@ def _eval_is_real(self):
+         # cosh(a+ib) = cos(b)*cosh(a) + i*sin(b)*sinh(a)
+         # the imaginary part can be an expression like n*pi
+         # if not, check if the imaginary part is a number
++        # Avoid computing im % pi as it can trigger infinite recursion
++        # when the expression contains unevaluated functions.
+         re, im = arg.as_real_imag()
+-        return (im%pi).is_zero
++        try:
++            return (im%pi).is_zero
++        except (TypeError, RecursionError):
++            return None
+ 
+     def _eval_is_positive(self):
+         # cosh(x+I*y) = cos(y)*cosh(x) + I*sin(y)*sinh(x)
+@@ -446,7 +451,12 @@ def _eval_is_positive(self):
+         z = self.args[0]
+ 
+         x, y = z.as_real_imag()
+-        ymod = y % (2*pi)
++        # Avoid computing y % (2*pi) as it can trigger infinite recursion
++        # when the expression contains unevaluated functions.
++        try:
++            ymod = y % (2*pi)
++        except (TypeError, RecursionError):
++            return None
+ 
+         yzero = ymod.is_zero
+         # shortcut if ymod is zero
+@@ -473,7 +483,14 @@ def _eval_is_nonnegative(self):
+         z = self.args[0]
+ 
+         x, y = z.as_real_imag()
+-        ymod = y % (2*pi)
++        # Avoid computing y % (2*pi) as it can trigger infinite recursion
++        # when the expression contains unevaluated functions.
++        # Instead, check if y is known to be a multiple of 2*pi.
++        try:
++            ymod = y % (2*pi)
++        except (TypeError, RecursionError):
++            # If modulo operation fails or triggers recursion, return None
++            return None
+ 
+         yzero = ymod.is_zero
+         # shortcut if ymod is zero

@@ -1,0 +1,47 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..7590d3eee 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -19,16 +19,38 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    # Partition the evaluation cache by a stable identity derived from the
++    # evaluation globals (module identity), so identical expressions in
++    # different modules do not conflate results.
++    default = {}  # type: Dict[object, Any]
+     evalcache = config._store.setdefault(evalcache_key, default)
++
++    # Derive a stable context id from the globals dict. __name__ and __file__
++    # are practical identifiers for the module where the expression is evaluated.
++    ctx = (d.get("__name__"), d.get("__file__"))
++
++    # Ensure there is a per-context sub-cache (created lazily).
++    ctx_cache = evalcache.get(ctx)
++    if ctx_cache is None:
++        ctx_cache = {}
++        evalcache[ctx] = ctx_cache
++
++    # Prefer a context-specific cached result.
+     try:
+-        return evalcache[expr]
++        return ctx_cache[expr]
+     except KeyError:
++        # Backward compatibility: if there exists a legacy expr-only cache entry,
++        # use it as a fallback when no context-specific entry is present.
++        legacy_val = evalcache.get(expr, None)
++        if legacy_val is not None and not isinstance(legacy_val, dict):
++            return legacy_val
++
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
+-        return x
++        value = eval(exprcode, d)
++        ctx_cache[expr] = value
++        return value
+ 
+ 
+ class MarkEvaluator:

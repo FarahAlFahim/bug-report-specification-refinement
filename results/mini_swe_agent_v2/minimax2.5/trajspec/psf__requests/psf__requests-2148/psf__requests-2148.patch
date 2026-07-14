@@ -1,0 +1,59 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..258e6888 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -8,6 +8,7 @@ This module contains the primary objects that power Requests.
+ """
+ 
+ import collections
++import socket
+ import datetime
+ 
+ from io import BytesIO, UnsupportedOperation
+@@ -19,10 +20,10 @@ from .cookies import cookiejar_from_dict, get_cookie_header
+ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+-from .packages.urllib3.exceptions import DecodeError
++from .packages.urllib3.exceptions import DecodeError, ProtocolError
+ from .exceptions import (
+     HTTPError, RequestException, MissingSchema, InvalidURL,
+-    ChunkedEncodingError, ContentDecodingError)
++    ChunkedEncodingError, ContentDecodingError, ConnectionError)
+ from .utils import (
+     guess_filename, get_auth_from_url, requote_uri,
+     stream_decode_response_unicode, to_key_val_list, parse_header_links,
+@@ -640,6 +641,10 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except socket.error as e:
++                    raise ConnectionError(e)
++                except ProtocolError as e:
++                    raise ConnectionError(e)
+             except AttributeError:
+                 # Standard file-like object.
+                 while True:
+diff --git a/requests/packages/urllib3/response.py b/requests/packages/urllib3/response.py
+index 7e0d47fa..7e0faa4f 100644
+--- a/requests/packages/urllib3/response.py
++++ b/requests/packages/urllib3/response.py
+@@ -1,6 +1,6 @@
+ import zlib
+ import io
+-from socket import timeout as SocketTimeout
++from socket import timeout as SocketTimeout, error as socket_error
+ 
+ from ._collections import HTTPHeaderDict
+ from .exceptions import ProtocolError, DecodeError, ReadTimeoutError
+@@ -197,6 +197,10 @@ class HTTPResponse(io.IOBase):
+                 # there is yet no clean way to get at it from this context.
+                 raise ReadTimeoutError(self._pool, None, 'Read timed out.')
+ 
++            except socket_error as e:
++                # socket.error can occur during response body reading (e.g., connection reset)
++                raise ProtocolError('Connection broken: %r' % e, e)
++
+             except BaseSSLError as e:
+                 # FIXME: Is there a better way to differentiate between SSLErrors?
+                 if not 'read operation timed out' in str(e):  # Defensive:

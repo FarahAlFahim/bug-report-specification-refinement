@@ -1,0 +1,21 @@
+diff --git a/src/_pytest/junitxml.py b/src/_pytest/junitxml.py
+index 15c630b1d..034296dd3 100644
+--- a/src/_pytest/junitxml.py
++++ b/src/_pytest/junitxml.py
+@@ -13,6 +13,7 @@ import os
+ import re
+ import sys
+ import time
++import socket
+ 
+ import py
+ 
+@@ -661,6 +662,8 @@ class LogXML:
+             self._get_global_properties_node(),
+             [x.to_xml() for x in self.node_reporters_ordered],
+             name=self.suite_name,
++            timestamp=time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(self.suite_start_time)),
++            hostname=socket.gethostname(),
+             errors=self.stats["error"],
+             failures=self.stats["failure"],
+             skipped=self.stats["skipped"],

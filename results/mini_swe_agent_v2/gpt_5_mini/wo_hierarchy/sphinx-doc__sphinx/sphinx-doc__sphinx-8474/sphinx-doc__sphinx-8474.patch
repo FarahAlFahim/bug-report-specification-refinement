@@ -1,0 +1,67 @@
+diff --git a/sphinx/domains/math.py b/sphinx/domains/math.py
+index a2f4bd964..a06f4fad6 100644
+--- a/sphinx/domains/math.py
++++ b/sphinx/domains/math.py
+@@ -107,11 +107,24 @@ class MathDomain(Domain):
+             # TODO: perhaps use rather a sphinx-core provided prefix here?
+             node_id = make_id('equation-%s' % target)
+             if env.config.math_numfig and env.config.numfig:
++                # toc_fignumbers normally has a per-document shape:
++                #   {docname: {figtype: {id: numbers}}}
++                # Single-file builders assemble it into a master_doc keyed
++                # mapping with aliased keys like "<docname>/<figtype>".
++                # Try the normal per-doc lookup first, then fall back to
++                # the assembled single-file shape.
+                 if docname in env.toc_fignumbers:
+                     numbers = env.toc_fignumbers[docname]['displaymath'].get(node_id, ())
+                     eqno = '.'.join(map(str, numbers))
+                 else:
+-                    eqno = ''
++                    master = getattr(env.config, 'master_doc', None)
++                    if master and master in env.toc_fignumbers:
++                        assembled = env.toc_fignumbers[master]
++                        alias = "%s/%s" % (docname, 'displaymath')
++                        numbers = assembled.get(alias, {}).get(node_id, ())
++                        eqno = '.'.join(map(str, numbers)) if numbers else ''
++                    else:
++                        eqno = ''
+             else:
+                 eqno = str(number)
+ 
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index 4bde57930..436e5e129 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -1061,6 +1061,15 @@ class StandardDomain(Domain):
+             if builder.name == 'latex':
+                 return tuple()
+             elif docname not in env.toc_secnumbers:
++                # maybe single-file builder assembled the mapping under
++                # master_doc with aliases like "<docname>/<anchor>".
++                master = getattr(env.config, 'master_doc', None)
++                if master and master in env.toc_secnumbers:
++                    anchorname = '#' + target_node['ids'][0]
++                    assembled = env.toc_secnumbers[master]
++                    alias = "%s/%s" % (docname, anchorname)
++                    if alias in assembled:
++                        return assembled.get(alias)
+                 raise ValueError  # no number assigned
+             else:
+                 anchorname = '#' + target_node['ids'][0]
+@@ -1075,7 +1084,15 @@ class StandardDomain(Domain):
+                 return env.toc_fignumbers[docname][figtype][figure_id]
+             except (KeyError, IndexError) as exc:
+                 # target_node is found, but fignumber is not assigned.
+-                # Maybe it is defined in orphaned document.
++                # Maybe it is defined in orphaned document or the
++                # environment was assembled for single-file output.
++                master = getattr(env.config, 'master_doc', None)
++                if master and master in env.toc_fignumbers:
++                    assembled = env.toc_fignumbers[master]
++                    alias = "%s/%s" % (docname, figtype)
++                    numbers = assembled.get(alias, {}).get(figure_id)
++                    if numbers is not None:
++                        return numbers
+                 raise ValueError from exc
+ 
+     def get_full_qualified_name(self, node: Element) -> str:

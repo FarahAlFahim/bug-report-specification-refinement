@@ -1,0 +1,18 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index dd3407bac3..7b807e97dc 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -55,9 +55,12 @@ class BaseDatabaseCreation:
+         # where the test DB doesn't exist, in which case we need to
+         # create it, then just not destroy it. If we instead skip
+         # this, we will get an exception.
++        # Close the runtime connection before backend-specific test DB creation
++        # so backends that manipulate physical DB files (e.g. SQLite) won't
++        # conflict with an open connection.
++        self.connection.close()
+         self._create_test_db(verbosity, autoclobber, keepdb)
+ 
+-        self.connection.close()
+         settings.DATABASES[self.connection.alias]["NAME"] = test_database_name
+         self.connection.settings_dict["NAME"] = test_database_name
+ 

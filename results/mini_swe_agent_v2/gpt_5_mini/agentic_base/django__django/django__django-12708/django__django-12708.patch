@@ -1,0 +1,64 @@
+diff --git a/django/db/backends/base/schema.py b/django/db/backends/base/schema.py
+index 61f88401ab..c5e2163fd1 100644
+--- a/django/db/backends/base/schema.py
++++ b/django/db/backends/base/schema.py
+@@ -403,9 +403,57 @@ class BaseDatabaseSchemaEditor:
+         meta_constraint_names = {constraint.name for constraint in model._meta.constraints}
+         meta_index_names = {constraint.name for constraint in model._meta.indexes}
+         columns = [model._meta.get_field(field).column for field in fields]
++        # When deleting an index (constraint_kwargs contains index=True and
++        # unique is not explicitly requested), prefer index-only objects. DB
++        # introspection can report both a unique constraint and an index for
++        # the same column set, which would yield two matches. In that case we
++        # should only remove an index-only object. If no index-only object is
++        # present (indexing is provided solely by a UNIQUE constraint), the
++        # index deletion is a no-op and must not remove the unique
++        # constraint. For unique constraint deletions we keep the strict
++        # behaviour of expecting exactly one match.
++        exclude = meta_constraint_names | meta_index_names
++        # Unique deletion: leave behaviour unchanged.
++        if constraint_kwargs.get('unique'):
++            constraint_names = self._constraint_names(
++                model, columns, exclude=exclude, **constraint_kwargs
++            )
++            if len(constraint_names) != 1:
++                raise ValueError("Found wrong number (%s) of constraints for %s(%s)" % (
++                    len(constraint_names),
++                    model._meta.db_table,
++                    ", ".join(columns),
++                ))
++            self.execute(self._delete_constraint_sql(sql, model, constraint_names[0]))
++            return
++
++        # Index deletion: prefer index-only matches by excluding unique
++        # constraints from the search. If none are found, treat as a no-op.
++        if constraint_kwargs.get('index'):
++            index_only_kwargs = dict(constraint_kwargs)
++            # ensure we only match index-only entries
++            index_only_kwargs['unique'] = False
++            constraint_names = self._constraint_names(
++                model, columns, exclude=exclude, **index_only_kwargs
++            )
++            if not constraint_names:
++                # No index-only object present. Indexing may be provided by a
++                # UNIQUE constraint or the index may already be absent. Do
++                # nothing.
++                return
++            if len(constraint_names) != 1:
++                raise ValueError("Found wrong number (%s) of constraints for %s(%s)" % (
++                    len(constraint_names),
++                    model._meta.db_table,
++                    ", ".join(columns),
++                ))
++            self.execute(self._delete_constraint_sql(sql, model, constraint_names[0]))
++            return
++
++        # Fallback: preserve existing behaviour for other kinds of composed
++        # constraints.
+         constraint_names = self._constraint_names(
+-            model, columns, exclude=meta_constraint_names | meta_index_names,
+-            **constraint_kwargs
++            model, columns, exclude=exclude, **constraint_kwargs
+         )
+         if len(constraint_names) != 1:
+             raise ValueError("Found wrong number (%s) of constraints for %s(%s)" % (

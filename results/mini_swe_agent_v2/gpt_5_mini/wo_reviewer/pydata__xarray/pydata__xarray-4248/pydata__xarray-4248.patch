@@ -1,0 +1,106 @@
+diff --git a/xarray/core/formatting.py b/xarray/core/formatting.py
+index 28eaae5f..67980bc9 100644
+--- a/xarray/core/formatting.py
++++ b/xarray/core/formatting.py
+@@ -146,6 +146,37 @@ def format_item(x, timedelta_format=None, quote_strings=True):
+         return str(x)
+ 
+ 
++
++def format_name_with_units(name, var):
++    """Return a display name including units from var.attrs['units'] if present."""
++    if name is None:
++        name = ''
++    # get underlying variable if wrapper provided
++    v = getattr(var, 'variable', var)
++    units = None
++    try:
++        units = v.attrs.get('units') if getattr(v, 'attrs', None) is not None else None
++    except Exception:
++        units = None
++    if units is None:
++        return str(name)
++    # handle iterable units (e.g., per-band units)
++    if isinstance(units, (str, bytes)):
++        unit_str = str(units)
++    else:
++        try:
++            units_list = list(units)
++            # stringify elements
++            units_list = [str(u) for u in units_list]
++            if all(u == units_list[0] for u in units_list):
++                unit_str = units_list[0]
++            else:
++                unit_str = ",".join(units_list)
++        except Exception:
++            unit_str = str(units)
++    return f"{name}, in {unit_str}"
++
++
+ def format_items(x):
+     """Returns a succinct summaries of all items in a sequence as strings"""
+     x = np.asarray(x)
+@@ -278,7 +309,8 @@ def summarize_variable(
+             raise TypeError(f"`max_width` value of `{max_width}` is not a valid int")
+         else:
+             max_width = max_width_options
+-    first_col = pretty_print(f"  {marker} {name} ", col_width)
++    display_name = format_name_with_units(name, getattr(var, 'variable', var))
++    first_col = pretty_print(f"  {marker} {display_name} ", col_width)
+     if var.dims:
+         dims_str = "({}) ".format(", ".join(map(str, var.dims)))
+     else:
+@@ -341,15 +373,24 @@ EMPTY_REPR = "    *empty*"
+ 
+ def _get_col_items(mapping):
+     """Get all column items to format, including both keys of `mapping`
+-    and MultiIndex levels if any.
++    and MultiIndex levels if any. Names include units when present so
++    column width calculation accounts for units in labels.
+     """
+     from .variable import IndexVariable
+ 
+     col_items = []
+     for k, v in mapping.items():
+-        col_items.append(k)
+         var = getattr(v, "variable", v)
+-        if isinstance(var, IndexVariable):
++        try:
++            is_index = isinstance(var, IndexVariable)
++        except Exception:
++            is_index = False
++        try:
++            display_name = format_name_with_units(k, var)
++        except Exception:
++            display_name = k
++        col_items.append(display_name)
++        if is_index:
+             level_names = var.to_index_variable().level_names
+             if level_names is not None:
+                 col_items += list(level_names)
+diff --git a/xarray/core/formatting_html.py b/xarray/core/formatting_html.py
+index 5521b33e..1840cf36 100644
+--- a/xarray/core/formatting_html.py
++++ b/xarray/core/formatting_html.py
+@@ -5,7 +5,11 @@ from html import escape
+ 
+ import pkg_resources
+ 
+-from .formatting import inline_variable_array_repr, short_data_repr
++from .formatting import (
++    inline_variable_array_repr,
++    short_data_repr,
++    format_name_with_units,
++)
+ 
+ STATIC_FILES = ("static/html/icons-svg-inline.html", "static/css/style.css")
+ 
+@@ -102,7 +106,7 @@ def summarize_variable(name, var, is_index=False, dtype=None, preview=None):
+ 
+     cssclass_idx = " class='xr-has-index'" if is_index else ""
+     dims_str = f"({', '.join(escape(dim) for dim in var.dims)})"
+-    name = escape(str(name))
++    name = escape(format_name_with_units(name, variable))
+     dtype = dtype or escape(str(var.dtype))
+ 
+     # "unique" ids required to expand/collapse subsections

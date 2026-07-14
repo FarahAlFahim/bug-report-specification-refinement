@@ -1,0 +1,33 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 7ef51bc84..87baaed5c 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -377,8 +377,13 @@ def hstack(cls, *args):
+         if len(args) == 0:
+             return cls._new()
+ 
+-        kls = type(args[0])
+-        return reduce(kls.row_join, args)
++        # Use instance-level row_join during reduction so that
++        # any null-matrix special-casing that depends on the
++        # accumulating instance (self) is respected.  Using the
++        # unbound row_join from the first argument's type breaks
++        # correct dimension accumulation when the first argument is
++        # a null matrix.
++        return reduce(lambda a, b: a.row_join(b), args)
+ 
+     def reshape(self, rows, cols):
+         """Reshape the matrix. Total number of elements must remain the same.
+@@ -600,8 +605,10 @@ def vstack(cls, *args):
+         if len(args) == 0:
+             return cls._new()
+ 
+-        kls = type(args[0])
+-        return reduce(kls.col_join, args)
++        # See comment in hstack: use the accumulating instance's
++        # col_join so null-matrix handling and instance-level dispatch
++        # behave correctly.
++        return reduce(lambda a, b: a.col_join(b), args)
+ 
+ 
+ class MatrixSpecial(MatrixRequired):

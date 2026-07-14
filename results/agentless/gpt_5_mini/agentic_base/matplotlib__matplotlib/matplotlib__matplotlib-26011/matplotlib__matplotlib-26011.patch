@@ -1,0 +1,32 @@
+diff --git a/lib/matplotlib/axis.py b/lib/matplotlib/axis.py
+index e93ff96..87aa6aa 100644
+--- a/lib/matplotlib/axis.py
++++ b/lib/matplotlib/axis.py
+@@ -1239,11 +1239,24 @@ class Axis(martist.Artist):
+ 
+         if emit:
+             self.axes.callbacks.process(f"{name}lim_changed", self.axes)
+-            # Call all of the other axes that are shared with this one
++            # Call all of the other axes that are shared with this one.
++            # When updating siblings, we must avoid re-entering propagation
++            # (which would cause recursion), but still ensure that callbacks
++            # registered on those sibling Axes are invoked if their limits
++            # actually change.  Therefore, update the sibling Axis with
++            # emit=False to suppress further propagation, then explicitly
++            # invoke the sibling Axes' callback registry if the view limits
++            # changed as a result of the update.
+             for other in self._get_shared_axes():
+                 if other is not self.axes:
+-                    other._axis_map[name]._set_lim(
+-                        v0, v1, emit=False, auto=auto)
++                    axis_other = other._axis_map[name]
++                    old0, old1 = axis_other.get_view_interval()
++                    axis_other._set_lim(v0, v1, emit=False, auto=auto)
++                    new0, new1 = axis_other.get_view_interval()
++                    # Only notify the sibling Axes' callbacks if its view limits
++                    # actually changed.
++                    if (old0, old1) != (new0, new1):
++                        other.callbacks.process(f"{name}lim_changed", other)
+                     if other.figure != self.figure:
+                         other.figure.canvas.draw_idle()
+ 

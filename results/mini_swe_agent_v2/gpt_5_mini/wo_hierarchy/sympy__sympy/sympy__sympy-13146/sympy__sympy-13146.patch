@@ -1,0 +1,86 @@
+diff --git a/sympy/core/add.py b/sympy/core/add.py
+index 2ec4fff073..1f81e856df 100644
+--- a/sympy/core/add.py
++++ b/sympy/core/add.py
+@@ -112,6 +112,21 @@ def flatten(cls, seq):
+                         # e.g. 3 + ...
+         order_factors = []
+ 
++        def _find_key_equiv(d, key):
++            """Find an existing dict key in d that is equivalent to key.
++
++            Equivalence is determined by structural equality (==) or
++            by the symbolic .equals method returning True. If none is
++            found, return None.
++            """
++            for k in d:
++                try:
++                    if k == key or (hasattr(key, 'equals') and key.equals(k)):
++                        return k
++                except Exception:
++                    pass
++            return None
++
+         for o in seq:
+ 
+             # O(x)
+@@ -185,9 +200,13 @@ def flatten(cls, seq):
+             # s is an expression with number factor extracted
+             # let's collect terms with the same s, so e.g.
+             # 2*x**2 + 3*x**2  ->  5*x**2
+-            if s in terms:
+-                terms[s] += c
+-                if terms[s] is S.NaN:
++            # find an equivalent existing key so numerically-equal but
++            # structurally-different expressions (e.g. Floats with different
++            # internal representation) are grouped together
++            k = _find_key_equiv(terms, s)
++            if k is not None:
++                terms[k] += c
++                if terms[k] is S.NaN:
+                     # we know for sure the result will be nan
+                     return [S.NaN], [], None
+             else:
+@@ -297,10 +316,22 @@ def as_coefficients_dict(a):
+         """
+ 
+         d = defaultdict(list)
++        def _find_key_equiv(dct, key):
++            for k in dct:
++                try:
++                    if k == key or (hasattr(key, 'equals') and key.equals(k)):
++                        return k
++                except Exception:
++                    pass
++            return None
+         for ai in a.args:
+             c, m = ai.as_coeff_Mul()
+-            d[m].append(c)
+-        for k, v in d.items():
++            k = _find_key_equiv(d, m)
++            if k is None:
++                d[m].append(c)
++            else:
++                d[k].append(c)
++        for k, v in list(d.items()):
+             if len(v) == 1:
+                 d[k] = v[0]
+             else:
+diff --git a/sympy/core/mul.py b/sympy/core/mul.py
+index 66fae5e092..767288880c 100644
+--- a/sympy/core/mul.py
++++ b/sympy/core/mul.py
+@@ -475,7 +475,12 @@ def _gather(c_powers):
+         inv_exp_dict = {}   # exp:Mul(num-bases)     x    x
+                             # e.g.  x:6  for  ... * 2  * 3  * ...
+         for b, e in num_exp:
+-            inv_exp_dict.setdefault(e, []).append(b)
++            # try to find an equivalent existing exponent key
++            k = _find_key_equiv(inv_exp_dict, e)
++            if k is None:
++                inv_exp_dict[e] = [b]
++            else:
++                inv_exp_dict[k].append(b)
+         for e, b in inv_exp_dict.items():
+             inv_exp_dict[e] = cls(*b)
+         c_part.extend([Pow(b, e) for e, b in inv_exp_dict.items() if e])

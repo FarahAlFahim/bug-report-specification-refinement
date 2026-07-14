@@ -1,0 +1,48 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 4648daf395..5bb41a7a25 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1077,10 +1077,41 @@ class Query(BaseExpression):
+         elif isinstance(value, (list, tuple)):
+             # The items of the iterable may be expressions and therefore need
+             # to be resolved independently.
+-            return type(value)(
++            #
++            # Historically this reconstructed sequence-like lookup arguments
++            # by calling type(value)(<generator-of-resolved-items>). That
++            # assumes that the constructor of the original type accepts a
++            # single iterable argument (e.g. list or tuple). However,
++            # subclasses of tuple such as collections.namedtuple require
++            # one positional argument per field (i.e. they expect separate
++            # positional args), so passing a single iterable raises
++            # TypeError. To accommodate both kinds of constructors, first
++            # materialize the resolved items and then attempt construction
++            # in a robust way: try the single-iterable form first (which is
++            # what tuple/list expect), and if that fails try expanding the
++            # items as separate positional arguments (which works for
++            # namedtuple-like types). As a last resort fall back to a plain
++            # tuple/list of the resolved items.
++            resolved_items = [
+                 self.resolve_lookup_value(sub_value, can_reuse, allow_joins)
+                 for sub_value in value
+-            )
++            ]
++            if isinstance(value, list):
++                # list() only accepts a single iterable argument, so return a
++                # plain list of resolved items.
++                return list(resolved_items)
++            # For tuple and tuple-subclasses, try to re-create the same type.
++            try:
++                # Prefer the single-iterable constructor (e.g. tuple(resolved_items)).
++                return type(value)(resolved_items)
++            except TypeError:
++                try:
++                    # Some tuple-subclasses (namedtuple) expect separate
++                    # positional arguments per field.
++                    return type(value)(*resolved_items)
++                except TypeError:
++                    # As a last resort, return a plain tuple of resolved items.
++                    return tuple(resolved_items)
+         return value
+ 
+     def solve_lookup_type(self, lookup):

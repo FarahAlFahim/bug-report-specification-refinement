@@ -1,0 +1,47 @@
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+index 477aae247..034b0374b 100644
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -297,8 +297,15 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+             # annotation only member (ex. attr: int)
+             for name in getannotations(cls):
+                 name = unmangle(cls, name)
+-                if name and name not in members:
++                if not name:
++                    continue
++                if name not in members:
+                     members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
++                else:
++                    # merge declaring-class info into existing entry if missing
++                    existing = members[name]
++                    if getattr(existing, 'class_', None) is None:
++                        existing.class_ = cls
+ 
+             # append instance attributes (cf. self.attr1) if analyzer knows
+             try:
+@@ -307,9 +314,23 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+                 analyzer = ModuleAnalyzer.for_module(modname)
+                 analyzer.analyze()
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+-                    if ns == qualname and name not in members:
++                    if ns != qualname:
++                        continue
++                    text = '\n'.join(docstring)
++                    if name not in members:
+                         members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+-                                                     docstring='\n'.join(docstring))
++                                                     docstring=text)
++                    else:
++                        # merge analyzer-provided docstring and declaring-class info
++                        existing = members[name]
++                        if existing.docstring:
++                            # append if the new text is not already present
++                            if text not in existing.docstring:
++                                existing.docstring = existing.docstring + '\n' + text
++                        else:
++                            existing.docstring = text
++                        if getattr(existing, 'class_', None) is None:
++                            existing.class_ = cls
+             except (AttributeError, PycodeError):
+                 pass
+     except AttributeError:

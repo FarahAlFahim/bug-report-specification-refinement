@@ -1,0 +1,14 @@
+diff --git a/django/contrib/admin/checks.py b/django/contrib/admin/checks.py
+index 0fefe65e48..8e199a6b7b 100644
+--- a/django/contrib/admin/checks.py
++++ b/django/contrib/admin/checks.py
+@@ -917,6 +917,9 @@ class ModelAdminChecks(BaseModelAdminChecks):
+                     )
+                 ]
+         if isinstance(field, models.ManyToManyField) or (
++            isinstance(field, models.ManyToOneRel)
++            and not isinstance(field, models.OneToOneRel) or
++            isinstance(field, models.ManyToManyRel) or
+             getattr(field, "rel", None) and field.rel.field.many_to_one
+         ):
+             return [

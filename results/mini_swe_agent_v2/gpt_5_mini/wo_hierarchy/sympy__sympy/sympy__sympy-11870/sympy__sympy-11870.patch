@@ -1,0 +1,28 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..f1c3ae4bd0 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -475,7 +475,23 @@ def trigsimp(expr, **opts):
+ 
+     expr = sympify(expr)
+ 
++    # If the expression contains exponentials (or the base E) it may
++    # be algebraically trigonometric but expressed purely in terms of
++    # exp and I. Ensure we attempt exponential->trig rewrites early so
++    # that inputs like (-I*exp(I*k) + I*exp(-I*k))/2 are converted to
++    # sin(k). The exptrigsimp routine contains guards to avoid
++    # introducing I where it was not present.
+     try:
++        # Only run exptrigsimp when there is something exponential-ish
++        # to avoid unnecessary work on generic inputs.
++        if expr.has(exp) or expr.has(S.Exp1) or expr.has(I):
++            expr = exptrigsimp(expr)
++    except Exception:
++        # Be conservative: if exptrigsimp fails for some exotic inputs,
++        # fall back to the original expression rather than crashing.
++        pass
++
++
+         return expr._eval_trigsimp(**opts)
+     except AttributeError:
+         pass

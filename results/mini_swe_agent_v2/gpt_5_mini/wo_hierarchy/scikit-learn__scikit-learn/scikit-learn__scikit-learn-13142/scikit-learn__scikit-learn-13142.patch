@@ -1,0 +1,29 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index bd34333c0..03837fe5d 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -260,7 +260,11 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
+         # Always do a final e-step to guarantee that the labels returned by
+         # fit_predict(X) are always consistent with fit(X).predict(X)
+         # for any value of max_iter and tol (and any random_state).
+-        _, log_resp = self._e_step(X)
++        # Compute the final responsibilities after we set the estimator
++        # parameters to the best found across initializations. Previously
++        # the E-step was executed before assigning best_params which meant
++        # that the returned labels could correspond to a different
++        # initialization than the stored parameters when n_init > 1.
+ 
+         if not self.converged_:
+             warnings.warn('Initialization %d did not converge. '
+@@ -270,6 +274,11 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
+                           % (init + 1), ConvergenceWarning)
+ 
+         self._set_parameters(best_params)
++        # Now that the estimator stores the best parameters, compute the
++        # responsibilities corresponding to those parameters so that the
++        # labels returned by fit_predict match predict() called after fit.
++        _, log_resp = self._e_step(X)
++
+         self.n_iter_ = best_n_iter
+         self.lower_bound_ = max_lower_bound
+ 

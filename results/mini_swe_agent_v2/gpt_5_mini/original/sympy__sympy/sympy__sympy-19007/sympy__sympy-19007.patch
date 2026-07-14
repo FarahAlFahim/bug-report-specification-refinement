@@ -1,0 +1,49 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index b821c42845..ccc0aab265 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -233,17 +233,39 @@ def transpose(self):
+         return self._eval_transpose()
+ 
+     def _entry(self, i, j, **kwargs):
+-        # Find row entry
++        # Find row entry. If the comparison of the (possibly symbolic)
++        # index with the block sizes cannot be decided (i.e. is neither
++        # True nor False), then we must not pick a block because the
++        # element may come from multiple blocks. In that case return a
++        # MatrixElement for the whole BlockMatrix so that it remains
++        # unevaluated.
++        from sympy import S
++        from sympy.matrices.expressions.matexpr import MatrixElement
++
++        orig_i, orig_j = i, j
++
++        row_block = None
+         for row_block, numrows in enumerate(self.rowblocksizes):
+-            if (i < numrows) != False:
++            cond = i < numrows
++            if cond is True or cond is S.true:
+                 break
+-            else:
++            elif cond is False or cond is S.false:
+                 i -= numrows
++                continue
++            else:
++                return MatrixElement(self, orig_i, orig_j)
++
++        col_block = None
+         for col_block, numcols in enumerate(self.colblocksizes):
+-            if (j < numcols) != False:
++            cond = j < numcols
++            if cond is True or cond is S.true:
+                 break
+-            else:
++            elif cond is False or cond is S.false:
+                 j -= numcols
++                continue
++            else:
++                return MatrixElement(self, orig_i, orig_j)
++
+         return self.blocks[row_block, col_block][i, j]
+ 
+     @property

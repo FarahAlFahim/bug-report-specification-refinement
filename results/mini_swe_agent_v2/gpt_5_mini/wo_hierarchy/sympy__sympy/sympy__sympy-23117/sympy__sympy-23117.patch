@@ -1,0 +1,22 @@
+diff --git a/sympy/tensor/array/ndim_array.py b/sympy/tensor/array/ndim_array.py
+index 6490a655a4..082162a665 100644
+--- a/sympy/tensor/array/ndim_array.py
++++ b/sympy/tensor/array/ndim_array.py
+@@ -195,7 +195,16 @@ def f(pointer):
+                 return [pointer], ()
+ 
+             result = []
+-            elems, shapes = zip(*[f(i) for i in pointer])
++            # Ensure we can handle empty iterables. Converting to a list
++            # allows determining emptiness and avoids ``zip(*[])`` which
++            # would raise ValueError. An empty top-level iterable is
++            # represented canonically as having shape (0,) and producing
++            # an empty flat list.
++            pointer_list = list(pointer)
++            if len(pointer_list) == 0:
++                return [], (0,)
++
++            elems, shapes = zip(*[f(i) for i in pointer_list])
+             if len(set(shapes)) != 1:
+                 raise ValueError("could not determine shape unambiguously")
+             for i in elems:

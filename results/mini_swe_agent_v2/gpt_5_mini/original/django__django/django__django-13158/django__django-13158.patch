@@ -1,0 +1,22 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index 07d6ffd4ca..016c1105ff 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -919,7 +919,16 @@ class QuerySet:
+     def none(self):
+         """Return an empty QuerySet."""
+         clone = self._chain()
+-        clone.query.set_empty()
++        # If this QuerySet represents a combinator (union/intersection/difference)
++        # the actual SQL is produced from the combined queries. Setting the
++        # top-level query to empty would not affect the combined parts, which
++        # would still return results. In that case, mark each underlying query
++        # as empty so the combined result is empty as well.
++        if clone.query.combinator and getattr(clone.query, 'combined_queries', None):
++            for q in clone.query.combined_queries:
++                q.set_empty()
++        else:
++            clone.query.set_empty()
+         return clone
+ 
+     ##################################################################

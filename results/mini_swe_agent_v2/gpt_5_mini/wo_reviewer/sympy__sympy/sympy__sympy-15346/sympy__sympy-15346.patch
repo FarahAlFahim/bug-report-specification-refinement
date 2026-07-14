@@ -1,0 +1,59 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 8ba346adbe..69ef03d258 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -503,7 +503,12 @@ def traverse(e):
+ 
+     trigsimpfunc = {
+         'fu': (lambda x: fu(x, **opts)),
+-        'matching': (lambda x: futrig(x)),
++        # The historical "matching" strategy used Fu-like
++        # transformations (futrig). Use the older pattern-matching
++        # based _trigsimp here so that explicit trig-pattern rewrites
++        # (which rely on __trigsimp) are applied consistently,
++        # including for numeric Rational arguments.
++        'matching': (lambda x: _trigsimp(x)),
+         'groebner': (lambda x: groebnersimp(x, **opts)),
+         'combined': (lambda x: futrig(groebnersimp(x,
+                                polynomial=True, hints=[2, tan]))),
+@@ -1002,13 +1007,33 @@ def __trigsimp(expr, deep=False):
+             for pattern, result in matchers_add:
+                 if not _dotrig(expr, pattern):
+                     continue
+-                expr = TR10i(expr)
+-                if expr.has(HyperbolicFunction):
+-                    res = expr.match(pattern)
+-                    # if "d" contains any trig or hyperbolic funcs with
+-                    # argument "a" or "b" then skip the simplification;
+-                    # this isn't perfect -- see tests
+-                    if res is None or not (a in res and b in res) or any(
++                # First try matching the current expression (before
++                # normalization). If that fails, try matching after
++                # applying TR10i which can perform angle-sum/angle-diff
++                # normalizations.
++                res = expr.match(pattern)
++                if res is None or not (a in res and b in res):
++                    # try normalized expression
++                    nexpr = TR10i(expr)
++                    # only attempt matching if normalization produced
++                    # trig/hyperbolic content
++                    if not nexpr.has(*_trigs):
++                        continue
++                    res = nexpr.match(pattern)
++                    if res is None or not (a in res and b in res):
++                        continue
++                    # make sure 'd' (if present) does not contain trig/hyperbolic
++                    # terms with arguments equal to 'a' or 'b'
++                    if d in res and any(
++                        w.args[0] in (res[a], res[b]) for w in res[d].atoms(
++                            TrigonometricFunction, HyperbolicFunction)):
++                        continue
++                    expr = result.subs(res)
++                    break
++                else:
++                    # res matched on original expr; perform the same safety
++                    # checks as before
++                    if d in res and any(
+                         w.args[0] in (res[a], res[b]) for w in res[d].atoms(
+                             TrigonometricFunction, HyperbolicFunction)):
+                         continue

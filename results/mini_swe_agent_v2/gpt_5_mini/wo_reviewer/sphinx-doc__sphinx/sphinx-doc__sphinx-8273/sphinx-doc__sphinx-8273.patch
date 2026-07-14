@@ -1,0 +1,26 @@
+diff --git a/sphinx/builders/manpage.py b/sphinx/builders/manpage.py
+index 4166dece9..74add0cc0 100644
+--- a/sphinx/builders/manpage.py
++++ b/sphinx/builders/manpage.py
+@@ -9,6 +9,7 @@
+ """
+ 
+ from os import path
++from sphinx.util.osutil import ensuredir
+ from typing import Any, Dict, List, Set, Tuple, Union
+ 
+ from docutils.frontend import OptionParser
+@@ -81,9 +82,12 @@ class ManualPageBuilder(Builder):
+             docsettings.section = section
+ 
+             targetname = '%s.%s' % (name, section)
++            # place man pages in per-section directories (man1/, man3/, ...)
++            section_dir = path.join(self.outdir, 'man' + str(section))
++            ensuredir(section_dir)
+             logger.info(darkgreen(targetname) + ' { ', nonl=True)
+             destination = FileOutput(
+-                destination_path=path.join(self.outdir, targetname),
++                destination_path=path.join(section_dir, targetname),
+                 encoding='utf-8')
+ 
+             tree = self.env.get_doctree(docname)

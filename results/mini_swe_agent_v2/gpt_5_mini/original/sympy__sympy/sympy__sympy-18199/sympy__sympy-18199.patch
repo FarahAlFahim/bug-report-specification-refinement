@@ -1,0 +1,19 @@
+diff --git a/sympy/ntheory/residue_ntheory.py b/sympy/ntheory/residue_ntheory.py
+index 9a3052d4c3..698d8e812d 100644
+--- a/sympy/ntheory/residue_ntheory.py
++++ b/sympy/ntheory/residue_ntheory.py
+@@ -768,6 +768,14 @@ def nthroot_mod(a, n, p, all_roots=False):
+     """
+     from sympy.core.numbers import igcdex
+     a, n, p = as_int(a), as_int(n), as_int(p)
++    # if a == 0 mod p then x = 0 mod p is always a root of x**n = a (mod p)
++    # (and in fact the only root modulo prime p).  is_nthpow_residue
++    # returns True for this case, but nthroot_mod didn't explicitly
++    # return the zero root.  Handle this case early.
++    if p != 0 and a % p == 0:
++        if all_roots:
++            return [0]
++        return 0
+     if n == 2:
+         return sqrt_mod(a, p, all_roots)
+     # see Hackman "Elementary Number Theory" (2009), page 76

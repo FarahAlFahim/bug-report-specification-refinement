@@ -1,0 +1,56 @@
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 27ab55ef99..c12bfbeebf 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -103,7 +103,7 @@ def entry(i, j):
+                 return other[i, j - pos]
+             return self[i, j - other.cols]
+ 
+-        return self._new(self.rows, self.cols + other.cols, entry)
++        return classof(self, other)._new(self.rows, self.cols + other.cols, entry)
+ 
+     def _eval_col_join(self, other):
+         rows = self.rows
+@@ -158,7 +158,7 @@ def _eval_row_insert(self, pos, other):
+         entries = list(self)
+         insert_pos = pos * self.cols
+         entries[insert_pos:insert_pos] = list(other)
+-        return self._new(self.rows + other.rows, self.cols, entries)
++        return classof(self, other)._new(self.rows + other.rows, self.cols, entries)
+ 
+     def _eval_row_join(self, other):
+         cols = self.cols
+diff --git a/sympy/matrices/repmatrix.py b/sympy/matrices/repmatrix.py
+index 6324fab36f..8cf2fc92a4 100644
+--- a/sympy/matrices/repmatrix.py
++++ b/sympy/matrices/repmatrix.py
+@@ -221,10 +221,10 @@ def _eval_transpose(self):
+         return self._fromrep(self._rep.transpose())
+ 
+     def _eval_col_join(self, other):
+-        return self._fromrep(self._rep.vstack(other._rep))
++        return classof(self, other)._fromrep(self._rep.vstack(other._rep))
+ 
+     def _eval_row_join(self, other):
+-        return self._fromrep(self._rep.hstack(other._rep))
++        return classof(self, other)._fromrep(self._rep.hstack(other._rep))
+ 
+     def _eval_extract(self, rowsList, colsList):
+         return self._fromrep(self._rep.extract(rowsList, colsList))
+@@ -412,12 +412,12 @@ def _eval_row_del(self, row):
+         self.rows -= 1
+ 
+     def _eval_col_insert(self, col, other):
+-        other = self._new(other)
+-        return self.hstack(self[:,:col], other, self[:,col:])
++        other = classof(self, other)._new(other)
++        return classof(self, other).hstack(self[:,:col], other, self[:,col:])
+ 
+     def _eval_row_insert(self, row, other):
+-        other = self._new(other)
+-        return self.vstack(self[:row,:], other, self[row:,:])
++        other = classof(self, other)._new(other)
++        return classof(self, other).vstack(self[:row,:], other, self[row:,:])
+ 
+     def col_op(self, j, f):
+         """In-place operation on col j using two-arg functor whose args are

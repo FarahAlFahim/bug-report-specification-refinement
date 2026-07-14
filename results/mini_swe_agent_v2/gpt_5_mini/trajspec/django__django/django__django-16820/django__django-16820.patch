@@ -1,0 +1,58 @@
+commit 652156e5b31d9dc700c4610371e7ad785f4b6fb1
+Author: Dev Null <devnull@example.com>
+Date:   Mon Jun 8 09:34:25 2026 +0000
+
+    Normalize index_together to Index instances when writing migrations to avoid deprecation warnings in squashed migrations
+
+diff --git a/django/db/migrations/writer.py b/django/db/migrations/writer.py
+index 79b89b269d..f0451b8eff 100644
+--- a/django/db/migrations/writer.py
++++ b/django/db/migrations/writer.py
+@@ -73,6 +73,47 @@ class OperationWriter:
+ 
+         imports = set()
+         name, args, kwargs = self.operation.deconstruct()
++        # Normalize deprecated Meta.index_together usage into Index
++        # instances so that squashed migrations don't emit
++        # RemovedInDjango51Warning on import. We perform a best-effort
++        # canonicalization at write time so that CreateModel/AlterModelOptions
++        # and AlterIndexTogether operations are written using the modern
++        # 'indexes' representation instead of 'index_together'. This mirrors
++        # the conversions performed by the autodetector while avoiding
++        # changing runtime operation behaviour.
++        try:
++            # Handle operations which embed model options (e.g. CreateModel,
++            # AlterModelOptions) where options is a dict.
++            options = kwargs.get("options")
++            if isinstance(options, dict) and "index_together" in options:
++                it = options.pop("index_together")
++                # Normalize to a list of Index instances, preserving any
++                # existing indexes.
++                indexes = list(options.get("indexes", []))
++                for fields in (it or []):
++                    # Each entry is a sequence of field names.
++                    indexes.append(models.Index(fields=list(fields), name=None))
++                if indexes:
++                    options["indexes"] = indexes
++                kwargs["options"] = options
++
++            # Handle AlterIndexTogether or other operations that pass
++            # index_together directly as a kwarg (e.g. AlterIndexTogether).
++            if "index_together" in kwargs:
++                it = kwargs.pop("index_together")
++                # Convert to 'indexes' kwarg with Index instances. Some
++                # operations expect the option name to be 'index_together'
++                # at runtime; we keep the operation object untouched and only
++                # change what's written to the migration file.
++                indexes = list(kwargs.get("indexes", []))
++                for fields in (it or []):
++                    indexes.append(models.Index(fields=list(fields), name=None))
++                if indexes:
++                    kwargs["indexes"] = indexes
++        except Exception:
++            # Be conservative: if anything goes wrong during normalization,
++            # fall back to serializing the original kwargs.
++            pass
+         operation_args = get_func_args(self.operation.__init__)
+ 
+         # See if this operation is in django.db.migrations. If it is,

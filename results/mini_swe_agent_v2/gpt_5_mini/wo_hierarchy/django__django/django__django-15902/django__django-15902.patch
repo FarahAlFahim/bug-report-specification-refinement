@@ -1,0 +1,50 @@
+diff --git a/django/forms/utils.py b/django/forms/utils.py
+index 905babce4d..afb7e8b290 100644
+--- a/django/forms/utils.py
++++ b/django/forms/utils.py
+@@ -64,14 +64,42 @@ class RenderableMixin:
+     def render(self, template_name=None, context=None, renderer=None):
+         renderer = renderer or self.renderer
+         template = template_name or self.template_name
++        # Evaluate context early so we can make a smarter decision about
++        # whether to emit the deprecation warning. For forms that only
++        # output hidden fields (for example, the ManagementForm used by
++        # formsets), rendering the default template results only in hidden
++        # inputs and there is no user-facing markup. In that case the
++        # deprecation warning would be noisy, so suppress it.
+         context = context or self.get_context()
+         if (
+             template == "django/forms/default.html"
+             or template == "django/forms/formsets/default.html"
+         ):
+-            warnings.warn(
+-                DEFAULT_TEMPLATE_DEPRECATION_MSG, RemovedInDjango50Warning, stacklevel=2
+-            )
++            emit_warning = True
++            # If the context looks like a form context and there are no
++            # visible fields or visible errors, suppress the warning. We
++            # use a duck-typing approach so this applies to ManagementForm
++            # (and any other form-like renderables) without importing the
++            # Form class here.
++            #
++            # Typical form context contains a 'fields' sequence for
++            # visible fields and 'hidden_fields' for hidden ones. If
++            # 'fields' is empty (no visible fields) and 'errors' is empty
++            # or falsy, the output will be only hidden inputs.
++            fields = context.get("fields")
++            errors = context.get("errors")
++            if fields is not None:
++                has_visible_fields = bool(fields)
++                has_visible_errors = bool(errors)
++                if not has_visible_fields and not has_visible_errors:
++                    emit_warning = False
++
++            if emit_warning:
++                warnings.warn(
++                    DEFAULT_TEMPLATE_DEPRECATION_MSG,
++                    RemovedInDjango50Warning,
++                    stacklevel=2,
++                )
+         return mark_safe(renderer.render(template, context))
+ 
+     __str__ = render

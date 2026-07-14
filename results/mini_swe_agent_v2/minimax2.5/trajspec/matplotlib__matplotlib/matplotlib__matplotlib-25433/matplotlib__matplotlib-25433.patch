@@ -1,0 +1,24 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index ebe5da43e2..be4d9d4f10 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -583,6 +583,9 @@ class Slider(SliderBase):
+             self.ax.figure.canvas.draw_idle()
+         self.val = val
+         if self.eventson:
++            # Release mouse grab to avoid blocking widget input when callback
++            # clears and redraws the figure (same pattern as Button._release).
++            self.ax.figure.canvas.release_mouse(self.ax)
+             self._observers.process('changed', val)
+ 
+     def on_changed(self, func):
+@@ -966,6 +969,9 @@ class RangeSlider(SliderBase):
+             self.ax.figure.canvas.draw_idle()
+         self.val = (vmin, vmax)
+         if self.eventson:
++            # Release mouse grab to avoid blocking widget input when callback
++            # clears and redraws the figure (same pattern as Button._release).
++            self.ax.figure.canvas.release_mouse(self.ax)
+             self._observers.process("changed", (vmin, vmax))
+ 
+     def on_changed(self, func):

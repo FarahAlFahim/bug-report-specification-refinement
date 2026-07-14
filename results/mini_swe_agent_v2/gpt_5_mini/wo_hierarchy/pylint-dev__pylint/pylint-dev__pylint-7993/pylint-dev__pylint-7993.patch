@@ -1,0 +1,31 @@
+diff --git a/pylint/reporters/text.py b/pylint/reporters/text.py
+index 29bd46798..3895e0d0d 100644
+--- a/pylint/reporters/text.py
++++ b/pylint/reporters/text.py
+@@ -175,14 +175,21 @@ class TextReporter(BaseReporter):
+         self._template = template
+ 
+         # Check to see if all parameters in the template are attributes of the Message
+-        arguments = re.findall(r"\{(.+?)(:.*)?\}", template)
+-        for argument in arguments:
+-            if argument[0] not in MESSAGE_FIELDS:
++        # Use string.Formatter.parse to respect escaped braces ({{ and }}) and
++        # proper format-string parsing semantics instead of a naive regex.
++        from string import Formatter
++
++        formatter = Formatter()
++        for literal_text, field_name, format_spec, conversion in formatter.parse(template):
++            # field_name is None for literal portions; otherwise it's the field
++            if field_name and field_name not in MESSAGE_FIELDS:
+                 warnings.warn(
+-                    f"Don't recognize the argument '{argument[0]}' in the --msg-template. "
++                    f"Don't recognize the argument '{field_name}' in the --msg-template. "
+                     "Are you sure it is supported on the current version of pylint?"
+                 )
+-                template = re.sub(r"\{" + argument[0] + r"(:.*?)?\}", "", template)
++                # Remove only the exact field occurrence, escaping the field_name
++                # so that any regex metacharacters are treated literally.
++                template = re.sub(r"\{" + re.escape(field_name) + r"(:.*?)?\}", "", template)
+         self._fixed_template = template
+ 
+     def write_message(self, msg: Message) -> None:

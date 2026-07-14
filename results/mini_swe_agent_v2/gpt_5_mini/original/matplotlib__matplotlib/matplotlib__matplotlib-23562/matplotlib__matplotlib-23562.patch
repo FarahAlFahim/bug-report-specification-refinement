@@ -1,0 +1,33 @@
+diff --git a/lib/mpl_toolkits/mplot3d/art3d.py b/lib/mpl_toolkits/mplot3d/art3d.py
+index 8fe6e7a9c1..c7c0f8c464 100644
+--- a/lib/mpl_toolkits/mplot3d/art3d.py
++++ b/lib/mpl_toolkits/mplot3d/art3d.py
+@@ -867,10 +867,26 @@ class Poly3DCollection(PolyCollection):
+         self.stale = True
+ 
+     def get_facecolor(self):
+-        return self._facecolors2d
++        # `_facecolors2d` is created during the 3D projection step. It is
++        # therefore possible for callers to request the facecolors before the
++        # collection has been drawn or projected. In that case, fall back to
++        # the base class implementation so that callers get a sensible
++        # (unprojected) color array instead of raising AttributeError.
++        try:
++            return self._facecolors2d
++        except AttributeError:
++            return PolyCollection.get_facecolor(self)
+ 
+     def get_edgecolor(self):
+-        return self._edgecolors2d
++        try:
++            return self._edgecolors2d
++        except AttributeError:
++            return PolyCollection.get_edgecolor(self)
++
++    # Backwards-compatible plural aliases expected by external code which
++    # commonly calls `get_facecolors()` / `get_edgecolors()` on collections.
++    get_facecolors = get_facecolor
++    get_edgecolors = get_edgecolor
+ 
+ 
+ def poly_collection_2d_to_3d(col, zs=0, zdir='z'):

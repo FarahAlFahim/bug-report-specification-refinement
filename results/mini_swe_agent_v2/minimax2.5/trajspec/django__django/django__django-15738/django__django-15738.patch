@@ -1,0 +1,96 @@
+diff --git a/django/db/backends/base/schema.py b/django/db/backends/base/schema.py
+index 03f0f11507..073fec68a3 100644
+--- a/django/db/backends/base/schema.py
++++ b/django/db/backends/base/schema.py
+@@ -517,47 +517,71 @@ class BaseDatabaseSchemaEditor:
+         if sql:
+             self.execute(sql)
+ 
+-    def alter_unique_together(self, model, old_unique_together, new_unique_together):
++    def alter_unique_together(
++        self, old_model, new_model=None, old_unique_together=None, new_unique_together=None
++    ):
+         """
+         Deal with a model changing its unique_together. The input
+         unique_togethers must be doubly-nested, not the single-nested
+         ["foo", "bar"] format.
++
++        To maintain backward compatibility, also accepts the legacy signature
++        alter_unique_together(model, old_unique_together, new_unique_together).
+         """
++        # Handle legacy call signature: alter_unique_together(model, old_unique_together, new_unique_together)
++        if new_unique_together is None:
++            # Legacy call detected: new_model is actually old_unique_together, old_unique_together is new_unique_together
++            new_unique_together = old_unique_together
++            old_unique_together = new_model
++            new_model = old_model  # Use the same model for both operations
++        
+         olds = {tuple(fields) for fields in old_unique_together}
+         news = {tuple(fields) for fields in new_unique_together}
+         # Deleted uniques
+         for fields in olds.difference(news):
+             self._delete_composed_index(
+-                model,
++                old_model,
+                 fields,
+                 {"unique": True, "primary_key": False},
+                 self.sql_delete_unique,
+             )
+         # Created uniques
+         for field_names in news.difference(olds):
+-            fields = [model._meta.get_field(field) for field in field_names]
+-            self.execute(self._create_unique_sql(model, fields))
++            fields = [new_model._meta.get_field(field) for field in field_names]
++            self.execute(self._create_unique_sql(new_model, fields))
+ 
+-    def alter_index_together(self, model, old_index_together, new_index_together):
++    def alter_index_together(
++        self, old_model, new_model=None, old_index_together=None, new_index_together=None
++    ):
+         """
+         Deal with a model changing its index_together. The input
+         index_togethers must be doubly-nested, not the single-nested
+         ["foo", "bar"] format.
++
++        To maintain backward compatibility, also accepts the legacy signature
++        alter_index_together(model, old_index_together, new_index_together).
+         """
++        # Handle legacy call signature: alter_index_together(model, old_index_together, new_index_together)
++        if new_index_together is None:
++            # Legacy call detected: new_model is actually old_index_together, old_index_together is new_index_together
++            new_index_together = old_index_together
++            old_index_together = new_model
++            new_model = old_model  # Use the same model for both operations
++        
+         olds = {tuple(fields) for fields in old_index_together}
+         news = {tuple(fields) for fields in new_index_together}
+         # Deleted indexes
+         for fields in olds.difference(news):
+             self._delete_composed_index(
+-                model,
++                old_model,
+                 fields,
+                 {"index": True, "unique": False},
+                 self.sql_delete_index,
+             )
+         # Created indexes
+         for field_names in news.difference(olds):
+-            fields = [model._meta.get_field(field) for field in field_names]
+-            self.execute(self._create_index_sql(model, fields=fields, suffix="_idx"))
++            fields = [new_model._meta.get_field(field) for field in field_names]
++            self.execute(self._create_index_sql(new_model, fields=fields, suffix="_idx"))
+ 
+     def _delete_composed_index(self, model, fields, constraint_kwargs, sql):
+         meta_constraint_names = {
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index 75a3b8b030..c97974585b 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -563,6 +563,7 @@ class AlterTogetherOptionOperation(ModelOptionOperation):
+             old_model = from_state.apps.get_model(app_label, self.name)
+             alter_together = getattr(schema_editor, "alter_%s" % self.option_name)
+             alter_together(
++                old_model,
+                 new_model,
+                 getattr(old_model._meta, self.option_name, set()),
+                 getattr(new_model._meta, self.option_name, set()),

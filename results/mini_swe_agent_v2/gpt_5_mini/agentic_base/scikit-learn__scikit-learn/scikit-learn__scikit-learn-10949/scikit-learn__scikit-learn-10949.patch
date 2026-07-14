@@ -1,0 +1,43 @@
+diff --git a/sklearn/utils/validation.py b/sklearn/utils/validation.py
+index fe1f7236e..cda5ad373 100644
+--- a/sklearn/utils/validation.py
++++ b/sklearn/utils/validation.py
+@@ -463,8 +463,37 @@ def check_array(array, accept_sparse=False, accept_large_sparse=True,
+ 
+     dtype_orig = getattr(array, "dtype", None)
+     if not hasattr(dtype_orig, 'kind'):
+-        # not a data type (e.g. a column named dtype in a pandas DataFrame)
++        # Handle DataFrame-like objects (e.g. pandas.DataFrame) which expose
++        # ``.dtypes`` rather than a scalar ``.dtype``. If all columns have the
++        # same dtype, use that common dtype as the original dtype so that
++        # subsequent dtype-conversion checks (and warnings) behave the same as
++        # for numpy arrays. If we cannot determine a single common dtype, fall
++        # back to treating the original dtype as unknown (None).
+         dtype_orig = None
++        dtypes = getattr(array, 'dtypes', None)
++        if dtypes is not None:
++            try:
++                # Use numpy.unique to determine the number of distinct
++                # column dtypes. This works for pandas Series/Index of
++                # dtype objects as well as for plain iterables of dtypes.
++                uniques = np.unique(dtypes)
++                if uniques.size == 1:
++                    # uniques[0] may already be a numpy.dtype or a
++                    # pandas extension dtype. Prefer to coerce to numpy
++                    # dtype when possible so that the resulting object has
++                    # a .kind attribute expected by downstream code.
++                    candidate = uniques[0]
++                    if hasattr(candidate, 'kind'):
++                        dtype_orig = candidate
++                    else:
++                        try:
++                            dtype_orig = np.dtype(candidate)
++                        except Exception:
++                            dtype_orig = None
++            except Exception:
++                # Any failure to interpret .dtypes should leave dtype_orig
++                # as None and avoid raising here.
++                dtype_orig = None
+ 
+     if dtype_numeric:
+         if dtype_orig is not None and dtype_orig.kind == "O":

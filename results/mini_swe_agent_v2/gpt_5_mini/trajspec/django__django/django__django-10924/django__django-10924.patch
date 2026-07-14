@@ -1,0 +1,18 @@
+diff --git a/django/forms/fields.py b/django/forms/fields.py
+index a977256525..24ec188d95 100644
+--- a/django/forms/fields.py
++++ b/django/forms/fields.py
+@@ -1078,7 +1078,12 @@ class MultiValueField(Field):
+ class FilePathField(ChoiceField):
+     def __init__(self, path, *, match=None, recursive=False, allow_files=True,
+                  allow_folders=False, **kwargs):
+-        self.path, self.match, self.recursive = path, match, recursive
++        # Support callable paths for compatibility with model Field
++        # deconstruction which may preserve a top-level callable. If a
++        # callable is provided, call it to obtain the concrete filesystem
++        # path before performing os.walk / os.scandir operations.
++        self.path = path() if callable(path) else path
++        self.match, self.recursive = match, recursive
+         self.allow_files, self.allow_folders = allow_files, allow_folders
+         super().__init__(choices=(), **kwargs)
+ 

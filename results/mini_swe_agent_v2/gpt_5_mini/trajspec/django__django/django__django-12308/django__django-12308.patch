@@ -1,0 +1,39 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..dd1d876570 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,6 +1,7 @@
+ import datetime
+ import decimal
+ from collections import defaultdict
++import json
+ 
+ from django.core.exceptions import FieldDoesNotExist
+ from django.db import models, router
+@@ -398,6 +399,14 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    elif isinstance(field, models.JSONField):
++        # Use the field's encoder to present JSON in a canonical form in the admin
++        try:
++            encoder = getattr(field, 'encoder', None)
++            return json.dumps(value, cls=encoder) if value is not None else empty_value_display
++        except Exception:
++            # Fall back to the default string representation on error
++            return str(value)
+     else:
+         return display_for_value(value, empty_value_display)
+ 
+@@ -417,6 +426,11 @@ def display_for_value(value, empty_value_display, boolean=False):
+         return formats.localize(value)
+     elif isinstance(value, (int, decimal.Decimal, float)):
+         return formats.number_format(value)
++    elif isinstance(value, dict):
++        try:
++            return json.dumps(value)
++        except Exception:
++            return str(value)
+     elif isinstance(value, (list, tuple)):
+         return ', '.join(str(v) for v in value)
+     else:

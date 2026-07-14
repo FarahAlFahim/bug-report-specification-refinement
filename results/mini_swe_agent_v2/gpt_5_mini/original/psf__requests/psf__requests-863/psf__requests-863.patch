@@ -1,0 +1,26 @@
+diff --git a/requests/models.py b/requests/models.py
+index d8456375..5dc12653 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -149,7 +149,20 @@ class Request(object):
+         hooks = hooks or {}
+ 
+         for (k, v) in list(hooks.items()):
+-            self.register_hook(event=k, hook=v)
++            # Allow a single callable or an iterable of callables to be passed
++            # for each hook event. If a list/tuple of callables is provided,
++            # register each individually. This avoids nesting lists inside
++            # the internal hooks storage which would later cause errors when
++            # dispatching (since a list is not callable).
++            if hasattr(v, '__call__'):
++                self.register_hook(event=k, hook=v)
++            elif isinstance(v, (list, tuple)):
++                for item in v:
++                    self.register_hook(event=k, hook=item)
++            else:
++                # Fallback: register whatever was provided. The hooks
++                # dispatcher will validate callability when invoked.
++                self.register_hook(event=k, hook=v)
+ 
+         #: Session.
+         self.session = session

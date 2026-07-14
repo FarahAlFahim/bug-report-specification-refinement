@@ -1,0 +1,44 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index a708f18..c2ac545 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -216,6 +216,39 @@ class Point(GeometryEntity):
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:
++            # Handle expressions like 2*Point(...) which produce a Mul containing a Point.
++            # In that case extract the Point factor and the numeric/other factor and
++            # perform the scaling before attempting the addition.
++            try:
++                from sympy import Mul
++            except Exception:
++                Mul = None
++
++            if isinstance(other, Mul):
++                point_factor = None
++                factor = sympify(1)
++                for a in other.args:
++                    if isinstance(a, Point):
++                        if point_factor is None:
++                            point_factor = a
++                        else:
++                            # more than one Point factor -> cannot interpret
++                            point_factor = None
++                            break
++                    else:
++                        factor = factor * a
++
++                if point_factor is not None:
++                    scaled = point_factor * factor
++                    try:
++                        s, o = Point._normalize_dimension(self, Point(scaled, evaluate=False))
++                    except TypeError:
++                        # fall through to generic error
++                        pass
++                    else:
++                        coords = [simplify(a + b) for a, b in zip(s, o)]
++                        return Point(coords, evaluate=False)
++
+             raise GeometryError("Don't know how to add {} and a Point object".format(other))
+ 
+         coords = [simplify(a + b) for a, b in zip(s, o)]

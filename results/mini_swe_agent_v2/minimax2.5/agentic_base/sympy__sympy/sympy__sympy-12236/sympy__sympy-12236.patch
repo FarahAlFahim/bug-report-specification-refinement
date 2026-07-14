@@ -1,0 +1,40 @@
+diff --git a/sympy/polys/partfrac.py b/sympy/polys/partfrac.py
+index 612b8f4607..b2b29b600b 100644
+--- a/sympy/polys/partfrac.py
++++ b/sympy/polys/partfrac.py
+@@ -127,7 +127,16 @@ def apart(f, x=None, full=False, **options):
+ 
+     common, P, Q = P.cancel(Q)
+ 
+-    poly, P = P.div(Q, auto=True)
++    # Use auto=False when cancel() returned a common factor != 1 and there's
++    # an actual denominator (Q degree > 0) and the domain is a polynomial ring
++    # (like ZZ[a]) to avoid incorrect division results with symbolic coefficients.
++    # This happens when cancel() modifies the polynomial (e.g., multiplying by -1),
++    # which causes auto=True to give incorrect remainder for polynomial rings.
++    # For regular cases or when Q is constant, use auto=True.
++    if common != S(1) and Q.degree() > 0 and P.get_domain().is_PolynomialRing:
++        poly, P = P.div(Q, auto=False)
++    else:
++        poly, P = P.div(Q, auto=True)
+     P, Q = P.rat_clear_denoms(Q)
+ 
+     if Q.degree() <= 1:
+@@ -333,7 +342,16 @@ def apart_list(f, x=None, dummies=None, **options):
+ 
+     common, P, Q = P.cancel(Q)
+ 
+-    poly, P = P.div(Q, auto=True)
++    # Use auto=False when cancel() returned a common factor != 1 and there's
++    # an actual denominator (Q degree > 0) and the domain is a polynomial ring
++    # (like ZZ[a]) to avoid incorrect division results with symbolic coefficients.
++    # This happens when cancel() modifies the polynomial (e.g., multiplying by -1),
++    # which causes auto=True to give incorrect remainder for polynomial rings.
++    # For regular cases or when Q is constant, use auto=True.
++    if common != S(1) and Q.degree() > 0 and P.get_domain().is_PolynomialRing:
++        poly, P = P.div(Q, auto=False)
++    else:
++        poly, P = P.div(Q, auto=True)
+     P, Q = P.rat_clear_denoms(Q)
+ 
+     polypart = poly

@@ -1,0 +1,112 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..96a3d2f2db 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,61 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    # Some Axes implementations (e.g. cartopy GeoAxes) expose ``axis`` as
++    # a callable method rather than the toolkit's AxisDict.  Historically
++    # this toolkit relied on its own AxisDict API (with .toggle()); to be
++    # compatible with arbitrary Axes, try to use that API when present and
++    # fall back to using the public Axes API (tick_params and label
++    # visibility) when not.
++    def _maybe_toggle(ax, side, **kwargs):
++        try:
++            axis_attr = ax.axis
++        except Exception:
++            axis_attr = None
++
++        # If axis_attr supports __getitem__ (i.e. subscriptable) and the
++        # resulting object has a toggle method, use it.
++        try:
++            if hasattr(axis_attr, "__getitem__"):
++                a = axis_attr[side]
++                toggle = getattr(a, "toggle", None)
++                if callable(toggle):
++                    toggle(**kwargs)
++                    return
++        except Exception:
++            # Any failure to index or toggle should fall through to the
++            # fallback implementation below.
++            pass
++
++        # Fallback: use tick_params and label visibility.  Map "bottom",
++        # "top" to x-axis and "left","right" to y-axis.
++        ticklabels = kwargs.get("ticklabels")
++        label = kwargs.get("label")
++
++        if side in ("bottom", "top"):
++            axisobj = ax.xaxis
++            axisnum = 1 if side == "bottom" else 2
++        else:
++            axisobj = ax.yaxis
++            axisnum = 1 if side == "left" else 2
++
++        if ticklabels is not None:
++            # label1On/label2On correspond to the ticklabel visibility
++            ax.tick_params(**{f"label{axisnum}On": ticklabels})
++        if label is not None:
++            # Show/hide the axis label depending on requested state.  We
++            # only change visibility when the label position matches the
++            # requested side to avoid moving other labels.
++            try:
++                pos = axisobj.get_label_position()
++            except Exception:
++                pos = None
++            if (pos == ("bottom" if side in ("bottom", "top") else "left")
++                    or pos == side):
++                axisobj.label.set_visible(bool(label))
++
++    _maybe_toggle(ax, "bottom", ticklabels=bottom_off, label=bottom_off)
++    _maybe_toggle(ax, "left", ticklabels=left_off, label=left_off)
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +81,41 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        # See _tick_only for rationale: try to use the toolkit's AxisDict
++        # API when present, otherwise fall back to the public Axes API.
++        try:
++            axis_attr = self.axis
++        except Exception:
++            axis_attr = None
++
++        try:
++            if hasattr(axis_attr, "__getitem__"):
++                a = axis_attr[self.orientation]
++                toggle = getattr(a, "toggle", None)
++                if callable(toggle):
++                    toggle(ticklabels=b, label=b)
++                    return
++        except Exception:
++            pass
++
++        # Fallback: use Axes methods.
++        side = self.orientation
++        if side in ("bottom", "top"):
++            axisobj = self.xaxis
++            axisnum = 1 if side == "bottom" else 2
++        else:
++            axisobj = self.yaxis
++            axisnum = 1 if side == "left" else 2
++
++        if b is not None:
++            self.tick_params(**{f"label{axisnum}On": b})
++            try:
++                pos = axisobj.get_label_position()
++            except Exception:
++                pos = None
++            if (pos == ("bottom" if side in ("bottom", "top") else "left")
++                    or pos == side):
++                axisobj.label.set_visible(bool(b))
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

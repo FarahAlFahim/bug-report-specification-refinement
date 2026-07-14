@@ -1,0 +1,21 @@
+diff --git a/django/forms/models.py b/django/forms/models.py
+index 5dcf923c12..9a2dd66ce1 100644
+--- a/django/forms/models.py
++++ b/django/forms/models.py
+@@ -1171,6 +1171,16 @@ class ModelChoiceIteratorValue:
+             other = other.value
+         return self.value == other
+ 
++    def __hash__(self):
++        """Make ModelChoiceIteratorValue hashable.
++
++        The hash is based on the wrapped value so that comparisons and
++        membership checks (e.g. `if value in some_collection`) behave as
++        expected when the widget code constructs ModelChoiceIteratorValue
++        instances. This keeps behaviour consistent with __eq__.
++        """
++        return hash(self.value)
++
+ 
+ class ModelChoiceIterator:
+     def __init__(self, field):

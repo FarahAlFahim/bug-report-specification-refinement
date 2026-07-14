@@ -1,0 +1,28 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 92213a4e67..a44aab185d 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -722,12 +722,21 @@ class SQLCompiler:
+             results = []
+             for item in opts.ordering:
+                 if hasattr(item, 'resolve_expression') and not isinstance(item, OrderBy):
++                    # If the outer ordering is descending, apply that to
++                    # expression-like ordering items immediately.
+                     item = item.desc() if descending else item.asc()
+                 if isinstance(item, OrderBy):
+                     results.append((item, False))
+                     continue
+-                results.extend(self.find_ordering_name(item, opts, alias,
+-                                                       order, already_seen))
++                # Resolve string ordering items using the original
++                # default_order (not the resolved 'order' for this
++                # nesting level). If the outer ordering had a '-' prefix,
++                # reverse the resolved set as a group.
++                inner = self.find_ordering_name(item, opts, alias,
++                                                 default_order, already_seen)
++                if descending:
++                    inner = list(reversed(inner))
++                results.extend(inner)
+             return results
+         targets, alias, _ = self.query.trim_joins(targets, joins, path)
+         return [(OrderBy(transform_function(t, alias), descending=descending), False) for t in targets]

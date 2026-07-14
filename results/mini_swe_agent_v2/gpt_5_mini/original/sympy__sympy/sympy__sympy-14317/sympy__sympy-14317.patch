@@ -1,0 +1,87 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 737e16cc74..ad4de7b723 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1853,12 +1853,79 @@ def _print_PolynomialRingBase(self, expr):
+         return r"%s%s\left[%s\right]" % (inv, domain, symbols)
+ 
+     def _print_Poly(self, poly):
++        # Build the polynomial expression in a logical (monomial) order
++        # similar to StrPrinter/PrettyPrinter so that terms go from highest
++        # to lowest degree. Using poly.as_expr() can lose that ordering.
+         cls = poly.__class__.__name__
+-        expr = self._print(poly.as_expr())
+-        gens = list(map(self._print, poly.gens))
++
++        # Prepare printed gens for building monomials
++        gens_printed = list(map(self._print, poly.gens))
++        mul_symbol = self._settings.get('mul_symbol_latex', ' ')
++
++        terms = []
++        for monom, coeff in poly.terms():
++            # build monomial part
++            s_monom_parts = []
++            for i, exp in enumerate(monom):
++                if exp > 0:
++                    if exp == 1:
++                        s_monom_parts.append(gens_printed[i])
++                    else:
++                        s_monom_parts.append(r"%s^{%d}" % (gens_printed[i], exp))
++
++            s_monom = r" ".join(s_monom_parts)
++
++            # build coefficient part
++            if coeff is S.One and s_monom:
++                s_coeff = ""
++            elif coeff is S.NegativeOne and s_monom:
++                s_coeff = "-"
++            else:
++                # If coefficient is an Add, parenthesize it
++                if coeff.is_Add:
++                    s_coeff = r"\left(%s\right)" % self._print(coeff)
++                else:
++                    s_coeff = self._print(coeff)
++
++            # combine coeff and monomial
++            if not s_monom:
++                s_term = s_coeff
++            else:
++                if s_coeff in ("", "-"):
++                    s_term = s_coeff + s_monom
++                else:
++                    # place multiplication symbol between coeff and monomial
++                    s_term = s_coeff + mul_symbol + s_monom
++
++            # handle sign for the term
++            if isinstance(s_term, str) and s_term.startswith('-'):
++                terms.append(('-', s_term[1:]))
++            else:
++                terms.append(('+', s_term))
++
++        # assemble expression string
++        if not terms:
++            expr = '0'
++        else:
++            expr_parts = []
++            # first term sign
++            sign, first = terms[0]
++            if sign == '-':
++                expr_parts.append('-')
++            expr_parts.append(first)
++
++            for sign, term in terms[1:]:
++                if sign == '-':
++                    expr_parts.append(' - ')
++                else:
++                    expr_parts.append(' + ')
++                expr_parts.append(term)
++
++            expr = ''.join(expr_parts)
++
+         domain = "domain=%s" % self._print(poly.get_domain())
++        args = ", ".join([expr] + gens_printed + [domain])
+ 
+-        args = ", ".join([expr] + gens + [domain])
+         if cls in accepted_latex_functions:
+             tex = r"\%s {\left (%s \right )}" % (cls, args)
+         else:

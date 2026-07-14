@@ -1,0 +1,37 @@
+diff --git a/django/contrib/admin/sites.py b/django/contrib/admin/sites.py
+index 837dabfea8..23ad58d99c 100644
+--- a/django/contrib/admin/sites.py
++++ b/django/contrib/admin/sites.py
+@@ -466,7 +466,13 @@ class AdminSite:
+                 'perms': perms,
+                 'admin_url': None,
+                 'add_url': None,
+-            }
++            
++                # Expose the actual Model class for consumers that need it.
++                # Historically this dict only contained serializable metadata
++                # which meant the model class wasn't available to callers.
++                # Adding the model here provides a supported way for
++                # custom admin views and templates to access the class.
++                'model': model,}
+             if perms.get('change') or perms.get('view'):
+                 model_dict['view_only'] = not perms.get('change')
+                 try:
+@@ -514,6 +520,17 @@ class AdminSite:
+ 
+         return app_list
+ 
++    def build_app_dict(self, request, label=None):
++        """
++        Public wrapper for building the app dictionary.
++
++        Historically the builder was a private API (_build_app_dict). Some
++        external consumers may want access to the model class object for
++        each entry. Exposing a public API ensures we can support that use
++        without relying on a private method name.
++        """
++        return self._build_app_dict(request, label=label)
++
+     def index(self, request, extra_context=None):
+         """
+         Display the main admin index page, which lists all of the installed

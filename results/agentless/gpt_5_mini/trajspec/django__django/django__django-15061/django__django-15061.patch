@@ -1,0 +1,37 @@
+diff --git a/django/contrib/postgres/forms/array.py b/django/contrib/postgres/forms/array.py
+index 9bc059d..bb51b84 100644
+--- a/django/contrib/postgres/forms/array.py
++++ b/django/contrib/postgres/forms/array.py
+@@ -125,10 +125,10 @@ class SplitArrayWidget(forms.Widget):
+         )
+ 
+     def id_for_label(self, id_):
+-        # See the comment for RadioSelect.id_for_label()
+-        if id_:
+-            id_ += '_0'
+-        return id_
++        # See the comment for RadioSelect.id_for_label().
++        # The top-level label should not point to a particular subwidget,
++        # so return an empty string to signal omission of the for attribute.
++        return ''
+ 
+     def get_context(self, name, value, attrs=None):
+         attrs = {} if attrs is None else attrs
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 6f60b80..0c894cd 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -849,9 +849,10 @@ class MultiWidget(Widget):
+         return context
+ 
+     def id_for_label(self, id_):
+-        if id_:
+-            id_ += '_0'
+-        return id_
++        # MultiWidget contains multiple inputs; the top-level label should not
++        # point to a specific subwidget (avoid for="..._0"). Return an empty
++        # string so that BoundField.label_tag omits the for attribute.
++        return ''
+ 
+     def value_from_datadict(self, data, files, name):
+         return [

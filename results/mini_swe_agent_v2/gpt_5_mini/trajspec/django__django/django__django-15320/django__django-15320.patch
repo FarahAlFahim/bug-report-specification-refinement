@@ -1,0 +1,73 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..b24cfb506c 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1149,7 +1149,20 @@ class Subquery(BaseExpression, Combinable):
+ 
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+-        self.query = getattr(queryset, 'query', queryset)
++        # Normalize to an sql.Query object when possible and ensure the
++        # .subquery flag is set on a clone so that Query.as_sql() will
++        # return a parenthesized SQL string. We clone to avoid
++        # mutating the caller's Query/QuerySet.
++        q = getattr(queryset, 'query', queryset)
++        try:
++            # Only Query-like objects have "clone" and "subquery".
++            if hasattr(q, 'clone') and hasattr(q, 'subquery'):
++                q = q.clone()
++                q.subquery = True
++        except Exception:
++            # Be conservative: if anything goes wrong, keep the original.
++            q = getattr(queryset, 'query', queryset)
++        self.query = q
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1157,7 +1170,19 @@ class Subquery(BaseExpression, Combinable):
+         return [self.query]
+ 
+     def set_source_expressions(self, exprs):
+-        self.query = exprs[0]
++        # When replacing the inner query ensure we maintain the
++        # subquery invariant: clone the incoming Query and set
++        # subquery=True when possible so that Query.as_sql() will
++        # produce a parenthesized SQL fragment.
++        q = exprs[0]
++        try:
++            if hasattr(q, 'clone') and hasattr(q, 'subquery'):
++                q = q.clone()
++                q.subquery = True
++        except Exception:
++            # Fall back to assigning the original expression.
++            pass
++        self.query = q
+ 
+     def _resolve_output_field(self):
+         return self.query.output_field
+@@ -1179,7 +1204,24 @@ class Subquery(BaseExpression, Combinable):
+         template_params = {**self.extra, **extra_context}
+         query = query or self.query
+         subquery_sql, sql_params = query.as_sql(compiler, connection)
+-        template_params['subquery'] = subquery_sql[1:-1]
++        # Query.as_sql() is expected to return a parenthesized SQL when
++        # the Query.subquery flag is True. However, some call sites may
++        # provide SQL that is already unparenthesized. Only strip a
++        # leading '(' and trailing ')' if they are present (after
++        # trimming whitespace). This avoids unconditionally removing
++        # real SQL characters.
++        if isinstance(subquery_sql, str):
++            s = subquery_sql
++            trimmed = s.strip()
++            if trimmed.startswith('(') and trimmed.endswith(')'):
++                # Use the trimmed inner content to avoid including
++                # surrounding whitespace inside the template.
++                inner = trimmed[1:-1]
++            else:
++                inner = s
++        else:
++            inner = subquery_sql
++        template_params['subquery'] = inner
+ 
+         template = template or template_params.get('template', self.template)
+         sql = template % template_params

@@ -1,0 +1,47 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..65d8658e85 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -25,6 +25,7 @@ from django.utils.translation import get_language
+ 
+ from .converters import get_converter
+ from .exceptions import NoReverseMatch, Resolver404
++from django.http import Http404
+ from .utils import get_callable
+ 
+ 
+@@ -260,6 +261,12 @@ class RoutePattern(CheckURLMixin):
+                     kwargs[key] = converter.to_python(value)
+                 except ValueError:
+                     return None
++                except Http404:
++                    # A converter may raise Http404 to indicate that the
++                    # path doesn't match this pattern. Treat it as a
++                    # non-match so URL resolution can continue trying
++                    # other patterns instead of propagating the 404.
++                    return None
+             return path[match.end():], (), kwargs
+         return None
+ 
+@@ -546,6 +553,21 @@ class URLResolver:
+                         tried.extend([pattern] + t for t in sub_tried)
+                     else:
+                         tried.append([pattern])
++                except Http404 as e:
++                    # Treat Http404 raised during sub-resolution as a
++                    # non-match (similar to Resolver404) so that other
++                    # patterns may be tried. If the Http404 carries
++                    # resolver information (a dict in args[0]), preserve
++                    # its 'tried' information when possible.
++                    sub_tried = None
++                    if e.args:
++                        first_arg = e.args[0]
++                        if isinstance(first_arg, dict):
++                            sub_tried = first_arg.get('tried')
++                    if sub_tried is not None:
++                        tried.extend([pattern] + t for t in sub_tried)
++                    else:
++                        tried.append([pattern])
+                 else:
+                     if sub_match:
+                         # Merge captured arguments in match with submatch

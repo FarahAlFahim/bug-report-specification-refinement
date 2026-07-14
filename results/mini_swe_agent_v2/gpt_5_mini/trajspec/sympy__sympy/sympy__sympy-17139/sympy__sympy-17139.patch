@@ -1,0 +1,22 @@
+diff --git a/sympy/simplify/fu.py b/sympy/simplify/fu.py
+index ad1130ef9..4124877f6 100644
+--- a/sympy/simplify/fu.py
++++ b/sympy/simplify/fu.py
+@@ -501,6 +501,17 @@ def _f(rv):
+         if not (rv.is_Pow and rv.base.func == f):
+             return rv
+ 
++        # The transformations implemented here are integer-specific and
++        # perform relational and integer arithmetic on the exponent (rv.exp).
++        # If the exponent is not known to be an integer (for example it may
++        # be complex like I), comparisons such as ``rv.exp < 0`` would
++        # dispatch to Expr.__lt__/__gt__ and raise TypeError.  Guard against
++        # that by only proceeding when ``exp.is_integer`` is True; otherwise
++        # leave the power unchanged.
++        if rv.exp.is_integer is not True:
++            return rv
++
++
+         if (rv.exp < 0) == True:
+             return rv
+         if (rv.exp > max) == True:

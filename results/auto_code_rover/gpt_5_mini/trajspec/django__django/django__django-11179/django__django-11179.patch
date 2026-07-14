@@ -1,0 +1,27 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 92fe4affb9..46b1e58ba6 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -275,8 +275,22 @@ class Collector:
+         if len(self.data) == 1 and len(instances) == 1:
+             instance = list(instances)[0]
+             if self.can_fast_delete(instance):
++                # Send pre_delete signal for this single instance if appropriate,
++                # then perform the DELETE inside the rollback-on-error context.
++                if not model._meta.auto_created:
++                    signals.pre_delete.send(sender=model, instance=instance, using=self.using)
+                 with transaction.mark_for_rollback_on_error():
+                     count = sql.DeleteQuery(model).delete_batch([instance.pk], self.using)
++                # Send post_delete signal for this instance.
++                if not model._meta.auto_created:
++                    signals.post_delete.send(sender=model, instance=instance, using=self.using)
++                # Apply any scheduled field updates for this model to the in-memory instance(s).
++                instances_for_fieldvalues = self.field_updates.get(model, {})
++                for (field, value), objs in instances_for_fieldvalues.items():
++                    for obj in objs:
++                        setattr(obj, field.attname, value)
++                # Clear the in-memory primary key to reflect that the instance no longer exists.
++                setattr(instance, model._meta.pk.attname, None)
+                 return count, {model._meta.label: count}
+ 
+         with transaction.atomic(using=self.using, savepoint=False):

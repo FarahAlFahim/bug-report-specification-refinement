@@ -1,0 +1,147 @@
+diff --git a/sympy/utilities/codegen.py b/sympy/utilities/codegen.py
+index f0befb2bd..0e10500f7 100644
+--- a/sympy/utilities/codegen.py
++++ b/sympy/utilities/codegen.py
+@@ -718,12 +718,16 @@ def routine(self, name, expr, argument_sequence=None, global_vars=None):
+ 
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
++            # also preserve original arguments for dimension extraction
+             new_sequence = []
++            original_arguments = {}  # map from converted symbol to original argument
+             for arg in argument_sequence:
+                 if isinstance(arg, IndexedBase):
+                     new_sequence.append(arg.label)
++                    original_arguments[arg.label] = arg
+                 else:
+                     new_sequence.append(arg)
++                    original_arguments[arg] = arg
+             argument_sequence = new_sequence
+ 
+             missing = [x for x in arg_list if x.name not in argument_sequence]
+@@ -739,7 +743,18 @@ def routine(self, name, expr, argument_sequence=None, global_vars=None):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # Check if original argument was a MatrixSymbol or IndexedBase to get dimensions
++                    original_arg = original_arguments.get(symbol)
++                    if original_arg is None:
++                        new_args.append(InputArgument(symbol))
++                    elif isinstance(original_arg, MatrixSymbol):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    elif isinstance(original_arg, IndexedBase):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_val, local_vars, global_vars)
+@@ -1381,12 +1396,16 @@ def routine(self, name, expr, argument_sequence, global_vars):
+ 
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
++            # also preserve original arguments for dimension extraction
+             new_sequence = []
++            original_arguments = {}  # map from converted symbol to original argument
+             for arg in argument_sequence:
+                 if isinstance(arg, IndexedBase):
+                     new_sequence.append(arg.label)
++                    original_arguments[arg.label] = arg
+                 else:
+                     new_sequence.append(arg)
++                    original_arguments[arg] = arg
+             argument_sequence = new_sequence
+ 
+             missing = [x for x in arg_list if x.name not in argument_sequence]
+@@ -1402,7 +1421,18 @@ def routine(self, name, expr, argument_sequence, global_vars):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # Check if original argument was a MatrixSymbol or IndexedBase to get dimensions
++                    original_arg = original_arguments.get(symbol)
++                    if original_arg is None:
++                        new_args.append(InputArgument(symbol))
++                    elif isinstance(original_arg, MatrixSymbol):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    elif isinstance(original_arg, IndexedBase):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_vals, local_vars, global_vars)
+@@ -1590,9 +1620,11 @@ def routine(self, name, expr, argument_sequence, global_vars):
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
+             new_sequence = []
++            original_arguments = {}  # map from converted symbol to original argument
+             for arg in argument_sequence:
+                 if isinstance(arg, IndexedBase):
+                     new_sequence.append(arg.label)
++                    original_arguments[arg.label] = arg
+                 else:
+                     new_sequence.append(arg)
+             argument_sequence = new_sequence
+@@ -1610,7 +1642,18 @@ def routine(self, name, expr, argument_sequence, global_vars):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # Check if original argument was a MatrixSymbol or IndexedBase to get dimensions
++                    original_arg = original_arguments.get(symbol)
++                    if original_arg is None:
++                        new_args.append(InputArgument(symbol))
++                    elif isinstance(original_arg, MatrixSymbol):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    elif isinstance(original_arg, IndexedBase):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_vals, local_vars, global_vars)
+@@ -1820,12 +1863,16 @@ def routine(self, name, expr, argument_sequence, global_vars):
+ 
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
++            # also preserve original arguments for dimension extraction
+             new_sequence = []
++            original_arguments = {}  # map from converted symbol to original argument
+             for arg in argument_sequence:
+                 if isinstance(arg, IndexedBase):
+                     new_sequence.append(arg.label)
++                    original_arguments[arg.label] = arg
+                 else:
+                     new_sequence.append(arg)
++                    original_arguments[arg] = arg
+             argument_sequence = new_sequence
+ 
+             missing = [x for x in arg_list if x.name not in argument_sequence]
+@@ -1841,7 +1888,18 @@ def routine(self, name, expr, argument_sequence, global_vars):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # Check if original argument was a MatrixSymbol or IndexedBase to get dimensions
++                    original_arg = original_arguments.get(symbol)
++                    if original_arg is None:
++                        new_args.append(InputArgument(symbol))
++                    elif isinstance(original_arg, MatrixSymbol):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    elif isinstance(original_arg, IndexedBase):
++                        dims = [(S.Zero, dim - 1) for dim in original_arg.shape]
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_vals, local_vars, global_vars)

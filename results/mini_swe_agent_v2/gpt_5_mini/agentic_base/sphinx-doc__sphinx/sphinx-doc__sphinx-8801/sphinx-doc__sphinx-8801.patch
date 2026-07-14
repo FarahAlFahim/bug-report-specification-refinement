@@ -1,0 +1,53 @@
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+index 477aae247..b3aeff005 100644
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -236,8 +236,18 @@ def get_object_members(subject: Any, objpath: List[str], attrgetter: Callable,
+         # append instance attributes (cf. self.attr1) if analyzer knows
+         namespace = '.'.join(objpath)
+         for (ns, name) in analyzer.find_attr_docs():
+-            if namespace == ns and name not in members:
+-                members[name] = Attribute(name, True, INSTANCEATTR)
++            if namespace == ns:
++                if name not in members:
++                    members[name] = Attribute(name, True, INSTANCEATTR)
++                else:
++                    # If analyzer found documentation for an attribute that
++                    # already exists (e.g. an annotation-only placeholder),
++                    # mark it as directly defined so callers know it has
++                    # attribute documentation associated with it.
++                    try:
++                        members[name] = Attribute(name, True, members[name].value)
++                    except Exception:
++                        pass
+ 
+     return members
+ 
+@@ -307,9 +317,24 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+                 analyzer = ModuleAnalyzer.for_module(modname)
+                 analyzer.analyze()
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+-                    if ns == qualname and name not in members:
+-                        members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+-                                                     docstring='\n'.join(docstring))
++                    if ns == qualname:
++                        if name not in members:
++                            members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
++                                                         docstring='\n'.join(docstring))
++                        else:
++                            # If an annotation-only attribute (or other placeholder)
++                            # was already added to members earlier, attach the
++                            # docstring found by the analyzer to that ObjectMember
++                            # so that downstream filtering treats it as documented.
++                            try:
++                                members[name].docstring = '\n'.join(docstring)
++                                # Ensure the class_ is set to the defining class
++                                if getattr(members[name], 'class_', None) is None:
++                                    members[name].class_ = cls
++                            except Exception:
++                                # be defensive: if members[name] is not an
++                                # ObjectMember for some reason, ignore and continue
++                                pass
+             except (AttributeError, PycodeError):
+                 pass
+     except AttributeError:

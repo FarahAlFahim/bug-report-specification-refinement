@@ -1,0 +1,28 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..f1d12328ce 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -909,6 +909,23 @@ default: %(va)s
+         Remove the `~.axes.Axes` *ax* from the figure; update the current Axes.
+         """
+ 
++        # If the Axes being removed currently holds the canvas mouse grab,
++        # make sure to release it.  This avoids leaving the canvas in a state
++        # where ``canvas.mouse_grabber`` references an Axes that has been
++        # removed, which would block subsequent widget interactions.
++        canvas = getattr(self, 'canvas', None)
++        if canvas is not None and getattr(canvas, 'mouse_grabber', None) is ax:
++            # Be defensive: some canvas implementations may not implement
++            # release_mouse, so guard the call.
++            release = getattr(canvas, 'release_mouse', None)
++            if callable(release):
++                try:
++                    release(ax)
++                except Exception:
++                    # Do not let errors here prevent axes removal; best effort
++                    # to release the grab is sufficient.
++                    pass
++
+         def _reset_locators_and_formatters(axis):
+             # Set the formatters and locators to be associated with axis
+             # (where previously they may have been associated with another

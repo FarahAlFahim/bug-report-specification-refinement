@@ -1,0 +1,61 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 5af213932..b9100ce3a 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -98,23 +98,26 @@ class IndexEntries:
+             for subentry in indexentry[1].values():
+                 subentry[0].sort(key=keyfunc0)  # type: ignore
+ 
+-        # sort the index entries; put all symbols at the front, even those
+-        # following the letters in ASCII, this is where the chr(127) comes from
+-        def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
++        # sort the index entries; keep all symbols together and avoid
++        # interleaving them with letters. The sort key is a tuple
++        # (category, normalized-key, entry-key) where category is 0 for
++        # symbols and 1 for letters/underscore.
++        def keyfunc(entry: Tuple[str, List]) -> Tuple[int, str, str]:
+             key, (void, void, category_key) = entry
+             if category_key:
+                 # using specified category key to sort
+                 key = category_key
+             lckey = unicodedata.normalize('NFD', key.lower())
+-            if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
++            if lckey.startswith('‏'):
+                 lckey = lckey[1:]
+-            if lckey[0:1].isalpha() or lckey.startswith('_'):
+-                lckey = chr(127) + lckey
+-            # ensure a determinstic order *within* letters by also sorting on
+-            # the entry itself
+-            return (lckey, entry[0])
++            is_letter = (lckey[0:1].isalpha() or lckey.startswith('_'))
++            category = 1 if is_letter else 0
++            # ensure a determinstic order within categories by also sorting on
++            # the entry key
++            return (category, lckey, entry[0])
+         newlist = sorted(new.items(), key=keyfunc)
+ 
++
+         if group_entries:
+             # fixup entries: transform
+             #   func() (in module foo)
+@@ -146,13 +149,16 @@ class IndexEntries:
+                 i += 1
+ 
+         # sort the sub-index entries
+-        def keyfunc2(entry: Tuple[str, List]) -> str:
++        def keyfunc2(entry: Tuple[str, List]) -> Tuple[int, str]:
++            # Return a tuple (category, key) like keyfunc so subitems that are
++            # symbols are grouped together and not mixed with letters.
+             key = unicodedata.normalize('NFD', entry[0].lower())
+             if key.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 key = key[1:]
+-            if key[0:1].isalpha() or key.startswith('_'):
+-                key = chr(127) + key
+-            return key
++            is_letter = (key[0:1].isalpha() or key.startswith('_'))
++            category = 1 if is_letter else 0
++            return (category, key)
++
+ 
+         # group the entries by letter
+         def keyfunc3(item: Tuple[str, List]) -> str:

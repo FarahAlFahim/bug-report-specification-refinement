@@ -1,0 +1,45 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index 5ac2407ea3..d8a07850a3 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -810,9 +810,12 @@ class QuerySet(AltersData):
+                     unique_fields=unique_fields,
+                 )
+                 connection = connections[self.db]
++                # When the backend can return rows for bulk inserts and the
++                # on_conflict handling isn't IGNORE, the returned rows should
++                # map 1:1 to the input objects without primary keys.
+                 if (
+                     connection.features.can_return_rows_from_bulk_insert
+-                    and on_conflict is None
++                    and on_conflict != OnConflict.IGNORE
+                 ):
+                     assert len(returned_columns) == len(objs_without_pk)
+                 for obj_without_pk, results in zip(objs_without_pk, returned_columns):
+@@ -1837,16 +1840,25 @@ class QuerySet(AltersData):
+         inserted_rows = []
+         bulk_return = connection.features.can_return_rows_from_bulk_insert
+         for item in [objs[i : i + batch_size] for i in range(0, len(objs), batch_size)]:
+-            if bulk_return and on_conflict is None:
++            # If the backend supports returning rows from a bulk insert and the
++            # on_conflict handling isn't IGNORE, request returning fields so
++            # primary keys (and other returning fields) can be populated on
++            # the model instances. For the IGNORE case we avoid requesting
++            # returning fields to preserve the previous behaviour.
++            if bulk_return and on_conflict != OnConflict.IGNORE:
+                 inserted_rows.extend(
+                     self._insert(
+                         item,
+                         fields=fields,
+                         using=self.db,
+                         returning_fields=self.model._meta.db_returning_fields,
++                        on_conflict=on_conflict,
++                        update_fields=update_fields,
++                        unique_fields=unique_fields,
+                     )
+                 )
+             else:
++                # Fall back to the non-returning path.
+                 self._insert(
+                     item,
+                     fields=fields,

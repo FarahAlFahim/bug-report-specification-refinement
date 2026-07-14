@@ -1,0 +1,20 @@
+diff --git a/sklearn/calibration.py b/sklearn/calibration.py
+index 2c4a33616..46b90e958 100644
+--- a/sklearn/calibration.py
++++ b/sklearn/calibration.py
+@@ -760,7 +760,14 @@ class _CalibratedClassifier:
+                 # When binary, `predictions` consists only of predictions for
+                 # clf.classes_[1] but `pos_class_indices` = 0
+                 class_idx += 1
+-            proba[:, class_idx] = calibrator.predict(this_pred)
++            # Some calibrators (e.g. IsotonicRegression) may return a
++            # column vector or a pandas object when global output
++            # configuration requests pandas outputs. Ensure we flatten the
++            # prediction to a 1d array so that the assignment into the
++            # proba column works regardless of the input type.
++            calibrated = calibrator.predict(this_pred)
++            calibrated = column_or_1d(calibrated)
++            proba[:, class_idx] = calibrated
+ 
+         # Normalize the probabilities
+         if n_classes == 2:

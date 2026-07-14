@@ -1,0 +1,48 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..eddcb329a0 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -480,6 +480,17 @@ def trigsimp(expr, **opts):
+     except AttributeError:
+         pass
+ 
++    # If the expression contains only exponential forms (exp or E**x)
++    # try to convert them to trigonometric/hyperbolic form first. This
++    # lets pure-exponential combinations like (-I*exp(I*k) + I*exp(-I*k))/2
++    # be converted to sin(k) before the rest of trigsimp runs.
++    try:
++        if not expr.has(*_trigs) and expr.has(exp):
++            expr = exptrigsimp(expr)
++    except Exception:
++        # Be conservative: if anything fails, keep the original expr
++        pass
++
+     old = opts.pop('old', False)
+     if not old:
+         opts.pop('deep', None)
+@@ -510,7 +521,24 @@ def traverse(e):
+         'old': lambda x: trigsimp_old(x, **opts),
+                    }[method]
+ 
+-    return trigsimpfunc(expr)
++    result = trigsimpfunc(expr)
++
++    # Replace exact sin(x)/x patterns with sinc(x)
++    try:
++        from sympy.simplify.simplify import bottom_up
++        from sympy import Wild
++        from sympy.functions.elementary.trigonometric import sinc, sin
++        A = Wild("A")
++        def _replace_sinc(e):
++            m = e.match(sin(A)/A)
++            if m:
++                return sinc(m[A])
++            return e
++        result = bottom_up(result, _replace_sinc)
++    except Exception:
++        pass
++
++    return result
+ 
+ 
+ def exptrigsimp(expr):

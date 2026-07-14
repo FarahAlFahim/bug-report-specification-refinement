@@ -1,0 +1,30 @@
+diff --git a/django/db/models/fields/json.py b/django/db/models/fields/json.py
+index 29c6ff0926..39faad2210 100644
+--- a/django/db/models/fields/json.py
++++ b/django/db/models/fields/json.py
+@@ -368,12 +368,23 @@ class KeyTransformIsNull(lookups.IsNull):
+     def as_oracle(self, compiler, connection):
+         if not self.rhs:
+             return HasKey(self.lhs.lhs, self.lhs.key_name).as_oracle(compiler, connection)
+-        return super().as_sql(compiler, connection)
++        # For isnull=True we need to match rows where the key is absent.
++        # On Oracle JSON extraction functions return SQL NULL both when the
++        # key is missing and when the key exists with the JSON value null,
++        # so "JSON_EXTRACT(...) IS NULL" would match both cases. Use the
++        # negation of HasKey(...) to test for absence of the key instead.
++        sql, params = HasKey(self.lhs.lhs, self.lhs.key_name).as_oracle(compiler, connection)
++        return ('NOT (%s)' % sql, params)
+ 
+     def as_sqlite(self, compiler, connection):
+         if not self.rhs:
+             return HasKey(self.lhs.lhs, self.lhs.key_name).as_sqlite(compiler, connection)
+-        return super().as_sql(compiler, connection)
++        # For isnull=True we want rows where the key does not exist. On
++        # SQLite JSON_EXTRACT(...) IS NULL matches both missing keys and
++        # keys with JSON null values, so negate HasKey(...) which tests
++        # for existence of the key (true even if the value is JSON null).
++        sql, params = HasKey(self.lhs.lhs, self.lhs.key_name).as_sqlite(compiler, connection)
++        return ('NOT (%s)' % sql, params)
+ 
+ 
+ class KeyTransformIn(lookups.In):

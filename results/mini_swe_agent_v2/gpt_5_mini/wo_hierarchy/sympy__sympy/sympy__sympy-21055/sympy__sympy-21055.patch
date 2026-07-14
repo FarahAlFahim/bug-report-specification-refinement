@@ -1,0 +1,31 @@
+diff --git a/sympy/assumptions/refine.py b/sympy/assumptions/refine.py
+index e1f97190c0..71dc37ead4 100644
+--- a/sympy/assumptions/refine.py
++++ b/sympy/assumptions/refine.py
+@@ -373,6 +373,18 @@ def refine_matrixelement(expr, assumptions):
+             return expr
+         return MatrixElement(matrix, j, i)
+ 
++def refine_arg(expr, assumptions):
++    """
++    Handler for the arg function.  We canonicalize arg(z) to atan2(im(z), re(z))
++    so that the existing refine_atan2 logic can apply assumption-based
++    simplifications (e.g. arg(x) -> 0 when x is positive).
++    """
++    try:
++        return expr._eval_rewrite_as_atan2(None)
++    except Exception:
++        return None
++
++
+ handlers_dict = {
+     'Abs': refine_abs,
+     'Pow': refine_Pow,
+@@ -380,5 +392,6 @@ def refine_matrixelement(expr, assumptions):
+     're': refine_re,
+     'im': refine_im,
+     'sign': refine_sign,
+-    'MatrixElement': refine_matrixelement
++    'MatrixElement': refine_matrixelement,
++    'arg': refine_arg
+ }  # type: Dict[str, Callable[[Expr, Boolean], Expr]]

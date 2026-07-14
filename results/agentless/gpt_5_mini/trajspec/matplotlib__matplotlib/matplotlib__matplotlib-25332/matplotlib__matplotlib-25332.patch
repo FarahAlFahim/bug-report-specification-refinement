@@ -1,0 +1,38 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index 2cd1cf9..e787346 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -846,6 +846,33 @@ class Grouper:
+         siblings = self._mapping.get(weakref.ref(a), [weakref.ref(a)])
+         return [x() for x in siblings]
+ 
++    def __getstate__(self):
++        """
++        Return a picklable representation of the Grouper.
++
++        We cannot pickle weakref.ReferenceType objects directly, so convert
++        the internal weakref-based mapping to a list of groups of actual
++        objects. The pickler will then handle those objects normally.
++        """
++        self.clean()
++        # collect unique group lists (mapping values may reference the same list)
++        unique_groups = {id(group): group for group in self._mapping.values()}
++        groups = [[ref() for ref in group] for group in unique_groups.values()]
++        return {'groups': groups}
++
++    def __setstate__(self, state):
++        """
++        Reconstruct the internal weakref mapping from the pickled state.
++        """
++        groups = state.get('groups', [])
++        self._mapping = {}
++        for group in groups:
++            # create weakrefs for each member and use a single list object
++            # per group as the mapping value so identity semantics are preserved
++            refs = [weakref.ref(x) for x in group]
++            for r in refs:
++                self._mapping[r] = refs
++
+ 
+ class GrouperView:
+     """Immutable view over a `.Grouper`."""

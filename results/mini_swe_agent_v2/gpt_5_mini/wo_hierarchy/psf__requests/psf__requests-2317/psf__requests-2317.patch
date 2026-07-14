@@ -1,0 +1,48 @@
+diff --git a/requests/models.py b/requests/models.py
+index 3f6a4f9..7d2e234 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -327,7 +327,21 @@ class PreparedRequest(RequestEncodingMixin, RequestHooksMixin):
+ 
+     def prepare_method(self, method):
+         """Prepares the given HTTP method."""
+-        self.method = method
++        # Normalize bytes to native string on py3 and coerce other values
++        # to the native string type. We intentionally avoid calling str()
++        # on bytes as that produces the Python representation "b'GET'" on
++        # Python 3. Use to_native_string which handles bytes -> str
++        # conversion using ASCII by default.
++        from .utils import to_native_string
++
++        if isinstance(method, bytes):
++            self.method = to_native_string(method)
++        else:
++            # Coerce non-bytes to native string (covers None and other
++            # stringable objects). to_native_string will return the input
++            # unchanged if it's already the native str type.
++            self.method = to_native_string(method) if method is not None else None
++
+         if self.method is not None:
+             self.method = self.method.upper()
+ 
+diff --git a/requests/sessions.py b/requests/sessions.py
+index d701ff2..6d0c707 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -425,7 +425,15 @@ class Session(SessionRedirectMixin):
+             If Tuple, ('cert', 'key') pair.
+         """
+ 
+-        method = builtin_str(method)
++        # Normalize method to native string. Avoid calling builtin_str on
++        # bytes on Python 3, which yields the repr "b'GET'". Use
++        # to_native_string which decodes bytes using ASCII by default.
++        from .utils import to_native_string
++
++        if isinstance(method, bytes):
++            method = to_native_string(method)
++        else:
++            method = to_native_string(method)
+ 
+         # Create the Request.
+         req = Request(

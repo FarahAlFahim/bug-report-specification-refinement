@@ -1,0 +1,50 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..565257f7a7 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -976,6 +976,45 @@ class CharField(Field):
+                 )
+             ]
+         else:
++            # If choices are provided, ensure max_length is large enough to hold
++            # the longest choice value. Use flatchoices to iterate (value, label)
++            # pairs and measure the length of the string representation of each
++            # scalar value. Skip non-scalar iterables (list/tuple/set/dict).
++            max_choice_length = 0
++            if self.choices:
++                # Import Promise here to handle lazy translation proxies without
++                # modifying module-level imports.
++                try:
++                    from django.utils.functional import Promise
++                except Exception:
++                    Promise = ()
++                for val, _label in self.flatchoices:
++                    # Skip non-scalar iterables (but not str/bytes).
++                    if isinstance(val, (list, tuple, set, dict)):
++                        continue
++                    # Handle lazy translation proxies (Promise) by forcing to str.
++                    if isinstance(val, Promise):
++                        sval = str(val)
++                    else:
++                        try:
++                            sval = str(val)
++                        except Exception:
++                            # If conversion to str fails for some value, ignore it.
++                            continue
++                    length = len(sval)
++                    if length > max_choice_length:
++                        max_choice_length = length
++                if max_choice_length > self.max_length:
++                    return [
++                        checks.Error(
++                            "'max_length' is too small for the longest choice value "
++                            "(max_length=%d, longest choice length=%d). Consider "
++                            "increasing 'max_length' or shortening the choice value."
++                            % (self.max_length, max_choice_length),
++                            obj=self,
++                            id='fields.E122',
++                        )
++                    ]
+             return []
+ 
+     def cast_db_type(self, connection):

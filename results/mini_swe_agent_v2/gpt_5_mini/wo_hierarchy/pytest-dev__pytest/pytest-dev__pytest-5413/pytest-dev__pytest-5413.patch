@@ -1,0 +1,25 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index c4ed961ac..29fff8dcd 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -537,9 +537,18 @@ class ExceptionInfo:
+     def __str__(self):
+         if self._excinfo is None:
+             return repr(self)
++        # Historically this constructed a ReprFileLocation which enforces a
++        # single-line summary by truncating at the first newline. That caused
++        # str(ExceptionInfo) to lose lines for multi-line exception messages
++        # (see issue description). To preserve the full exception text when
++        # converting ExceptionInfo to str, build the file:lineno prefix and
++        # append the full exconly() output directly (which may contain
++        # multiple lines).
+         entry = self.traceback[-1]
+-        loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
+-        return str(loc)
++        path = entry.path
++        lineno = entry.lineno + 1
++        message = self.exconly()
++        return "{}:{}: {}".format(path, lineno, message)
+ 
+     def match(self, regexp):
+         """

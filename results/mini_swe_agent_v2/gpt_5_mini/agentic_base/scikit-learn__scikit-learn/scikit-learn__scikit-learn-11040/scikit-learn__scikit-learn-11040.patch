@@ -1,0 +1,78 @@
+diff --git a/sklearn/neighbors/base.py b/sklearn/neighbors/base.py
+index 3e5e729c2..30c1e4a96 100644
+--- a/sklearn/neighbors/base.py
++++ b/sklearn/neighbors/base.py
+@@ -55,6 +55,39 @@ def _check_weights(weights):
+                          "'distance', or a callable function")
+ 
+ 
++def _check_n_neighbors(n_neighbors, name="n_neighbors"):
++    """Validate and normalize n_neighbors parameter.
++
++    Accepts Python ints and numpy integer types. If a float is provided it
++    must be integer-valued (e.g. 3.0) and will be converted to int. Booleans
++    are rejected. Returns the normalized int or None.
++    """
++    if n_neighbors is None:
++        return None
++    # reject booleans explicitly
++    if isinstance(n_neighbors, bool):
++        raise TypeError("%s must be an integer, got boolean" % name)
++
++    # native python int or numpy integer
++    if isinstance(n_neighbors, (int, np.integer)):
++        return int(n_neighbors)
++
++    # floats: accept only integer-valued floats
++    if isinstance(n_neighbors, (float, np.floating)):
++        if float(n_neighbors).is_integer():
++            return int(n_neighbors)
++        raise ValueError("%s must be an integer, got %r" % (name, n_neighbors))
++
++    # try to coerce objects that implement __index__ (e.g. types.Indexed)
++    try:
++        import operator
++
++        idx = operator.index(n_neighbors)
++        return int(idx)
++    except Exception:
++        raise TypeError("%s must be an integer, got %r" % (name, n_neighbors))
++
++
+ def _get_weights(dist, weights):
+     """Get the weights from an array of distances and a parameter ``weights``
+ 
+@@ -107,7 +140,8 @@ class NeighborsBase(six.with_metaclass(ABCMeta, BaseEstimator)):
+                  algorithm='auto', leaf_size=30, metric='minkowski',
+                  p=2, metric_params=None, n_jobs=1):
+ 
+-        self.n_neighbors = n_neighbors
++        # normalize/validate n_neighbors early to ensure integer semantics
++        self.n_neighbors = _check_n_neighbors(n_neighbors, name='n_neighbors')
+         self.radius = radius
+         self.algorithm = algorithm
+         self.leaf_size = leaf_size
+@@ -328,6 +362,11 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # validate and normalize method-level n_neighbors
++        n_neighbors = _check_n_neighbors(n_neighbors, name='n_neighbors')
++        if n_neighbors is None:
++            raise ValueError("n_neighbors must be specified")
++
+         if X is not None:
+             query_is_train = False
+             X = check_array(X, accept_sparse='csr')
+@@ -467,6 +506,11 @@ class KNeighborsMixin(object):
+         if n_neighbors is None:
+             n_neighbors = self.n_neighbors
+ 
++        # validate and normalize method-level n_neighbors
++        n_neighbors = _check_n_neighbors(n_neighbors, name='n_neighbors')
++        if n_neighbors is None:
++            raise ValueError("n_neighbors must be specified")
++
+         # kneighbors does the None handling.
+         if X is not None:
+             X = check_array(X, accept_sparse='csr')

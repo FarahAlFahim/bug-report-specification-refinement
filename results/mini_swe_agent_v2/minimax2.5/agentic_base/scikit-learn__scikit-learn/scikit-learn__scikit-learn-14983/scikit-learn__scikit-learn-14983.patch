@@ -1,0 +1,15 @@
+diff --git a/sklearn/multiclass.py b/sklearn/multiclass.py
+index 9cee96614..3cf79b927 100644
+--- a/sklearn/multiclass.py
++++ b/sklearn/multiclass.py
+@@ -177,10 +177,8 @@ class OneVsRestClassifier(MultiOutputMixin, ClassifierMixin,
+     label_binarizer_ : LabelBinarizer object
+         Object used to transform multiclass labels to binary labels and
+         vice-versa.
+-
+     multilabel_ : boolean
+         Whether a OneVsRestClassifier is a multilabel classifier.
+-
+     """
+     def __init__(self, estimator, n_jobs=None):
+         self.estimator = estimator

@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/mathml.py b/sympy/printing/mathml.py
+index 1aa0ee01a2..e4f8b3b0fd 100644
+--- a/sympy/printing/mathml.py
++++ b/sympy/printing/mathml.py
+@@ -472,6 +472,18 @@ def _print_list(self, seq):
+             dom_element.appendChild(self._print(item))
+         return dom_element
+ 
++    def _print_IndexedBase(self, e):
++        base = self.dom.createElement('indexedbase')
++        base.appendChild(self._print(e.label))
++        return base
++
++    def _print_Indexed(self, e):
++        index = self.dom.createElement('indexed')
++        index.appendChild(self._print(e.base))
++        for idx in e.indices:
++            index.appendChild(self._print(idx))
++        return index
++
+     def _print_int(self, p):
+         dom_element = self.dom.createElement(self.mathml_tag(p))
+         dom_element.appendChild(self.dom.createTextNode(str(p)))
+@@ -1184,6 +1196,16 @@ def _print_Relational(self, e):
+         mrow.appendChild(self._print(e.rhs))
+         return mrow
+ 
++    def _print_IndexedBase(self, e):
++        return self._print(e.label)
++
++    def _print_Indexed(self, e):
++        sub = self.dom.createElement('msub')
++        sub.appendChild(self._print(e.base))
++        for idx in e.indices:
++            sub.appendChild(self._print(idx))
++        return sub
++
+     def _print_int(self, p):
+         dom_element = self.dom.createElement(self.mathml_tag(p))
+         dom_element.appendChild(self.dom.createTextNode(str(p)))

@@ -1,0 +1,58 @@
+diff --git a/requests/utils.py b/requests/utils.py
+index 8d17b6b2..f4bd187b 100644
+--- a/requests/utils.py
++++ b/requests/utils.py
+@@ -357,14 +357,41 @@ def get_encoding_from_headers(headers):
+ 
+ 
+ def stream_decode_response_unicode(iterator, r):
+-    """Stream decodes a iterator."""
++    """Stream decodes a iterator.
+ 
+-    if r.encoding is None:
++    Determine an encoding to use for streaming. Prefer an explicit
++    Response.encoding. If that's not set, consult the response
++    headers for a charset. As a special-case, treat JSON media types
++    (application/json and +json vendor types) as UTF-8 by default
++    when no charset is provided per RFC/common practice.
++    """
++
++    encoding = getattr(r, 'encoding', None)
++    if encoding is None:
++        try:
++            encoding = get_encoding_from_headers(r.headers)
++        except Exception:
++            encoding = None
++
++        if not encoding:
++            # Inspect the content-type for json media types. We avoid
++            # consuming the body here; this only looks at headers.
++            content_type = ''
++            try:
++                content_type = (r.headers.get('content-type') or '').split(';', 1)[0].strip().lower()
++            except Exception:
++                content_type = ''
++
++            if content_type == 'application/json' or content_type.endswith('+json'):
++                encoding = 'utf-8'
++
++    if encoding is None:
++        # No non-consuming encoding could be determined; yield raw bytes.
+         for item in iterator:
+             yield item
+         return
+ 
+-    decoder = codecs.getincrementaldecoder(r.encoding)(errors='replace')
++    decoder = codecs.getincrementaldecoder(encoding)(errors='replace')
+     for chunk in iterator:
+         rv = decoder.decode(chunk)
+         if rv:
+@@ -372,8 +399,6 @@ def stream_decode_response_unicode(iterator, r):
+     rv = decoder.decode(b'', final=True)
+     if rv:
+         yield rv
+-
+-
+ def iter_slices(string, slice_length):
+     """Iterate over slices of a string."""
+     pos = 0

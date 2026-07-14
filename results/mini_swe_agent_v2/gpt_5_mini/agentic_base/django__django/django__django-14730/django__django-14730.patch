@@ -1,0 +1,57 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..c43af2e059 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1212,6 +1212,7 @@ class ManyToManyField(RelatedField):
+             *super().check(**kwargs),
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
++            *self._check_related_name_for_symmetrical_self_relation(**kwargs),
+             *self._check_ignored_options(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
+         ]
+@@ -1227,6 +1228,44 @@ class ManyToManyField(RelatedField):
+             ]
+         return []
+ 
++    def _check_related_name_for_symmetrical_self_relation(self, from_model=None, **kwargs):
++        """Ensure that an explicit related_name on a symmetrical self-referential
++        ManyToManyField isn't silently ignored. If the field was given an
++        explicit related_name, the relation is symmetrical and self-referential,
++        raise a model check error.
++        """
++        # If the user did not explicitly supply a related_name, nothing to do.
++        if self._related_name is None:
++            return []
++        # If relation is not symmetrical, ok.
++        if not self.remote_field.symmetrical:
++            return []
++        # Resolve the target model relative to the model where the field is defined.
++        scope_model = from_model if from_model is not None else self.model
++        try:
++            to_model = resolve_relation(scope_model, self.remote_field.model)
++        except Exception:
++            return []
++        # If we cannot resolve the model to a class, skip the check.
++        if not isinstance(to_model, type):
++            return []
++        # If self-referential, then the provided related_name will be ignored.
++        if scope_model == to_model:
++            return [
++                checks.Error(
++                    "The related_name '%s' for field %s.%s is ignored for symmetrical self-referential ManyToManyFields." % (
++                        self._related_name, self.model._meta.object_name, self.name
++                    ),
++                    hint=(
++                        "Symmetrical self-referential ManyToManyFields don't create a reverse accessor. "
++                        "Remove the related_name argument or set symmetrical=False if you want a reverse accessor."
++                    ),
++                    obj=self,
++                    id='fields.E340',
++                )
++            ]
++        return []
++
+     def _check_ignored_options(self, **kwargs):
+         warnings = []
+ 

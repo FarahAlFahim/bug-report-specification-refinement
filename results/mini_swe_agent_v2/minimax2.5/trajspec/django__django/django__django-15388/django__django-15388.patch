@@ -1,0 +1,13 @@
+diff --git a/django/template/autoreload.py b/django/template/autoreload.py
+index cf1b20ba95..6068460af4 100644
+--- a/django/template/autoreload.py
++++ b/django/template/autoreload.py
+@@ -50,5 +50,6 @@ def watch_for_template_changes(sender, **kwargs):
+ def template_changed(sender, file_path, **kwargs):
+     for template_dir in get_template_directories():
+         if template_dir in file_path.parents:
+-            reset_loaders()
+-            return True
++            if file_path.suffix in {'.html', '.htm', '.txt', '.mako'}:
++                reset_loaders()
++                return True

@@ -1,0 +1,29 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 74f45dd..e2476b6 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -19,16 +19,14 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
+-    evalcache = config._store.setdefault(evalcache_key, default)
+-    try:
+-        return evalcache[expr]
+-    except KeyError:
+-        import _pytest._code
+-
+-        exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
+-        return x
++    # Evaluate the expression each time instead of caching the result.
++    # The result may depend on the globals provided in `d`, which differ
++    # between test items, so caching only by the expression string can lead
++    # to incorrect reuse of prior evaluation results.
++    import _pytest._code
++
++    exprcode = _pytest._code.compile(expr, mode="eval")
++    return eval(exprcode, d)
+ 
+ 
+ class MarkEvaluator:

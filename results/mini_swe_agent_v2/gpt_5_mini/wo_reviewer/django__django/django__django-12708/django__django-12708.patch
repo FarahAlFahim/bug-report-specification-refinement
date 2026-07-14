@@ -1,0 +1,105 @@
+diff --git a/django/db/backends/base/schema.py b/django/db/backends/base/schema.py
+index 61f88401ab..18f86f9909 100644
+--- a/django/db/backends/base/schema.py
++++ b/django/db/backends/base/schema.py
+@@ -397,6 +397,19 @@ class BaseDatabaseSchemaEditor:
+         # Created indexes
+         for field_names in news.difference(olds):
+             fields = [model._meta.get_field(field) for field in field_names]
++            # Determine the column names for these fields.
++            columns = [f.column for f in fields]
++            # Exclude indexes/constraints that are declared in the model's Meta
++            meta_constraint_names = {c.name for c in model._meta.constraints}
++            meta_index_names = {i.name for i in model._meta.indexes}
++            # If a DB constraint or index already exists for these columns, do not create a duplicate.
++            existing = self._constraint_names(
++                model, columns, index=True, exclude=meta_constraint_names | meta_index_names
++            )
++            if existing:
++                # A matching DB object already exists (could be a unique constraint or an index),
++                # so skip creating a new index to avoid duplicate objects.
++                continue
+             self.execute(self._create_index_sql(model, fields, suffix="_idx"))
+ 
+     def _delete_composed_index(self, model, fields, constraint_kwargs, sql):
+@@ -407,13 +420,49 @@ class BaseDatabaseSchemaEditor:
+             model, columns, exclude=meta_constraint_names | meta_index_names,
+             **constraint_kwargs
+         )
+-        if len(constraint_names) != 1:
+-            raise ValueError("Found wrong number (%s) of constraints for %s(%s)" % (
+-                len(constraint_names),
+-                model._meta.db_table,
+-                ", ".join(columns),
+-            ))
+-        self.execute(self._delete_constraint_sql(sql, model, constraint_names[0]))
++        if len(constraint_names) == 0:
++            # Nothing to delete.
++            return
++        if len(constraint_names) == 1:
++            target = constraint_names[0]
++        else:
++            # Multiple matching DB objects (e.g. a unique constraint and a plain index).
++            # Try to disambiguate using introspected constraint flags where possible.
++            with self.connection.cursor() as cursor:
++                constraints = self.connection.introspection.get_constraints(cursor, model._meta.db_table)
++            candidates = [(name, constraints.get(name, {})) for name in constraint_names]
++            # Determine preference from requested kwargs.
++            pref = None
++            if constraint_kwargs.get('unique'):
++                pref = 'unique'
++            elif constraint_kwargs.get('index'):
++                pref = 'index'
++            if pref is not None:
++                filtered = [name for name, info in candidates if info.get(pref)]
++                if len(filtered) == 1:
++                    target = filtered[0]
++                elif len(filtered) > 1:
++                    # Multiple matches of preferred type: can't decide -> no-op
++                    return
++                else:
++                    # No preferred-type matches: use heuristics.
++                    if pref == 'index':
++                        filtered2 = [name for name, info in candidates if not info.get('unique')]
++                        if len(filtered2) == 1:
++                            target = filtered2[0]
++                        else:
++                            return
++                    else:
++                        filtered2 = [name for name, info in candidates if info.get('unique')]
++                        if len(filtered2) == 1:
++                            target = filtered2[0]
++                        else:
++                            return
++            else:
++                # No preference indicated; can't decide among multiple matches -> no-op
++                return
++        self.execute(self._delete_constraint_sql(sql, model, target))
++
+ 
+     def alter_db_table(self, model, old_db_table, new_db_table):
+         """Rename the table a model points to."""
+@@ -1153,17 +1202,17 @@ class BaseDatabaseSchemaEditor:
+         result = []
+         for name, infodict in constraints.items():
+             if column_names is None or column_names == infodict['columns']:
+-                if unique is not None and infodict['unique'] != unique:
++                if unique is not None and infodict.get('unique') != unique:
+                     continue
+-                if primary_key is not None and infodict['primary_key'] != primary_key:
++                if primary_key is not None and infodict.get('primary_key') != primary_key:
+                     continue
+-                if index is not None and infodict['index'] != index:
++                if index is not None and infodict.get('index') != index:
+                     continue
+-                if check is not None and infodict['check'] != check:
++                if check is not None and infodict.get('check') != check:
+                     continue
+-                if foreign_key is not None and not infodict['foreign_key']:
++                if foreign_key is not None and not infodict.get('foreign_key'):
+                     continue
+-                if type_ is not None and infodict['type'] != type_:
++                if type_ is not None and infodict.get('type') != type_:
+                     continue
+                 if not exclude or name not in exclude:
+                     result.append(name)

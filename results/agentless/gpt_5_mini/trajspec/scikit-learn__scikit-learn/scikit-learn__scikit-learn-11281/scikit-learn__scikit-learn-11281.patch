@@ -1,0 +1,89 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index 721709f..2fd8de6 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -240,8 +240,38 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # Persist training-set labels_ for compatibility with clusterer-style
++        # estimators (e.g., KMeans). The labels correspond to the component
++        # assignments for the training data using the fitted parameters.
++        # Use predict() which will validate the estimator is fitted.
++        try:
++            self.labels_ = self.predict(X)
++        except Exception:
++            # If for some reason labels cannot be computed, ensure we do not
++            # break the API; don't set labels_ in that case.
++            if hasattr(self, 'labels_'):
++                delattr(self, 'labels_')
++
+         return self
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the model and return the training set labels.
++
++        This convenience is provided for compatibility with clustering
++        estimators' API (e.g., sklearn.cluster.KMeans.fit_predict).
++        """
++        self.fit(X)
++        return getattr(self, 'labels_', self.predict(X))
++
++    @property
++    def n_clusters(self):
++        """Alias for n_components to be compatible with clusterer API."""
++        return self.n_components
++
++    @n_clusters.setter
++    def n_clusters(self, value):
++        self.n_components = value
++
+     def _e_step(self, X):
+         """E step.
+ 
+@@ -500,4 +530,4 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+             print("Initialization converged: %s" % self.converged_)
+         elif self.verbose >= 2:
+             print("Initialization converged: %s\t time lapse %.5fs\t ll %.5f" %
+-                  (self.converged_, time() - self._init_prev_time, ll))
++                  (self.converged_, time() - self._init_prev_time, ll))
+diff --git a/sklearn/mixture/bayesian_mixture.py b/sklearn/mixture/bayesian_mixture.py
+index 84fca4d..db8f8c2 100644
+--- a/sklearn/mixture/bayesian_mixture.py
++++ b/sklearn/mixture/bayesian_mixture.py
+@@ -240,6 +240,9 @@ class BayesianGaussianMixture(BaseMixture):
+         Lower bound value on the likelihood (of the training data with
+         respect to the model) of the best fit of inference.
+ 
++    labels_ : array-like, shape (n_samples,)
++        Component labels for the training data. Present after calling fit().
++
+     weight_concentration_prior_ : tuple or float
+         The dirichlet concentration of each component on the weight
+         distribution (Dirichlet). The type depends on
+@@ -782,4 +785,4 @@ class BayesianGaussianMixture(BaseMixture):
+             self.precisions_ = np.dot(self.precisions_cholesky_,
+                                       self.precisions_cholesky_.T)
+         else:
+-            self.precisions_ = self.precisions_cholesky_ ** 2
++            self.precisions_ = self.precisions_cholesky_ ** 2
+diff --git a/sklearn/mixture/gaussian_mixture.py b/sklearn/mixture/gaussian_mixture.py
+index 67ca063..aa55d70 100644
+--- a/sklearn/mixture/gaussian_mixture.py
++++ b/sklearn/mixture/gaussian_mixture.py
+@@ -574,6 +574,9 @@ class GaussianMixture(BaseMixture):
+     lower_bound_ : float
+         Log-likelihood of the best fit of EM.
+ 
++    labels_ : array-like, shape (n_samples,)
++        Component labels for the training data. Present after calling fit().
++
+     See Also
+     --------
+     BayesianGaussianMixture : Gaussian mixture model fit with a variational
+@@ -747,4 +750,4 @@ class GaussianMixture(BaseMixture):
+         aic : float
+             The lower the better.
+         """
+-        return -2 * self.score(X) * X.shape[0] + 2 * self._n_parameters()
++        return -2 * self.score(X) * X.shape[0] + 2 * self._n_parameters()

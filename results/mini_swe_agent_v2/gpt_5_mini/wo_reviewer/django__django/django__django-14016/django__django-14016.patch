@@ -1,0 +1,32 @@
+diff --git a/django/utils/tree.py b/django/utils/tree.py
+index 302cd37d5f..d712f23d3e 100644
+--- a/django/utils/tree.py
++++ b/django/utils/tree.py
+@@ -48,9 +48,26 @@ class Node:
+         return "<%s: %s>" % (self.__class__.__name__, self)
+ 
+     def __deepcopy__(self, memodict):
++        """
++        Create a deepcopy of this Node. Only Node children are deep-copied
++        recursively; non-Node (leaf) children are appended as-is. This
++        mirrors the cloning semantics used elsewhere in the ORM (for
++        example WhereNode.clone) and avoids attempting to deepcopy objects
++        which are not deepcopyable/pickleable (such as dict_keys), which
++        would raise a TypeError.
++        """
+         obj = Node(connector=self.connector, negated=self.negated)
+         obj.__class__ = self.__class__
+-        obj.children = copy.deepcopy(self.children, memodict)
++        new_children = []
++        for child in self.children:
++            if isinstance(child, Node):
++                new_children.append(copy.deepcopy(child, memodict))
++            else:
++                # Leaf values are intentionally not deep-copied. This keeps
++                # semantics consistent with other node-cloning logic and
++                # avoids errors when leaf values are not deepcopyable.
++                new_children.append(child)
++        obj.children = new_children
+         return obj
+ 
+     def __len__(self):

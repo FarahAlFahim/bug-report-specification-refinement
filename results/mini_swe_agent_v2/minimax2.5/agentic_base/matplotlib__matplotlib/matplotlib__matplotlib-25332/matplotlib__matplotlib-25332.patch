@@ -1,0 +1,49 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..b0b11a9474 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -846,6 +846,44 @@ class Grouper:
+         siblings = self._mapping.get(weakref.ref(a), [weakref.ref(a)])
+         return [x() for x in siblings]
+ 
++    def __getstate__(self):
++        """
++        Serialize the Grouper instance.
++
++        Convert weakref-based mapping to a regular mapping with dereferenced
++        objects for pickle compatibility.
++        """
++        # Clean up dead weak references before pickling
++        self.clean()
++        # Convert weakrefs to actual objects for serialization
++        # The structure is: {weakref(obj): [weakref(obj1), weakref(obj2), ...]}
++        # We need to convert to: {obj: [obj1, obj2, ...]}
++        mapping = {}
++        for key, values in self._mapping.items():
++            key_obj = key()
++            if key_obj is not None:
++                mapping[key_obj] = [v() for v in values if v() is not None]
++        return {'_mapping': mapping}
++
++    def __setstate__(self, state):
++        """
++        Deserialize the Grouper instance.
++
++        Reconstruct weakrefs from the dereferenced objects.
++        """
++        mapping = state.get('_mapping', {})
++        # Convert actual objects back to weakrefs
++        # The structure is: {obj: [obj1, obj2, ...]}
++        # We need to convert to: {weakref(obj): [weakref(obj1), weakref(obj2), ...]}
++        self._mapping = {}
++        for key, values in mapping.items():
++            key_ref = weakref.ref(key)
++            value_refs = [weakref.ref(v) for v in values]
++            self._mapping[key_ref] = value_refs
++            # Update the mapping for each value to point to the same list
++            for v in value_refs:
++                self._mapping[v] = value_refs
++
+ 
+ class GrouperView:
+     """Immutable view over a `.Grouper`."""

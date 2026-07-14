@@ -1,0 +1,32 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 6d3cc05bd3..da42d2b6f2 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -490,10 +490,13 @@ def _print_Product(self, expr):
+         sign_height = 0
+ 
+         for lim in expr.limits:
+-            width = (func_height + 2) * 5 // 3 - 2
++            # conservative width relationship: keep the product sign
++            # slimmer while avoiding non-positive widths
++            width = max(1, (func_height + 2) * 3 // 2 - 2)
+             sign_lines = []
+             sign_lines.append(corner_chr + (horizontal_chr*width) + corner_chr)
+-            for i in range(func_height + 1):
++            # vertical segment count should match the function height
++            for i in range(func_height):
+                 sign_lines.append(vertical_chr + (' '*width) + vertical_chr)
+ 
+             pretty_sign = stringPict('')
+@@ -514,9 +517,10 @@ def _print_Product(self, expr):
+                 pretty_func.baseline = 0
+                 first = False
+ 
++            # use full sign height for symmetric padding
+             height = pretty_sign.height()
+             padding = stringPict('')
+-            padding = prettyForm(*padding.stack(*[' ']*(height - 1)))
++            padding = prettyForm(*padding.stack(*[' ']*height))
+             pretty_sign = prettyForm(*pretty_sign.right(padding))
+ 
+             pretty_func = prettyForm(*pretty_sign.right(pretty_func))

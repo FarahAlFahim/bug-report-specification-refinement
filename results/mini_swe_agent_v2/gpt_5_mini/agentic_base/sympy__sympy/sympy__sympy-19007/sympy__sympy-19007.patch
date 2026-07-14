@@ -1,0 +1,52 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index b821c42845..b8f65daffb 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -1,6 +1,6 @@
+ from __future__ import print_function, division
+ 
+-from sympy import ask, Q
++from sympy import ask, Q, S
+ from sympy.core import Basic, Add
+ from sympy.strategies import typed, exhaust, condition, do_one, unpack
+ from sympy.strategies.traverse import bottom_up
+@@ -233,17 +233,34 @@ def transpose(self):
+         return self._eval_transpose()
+ 
+     def _entry(self, i, j, **kwargs):
+-        # Find row entry
++        # Find row entry. If any comparison is undecidable (e.g. involves
++        # a symbolic index) we should not assume the block membership. In
++        # that case return a MatrixElement referring to this BlockMatrix
++        # with the original indices.
++        i0, j0 = i, j
++        # Find the row block
+         for row_block, numrows in enumerate(self.rowblocksizes):
+-            if (i < numrows) != False:
++            cond = (i < numrows)
++            if cond is S.true:
+                 break
+-            else:
++            elif cond is S.false:
+                 i -= numrows
++            else:
++                # undecidable
++                from sympy.matrices.expressions.matexpr import MatrixElement
++                return MatrixElement(self, i0, j0)
++
++        # Find the column block
+         for col_block, numcols in enumerate(self.colblocksizes):
+-            if (j < numcols) != False:
++            cond = (j < numcols)
++            if cond is S.true:
+                 break
+-            else:
++            elif cond is S.false:
+                 j -= numcols
++            else:
++                from sympy.matrices.expressions.matexpr import MatrixElement
++                return MatrixElement(self, i0, j0)
++
+         return self.blocks[row_block, col_block][i, j]
+ 
+     @property

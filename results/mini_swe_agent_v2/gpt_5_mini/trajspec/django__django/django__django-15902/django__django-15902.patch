@@ -1,0 +1,82 @@
+diff --git a/django/forms/formsets.py b/django/forms/formsets.py
+index 3adbc6979a..f3e56b733d 100644
+--- a/django/forms/formsets.py
++++ b/django/forms/formsets.py
+@@ -48,6 +48,24 @@ class ManagementForm(Form):
+         cleaned_data.setdefault(INITIAL_FORM_COUNT, 0)
+         return cleaned_data
+ 
++    def render(self, template_name=None, context=None, renderer=None):
++        """
++        Render the management form while avoiding the default-template
++        deprecation warning. The management form only outputs hidden inputs
++        and should not trigger the RemovedInDjango50Warning about the
++        generic "django/forms/default.html" templates.
++
++        This method mirrors RenderableMixin.render but intentionally does
++        not emit the deprecation warning for the default form templates.
++        """
++        from django.utils.safestring import mark_safe
++
++        renderer = renderer or self.renderer
++        template = template_name or self.template_name
++        context = context or self.get_context()
++        return mark_safe(renderer.render(template, context))
++
++
+ 
+ class BaseFormSet(RenderableFormMixin):
+     """
+diff --git a/django/forms/utils.py b/django/forms/utils.py
+index 905babce4d..4bf97a21d2 100644
+--- a/django/forms/utils.py
++++ b/django/forms/utils.py
+@@ -69,9 +69,45 @@ class RenderableMixin:
+             template == "django/forms/default.html"
+             or template == "django/forms/formsets/default.html"
+         ):
+-            warnings.warn(
+-                DEFAULT_TEMPLATE_DEPRECATION_MSG, RemovedInDjango50Warning, stacklevel=2
+-            )
++            # Avoid noisy deprecation warnings for management-only output.
++            # If the context indicates there are no visible fields (for a
++            # Form) or no visible forms (for a FormSet), skip the warning
++            # because the rendered output will only contain hidden inputs.
++            skip_warning = False
++            try:
++                if isinstance(context, dict):
++                    # Form context provides 'fields' (visible) and
++                    # 'hidden_fields'. If there are no visible fields, skip.
++                    if context.get("fields") == []:
++                        skip_warning = True
++                    # FormSet context provides 'formset'. If none of the
++                    # contained forms have visible fields, skip.
++                    elif "formset" in context:
++                        formset = context["formset"]
++                        visible_any = False
++                        for form in getattr(formset, "forms", []):
++                            try:
++                                if form.visible_fields():
++                                    visible_any = True
++                                    break
++                            except Exception:
++                                # If we can't determine, be conservative and
++                                # emit the warning.
++                                visible_any = True
++                                break
++                        if not visible_any:
++                            skip_warning = True
++            except Exception:
++                # If anything goes wrong while introspecting the context,
++                # fall back to emitting the warning.
++                skip_warning = False
++
++            if not skip_warning:
++                warnings.warn(
++                    DEFAULT_TEMPLATE_DEPRECATION_MSG,
++                    RemovedInDjango50Warning,
++                    stacklevel=2,
++                )
+         return mark_safe(renderer.render(template, context))
+ 
+     __str__ = render

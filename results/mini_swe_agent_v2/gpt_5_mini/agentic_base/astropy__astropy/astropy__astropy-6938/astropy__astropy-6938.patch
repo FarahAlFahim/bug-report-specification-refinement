@@ -1,0 +1,24 @@
+diff --git a/astropy/io/fits/fitsrec.py b/astropy/io/fits/fitsrec.py
+index 574b4073b1..277eb5c8e8 100644
+--- a/astropy/io/fits/fitsrec.py
++++ b/astropy/io/fits/fitsrec.py
+@@ -1259,9 +1259,17 @@ class FITS_rec(np.recarray):
+ 
+             output_field[jdx] = value
+ 
+-        # Replace exponent separator in floating point numbers
++        # Replace exponent separator in floating point numbers.  Numpy's
++        # char.replace (and the chararray.replace method) return a new array
++        # rather than operating in-place, and because ``output_field`` is a
++        # view into the parent recarray buffer we must write the replaced
++        # result back into that buffer so the parent sees the change.
+         if 'D' in format:
+-            output_field.replace(encode_ascii('E'), encode_ascii('D'))
++            replaced = chararray.replace(output_field,
++                                         encode_ascii('E'),
++                                         encode_ascii('D'))
++            # Write the replaced values back into the original buffer/view
++            output_field[:] = replaced
+ 
+ 
+ def _get_recarray_field(array, key):

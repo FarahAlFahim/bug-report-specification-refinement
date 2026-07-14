@@ -1,0 +1,98 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 1feaa7a..8a04e72 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -11,10 +11,48 @@ from .mpl_axes import Axes
+ 
+ 
+ def _tick_only(ax, bottom_on, left_on):
++    """
++    Toggle ticklabels and axis labels for 'bottom' (x) and 'left' (y)
++    sides. Some Axes subclasses (such as mpl_toolkits' mpl_axes.Axes)
++    expose an AxisDict at ax.axis (subscriptable, with .toggle()); other
++    Axes (including most matplotlib and third-party axes) expose axis as
++    a callable method. Support both kinds here.
++
++    Note: AxisDict.toggle uses keyword booleans to indicate "turn off"
++    (True means turn off). For the callable/matplotlib axes we therefore
++    set visibility = not(flag).
++    """
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++
++    axis_attr = getattr(ax, "axis", None)
++    if not callable(axis_attr) and axis_attr is not None:
++        # AxisDict-like: keep existing behaviour
++        ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
++        ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    else:
++        # Matplotlib/third-party Axes: use tick_params and label visibility.
++        # For AxisDict.toggle the boolean means "turn off", so compute
++        # visible = not(off_flag).
++        visible_bottom = not bottom_off
++        visible_left = not left_off
++
++        # X axis: control bottom/top ticklabels and the x-axis label
++        ax.tick_params(axis="x", which="both",
++                       labelbottom=visible_bottom, labeltop=False)
++        try:
++            ax.xaxis.label.set_visible(visible_bottom)
++        except Exception:
++            # Some Axes implementations might not have xaxis.label; ignore.
++            pass
++
++        # Y axis: control left/right ticklabels and the y-axis label
++        ax.tick_params(axis="y", which="both",
++                       labelleft=visible_left, labelright=False)
++        try:
++            ax.yaxis.label.set_visible(visible_left)
++        except Exception:
++            pass
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +66,40 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        """
++        Toggle the colorbar label and ticklabels for the orientation side.
++        The existing AxisDict.toggle expects a boolean meaning "turn off".
++        For general Axes, translate that to visible = not(b).
++        """
++        axis_attr = getattr(self, "axis", None)
++        if not callable(axis_attr) and axis_attr is not None:
++            axis = self.axis[self.orientation]
++            axis.toggle(ticklabels=b, label=b)
++            return
++
++        visible = not b
++        ori = self.orientation
++        # Handle vertical (left/right) orientations
++        if ori in ("left", "right"):
++            # y-axis label visibility
++            try:
++                self.yaxis.label.set_visible(visible)
++            except Exception:
++                pass
++            if ori == "left":
++                self.tick_params(axis="y", labelleft=visible, labelright=False)
++            else:
++                self.tick_params(axis="y", labelright=visible, labelleft=False)
++        else:
++            # horizontal (bottom/top) orientations
++            try:
++                self.xaxis.label.set_visible(visible)
++            except Exception:
++                pass
++            if ori == "bottom":
++                self.tick_params(axis="x", labelbottom=visible, labeltop=False)
++            else:
++                self.tick_params(axis="x", labeltop=visible, labelbottom=False)
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

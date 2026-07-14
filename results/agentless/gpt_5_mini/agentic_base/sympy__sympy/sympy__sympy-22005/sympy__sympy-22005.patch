@@ -1,0 +1,36 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index 66efb1a..37d3432 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -248,6 +248,13 @@ def solve_generic(polys, opt):
+                 (finite number of solutions)
+                 '''))
+ 
++        # Preserve the generators that were requested for this call so that
++        # we can detect positive-dimensional systems. If the Groebner basis
++        # contains a single univariate polynomial but more than one
++        # generator was requested, the solution set is infinite and should
++        # not be treated as zero-dimensional.
++        orig_gens = gens
++
+         gens = f.gens
+         gen = gens[-1]
+ 
+@@ -257,7 +264,16 @@ def solve_generic(polys, opt):
+             return []
+ 
+         if len(basis) == 1:
+-            return [(zero,) for zero in zeros]
++            # If only one basis polynomial exists and exactly one generator
++            # was requested, return its roots. If more generators were
++            # requested then the system is positive-dimensional.
++            if len(orig_gens) == 1:
++                return [(zero,) for zero in zeros]
++            else:
++                raise NotImplementedError(filldedent('''
++                    only zero-dimensional systems supported
++                    (finite number of solutions)
++                    '''))
+ 
+         solutions = []
+ 

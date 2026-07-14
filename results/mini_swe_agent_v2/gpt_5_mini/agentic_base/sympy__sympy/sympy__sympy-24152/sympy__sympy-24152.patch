@@ -1,0 +1,53 @@
+diff --git a/sympy/physics/quantum/tensorproduct.py b/sympy/physics/quantum/tensorproduct.py
+index 78accaf295..b2cd89dc84 100644
+--- a/sympy/physics/quantum/tensorproduct.py
++++ b/sympy/physics/quantum/tensorproduct.py
+@@ -240,14 +240,46 @@ def doit(self, **hints):
+ 
+     def _eval_expand_tensorproduct(self, **hints):
+         """Distribute TensorProducts across addition."""
++        # The constructor for TensorProduct may pull commutative scalar
++        # factors out front and return a Mul of the form
++        # Mul(c_part, TensorProduct(...)) or c_part * single_nc_arg.
++        # In those cases we need to detect the embedded TensorProduct and
++        # recurse into it so that additions in inner non-commutative
++        # arguments get expanded as well.
++        #
++        # Build a working tuple of arguments that represent the non-commutative
++        # part we actually want to examine for Add instances.
+         args = self.args
+         add_args = []
++
++        # Helper to attempt recursive expansion on a constructed tp-like expr.
++        def _maybe_recurse(tp):
++            # If tp is a bare TensorProduct, recurse directly.
++            if isinstance(tp, TensorProduct):
++                return tp._eval_expand_tensorproduct()
++            # If tp is a Mul with a single non-commutative part that is a
++            # TensorProduct (or a Pow of a TensorProduct), expand that inner
++            # TensorProduct and reattach the commutative factors.
++            if isinstance(tp, Mul):
++                c_part, nc_part = tp.args_cnc()
++                if len(nc_part) == 1:
++                    inner = nc_part[0]
++                    # handle Pow of TensorProduct
++                    if isinstance(inner, Pow) and isinstance(inner.base, TensorProduct):
++                        inner_expanded = tensor_product_simp_Pow(inner)
++                        # inner_expanded is a TensorProduct
++                        inner_expanded = inner_expanded._eval_expand_tensorproduct()
++                        return Mul(*c_part) * inner_expanded
++                    elif isinstance(inner, TensorProduct):
++                        inner_expanded = inner._eval_expand_tensorproduct()
++                        return Mul(*c_part) * inner_expanded
++            return tp
++
+         for i in range(len(args)):
+             if isinstance(args[i], Add):
+                 for aa in args[i].args:
+                     tp = TensorProduct(*args[:i] + (aa,) + args[i + 1:])
+-                    if isinstance(tp, TensorProduct):
+-                        tp = tp._eval_expand_tensorproduct()
++                    tp = _maybe_recurse(tp)
+                     add_args.append(tp)
+                 break
+ 

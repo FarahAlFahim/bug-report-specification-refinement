@@ -1,0 +1,22 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index a708f18..c817da0 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -120,6 +120,17 @@ class Point(GeometryEntity):
+             if len(coords) == kwargs.get('dim', len(coords)):
+                 return coords
+ 
++        # Allow expressions like scalar * Point(...) (a Mul with a Point factor).
++        # In that case interpret it as scaling the Point's coordinates by the scalar.
++        if isinstance(coords, Expr) and getattr(coords, 'is_Mul', False):
++            for factor in coords.args:
++                if getattr(factor, 'is_Point', False):
++                    # coords represents (scalar * factor).  Extract the scalar and
++                    # build a coordinate sequence by scaling the point's coordinates.
++                    scalar = coords / factor
++                    coords = Tuple(*[simplify(scalar * c) for c in factor.args])
++                    break
++
+         if not is_sequence(coords):
+             raise TypeError(filldedent('''
+                 Expecting sequence of coordinates, not `{}`'''

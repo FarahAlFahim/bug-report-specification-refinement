@@ -1,0 +1,79 @@
+diff --git a/sklearn/cluster/_affinity_propagation.py b/sklearn/cluster/_affinity_propagation.py
+index 0511594..843f08e 100644
+--- a/sklearn/cluster/_affinity_propagation.py
++++ b/sklearn/cluster/_affinity_propagation.py
+@@ -193,13 +193,22 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+             se = np.sum(e, axis=1)
+             unconverged = (np.sum((se == convergence_iter) + (se == 0))
+                            != n_samples)
+-            if (not unconverged and (K > 0)) or (it == max_iter):
++            # Only break when the algorithm has actually converged and there
++            # is at least one exemplar. The previous attempt to special-case
++            # loop exhaustion used a dead clause (it == max_iter) which never
++            # became true inside the loop. Do not treat loop exhaustion as
++            # convergence.
++            if (not unconverged and (K > 0)):
+                 if verbose:
+                     print("Converged after %d iterations." % it)
+                 break
+     else:
+         if verbose:
+             print("Did not converge")
++        # If the algorithm did not converge we must not return a plausible
++        # set of exemplars computed from the last iteration. Force E to be
++        # empty so downstream logic returns no cluster centers and -1 labels.
++        E = np.zeros(n_samples, dtype=bool)
+ 
+     I = np.flatnonzero(E)
+     K = I.size  # Identify exemplars
+@@ -222,8 +231,10 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+     else:
+         warnings.warn("Affinity propagation did not converge, this model "
+                       "will not have any cluster centers.", ConvergenceWarning)
+-        labels = np.array([-1] * n_samples)
+-        cluster_centers_indices = []
++        # Return consistent array types: labels as an ndarray and
++        # cluster_centers_indices as an empty ndarray (not a Python list).
++        labels = np.full(n_samples, -1, dtype=int)
++        cluster_centers_indices = np.array([], dtype=int)
+ 
+     if return_n_iter:
+         return cluster_centers_indices, labels, it + 1
+@@ -409,8 +420,26 @@ class AffinityPropagation(ClusterMixin, BaseEstimator):
+         """
+         check_is_fitted(self)
+         if not hasattr(self, "cluster_centers_"):
+-            raise ValueError("Predict method is not supported when "
+-                             "affinity='precomputed'.")
++            # For the precomputed affinity case cluster_centers_ is not set.
++            # If the model did not converge, cluster_centers_indices_ will be
++            # an empty array and we can return -1 labels for all samples.
++            # Otherwise, prediction with precomputed affinities is not supported.
++            if getattr(self, "affinity", None) == "precomputed":
++                centers_idx = getattr(self, "cluster_centers_indices_", None)
++                if centers_idx is None:
++                    raise ValueError("Predict method is not supported when "
++                                     "affinity='precomputed'.")
++                if np.asarray(centers_idx).size == 0:
++                    warnings.warn("This model does not have any cluster centers "
++                                  "because affinity propagation did not converge. "
++                                  "Labeling every sample as '-1'.", ConvergenceWarning)
++                    return np.full(X.shape[0], -1, dtype=int)
++                else:
++                    raise ValueError("Predict method is not supported when "
++                                     "affinity='precomputed'.")
++            else:
++                raise ValueError("Predict method is not supported when "
++                                 "affinity='precomputed'.")
+ 
+         if self.cluster_centers_.shape[0] > 0:
+             return pairwise_distances_argmin(X, self.cluster_centers_)
+@@ -418,7 +447,7 @@ class AffinityPropagation(ClusterMixin, BaseEstimator):
+             warnings.warn("This model does not have any cluster centers "
+                           "because affinity propagation did not converge. "
+                           "Labeling every sample as '-1'.", ConvergenceWarning)
+-            return np.array([-1] * X.shape[0])
++            return np.full(X.shape[0], -1, dtype=int)
+ 
+     def fit_predict(self, X, y=None):
+         """Fit the clustering from features or affinity matrix, and return

@@ -1,0 +1,29 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..b619387f29 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -848,10 +848,20 @@ class MultiWidget(Widget):
+         context['widget']['subwidgets'] = subwidgets
+         return context
+ 
+-    def id_for_label(self, id_):
+-        if id_:
+-            id_ += '_0'
+-        return id_
++    add_id_index = True
++
++    def id_for_label(self, id_, index=None):
++        """
++        Return the ID attribute for the <label> element for this widget.
++
++        Return an empty string if index is None (to improve accessibility,
++        similar to RadioSelect), or if add_id_index is False, or if id_
++        is None.
++        Otherwise, return 'id_<index>'.
++        """
++        if index is None or not self.add_id_index or not id_:
++            return ''
++        return '%s_%s' % (id_, index)
+ 
+     def value_from_datadict(self, data, files, name):
+         return [

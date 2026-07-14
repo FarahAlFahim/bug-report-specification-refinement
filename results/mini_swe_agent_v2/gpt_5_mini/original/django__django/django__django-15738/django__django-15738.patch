@@ -1,0 +1,21 @@
+diff --git a/django/db/backends/base/schema.py b/django/db/backends/base/schema.py
+index 03f0f11507..62463add2b 100644
+--- a/django/db/backends/base/schema.py
++++ b/django/db/backends/base/schema.py
+@@ -582,7 +582,15 @@ class BaseDatabaseSchemaEditor:
+             )
+             if default_name in constraint_names:
+                 constraint_names = [default_name]
+-        if len(constraint_names) != 1:
++        # If no matching constraint is found, treat it as a no-op. This can
++        # happen when altering fields in a single migration where the
++        # constraint may have already been removed as part of another
++        # operation (for example, converting a ForeignKey to a ManyToMany
++        # which removes the underlying column). Only raise if multiple
++        # matching constraints are found, which indicates ambiguity.
++        if len(constraint_names) == 0:
++            return
++        if len(constraint_names) > 1:
+             raise ValueError(
+                 "Found wrong number (%s) of constraints for %s(%s)"
+                 % (

@@ -1,0 +1,28 @@
+diff --git a/src/flask/config.py b/src/flask/config.py
+index d4fc310f..3996b261 100644
+--- a/src/flask/config.py
++++ b/src/flask/config.py
+@@ -234,6 +234,7 @@ class Config(dict):
+         filename: str,
+         load: t.Callable[[t.IO[t.Any]], t.Mapping],
+         silent: bool = False,
++        mode: str = "r",
+     ) -> bool:
+         """Update the values in the config from a file that is loaded
+         using the ``load`` parameter. The loaded data is passed to the
+@@ -260,8 +261,14 @@ class Config(dict):
+         """
+         filename = os.path.join(self.root_path, filename)
+ 
++        # Normalize simple mode values like 'b' or 't' to include the
++        # read flag so callers can pass mode='b' for binary reads.
++        file_mode = mode
++        if mode in ("b", "t"):
++            file_mode = "r" + mode
++
+         try:
+-            with open(filename) as f:
++            with open(filename, file_mode) as f:
+                 obj = load(f)
+         except OSError as e:
+             if silent and e.errno in (errno.ENOENT, errno.EISDIR):

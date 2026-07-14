@@ -1,0 +1,20 @@
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -507,6 +507,17 @@
+         "Matrix power printer"
+         return '{0}({1}, {2})'.format(self._module_format('numpy.linalg.matrix_power'),
+             self._print(expr.args[0]), self._print(expr.args[1]))
++    def _print_Identity(self, expr):
++        """Print a matrix Identity for numpy backend as numpy.eye(n).
++
++        This avoids emitting the bare token 'I' (which could be bound to the
++        imaginary unit in numeric namespaces) and instead emits a call to
++        numpy.eye so that the generated numeric function constructs a
++        numeric identity matrix at runtime.
++        """
++        # expr.args[0] is the size n
++        return '{0}({1})'.format(self._module_format('numpy.eye'), self._print(expr.args[0]))
++
+ 
+     def _print_Inverse(self, expr):
+         "Matrix inverse printer"

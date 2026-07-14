@@ -1,0 +1,114 @@
+diff --git a/django/template/context_processors.py b/django/template/context_processors.py
+index 0e9efb2f69..3330d90200 100644
+--- a/django/template/context_processors.py
++++ b/django/template/context_processors.py
+@@ -67,14 +67,40 @@ def static(request):
+     """
+     Add static-related context variables to the context.
+     """
+-    return {'STATIC_URL': settings.STATIC_URL}
++    # Prefix STATIC_URL with SCRIPT_NAME when running under a WSGI subpath.
++    static_url = settings.STATIC_URL
++    script_name = request.META.get('SCRIPT_NAME', '')
++    if script_name and script_name != '/' and isinstance(static_url, str):
++        # Avoid prefixing absolute URLs or protocol-relative URLs.
++        if not (static_url.startswith('//') or '://' in static_url):
++            if not script_name.startswith('/'):
++                script_name = '/' + script_name
++            script_name = script_name.rstrip('/')
++            if not static_url.startswith(script_name + '/') and static_url != script_name:
++                if static_url.startswith('/'):
++                    static_url = script_name + static_url
++                else:
++                    static_url = script_name + '/' + static_url
++    return {'STATIC_URL': static_url}
+ 
+ 
+ def media(request):
+     """
+     Add media-related context variables to the context.
+     """
+-    return {'MEDIA_URL': settings.MEDIA_URL}
++    media_url = settings.MEDIA_URL
++    script_name = request.META.get('SCRIPT_NAME', '')
++    if script_name and script_name != '/' and isinstance(media_url, str):
++        if not (media_url.startswith('//') or '://' in media_url):
++            if not script_name.startswith('/'):
++                script_name = '/' + script_name
++            script_name = script_name.rstrip('/')
++            if not media_url.startswith(script_name + '/') and media_url != script_name:
++                if media_url.startswith('/'):
++                    media_url = script_name + media_url
++                else:
++                    media_url = script_name + '/' + media_url
++    return {'MEDIA_URL': media_url}
+ 
+ 
+ def request(request):
+diff --git a/django/templatetags/static.py b/django/templatetags/static.py
+index 39712aaba0..5a38283c09 100644
+--- a/django/templatetags/static.py
++++ b/django/templatetags/static.py
+@@ -1,4 +1,4 @@
+-from urllib.parse import quote, urljoin
++from urllib.parse import quote, urljoin, urlparse
+ 
+ from django import template
+ from django.apps import apps
+@@ -7,6 +7,40 @@ from django.utils.html import conditional_escape
+ 
+ register = template.Library()
+ 
++def _maybe_prefix_script_name(url, context):
++    """Prefix a URL with request.META['SCRIPT_NAME'] when appropriate.
++
++    If the URL is absolute (has a scheme or netloc) or protocol-relative (//),
++    don't prefix. SCRIPT_NAME of '' or '/' are ignored.
++    """
++    if context is None:
++        return url
++    # context may be a Context (mapping) or a dict-like; use get
++    request = context.get('request') if hasattr(context, 'get') else None
++    if not request:
++        return url
++    script_name = request.META.get('SCRIPT_NAME', '')
++    if not script_name or script_name == '/':
++        return url
++    # If URL includes scheme or netloc, don't prefix
++    parsed = urlparse(url)
++    if parsed.scheme or parsed.netloc:
++        return url
++    # protocol-relative URLs (//domain) should not be prefixed
++    if isinstance(url, str) and url.startswith('//'):
++        return url
++    # Normalize script_name: ensure leading slash and no trailing slash
++    if not script_name.startswith('/'):
++        script_name = '/' + script_name
++    script_name = script_name.rstrip('/')
++    # If already prefixed, return as-is
++    if url == script_name or url.startswith(script_name + '/'):
++        return url
++    # Join script_name and url appropriately
++    if isinstance(url, str) and url.startswith('/'):
++        return script_name + url
++    return script_name + '/' + url
++
+ 
+ class PrefixNode(template.Node):
+ 
+@@ -48,6 +82,7 @@ class PrefixNode(template.Node):
+ 
+     def render(self, context):
+         prefix = self.handle_simple(self.name)
++        prefix = _maybe_prefix_script_name(prefix, context)
+         if self.varname is None:
+             return prefix
+         context[self.varname] = prefix
+@@ -104,6 +139,7 @@ class StaticNode(template.Node):
+ 
+     def render(self, context):
+         url = self.url(context)
++        url = _maybe_prefix_script_name(url, context)
+         if context.autoescape:
+             url = conditional_escape(url)
+         if self.varname is None:

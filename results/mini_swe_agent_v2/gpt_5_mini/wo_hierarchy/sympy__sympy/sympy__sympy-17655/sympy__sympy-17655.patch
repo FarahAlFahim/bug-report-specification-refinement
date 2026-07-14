@@ -1,0 +1,73 @@
+diff --git a/sympy/geometry/entity.py b/sympy/geometry/entity.py
+index ee5c910268..6d40b63231 100644
+--- a/sympy/geometry/entity.py
++++ b/sympy/geometry/entity.py
+@@ -139,7 +139,32 @@ def __repr__(self):
+ 
+     def __rmul__(self, a):
+         """Implementation of reverse multiplication method."""
+-        return a.__mul__(self)
++        # Try to let the left operand handle the multiplication first.
++        # However, numeric left operands (e.g. Float) may construct a
++        # Mul expression rather than delegating back to GeometryEntity's
++        # __mul__. In that case we should fall back to the GeometryEntity's
++        # own multiplication logic so that expressions like
++        # number * Point produce a Point rather than a Mul.
++        try:
++            res = a.__mul__(self)
++        except Exception:
++            # If the left operand raises, try our own multiplication.
++            return self.__mul__(a)
++
++        # If the left operand returned a GeometryEntity (or subclass),
++        # use that result. Otherwise attempt to perform the operation
++        # using the right-hand geometry object's __mul__ so that
++        # numeric * Point yields a Point.
++        from sympy.geometry.entity import GeometryEntity as _GE
++        if isinstance(res, _GE):
++            return res
++
++        # Fall back to GeometryEntity's __mul__ implementation. If that
++        # also fails, return the original result from the left operand.
++        try:
++            return self.__mul__(a)
++        except Exception:
++            return res
+ 
+     def __rsub__(self, a):
+         """Implementation of reverse subtraction method."""
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..8121b8d57a 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,6 +213,30 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+ 
+         """
++        # Handle cases where `other` is a Mul like `scalar*Point` which
++        # may be produced when a numeric left operand handles multiplication
++        # (e.g. 2.0*Point). In that case convert it to a Point so that
++        # addition behaves consistently regardless of operand order.
++        from sympy.core.mul import Mul
++        from sympy.geometry.entity import GeometryEntity
++
++        if isinstance(other, Mul):
++            # Look for a GeometryEntity within the Mul args
++            geoms = [a for a in other.args if isinstance(a, GeometryEntity)]
++            if len(geoms) == 1:
++                geom = geoms[0]
++                # compute the product of the remaining args
++                factor = 1
++                for a in other.args:
++                    if a is not geom:
++                        factor = factor * a
++                try:
++                    other = geom*factor
++                except Exception:
++                    # if we cannot convert, leave `other` as-is and
++                    # let the normal logic raise the appropriate error
++                    pass
++
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:

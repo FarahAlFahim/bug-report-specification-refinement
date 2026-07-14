@@ -1,0 +1,39 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..d0056d8d76 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -580,6 +580,34 @@ def run_with_reloader(main_func, *args, **kwargs):
+         if os.environ.get(DJANGO_AUTORELOAD_ENV) == 'true':
+             reloader = get_reloader()
+             logger.info('Watching for file changes with %s', reloader.__class__.__name__)
++            # If the process was started via a script (eg. "python manage.py
++            # runserver"), ensure that the script file is explicitly watched.
++            # Scripts executed as __main__ aren't present in sys.modules and
++            # therefore won't be discovered by iter_all_python_module_files().
++            try:
++                import django.__main__ as _django_main
++            except Exception:
++                _django_main = None
++
++            try:
++                argv0 = sys.argv[0]
++            except Exception:
++                argv0 = None
++
++            if argv0:
++                script_path = Path(argv0)
++                # Only watch if the script exists on disk and it isn't the
++                # django "-m django" entrypoint (django.__main__).
++                try:
++                    if script_path.exists():
++                        resolved = script_path.resolve().absolute()
++                        if _django_main is None or resolved != Path(_django_main.__file__).resolve().absolute():
++                            reloader.watch_file(resolved)
++                except Exception:
++                    # Be conservative: if anything goes wrong while trying to
++                    # resolve/watch the script, don't prevent the reloader
++                    # from starting.
++                    logger.debug('Unable to watch script %r for autoreload.', argv0, exc_info=True)
+             start_django(reloader, main_func, *args, **kwargs)
+         else:
+             exit_code = restart_with_reloader()

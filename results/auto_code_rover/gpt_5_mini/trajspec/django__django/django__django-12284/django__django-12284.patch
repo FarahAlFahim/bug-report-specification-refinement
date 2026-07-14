@@ -1,0 +1,39 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 1a55d3d417..bd800866aa 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,10 +764,32 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            accessor_name = 'get_%s_display' % self.name
++            # Walk the MRO to find a raw definition of the accessor (i.e. in a
++            # base class __dict__). If none is found, install the generated
++            # accessor. If a raw definition is found and it is the generated
++            # functools.partialmethod that dispatches to _get_FIELD_display,
++            # replace it so the accessor is bound to this Field instance.
++            # Otherwise (user-defined method), do not override.
++            install = True
++            for base in cls.__mro__:
++                raw = base.__dict__.get(accessor_name, None)
++                if raw is None:
++                    continue
++                # If the raw definition is a generated partialmethod that calls
++                # _get_FIELD_display, we may safely replace it so the subclass's
++                # Field instance is used. Otherwise (user override), leave it.
++                if isinstance(raw, partialmethod) and getattr(getattr(raw, 'func', None), '__name__', '') == '_get_FIELD_display':
++                    # replace the inherited generated accessor with one bound to
++                    # this Field instance
++                    install = True
++                else:
++                    install = False
++                break
++            if install:
+                 setattr(
+                     cls,
+-                    'get_%s_display' % self.name,
++                    accessor_name,
+                     partialmethod(cls._get_FIELD_display, field=self),
+                 )
+ 

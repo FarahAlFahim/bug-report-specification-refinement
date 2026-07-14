@@ -1,0 +1,68 @@
+diff --git a/sympy/polys/factortools.py b/sympy/polys/factortools.py
+index 93298f47e6..122b9fabf8 100644
+--- a/sympy/polys/factortools.py
++++ b/sympy/polys/factortools.py
+@@ -72,6 +72,7 @@
+     ExtraneousFactors, DomainError, CoercionFailed, EvaluationFailed)
+ 
+ from sympy.ntheory import nextprime, isprime, factorint
++from math import comb as binomial
+ from sympy.utilities import subsets
+ 
+ from math import ceil as _ceil, log as _log
+@@ -124,21 +125,47 @@ def dmp_trial_division(f, factors, u, K):
+ 
+ 
+ def dup_zz_mignotte_bound(f, K):
+-    """Mignotte bound for univariate polynomials in `K[x]`. """
+-    a = dup_max_norm(f, K)
+-    b = abs(dup_LC(f, K))
++    """Mignotte bound for univariate polynomials in `K[x]`.
++
++    This is now the Knuth-Cohen bound, which is a tighter bound than
++    the classical Mignotte bound.
++    """
+     n = dup_degree(f)
++    b = abs(dup_LC(f, K))
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    if n == 0:
++        # For constant polynomials, the bound is the absolute value of the constant
++        return b
++
++    # Knuth-Cohen bound: sqrt(sum_{i=0}^n C(n, i) * a_i^2) * |LC| / 2^(n-1)
++    # where a_i are the coefficients of the polynomial
++    sum_val = sum(binomial(n, i) * f[i]**2 for i in range(n+1))
++
++    return K.sqrt(sum_val) * b // K(2)**(n-1)
+ 
+ 
+ def dmp_zz_mignotte_bound(f, u, K):
+-    """Mignotte bound for multivariate polynomials in `K[X]`. """
+-    a = dmp_max_norm(f, u, K)
+-    b = abs(dmp_ground_LC(f, u, K))
++    """Mignotte bound for multivariate polynomials in `K[X]`.
++
++    This is now the Knuth-Cohen bound, which is a tighter bound than
++    the classical Mignotte bound.
++    """
+     n = sum(dmp_degree_list(f, u))
++    b = abs(dmp_ground_LC(f, u, K))
++
++    if n == 0:
++        # For constant polynomials, the bound is just the absolute value
++        return b
++
++    # Knuth-Cohen bound: sqrt(sum_{i=0}^n C(n, i) * ||a_i||^2) * |LC| / 2^(n-1)
++    # where a_i are the coefficients and ||a_i|| is the max norm
++    # For u=0 (univariate), f[i] is an integer, so we use abs() instead of dmp_max_norm
++    if u == 0:
++        sum_val = sum(binomial(n, i) * abs(f[i])**2 for i in range(n+1))
++    else:
++        sum_val = sum(binomial(n, i) * dmp_max_norm(f[i], u-1, K)**2 for i in range(n+1))
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    return K.sqrt(sum_val) * b // K(2)**(n-1)
+ 
+ 
+ def dup_zz_hensel_step(m, f, g, h, s, t, K):

@@ -1,0 +1,17 @@
+diff --git a/django/forms/formsets.py b/django/forms/formsets.py
+index 3adbc6979a..7fd0a55159 100644
+--- a/django/forms/formsets.py
++++ b/django/forms/formsets.py
+@@ -40,6 +40,12 @@ class ManagementForm(Form):
+     MIN_NUM_FORMS = IntegerField(required=False, widget=HiddenInput)
+     MAX_NUM_FORMS = IntegerField(required=False, widget=HiddenInput)
+ 
++    # The management form only renders hidden fields. Use the
++    # multiple_hidden widget template so rendering it does not hit the
++    # form-level default templates ("django/forms/default.html") which
++    # currently trigger a RemovedInDjango50Warning. See ticket/PR notes.
++    template_name = "django/forms/widgets/multiple_hidden.html"
++
+     def clean(self):
+         cleaned_data = super().clean()
+         # When the management form is invalid, we don't know how many forms

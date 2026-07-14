@@ -1,0 +1,46 @@
+diff --git a/src/_pytest/tmpdir.py b/src/_pytest/tmpdir.py
+index 29c7e19d7..ceb8e372b 100644
+--- a/src/_pytest/tmpdir.py
++++ b/src/_pytest/tmpdir.py
+@@ -150,14 +150,39 @@ class TempdirFactory:
+ 
+ def get_user() -> Optional[str]:
+     """Return the current user name, or None if getuser() does not work
+-    in the current environment (see #1010)."""
++    in the current environment (see #1010).
++
++    The returned username is sanitized and guaranteed to be a single
++    filesystem-safe path component. Any runs of characters that are not
++    ASCII letters, digits, dot, underscore or hyphen are replaced with a
++    single underscore. If the sanitized result is empty or getuser() is
++    not available, return ``None``.
++    """
+     import getpass
+ 
+     try:
+-        return getpass.getuser()
++        raw = getpass.getuser()
+     except (ImportError, KeyError):
+         return None
+ 
++    # Normalize the username to a single filesystem-safe path component.
++    # Some platforms (notably Windows) may return values that contain
++    # path-separator or other filesystem-unsafe characters (for example
++    # a domain\user form). Replace any run of characters that are not
++    # ASCII letters, digits, dot, underscore or hyphen with a single
++    # underscore to ensure the resulting string is a single safe
++    # component. If the result is empty, return None to fall back to the
++    # default handling elsewhere.
++    try:
++        sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", raw)
++    except Exception:
++        # In the unlikely event regex processing fails, fall back to None
++        return None
++
++    if not sanitized:
++        return None
++    return sanitized
++
+ 
+ def pytest_configure(config: Config) -> None:
+     """Create a TempdirFactory and attach it to the config object.

@@ -1,0 +1,41 @@
+diff --git a/sklearn/utils/metaestimators.py b/sklearn/utils/metaestimators.py
+index d3aba4f49..9253bcbab 100644
+--- a/sklearn/utils/metaestimators.py
++++ b/sklearn/utils/metaestimators.py
+@@ -73,6 +73,36 @@ class _BaseComposition(BaseEstimator, metaclass=ABCMeta):
+                              '{0!r}'.format(invalid_names))
+ 
+ 
++
++
++    def __len__(self):
++        """Return the length of the first sequence-like required parameter.
++
++        Many composition estimators (Pipeline, FeatureUnion,
++        ColumnTransformer, VotingClassifier, ...) expose a sequence of
++        named estimators via an attribute declared in ``_required_parameters``.
++        Implementing ``__len__`` on the common base enables Python's sizing
++        protocol (len(obj)) and makes instances behave more like sequences
++        where appropriate.
++        """
++        required = getattr(self, "_required_parameters", None)
++        if not required:
++            # no declared required parameters: fall back to raising TypeError
++            raise TypeError("object of type '%s' has no len()" %
++                            type(self).__name__)
++        # Look for the first attribute that exists on the instance and is
++        # sequence-like. We tolerate attributes that are None or empty.
++        for attr in required:
++            if hasattr(self, attr):
++                val = getattr(self, attr)
++                try:
++                    return len(val)
++                except TypeError:
++                    # attribute exists but is not sized; continue searching
++                    continue
++        # No suitable sized attribute found
++        raise TypeError("object of type '%s' has no len()" %
++                        type(self).__name__)
+ class _IffHasAttrDescriptor:
+     """Implements a conditional property using the descriptor protocol.
+ 

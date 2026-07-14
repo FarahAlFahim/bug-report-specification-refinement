@@ -1,0 +1,62 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..85bfa4c168 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1210,6 +1210,7 @@ class ManyToManyField(RelatedField):
+     def check(self, **kwargs):
+         return [
+             *super().check(**kwargs),
++            *self._check_symmetrical_self_related_name(**kwargs),
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
+@@ -1257,9 +1258,48 @@ class ManyToManyField(RelatedField):
+                     id='fields.W343',
+                 )
+             )
+-
+         return warnings
+ 
++    def _check_symmetrical_self_related_name(self, from_model=None, **kwargs):
++        """Ensure developers don't supply a related_name for symmetrical self M2M.
++
++        A symmetrical self-referential ManyToManyField does not create a
++        reverse accessor. Accepting a user-specified related_name in this
++        situation is misleading because it will be ignored/overwritten later
++        during contribute_to_class. If the relation resolves to the same
++        model as the field is defined on and a related_name was explicitly
++        provided, raise an error so the developer can fix the definition.
++        """
++        # Skip checks that require the model when it's not provided.
++        if from_model is None:
++            return []
++
++        errors = []
++        try:
++            to_model = resolve_relation(from_model, self.remote_field.model)
++        except Exception:
++            return []
++
++        # Only trigger for true self-referential relations where the relation
++        # resolves to the same model class and the relationship is
++        # symmetrical. Use the original user-supplied related_name presence
++        # (self._related_name) to detect explicit specification.
++        if to_model == from_model and getattr(self.remote_field, 'symmetrical', False) and self._related_name is not None:
++            errors.append(
++                checks.Error(
++                    "Related name '%s' for field %s.%s will be ignored for a symmetrical self relation." % (
++                        self._related_name, from_model._meta.object_name, self.name
++                    ),
++                    hint=(
++                        "Remove the related_name argument, or set symmetrical=False if you need a reverse accessor."
++                    ),
++                    obj=self,
++                    id='fields.E341',
++                )
++            )
++
++        return errors
++
+     def _check_relationship_model(self, from_model=None, **kwargs):
+         if hasattr(self.remote_field.through, '_meta'):
+             qualified_model_name = "%s.%s" % (

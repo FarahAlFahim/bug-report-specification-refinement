@@ -1,0 +1,18 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index c55864243a..41565ce79c 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -3019,6 +3019,13 @@ class Figure(FigureBase):
+         # of meaning that a figure can be detached from one canvas, and
+         # re-attached to another.
+         state.pop("canvas")
++        # Backends may stash runtime-only, per-canvas caches on the
++        # Figure (e.g. ``_original_dpi``) which must not be persisted in a
++        # pickle.  Persisting these values can cause the cache to be reapplied
++        # multiple times when the figure is unpickled and re-attached to a
++        # canvas, leading to incorrect repeated scaling of the logical DPI.
++        # Ensure such attributes are not stored in the pickled state.
++        state.pop('_original_dpi', None)
+ 
+         # Set cached renderer to None -- it can't be pickled.
+         state["_cachedRenderer"] = None

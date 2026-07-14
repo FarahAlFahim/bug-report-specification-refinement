@@ -1,0 +1,27 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 16dff6a1cd..6440faa60c 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -395,7 +395,10 @@ class Collector:
+                 with transaction.mark_for_rollback_on_error():
+                     count = sql.DeleteQuery(model).delete_batch([instance.pk], self.using)
+                 setattr(instance, model._meta.pk.attname, None)
+-                return count, {model._meta.label: count}
++                # Normalize per-model dict: do not report zero-count entries.
++                if count:
++                    return count, {model._meta.label: count}
++                return 0, {}
+ 
+         with transaction.atomic(using=self.using, savepoint=False):
+             # send pre_delete signals
+@@ -442,4 +445,9 @@ class Collector:
+         for model, instances in self.data.items():
+             for instance in instances:
+                 setattr(instance, model._meta.pk.attname, None)
+-        return sum(deleted_counter.values()), dict(deleted_counter)
++        total = sum(deleted_counter.values())
++        # Normalize per-model dict by removing zero-valued entries so that
++        # callers observe a consistent shape regardless of internal delete
++        # implementation (fast-delete vs per-instance paths).
++        per_model = {label: cnt for label, cnt in deleted_counter.items() if cnt}
++        return total, per_model

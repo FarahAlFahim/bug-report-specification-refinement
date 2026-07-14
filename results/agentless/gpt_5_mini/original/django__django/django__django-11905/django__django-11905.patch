@@ -1,0 +1,17 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 6d1043b..5bca748 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -463,6 +463,12 @@ class IsNull(BuiltinLookup):
+     prepare_rhs = False
+ 
+     def as_sql(self, compiler, connection):
++        # The isnull lookup must be given an explicit boolean value.
++        # Reject non-boolean values to avoid relying on truthy/falsey
++        # semantics, which are undocumented and may lead to confusing
++        # behavior (e.g. JOIN promotion differences).
++        if not isinstance(self.rhs, bool):
++            raise TypeError("The 'isnull' lookup requires a boolean value.")
+         sql, params = compiler.compile(self.lhs)
+         if self.rhs:
+             return "%s IS NULL" % sql, params

@@ -1,0 +1,38 @@
+diff --git a/django/core/validators.py b/django/core/validators.py
+index 72fbe15551..85a932223b 100644
+--- a/django/core/validators.py
++++ b/django/core/validators.py
+@@ -126,8 +126,17 @@ class URLValidator(RegexValidator):
+             else:
+                 raise
+         else:
+-            # Now verify IPv6 in the netloc part
+-            host_match = re.search(r'^\[(.+)\](?::\d{1,5})?$', urlsplit(value).netloc)
++            # Now verify IPv6 in the netloc part. urlsplit can raise a
++            # ValueError for certain malformed inputs (for example
++            # "Invalid IPv6 URL"). Convert those into ValidationError to
++            # ensure callers (e.g. forms.URLField.clean) always receive a
++            # ValidationError for invalid user input.
++            try:
++                _scheme, _netloc, _path, _query, _fragment = urlsplit(value)
++            except ValueError:
++                raise ValidationError(self.message, code=self.code, params={'value': value})
++
++            host_match = re.search(r'^\[(.+)\](?::\d{1,5})?$', _netloc)
+             if host_match:
+                 potential_ip = host_match[1]
+                 try:
+@@ -139,7 +148,12 @@ class URLValidator(RegexValidator):
+         # section 3.1. It's defined to be 255 bytes or less, but this includes
+         # one byte for the length of the name and one byte for the trailing dot
+         # that's used to indicate absolute names in DNS.
+-        if len(urlsplit(value).hostname) > 253:
++        try:
++            _hostname = urlsplit(value).hostname
++        except ValueError:
++            raise ValidationError(self.message, code=self.code, params={'value': value})
++
++        if _hostname and len(_hostname) > 253:
+             raise ValidationError(self.message, code=self.code, params={'value': value})
+ 
+ 

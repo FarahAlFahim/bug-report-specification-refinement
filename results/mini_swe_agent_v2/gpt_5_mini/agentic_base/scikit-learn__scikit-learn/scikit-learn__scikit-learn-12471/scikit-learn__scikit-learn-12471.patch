@@ -1,0 +1,36 @@
+diff --git a/sklearn/preprocessing/_encoders.py b/sklearn/preprocessing/_encoders.py
+index 1e05aba59..487a60161 100644
+--- a/sklearn/preprocessing/_encoders.py
++++ b/sklearn/preprocessing/_encoders.py
+@@ -45,7 +45,14 @@ class _BaseEncoder(BaseEstimator, TransformerMixin):
+ 
+         """
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        # Upcast fixed-width numpy string dtypes (both unicode 'U' and
++        # bytes 'S') as well as python lists of strings to object dtype.
++        # This avoids silent truncation when assigning longer category
++        # strings into arrays with a shorter fixed-width string dtype
++        # during transform with handle_unknown='ignore'. See issue where
++        # OneHotEncoder/OrdinalEncoder would assign categories_[i][0]
++        # into a column view and trigger truncation.
++        if X_temp.dtype.kind in ('U', 'S'):
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp
+@@ -555,7 +562,14 @@ class OneHotEncoder(_BaseEncoder):
+     def _transform_new(self, X):
+         """New implementation assuming categorical input"""
+         X_temp = check_array(X, dtype=None)
+-        if not hasattr(X, 'dtype') and np.issubdtype(X_temp.dtype, np.str_):
++        # Upcast fixed-width numpy string dtypes (both unicode 'U' and
++        # bytes 'S') as well as python lists of strings to object dtype.
++        # This avoids silent truncation when assigning longer category
++        # strings into arrays with a shorter fixed-width string dtype
++        # during transform with handle_unknown='ignore'. See issue where
++        # OneHotEncoder/OrdinalEncoder would assign categories_[i][0]
++        # into a column view and trigger truncation.
++        if X_temp.dtype.kind in ('U', 'S'):
+             X = check_array(X, dtype=np.object)
+         else:
+             X = X_temp

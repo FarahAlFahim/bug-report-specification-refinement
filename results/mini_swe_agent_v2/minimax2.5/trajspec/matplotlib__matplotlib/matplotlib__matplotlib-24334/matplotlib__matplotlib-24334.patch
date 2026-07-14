@@ -1,0 +1,18 @@
+diff --git a/lib/matplotlib/axis.py b/lib/matplotlib/axis.py
+index af0815d41d..7c8688e150 100644
+--- a/lib/matplotlib/axis.py
++++ b/lib/matplotlib/axis.py
+@@ -2024,6 +2024,13 @@ class Axis(martist.Artist):
+         result = self._set_tick_locations(ticks, minor=minor)
+         if labels is not None:
+             self.set_ticklabels(labels, minor=minor, **kwargs)
++        else:
++            if kwargs:
++                raise ValueError(
++                    "Incorrect use of keyword argument 'kwargs'. "
++                    "Keyword arguments other than 'minor' modify the text "
++                    "labels and can only be used if 'labels' are passed as "
++                    "well.")
+         return result
+ 
+     def _get_tick_boxes_siblings(self, renderer):

@@ -1,0 +1,32 @@
+diff --git a/astropy/wcs/wcs.py b/astropy/wcs/wcs.py
+index d3a06f2b31..e4e3668c58 100644
+--- a/astropy/wcs/wcs.py
++++ b/astropy/wcs/wcs.py
+@@ -1218,6 +1218,14 @@ reduce these to 2 dimensions using the naxis kwarg.
+                 raise ValueError(
+                     "Coordinate arrays are not broadcastable to each other")
+ 
++            # Handle empty arrays - return empty results without calling func
++            if axes[0].size == 0:
++                if ra_dec_order and sky == 'output':
++                    return (axes[0].reshape(axes[0].shape),
++                            axes[0].reshape(axes[0].shape))
++                return [axes[0].reshape(axes[0].shape)
++                        for _ in range(self.naxis)]
++
+             xy = np.hstack([x.reshape((x.size, 1)) for x in axes])
+ 
+             if ra_dec_order and sky == 'input':
+@@ -1235,6 +1243,12 @@ reduce these to 2 dimensions using the naxis kwarg.
+                 raise ValueError(
+                     "When providing two arguments, the array must be "
+                     "of shape (N, {0})".format(self.naxis))
++            # Handle empty arrays - return empty result without calling func
++            if xy.shape[0] == 0:
++                result = np.empty((0, self.naxis))
++                if ra_dec_order and sky == 'output':
++                    result = self._normalize_sky(result)
++                return result
+             if ra_dec_order and sky == 'input':
+                 xy = self._denormalize_sky(xy)
+             result = func(xy, origin)

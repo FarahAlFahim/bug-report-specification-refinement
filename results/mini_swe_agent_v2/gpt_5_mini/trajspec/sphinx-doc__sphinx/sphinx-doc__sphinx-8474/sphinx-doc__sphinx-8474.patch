@@ -1,0 +1,82 @@
+diff --git a/sphinx/domains/math.py b/sphinx/domains/math.py
+index a2f4bd964..dd46da7f8 100644
+--- a/sphinx/domains/math.py
++++ b/sphinx/domains/math.py
+@@ -107,11 +107,22 @@ class MathDomain(Domain):
+             # TODO: perhaps use rather a sphinx-core provided prefix here?
+             node_id = make_id('equation-%s' % target)
+             if env.config.math_numfig and env.config.numfig:
++                # normal per-document mapping
+                 if docname in env.toc_fignumbers:
+                     numbers = env.toc_fignumbers[docname]['displaymath'].get(node_id, ())
+                     eqno = '.'.join(map(str, numbers))
+                 else:
+-                    eqno = ''
++                    # single-file/aggregated builders store fignumbers under the
++                    # master_doc key using aliases of the form "<docname>/<figtype>".
++                    # Try to recover numbers from that shape as a fallback to
++                    # avoid spurious missing-number warnings.
++                    master = getattr(builder.config, 'master_doc', None)
++                    if master and master in env.toc_fignumbers:
++                        alias = "%s/%s" % (docname, 'displaymath')
++                        numbers = env.toc_fignumbers[master].get(alias, {}).get(node_id, ())
++                        eqno = '.'.join(map(str, numbers)) if numbers else ''
++                    else:
++                        eqno = ''
+             else:
+                 eqno = str(number)
+ 
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index 4bde57930..a8841d2bd 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -1060,8 +1060,27 @@ class StandardDomain(Domain):
+         if figtype == 'section':
+             if builder.name == 'latex':
+                 return tuple()
+-            elif docname not in env.toc_secnumbers:
+-                raise ValueError  # no number assigned
++            # try per-document mapping first
++            if docname not in env.toc_secnumbers:
++                # fallback for single-file/aggregated builders: they may store
++                # all secnumbers under the master_doc key using aliases
++                # of the form "<docname>/<refid>". Try to recover numbers
++                # from that shape before giving up.
++                master = getattr(builder.config, 'master_doc', None)
++                if master and master in env.toc_secnumbers:
++                    anchorname = '#' + target_node['ids'][0]
++                    alias = "%s/%s" % (docname, anchorname)
++                    # alias keys may also use an empty anchor name
++                    alt_alias = "%s/%s" % (docname, '')
++                    secnums_master = env.toc_secnumbers[master]
++                    if alias in secnums_master:
++                        return secnums_master.get(alias)
++                    elif alt_alias in secnums_master:
++                        return secnums_master.get(alt_alias)
++                    else:
++                        raise ValueError  # no number assigned
++                else:
++                    raise ValueError  # no number assigned
+             else:
+                 anchorname = '#' + target_node['ids'][0]
+                 if anchorname not in env.toc_secnumbers[docname]:
+@@ -1075,9 +1094,18 @@ class StandardDomain(Domain):
+                 return env.toc_fignumbers[docname][figtype][figure_id]
+             except (KeyError, IndexError) as exc:
+                 # target_node is found, but fignumber is not assigned.
+-                # Maybe it is defined in orphaned document.
++                # Maybe it is defined in orphaned document. Try fallback to
++                # single-file/aggregated builder mapping where fignumbers are
++                # stored under the master_doc with aliased keys.
++                master = getattr(builder.config, 'master_doc', None)
++                if master and master in env.toc_fignumbers:
++                    alias = "%s/%s" % (docname, figtype)
++                    numbers = env.toc_fignumbers[master].get(alias, {}).get(figure_id)
++                    if numbers:
++                        return numbers
+                 raise ValueError from exc
+ 
++
+     def get_full_qualified_name(self, node: Element) -> str:
+         if node.get('reftype') == 'option':
+             progname = node.get('std:program')

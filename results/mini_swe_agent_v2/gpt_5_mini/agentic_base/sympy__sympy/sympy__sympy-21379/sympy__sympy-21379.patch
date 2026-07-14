@@ -1,0 +1,137 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index 3894f4fd1c..d31b7e20ac 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1037,7 +1037,29 @@ def fallback(self, old, new):
+                     hit = True
+                     args[i] = arg
+             if hit:
+-                rv = self.func(*args)
++                try:
++                    rv = self.func(*args)
++                except Exception:
++                    # Reconstruction of the expression with the new
++                    # arguments may trigger internal simplifications that
++                    # invoke polynomial machinery and raise errors (for
++                    # example when Piecewise is present). Try to construct
++                    # the expression without evaluation; if that also
++                    # fails, give up and return the original expression.
++                    from sympy.polys.polyerrors import (
++                        PolynomialError, PolificationFailed,
++                        PolynomialDivisionFailed)
++                    import sys
++                    exc = sys.exc_info()[1]
++                    if isinstance(exc, (PolynomialError,
++                                        PolificationFailed,
++                                        PolynomialDivisionFailed)):
++                        try:
++                            rv = self.func(*args, evaluate=False)
++                        except Exception:
++                            return self
++                    else:
++                        raise
+                 hack2 = hints.get('hack2', False)
+                 if hack2 and self.is_Mul and not rv.is_Mul:  # 2-arg hack
+                     coeff = S.One
+@@ -1058,7 +1080,23 @@ def fallback(self, old, new):
+         if _aresame(self, old):
+             return new
+ 
+-        rv = self._eval_subs(old, new)
++        try:
++            rv = self._eval_subs(old, new)
++        except Exception:
++            # Some substitutions trigger polynomial-related machinery which
++            # may raise PolynomialError or PolificationFailed during
++            # intermediate simplifications (e.g., when expressions contain
++            # Piecewise). In substitution contexts we prefer to fall back to
++            # a structural replacement rather than letting such internal
++            # errors propagate. Catch polynomial-related errors and use the
++            # fallback traversal.
++            from sympy.polys.polyerrors import PolynomialError, PolificationFailed
++            import sys
++            exc = sys.exc_info()[1]
++            if isinstance(exc, (PolynomialError, PolificationFailed)):
++                rv = None
++            else:
++                raise
+         if rv is None:
+             rv = fallback(self, old, new)
+         return rv
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 1c7ef70b6a..89085c5662 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -1212,8 +1212,19 @@ def as_terms(self):
+                     if factor.is_commutative:
+                         base, exp = decompose_power(factor)
+ 
+-                        cpart[base] = exp
+-                        gens.add(base)
++                        # Avoid treating Piecewise (or expressions containing
++                        # Piecewise) as polynomial generators for the purpose
++                        # of term analysis. Bases containing Piecewise can
++                        # cause downstream polynomial routines to raise
++                        # errors; instead, treat the original factor as a
++                        # non-coefficient part so it does not become a
++                        # generator.
++                        from sympy.functions.elementary.piecewise import Piecewise
++                        if base.has(Piecewise):
++                            ncpart.append(factor)
++                        else:
++                            cpart[base] = exp
++                            gens.add(base)
+                     else:
+                         ncpart.append(factor)
+ 
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index bfec61de64..4d065fda21 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -4394,9 +4394,16 @@ def _parallel_poly_from_expr(exprs, opt):
+     if not opt.gens:
+         raise PolificationFailed(opt, origs, exprs, True)
+ 
++    from sympy.polys.polyerrors import PolificationFailed
+     for k in opt.gens:
+-        if isinstance(k, Piecewise):
+-            raise PolynomialError("Piecewise generators do not make sense")
++        # If any generator contains Piecewise, abort polynomialization by
++        # raising PolificationFailed so callers can fall back to
++        # non-polynomial code paths. Previously this raised a
++        # PolynomialError which could surface unexpectedly during
++        # substitution; raising PolificationFailed is consistent with the
++        # rest of the polification pipeline.
++        if getattr(k, 'has', lambda *a: False)(Piecewise):
++            raise PolificationFailed(opt, origs, exprs, True)
+ 
+     coeffs_list, lengths = [], []
+ 
+diff --git a/sympy/polys/polyutils.py b/sympy/polys/polyutils.py
+index f51f80098d..be087d3801 100644
+--- a/sympy/polys/polyutils.py
++++ b/sympy/polys/polyutils.py
+@@ -266,8 +266,21 @@ def _is_coeff(factor):
+                     else:
+                         base, exp = decompose_power_rat(factor)
+ 
+-                    elements[base] = elements.setdefault(base, 0) + exp
+-                    gens.add(base)
++                    # Avoid using Piecewise (or expressions containing Piecewise)
++                    # as polynomial generators. In some substitution/simplification
++                    # flows bases produced by decompose_power may contain
++                    # Piecewise, which later leads to an explicit check in
++                    # polytools raising PolynomialError("Piecewise generators do
++                    # not make sense"). Treat such factors as coefficients
++                    # instead of generators so they don't enter gens.
++                    from sympy.functions.elementary.piecewise import Piecewise
++                    if base.has(Piecewise):
++                        # Put the original factor into the coefficient part so
++                        # it is not considered a polynomial generator.
++                        coeff.append(factor)
++                    else:
++                        elements[base] = elements.setdefault(base, 0) + exp
++                        gens.add(base)
+ 
+             terms.append((coeff, elements))
+ 

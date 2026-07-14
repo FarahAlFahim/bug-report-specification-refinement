@@ -1,0 +1,28 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..ebb9f379c2 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,5 +1,6 @@
+ import datetime
+ import decimal
++import json
+ from collections import defaultdict
+ 
+ from django.core.exceptions import FieldDoesNotExist
+@@ -398,6 +399,16 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    # JSONField should be rendered as valid JSON using the field's encoder
++    elif isinstance(field, models.JSONField):
++        # For None handled above. For dict/list values, try to dump using
++        # the field's encoder to preserve any custom serialization.
++        try:
++            return json.dumps(value, cls=getattr(field, 'encoder', None))
++        except TypeError:
++            # Fall back to the generic display behavior on non-serializable
++            # values (mirrors JSONField.validate/get_prep_value behavior).
++            return display_for_value(value, empty_value_display)
+     else:
+         return display_for_value(value, empty_value_display)
+ 

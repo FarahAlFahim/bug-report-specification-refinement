@@ -1,0 +1,115 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index 7b17d7612..20782f445 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -1,4 +1,5 @@
+ import inspect
++import os
+ import re
+ import sys
+ import traceback
+@@ -560,11 +561,22 @@ class ExceptionInfo(Generic[_E]):
+         """ return True if the exception is an instance of exc """
+         return isinstance(self.value, exc)
+ 
+-    def _getreprcrash(self) -> "ReprFileLocation":
++    def _getreprcrash(self, invocation_dir=None) -> "ReprFileLocation":
+         exconly = self.exconly(tryshort=True)
+         entry = self.traceback.getcrashentry()
+         path, lineno = entry.frame.code.raw.co_filename, entry.lineno
+-        return ReprFileLocation(path, lineno + 1, exconly)
++        # Compute relative path if invocation_dir is provided
++        if invocation_dir is not None:
++            try:
++                path_obj = py.path.local(path)
++                # Check if path is absolute using os.path.isabs
++                if os.path.isabs(path):
++                    relpath = path_obj.relto(invocation_dir)
++                    if relpath:
++                        path = relpath
++            except OSError:
++                pass
++        return ReprFileLocation(str(path), lineno + 1, exconly)
+ 
+     def getrepr(
+         self,
+@@ -575,6 +587,7 @@ class ExceptionInfo(Generic[_E]):
+         funcargs: bool = False,
+         truncate_locals: bool = True,
+         chain: bool = True,
++        invocation_dir=None,
+     ) -> Union["ReprExceptionInfo", "ExceptionChainRepr"]:
+         """
+         Return str()able representation of this exception info.
+@@ -611,7 +624,7 @@ class ExceptionInfo(Generic[_E]):
+                         self.type, self.value, self.traceback[0]._rawentry
+                     )
+                 ),
+-                self._getreprcrash(),
++                self._getreprcrash(invocation_dir=invocation_dir),
+             )
+ 
+         fmt = FormattedExcinfo(
+@@ -622,6 +635,7 @@ class ExceptionInfo(Generic[_E]):
+             funcargs=funcargs,
+             truncate_locals=truncate_locals,
+             chain=chain,
++            invocation_dir=invocation_dir,
+         )
+         return fmt.repr_excinfo(self)
+ 
+@@ -656,6 +670,7 @@ class FormattedExcinfo:
+     truncate_locals = attr.ib(type=bool, default=True)
+     chain = attr.ib(type=bool, default=True)
+     astcache = attr.ib(default=attr.Factory(dict), init=False, repr=False)
++    invocation_dir = attr.ib(default=None)
+ 
+     def _getindent(self, source: "Source") -> int:
+         # figure out indent for given source
+@@ -791,7 +806,16 @@ class FormattedExcinfo:
+     def _makepath(self, path):
+         if not self.abspath:
+             try:
+-                np = py.path.local().bestrelpath(path)
++                # Use invocation_dir if available, otherwise fall back to current directory
++                if self.invocation_dir is not None:
++                    path_obj = py.path.local(path)
++                    relpath = path_obj.relto(self.invocation_dir)
++                    if relpath:
++                        np = relpath
++                    else:
++                        np = str(path)
++                else:
++                    np = py.path.local().bestrelpath(path)
+             except OSError:
+                 return path
+             if len(np) < len(str(path)):
+diff --git a/src/_pytest/nodes.py b/src/_pytest/nodes.py
+index 4a79bc861..bfbdd0539 100644
+--- a/src/_pytest/nodes.py
++++ b/src/_pytest/nodes.py
+@@ -361,9 +361,14 @@ class Node(metaclass=NodeMeta):
+         else:
+             truncate_locals = True
+ 
++        # Use invocation_dir to determine if we can show relative paths
++        # This ensures correct path display even if a fixture changes the working directory
++        invocation_dir = self.config.invocation_dir
+         try:
+-            os.getcwd()
+-            abspath = False
++            if invocation_dir.isdir():
++                abspath = False
++            else:
++                abspath = True
+         except OSError:
+             abspath = True
+ 
+@@ -374,6 +379,7 @@ class Node(metaclass=NodeMeta):
+             style=style,
+             tbfilter=False,  # pruned already, or in --fulltrace mode.
+             truncate_locals=truncate_locals,
++            invocation_dir=invocation_dir,
+         )
+ 
+     def repr_failure(

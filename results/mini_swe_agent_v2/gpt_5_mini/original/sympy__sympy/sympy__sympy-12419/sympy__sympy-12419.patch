@@ -1,0 +1,42 @@
+diff --git a/sympy/concrete/summations.py b/sympy/concrete/summations.py
+index 42a3db7f8..eaa9dc50e 100644
+--- a/sympy/concrete/summations.py
++++ b/sympy/concrete/summations.py
+@@ -878,28 +878,31 @@ def _cond_bounds(cond, var):
+                 low = None; high = None
+                 for p in cond.args:
+                     if isinstance(p, Relational):
+-                        if str(p.rhs) == str(var) and p.rel_op in ("<=", "<"):
++                        if p.rhs == var and p.rel_op in ("<=", "<"):
+                             low = p.lhs
+-                        elif str(p.lhs) == str(var) and p.rel_op in ("<=", "<"):
++                        elif p.lhs == var and p.rel_op in ("<=", "<"):
+                             high = p.rhs
+                 return (low, high)
+             if isinstance(cond, Relational):
+-                if str(cond.rhs) == str(var) and cond.rel_op in ("<=", "<"):
++                if cond.rhs == var and cond.rel_op in ("<=", "<"):
+                     return (cond.lhs, None)
+-                if str(cond.lhs) == str(var) and cond.rel_op in ("<=", "<"):
++                if cond.lhs == var and cond.rel_op in ("<=", "<"):
+                     return (None, cond.rhs)
+             return (None, None)
+ 
+         # Try to evaluate the sum by summing over each piece's valid index range
+         parts = []
++        from sympy import sympify
+         for expr_piece, cond in f.args:
++            expr_piece = sympify(expr_piece)
+             low, high = _cond_bounds(cond, i)
+             if low is None and high is None:
+                 # cannot handle this piecewise condition
+                 parts = None
+                 break
+-            new_low = a if low is None else (a if low < a else low)
+-            new_high = b if high is None else (b if high > b else high)
++            from sympy import Max, Min
++            new_low = a if low is None else Max(a, low)
++            new_high = b if high is None else Min(b, high)
+             # If the computed new range is empty, skip
+             if (new_high - new_low) < 0:
+                 continue

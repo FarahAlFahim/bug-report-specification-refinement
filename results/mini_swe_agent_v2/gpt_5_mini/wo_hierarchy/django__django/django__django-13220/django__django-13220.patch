@@ -1,0 +1,103 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..874d75529f 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,98 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def _atomic_key(self, error):
++        """Return a stable, comparable representation for an atomic error.
++
++        The representation is a tuple: (message_string, code, normalized_params),
++        where message_string uses the same formatting semantics as __iter__.
++        """
++        message = error.message
++        # Format message with params when present and formatting succeeds.
++        if getattr(error, 'params', None):
++            try:
++                message_string = message % error.params
++            except Exception:
++                message_string = str(message)
++        else:
++            message_string = str(message)
++
++        code = getattr(error, 'code', None)
++
++        def _normalize_params(p):
++            # None stays None
++            if p is None:
++                return None
++            # Primitive immutable types
++            if isinstance(p, (str, int, float, bool)):
++                return p
++            # dict -> sorted tuple of (key, normalized_value)
++            if isinstance(p, dict):
++                return tuple((k, _normalize_params(v)) for k, v in sorted(p.items()))
++            # list/tuple -> tuple of normalized elements
++            if isinstance(p, (list, tuple)):
++                return tuple(_normalize_params(x) for x in p)
++            # set -> sorted tuple
++            if isinstance(p, set):
++                return tuple(sorted(_normalize_params(x) for x in p))
++            # Fallback to repr for other types
++            try:
++                return repr(p)
++            except Exception:
++                return str(type(p))
++
++        normalized_params = _normalize_params(getattr(error, 'params', None))
++
++        return (message_string, code, normalized_params)
++
++    def _atomic_counter(self):
++        """Return a Counter of atomic keys for this ValidationError (non-dict case)."""
++        from collections import Counter
++        if hasattr(self, 'error_dict'):
++            # Not applicable for dict-based errors.
++            return None
++        keys = [self._atomic_key(err) for err in self.error_list]
++        return Counter(keys)
++
++    def _dict_atomic_counters(self):
++        """Return a mapping of field -> Counter of atomic keys for dict-based errors."""
++        from collections import Counter
++        if not hasattr(self, 'error_dict'):
++            return None
++        result = {}
++        for field, errors in self.error_dict.items():
++            result[field] = Counter(self._atomic_key(err) for err in errors)
++        return result
++
++    def __eq__(self, other):
++        # Only equal to another ValidationError
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++
++        # Preserve structural distinction between dict-based and non-dict.
++        self_is_dict = hasattr(self, 'error_dict')
++        other_is_dict = hasattr(other, 'error_dict')
++        if self_is_dict != other_is_dict:
++            return False
++
++        if self_is_dict:
++            self_counters = self._dict_atomic_counters()
++            other_counters = other._dict_atomic_counters()
++            # Keys must match
++            if set(self_counters.keys()) != set(other_counters.keys()):
++                return False
++            # For each key, counters must match (multiset equality)
++            for key in self_counters:
++                if self_counters[key] != other_counters.get(key):
++                    return False
++            return True
++
++        # Non-dict case: compare multisets of atomic errors
++        return self._atomic_counter() == other._atomic_counter()
++
++    # Instances become unhashable when value-based equality is defined.
++    __hash__ = None
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

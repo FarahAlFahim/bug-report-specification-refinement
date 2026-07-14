@@ -1,0 +1,33 @@
+diff --git a/lib/mpl_toolkits/mplot3d/axes3d.py b/lib/mpl_toolkits/mplot3d/axes3d.py
+index 9db44b7994..43eee07f83 100644
+--- a/lib/mpl_toolkits/mplot3d/axes3d.py
++++ b/lib/mpl_toolkits/mplot3d/axes3d.py
+@@ -389,6 +389,12 @@ class Axes3D(Axes):
+     def draw(self, renderer):
+         self._unstale_viewLim()
+ 
++        # If the Axes has been made invisible, do nothing.  The base
++        # Axes.draw performs this check, but Axes3D has its own draw
++        # steps and may be invoked directly; ensure visibility is honored.
++        if not self.get_visible():
++            return
++
+         # draw the background patch
+         self.patch.draw(renderer)
+         self._frameon = False
+diff --git a/lib/mpl_toolkits/mplot3d/axis3d.py b/lib/mpl_toolkits/mplot3d/axis3d.py
+index d08576904d..a4abfbcdb3 100644
+--- a/lib/mpl_toolkits/mplot3d/axis3d.py
++++ b/lib/mpl_toolkits/mplot3d/axis3d.py
+@@ -297,6 +297,11 @@ class Axis(maxis.XAxis):
+ 
+     @artist.allow_rasterization
+     def draw(self, renderer):
++        # Respect Artist visibility: if the Axis is not visible, do nothing.
++        # Axis.get_tightbbox already checks visibility, but draw can be called
++        # directly by Axes3D and must honor visibility as well.
++        if not self.get_visible():
++            return
+         self.label._transform = self.axes.transData
+         renderer.open_group("axis3d", gid=self.get_gid())
+ 

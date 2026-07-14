@@ -1,0 +1,51 @@
+diff --git a/sympy/matrices/expressions/blockmatrix.py b/sympy/matrices/expressions/blockmatrix.py
+index b821c42845..9856615280 100644
+--- a/sympy/matrices/expressions/blockmatrix.py
++++ b/sympy/matrices/expressions/blockmatrix.py
+@@ -7,7 +7,9 @@
+ from sympy.utilities import sift
+ from sympy.utilities.misc import filldedent
+ 
+-from sympy.matrices.expressions.matexpr import MatrixExpr, ZeroMatrix, Identity
++from sympy.matrices.expressions.matexpr import (
++    MatrixExpr, ZeroMatrix, Identity, MatrixElement
++)
+ from sympy.matrices.expressions.matmul import MatMul
+ from sympy.matrices.expressions.matadd import MatAdd
+ from sympy.matrices.expressions.matpow import MatPow
+@@ -233,17 +235,31 @@ def transpose(self):
+         return self._eval_transpose()
+ 
+     def _entry(self, i, j, **kwargs):
++        # Determine which block contains the (i, j) entry.
++        # If the comparisons are inconclusive for symbolic indices,
++        # return a MatrixElement referring to this BlockMatrix rather than
++        # eagerly selecting a particular block.
++        i0, j0 = i, j
+         # Find row entry
+         for row_block, numrows in enumerate(self.rowblocksizes):
+-            if (i < numrows) != False:
++            # If i < numrows is definitely True, this is the block
++            if (i < numrows) is True:
+                 break
+-            else:
++            # If i < numrows is definitely False, subtract and continue
++            if (i < numrows) is False:
+                 i -= numrows
++                continue
++            # Inconclusive comparison (symbolic); return a MatrixElement
++            return MatrixElement(self, i0, j0)
++
+         for col_block, numcols in enumerate(self.colblocksizes):
+-            if (j < numcols) != False:
++            if (j < numcols) is True:
+                 break
+-            else:
++            if (j < numcols) is False:
+                 j -= numcols
++                continue
++            return MatrixElement(self, i0, j0)
++
+         return self.blocks[row_block, col_block][i, j]
+ 
+     @property

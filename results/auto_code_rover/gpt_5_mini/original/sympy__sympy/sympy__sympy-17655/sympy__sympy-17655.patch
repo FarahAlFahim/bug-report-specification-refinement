@@ -1,0 +1,27 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..ca0e5243b4 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,6 +213,22 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+ 
+         """
++        # Handle cases like scalar * Point: e.g., 2 * Point(1, 1)
++        # where `other` is a Mul containing exactly one Point instance.
++        # Convert such Mul to Point * scalar so Point(other, ...) will work.
++        if getattr(other, 'is_Mul', False):
++            pts = [a for a in other.args if isinstance(a, Point)]
++            if len(pts) == 1:
++                pt = pts[0]
++                # product of the remaining factors
++                factor = S.One
++                for a in other.args:
++                    if a is pt:
++                        continue
++                    factor = factor * a
++                # use Point.__mul__ to preserve evaluation behavior
++                other = pt * factor
++
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:

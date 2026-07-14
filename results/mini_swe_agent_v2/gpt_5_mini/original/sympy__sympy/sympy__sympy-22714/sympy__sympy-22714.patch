@@ -1,0 +1,47 @@
+diff --git a/sympy/core/sympify.py b/sympy/core/sympify.py
+index 591e784133..9f854fdd21 100644
+--- a/sympy/core/sympify.py
++++ b/sympy/core/sympify.py
+@@ -378,7 +378,17 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+             return a
+ 
+     if evaluate is None:
+-        evaluate = global_parameters.evaluate
++        # Respect an explicit evaluate argument, but if none was provided
++        # then avoid using the global `evaluate` flag for string inputs.
++        # When parsing from a string we don't want the global evaluation
++        # setting to change how the parser transforms the input (see
++        # issue where with ``with evaluate(False)`` parsing strings could
++        # lead to unexpected constructor calls and errors).  If the user
++        # explicitly passes evaluate to sympify it will be honored.
++        if isinstance(a, str):
++            evaluate = True
++        else:
++            evaluate = global_parameters.evaluate
+ 
+     # Support for basic numpy datatypes
+     if _is_numpy_instance(a):
+@@ -473,7 +483,22 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+ 
+     try:
+         a = a.replace('\n', '')
+-        expr = parse_expr(a, local_dict=locals, transformations=transformations, evaluate=evaluate)
++        # When parsing from a string, prefer not to be affected by the
++        # global `evaluate` flag.  If the caller didn't explicitly pass
++        # an evaluate value and the global flag is False, parse the
++        # string with evaluation enabled in a temporary context so that
++        # the parser and symbol constructors behave as they would by
++        # default.  This avoids surprising errors such as constructors
++        # receiving incorrect argument types.
++        if isinstance(a, str) and evaluate:
++            from sympy.core.parameters import evaluate as _evaluate_ctx
++            if not global_parameters.evaluate:
++                with _evaluate_ctx(True):
++                    expr = parse_expr(a, local_dict=locals, transformations=transformations, evaluate=evaluate)
++            else:
++                expr = parse_expr(a, local_dict=locals, transformations=transformations, evaluate=evaluate)
++        else:
++            expr = parse_expr(a, local_dict=locals, transformations=transformations, evaluate=evaluate)
+     except (TokenError, SyntaxError) as exc:
+         raise SympifyError('could not parse %r' % a, exc)
+ 

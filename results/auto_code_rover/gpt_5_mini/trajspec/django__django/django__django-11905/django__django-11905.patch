@@ -1,0 +1,37 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..9d004ab7b7 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -462,9 +462,31 @@ class IsNull(BuiltinLookup):
+     lookup_name = 'isnull'
+     prepare_rhs = False
+ 
++    def get_prep_lookup(self):
++        """
++        Ensure that non-expression RHS values for the isnull lookup are strict booleans.
++        Expressions (objects with resolve_expression) are returned unchanged so they
++        can be resolved by the compiler. Non-boolean literals raise a ValueError to
++        avoid ambiguous truthiness behavior.
++        """
++        rhs = self.rhs
++        # If rhs is an expression (F, Subquery, etc.), leave it unchanged.
++        if hasattr(rhs, 'resolve_expression'):
++            return rhs
++        # Only accept real booleans for literal RHS values.
++        if rhs is True or rhs is False:
++            return rhs
++        raise ValueError(
++            "The 'isnull' lookup requires a boolean value (True/False) or an expression; "
++            "got %r." % (rhs,)
++        )
++
+     def as_sql(self, compiler, connection):
+         sql, params = compiler.compile(self.lhs)
+-        if self.rhs:
++        # Only treat an explicit boolean True as the IS NULL case. This avoids
++        # interpreting arbitrary truthy literals (like non-empty strings or integers)
++        # as True via Python truthiness, which caused inconsistent behavior.
++        if self.rhs is True:
+             return "%s IS NULL" % sql, params
+         else:
+             return "%s IS NOT NULL" % sql, params

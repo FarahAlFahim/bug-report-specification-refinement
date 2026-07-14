@@ -1,0 +1,34 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 4648daf395..13cba79ffe 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1077,10 +1077,27 @@ class Query(BaseExpression):
+         elif isinstance(value, (list, tuple)):
+             # The items of the iterable may be expressions and therefore need
+             # to be resolved independently.
+-            return type(value)(
++            resolved_items = [
+                 self.resolve_lookup_value(sub_value, can_reuse, allow_joins)
+                 for sub_value in value
+-            )
++            ]
++            # Reconstruct the container. For builtins like list and tuple,
++            # calling the type with an iterable works (e.g. tuple(iterable)).
++            # However, some tuple subclasses (for example, namedtuple
++            # instances) define a __new__ signature that expects one
++            # positional argument per field, and thus don't accept a single
++            # iterable argument. In that case, try to construct the same
++            # type by expanding the items as separate positional arguments.
++            try:
++                return type(value)(resolved_items)
++            except TypeError:
++                try:
++                    return type(value)(*resolved_items)
++                except TypeError:
++                    # As a last resort, fall back to a plain list/tuple of
++                    # resolved items to avoid raising here during lookup
++                    # value normalization.
++                    return resolved_items if isinstance(value, list) else tuple(resolved_items)
+         return value
+ 
+     def solve_lookup_type(self, lookup):

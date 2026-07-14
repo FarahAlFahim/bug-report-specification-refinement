@@ -1,0 +1,79 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 1dee8a23d9..e064d89052 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1515,6 +1515,7 @@ class DraggableBase:
+         ]
+ 
+     def on_motion(self, evt):
++        self._check_canvas()
+         if self._check_still_parented() and self.got_artist:
+             dx = evt.x - self.mouse_x
+             dy = evt.y - self.mouse_y
+@@ -1528,6 +1529,7 @@ class DraggableBase:
+                 self.canvas.draw()
+ 
+     def on_pick(self, evt):
++        self._check_canvas()
+         if self._check_still_parented() and evt.artist == self.ref_artist:
+             self.mouse_x = evt.mouseevent.x
+             self.mouse_y = evt.mouseevent.y
+@@ -1545,6 +1547,7 @@ class DraggableBase:
+             self.save_offset()
+ 
+     def on_release(self, event):
++        self._check_canvas()
+         if self._check_still_parented() and self.got_artist:
+             self.finalize_offset()
+             self.got_artist = False
+@@ -1562,6 +1565,7 @@ class DraggableBase:
+ 
+     def disconnect(self):
+         """Disconnect the callbacks."""
++        self._check_canvas()
+         for cid in self.cids:
+             self.canvas.mpl_disconnect(cid)
+         try:
+@@ -1571,6 +1575,42 @@ class DraggableBase:
+         else:
+             self.canvas.mpl_disconnect(c1)
+ 
++    def __getstate__(self):
++        state = self.__dict__.copy()
++        # The canvas is not picklable, and the callback IDs are invalid after
++        # unpickling. We need to exclude them from the pickled state.
++        state.pop('canvas', None)
++        state.pop('cids', None)
++        state.pop('_c1', None)
++        state.pop('background', None)
++        return state
++
++    def __setstate__(self, state):
++        self.__dict__.update(state)
++        # Don't reconnect to the canvas here; instead, we'll check and
++        # reconnect lazily when the draggable is used.
++
++    def _connect(self):
++        """Reconnect to the canvas after unpickling."""
++        # Check if ref_artist has a figure with a canvas
++        if self.ref_artist.figure is None:
++            return
++        self.canvas = self.ref_artist.figure.canvas
++        if self.canvas is None:
++            return
++        self._use_blit = self._use_blit and self.canvas.supports_blit
++        self.cids = [
++            self.canvas.callbacks._connect_picklable(
++                'pick_event', self.on_pick),
++            self.canvas.callbacks._connect_picklable(
++                'button_release_event', self.on_release),
++        ]
++
++    def _check_canvas(self):
++        """Check if connected to canvas, and reconnect if not."""
++        if not hasattr(self, 'canvas') or self.canvas is None:
++            self._connect()
++
+     def save_offset(self):
+         pass
+ 

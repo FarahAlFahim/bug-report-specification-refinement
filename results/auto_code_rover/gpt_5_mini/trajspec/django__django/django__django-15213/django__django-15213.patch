@@ -1,0 +1,34 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..74c102a01c 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,28 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        # WhereNode.as_sql uses sentinel return values (''/None) to indicate
++        # a node that "matches everything" in WHERE contexts. Those sentinels
++        # are invalid SQL fragments for SELECT/annotation contexts. Preserve
++        # EmptyResultSet exceptions (so callers can use existing fallbacks),
++        # but normalize falsey SQL results into an explicit boolean True value
++        # compiled with the ExpressionWrapper's output_field.
++        from django.db.models.sql.where import EmptyResultSet
++
++        try:
++            compiled = compiler.compile(self.expression)
++        except EmptyResultSet:
++            # Preserve behavior so callers (e.g. SQLCompiler.get_select) can
++            # handle the impossible-empty-result fallback.
++            raise
++
++        # compiled is expected to be a (sql, params) tuple. If the SQL part
++        # is falsey (e.g. ''), treat it as a WHERE "matches everything"
++        # sentinel and compile an explicit True literal/expression instead.
++        if not compiled or not compiled[0]:
++            return compiler.compile(Value(True, output_field=self.output_field))
++
++        return compiled
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

@@ -1,0 +1,2450 @@
+{
+  "schema_version": 2,
+  "repair_agent": "Mini-SWE-Agent V2",
+  "model": "gpt_5_mini",
+  "dataset_name": "SWE-bench Lite",
+  "expected_total": 300,
+  "variants": [
+    "original",
+    "agentic_base",
+    "trajspec",
+    "wo_reviewer",
+    "wo_hierarchy"
+  ],
+  "per_variant": {
+    "original": {
+      "label": "Original Reports",
+      "total_evaluated": 300,
+      "total_resolved_at_1": 123,
+      "overall_pass_at_1": 0.41
+    },
+    "agentic_base": {
+      "label": "Agentic-Base Reports",
+      "total_evaluated": 300,
+      "total_resolved_at_1": 146,
+      "overall_pass_at_1": 0.4866666666666667
+    },
+    "trajspec": {
+      "label": "TrajSpec Reports",
+      "total_evaluated": 300,
+      "total_resolved_at_1": 179,
+      "overall_pass_at_1": 0.5966666666666667
+    },
+    "wo_reviewer": {
+      "label": "w/o Reviewer",
+      "total_evaluated": 300,
+      "total_resolved_at_1": 144,
+      "overall_pass_at_1": 0.48
+    },
+    "wo_hierarchy": {
+      "label": "w/o Hierarchy",
+      "total_evaluated": 300,
+      "total_resolved_at_1": 143,
+      "overall_pass_at_1": 0.4766666666666667
+    }
+  },
+  "per_repository": {
+    "astropy__astropy": {
+      "total_instances": 6,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 3,
+          "pass_at_1": 0.5
+        },
+        "agentic_base": {
+          "resolved_instances": 4,
+          "pass_at_1": 0.6666666666666666
+        },
+        "trajspec": {
+          "resolved_instances": 5,
+          "pass_at_1": 0.8333333333333334
+        },
+        "wo_reviewer": {
+          "resolved_instances": 3,
+          "pass_at_1": 0.5
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 5,
+          "pass_at_1": 0.8333333333333334
+        }
+      }
+    },
+    "django__django": {
+      "total_instances": 114,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 58,
+          "pass_at_1": 0.5087719298245614
+        },
+        "agentic_base": {
+          "resolved_instances": 69,
+          "pass_at_1": 0.6052631578947368
+        },
+        "trajspec": {
+          "resolved_instances": 82,
+          "pass_at_1": 0.7192982456140351
+        },
+        "wo_reviewer": {
+          "resolved_instances": 66,
+          "pass_at_1": 0.5789473684210527
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 65,
+          "pass_at_1": 0.5701754385964912
+        }
+      }
+    },
+    "matplotlib__matplotlib": {
+      "total_instances": 23,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 10,
+          "pass_at_1": 0.43478260869565216
+        },
+        "agentic_base": {
+          "resolved_instances": 11,
+          "pass_at_1": 0.4782608695652174
+        },
+        "trajspec": {
+          "resolved_instances": 14,
+          "pass_at_1": 0.6086956521739131
+        },
+        "wo_reviewer": {
+          "resolved_instances": 13,
+          "pass_at_1": 0.5652173913043478
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 10,
+          "pass_at_1": 0.43478260869565216
+        }
+      }
+    },
+    "mwaskom__seaborn": {
+      "total_instances": 4,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 1,
+          "pass_at_1": 0.25
+        },
+        "agentic_base": {
+          "resolved_instances": 1,
+          "pass_at_1": 0.25
+        },
+        "trajspec": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.5
+        },
+        "wo_reviewer": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.5
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.5
+        }
+      }
+    },
+    "pallets__flask": {
+      "total_instances": 3,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 0,
+          "pass_at_1": 0.0
+        },
+        "agentic_base": {
+          "resolved_instances": 0,
+          "pass_at_1": 0.0
+        },
+        "trajspec": {
+          "resolved_instances": 0,
+          "pass_at_1": 0.0
+        },
+        "wo_reviewer": {
+          "resolved_instances": 0,
+          "pass_at_1": 0.0
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 0,
+          "pass_at_1": 0.0
+        }
+      }
+    },
+    "psf__requests": {
+      "total_instances": 6,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.3333333333333333
+        },
+        "agentic_base": {
+          "resolved_instances": 3,
+          "pass_at_1": 0.5
+        },
+        "trajspec": {
+          "resolved_instances": 6,
+          "pass_at_1": 1.0
+        },
+        "wo_reviewer": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.3333333333333333
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.3333333333333333
+        }
+      }
+    },
+    "pydata__xarray": {
+      "total_instances": 5,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 1,
+          "pass_at_1": 0.2
+        },
+        "agentic_base": {
+          "resolved_instances": 1,
+          "pass_at_1": 0.2
+        },
+        "trajspec": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.4
+        },
+        "wo_reviewer": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.4
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.4
+        }
+      }
+    },
+    "pylint-dev__pylint": {
+      "total_instances": 6,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 1,
+          "pass_at_1": 0.16666666666666666
+        },
+        "agentic_base": {
+          "resolved_instances": 1,
+          "pass_at_1": 0.16666666666666666
+        },
+        "trajspec": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.3333333333333333
+        },
+        "wo_reviewer": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.3333333333333333
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 2,
+          "pass_at_1": 0.3333333333333333
+        }
+      }
+    },
+    "pytest-dev__pytest": {
+      "total_instances": 17,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 3,
+          "pass_at_1": 0.17647058823529413
+        },
+        "agentic_base": {
+          "resolved_instances": 4,
+          "pass_at_1": 0.23529411764705882
+        },
+        "trajspec": {
+          "resolved_instances": 4,
+          "pass_at_1": 0.23529411764705882
+        },
+        "wo_reviewer": {
+          "resolved_instances": 4,
+          "pass_at_1": 0.23529411764705882
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 4,
+          "pass_at_1": 0.23529411764705882
+        }
+      }
+    },
+    "scikit-learn__scikit-learn": {
+      "total_instances": 23,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 11,
+          "pass_at_1": 0.4782608695652174
+        },
+        "agentic_base": {
+          "resolved_instances": 12,
+          "pass_at_1": 0.5217391304347826
+        },
+        "trajspec": {
+          "resolved_instances": 14,
+          "pass_at_1": 0.6086956521739131
+        },
+        "wo_reviewer": {
+          "resolved_instances": 13,
+          "pass_at_1": 0.5652173913043478
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 14,
+          "pass_at_1": 0.6086956521739131
+        }
+      }
+    },
+    "sphinx-doc__sphinx": {
+      "total_instances": 16,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 8,
+          "pass_at_1": 0.5
+        },
+        "agentic_base": {
+          "resolved_instances": 8,
+          "pass_at_1": 0.5
+        },
+        "trajspec": {
+          "resolved_instances": 10,
+          "pass_at_1": 0.625
+        },
+        "wo_reviewer": {
+          "resolved_instances": 7,
+          "pass_at_1": 0.4375
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 6,
+          "pass_at_1": 0.375
+        }
+      }
+    },
+    "sympy__sympy": {
+      "total_instances": 77,
+      "per_variant": {
+        "original": {
+          "resolved_instances": 25,
+          "pass_at_1": 0.3246753246753247
+        },
+        "agentic_base": {
+          "resolved_instances": 32,
+          "pass_at_1": 0.4155844155844156
+        },
+        "trajspec": {
+          "resolved_instances": 38,
+          "pass_at_1": 0.4935064935064935
+        },
+        "wo_reviewer": {
+          "resolved_instances": 30,
+          "pass_at_1": 0.38961038961038963
+        },
+        "wo_hierarchy": {
+          "resolved_instances": 31,
+          "pass_at_1": 0.4025974025974026
+        }
+      }
+    }
+  },
+  "variants_resolved_comparison": {
+    "astropy__astropy-12907": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "astropy__astropy-14182": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "astropy__astropy-14365": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "astropy__astropy-14995": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "astropy__astropy-6938": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "astropy__astropy-7746": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-10914": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-10924": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11001": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "django__django-11019": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11039": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11049": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11099": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11133": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11179": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11283": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11422": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11564": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11583": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11620": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11630": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11742": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11797": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11815": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11848": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-11905": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11910": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11964": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-11999": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12113": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "django__django-12125": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "django__django-12184": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12284": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12286": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12308": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "django__django-12453": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "django__django-12470": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-12497": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12589": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "django__django-12700": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12708": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-12747": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12856": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12908": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12915": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-12983": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13028": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13033": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13158": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13220": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-13230": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13265": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-13315": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13321": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-13401": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13447": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "django__django-13448": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-13551": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13590": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13658": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13660": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13710": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13757": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13768": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-13925": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13933": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-13964": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-14016": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14017": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-14155": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-14238": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14382": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14411": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14534": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-14580": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14608": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14667": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-14672": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "django__django-14730": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-14752": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14787": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14855": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14915": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14997": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-14999": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-15061": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15202": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15213": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "django__django-15252": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15320": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-15347": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-15388": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15400": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-15498": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-15695": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15738": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15781": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15789": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15790": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-15814": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "django__django-15819": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-15851": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-15902": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "django__django-15996": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "django__django-16041": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-16046": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-16139": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-16229": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-16255": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-16379": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-16400": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-16408": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-16527": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-16595": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-16816": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-16820": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-16873": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-16910": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "django__django-17051": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "django__django-17087": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-18869": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-22711": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-22835": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-23299": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-23314": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-23476": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-23562": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-23563": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-23913": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-23964": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-23987": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-24149": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-24265": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-24334": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-24970": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-25079": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-25311": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-25332": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-25433": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-25442": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-25498": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "matplotlib__matplotlib-26011": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "matplotlib__matplotlib-26020": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "mwaskom__seaborn-2848": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "mwaskom__seaborn-3010": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "mwaskom__seaborn-3190": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "mwaskom__seaborn-3407": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pallets__flask-4045": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pallets__flask-4992": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pallets__flask-5063": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "psf__requests-1963": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "psf__requests-2148": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "psf__requests-2317": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "psf__requests-2674": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "psf__requests-3362": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "psf__requests-863": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pydata__xarray-3364": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pydata__xarray-4094": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pydata__xarray-4248": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pydata__xarray-4493": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pydata__xarray-5131": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pylint-dev__pylint-5859": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pylint-dev__pylint-6506": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pylint-dev__pylint-7080": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pylint-dev__pylint-7114": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pylint-dev__pylint-7228": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pylint-dev__pylint-7993": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pytest-dev__pytest-11143": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pytest-dev__pytest-11148": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-5103": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-5221": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-5227": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pytest-dev__pytest-5413": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-5495": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-5692": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-6116": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-7168": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-7220": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-7373": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pytest-dev__pytest-7432": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "pytest-dev__pytest-7490": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-8365": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-8906": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "pytest-dev__pytest-9359": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-10297": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-10508": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-10949": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-11040": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-11281": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-12471": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-13142": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-13241": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-13439": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-13496": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-13497": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-13584": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-13779": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-14087": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-14092": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-14894": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-14983": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-15512": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-15535": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-25500": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-25570": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "scikit-learn__scikit-learn-25638": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "scikit-learn__scikit-learn-25747": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-10325": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "sphinx-doc__sphinx-10451": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "sphinx-doc__sphinx-11445": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sphinx-doc__sphinx-7686": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-7738": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-7975": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-8273": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-8282": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-8435": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sphinx-doc__sphinx-8474": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-8506": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-8595": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-8627": {
+      "original": true,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sphinx-doc__sphinx-8713": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sphinx-doc__sphinx-8721": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sphinx-doc__sphinx-8801": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-11400": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-11870": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-11897": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-12171": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-12236": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-12419": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-12454": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-12481": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-13031": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13043": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13146": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13177": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13437": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13471": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-13480": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-13647": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-13773": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13895": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13915": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-13971": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-14024": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-14308": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-14317": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-14396": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-14774": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-14817": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-15011": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-15308": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-15345": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-15346": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-15609": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-15678": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-16106": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-16281": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-16503": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-16792": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-16988": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-17022": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-17139": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-17630": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-17655": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-18057": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-18087": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-18189": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-18199": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-18532": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-18621": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-18698": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-18835": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-19007": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-19254": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-19487": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-20049": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-20154": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-20212": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-20322": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-20442": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-20590": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-20639": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-21055": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-21171": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-21379": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-21612": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-21614": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-21627": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-21847": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-22005": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-22714": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-22840": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-23117": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-23191": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-23262": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-24066": {
+      "original": false,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-24102": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-24152": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": true
+    },
+    "sympy__sympy-24213": {
+      "original": true,
+      "agentic_base": true,
+      "trajspec": true,
+      "wo_reviewer": true,
+      "wo_hierarchy": false
+    },
+    "sympy__sympy-24909": {
+      "original": false,
+      "agentic_base": false,
+      "trajspec": false,
+      "wo_reviewer": false,
+      "wo_hierarchy": false
+    }
+  }
+}

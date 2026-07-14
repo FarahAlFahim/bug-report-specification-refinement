@@ -1,0 +1,26 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 4e4c0c1c48..f25a46838b 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1271,10 +1271,19 @@ def __new__(cls, *args, **kwargs):
+             try:
+                 _args = frozenset(cls._new_args_filter(args_gen))
+             except ShortCircuit:
+-                return sympify(cls.zero)
++                # cls.zero may be defined as a property on the class; if so,
++                # evaluate it via the fget to get the actual value. Same for
++                # cls.identity below.
++                zero = getattr(cls, 'zero')
++                if isinstance(zero, property):
++                    zero = zero.fget(cls)
++                return sympify(zero)
+ 
+             if not _args:
+-                return sympify(cls.identity)
++                identity = getattr(cls, 'identity')
++                if isinstance(identity, property):
++                    identity = identity.fget(cls)
++                return sympify(identity)
+             elif len(_args) == 1:
+                 return set(_args).pop()
+ 

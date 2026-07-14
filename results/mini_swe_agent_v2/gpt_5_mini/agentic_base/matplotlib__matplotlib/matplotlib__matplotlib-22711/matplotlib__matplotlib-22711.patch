@@ -1,0 +1,44 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index da5b40a5ef..f0018fa23d 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -897,19 +897,28 @@ class RangeSlider(SliderBase):
+         _api.check_shape((2,), val=val)
+         val[0] = self._min_in_bounds(val[0])
+         val[1] = self._max_in_bounds(val[1])
+-        xy = self.poly.xy
++        # Construct the 4 core rectangle vertices and assign them to the
++        # polygon. Some backends/implementations return poly.xy with 4
++        # vertices (no repeated closing vertex) while others include the
++        # closing vertex as a 5th point. Relying on mutating indices up to
++        # 4 is therefore fragile. Polygon.set_xy will ensure the polygon is
++        # closed as appropriate, so we create the 4 corner points explicitly.
+         if self.orientation == "vertical":
+-            xy[0] = .25, val[0]
+-            xy[1] = .25, val[1]
+-            xy[2] = .75, val[1]
+-            xy[3] = .75, val[0]
+-            xy[4] = .25, val[0]
++            xy = np.array([
++                (.25, val[0]),
++                (.25, val[1]),
++                (.75, val[1]),
++                (.75, val[0]),
++            ])
+         else:
+-            xy[0] = val[0], .25
+-            xy[1] = val[0], .75
+-            xy[2] = val[1], .75
+-            xy[3] = val[1], .25
+-            xy[4] = val[0], .25
++            xy = np.array([
++                (val[0], .25),
++                (val[0], .75),
++                (val[1], .75),
++                (val[1], .25),
++            ])
++        # Assign the 4 core vertices; Polygon.set_xy will append the
++        # closing vertex if required by the patch.
+         self.poly.xy = xy
+         self.valtext.set_text(self._format(val))
+         if self.drawon:

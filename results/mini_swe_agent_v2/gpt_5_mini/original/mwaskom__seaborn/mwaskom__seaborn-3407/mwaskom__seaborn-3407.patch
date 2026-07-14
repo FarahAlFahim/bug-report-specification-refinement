@@ -1,0 +1,50 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 75349099..8d6a9eeb 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1487,9 +1487,16 @@ class PairGrid(Grid):
+             else:
+                 plt.sca(ax)
+ 
+-            vector = self.data[var]
++            # Use .loc to allow indexing by tuple keys for MultiIndex columns
++            try:
++                vector = self.data.loc[:, var]
++            except Exception:
++                vector = self.data[var]
+             if self._hue_var is not None:
+-                hue = self.data[self._hue_var]
++                try:
++                    hue = self.data.loc[:, self._hue_var]
++                except Exception:
++                    hue = self.data[self._hue_var]
+             else:
+                 hue = None
+ 
+@@ -1516,7 +1523,11 @@ class PairGrid(Grid):
+         fixed_color = kwargs.pop("color", None)
+ 
+         for var, ax in zip(self.diag_vars, self.diag_axes):
+-            hue_grouped = self.data[var].groupby(self.hue_vals)
++            # Grouping should also support MultiIndex column keys
++            try:
++                hue_grouped = self.data.loc[:, var].groupby(self.hue_vals)
++            except Exception:
++                hue_grouped = self.data[var].groupby(self.hue_vals)
+ 
+             plot_kwargs = kwargs.copy()
+             if str(func.__module__).startswith("seaborn"):
+@@ -1591,7 +1602,12 @@ class PairGrid(Grid):
+         if self._hue_var is not None and self._hue_var not in axes_vars:
+             axes_vars.append(self._hue_var)
+ 
+-        data = self.data[axes_vars]
++        # Use .loc to select columns; fall back to direct indexing for
++        # compatibility with non-DataFrame-like objects
++        try:
++            data = self.data.loc[:, axes_vars]
++        except Exception:
++            data = self.data[axes_vars]
+         if self._dropna:
+             data = data.dropna()
+ 

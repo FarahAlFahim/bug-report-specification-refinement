@@ -1,0 +1,20 @@
+diff --git a/sympy/simplify/fu.py b/sympy/simplify/fu.py
+index ad1130ef9..3cb2afee7 100644
+--- a/sympy/simplify/fu.py
++++ b/sympy/simplify/fu.py
+@@ -501,6 +501,15 @@ def _f(rv):
+         if not (rv.is_Pow and rv.base.func == f):
+             return rv
+ 
++        # Only attempt integer-specific power transformations when the
++        # exponent is known to be an integer. If the exponent is complex
++        # or otherwise not provably an integer, avoid numeric comparisons
++        # and integer operations which may raise (e.g. comparing complex
++        # values to real numbers). This prevents errors such as
++        # "Invalid comparison of complex I" when rv.exp is I.
++        if rv.exp.is_integer is not True:
++            return rv
++
+         if (rv.exp < 0) == True:
+             return rv
+         if (rv.exp > max) == True:

@@ -1,0 +1,21 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..5940be722b 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1265,6 +1265,16 @@ def __new__(cls, *args, **kwargs):
+         # Reduce sets using known rules
+         if evaluate:
+             args = list(cls._new_args_filter(args))
++            # Remove duplicate arguments while preserving order. Duplicates
++            # (e.g., Intersection(A, A, B)) should not change the result and
++            # can cause incorrect simplification in downstream routines
++            # (see issue with multiple identical FiniteSets).  Removing
++            # duplicates here ensures canonical processing.
++            seen = []
++            for a in args:
++                if a not in seen:
++                    seen.append(a)
++            args = seen
+             return simplify_intersection(args)
+ 
+         args = list(ordered(args, Set._infimum_key))

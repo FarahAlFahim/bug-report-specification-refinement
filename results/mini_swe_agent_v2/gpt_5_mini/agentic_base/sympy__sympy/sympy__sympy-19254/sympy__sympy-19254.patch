@@ -1,0 +1,132 @@
+diff --git a/sympy/polys/densearith.py b/sympy/polys/densearith.py
+index 4ca5c44123..7256888d05 100644
+--- a/sympy/polys/densearith.py
++++ b/sympy/polys/densearith.py
+@@ -1787,6 +1787,36 @@ def dmp_l1_norm(f, u, K):
+     return sum([ dmp_l1_norm(c, v, K) for c in f ])
+ 
+ 
++def dup_l2_norm(f, K):
++    """Returns floor of l2 (Euclidean) norm of a polynomial in ``K[x]``."""
++    if not f:
++        return 0
++    # sum of squares of absolute coefficients, then integer floor sqrt
++    from math import isqrt
++    s = 0
++    for c in f:
++        c = K.abs(c)
++        # ensure c is int-like
++        try:
++            v = int(c)
++        except Exception:
++            v = c
++        s += v*v
++    return isqrt(s)
++
++def dmp_l2_norm(f, u, K):
++    """Returns floor of l2 (Euclidean) norm of a polynomial in ``K[X]``."""
++    if not u:
++        return dup_l2_norm(f, K)
++    v = u - 1
++    from math import isqrt
++    s = 0
++    for c in f:
++        # c is a coefficient polynomial in fewer variables
++        vnorm = dmp_l2_norm(c, v, K)
++        s += int(vnorm)**2
++    return isqrt(s)
++
+ def dup_expand(polys, K):
+     """
+     Multiply together several polynomials in ``K[x]``.
+diff --git a/sympy/polys/factortools.py b/sympy/polys/factortools.py
+index 93298f47e6..75590ee444 100644
+--- a/sympy/polys/factortools.py
++++ b/sympy/polys/factortools.py
+@@ -124,21 +124,67 @@ def dmp_trial_division(f, factors, u, K):
+ 
+ 
+ def dup_zz_mignotte_bound(f, K):
+-    """Mignotte bound for univariate polynomials in `K[x]`. """
+-    a = dup_max_norm(f, K)
+-    b = abs(dup_LC(f, K))
+-    n = dup_degree(f)
++    """Knuth-Cohen style coefficient bound for univariate polynomials in `K[x]`.
++
++    This replaces the previous loose Mignotte-style bound with a tighter bound
++    based on the L2 norm of coefficients and a binomial factor.
++    Returns an integer bound.
++    """
++    from math import comb, isqrt
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    n = dup_degree(f)
++    if n < 0:
++        return 0
++    a = abs(dup_LC(f, K))
++    if a == 0:
++        return 0
++    # floor of L2 norm
++    l2 = dup_l2_norm(f, K)
++    # binomial coefficient central term approx: binomial(n, floor(n/2))
++    try:
++        binom = comb(n, n//2)
++    except Exception:
++        # fallback for very old Pythons (shouldn't happen here)
++        from math import factorial
++        binom = factorial(n) // (factorial(n//2)*factorial(n - n//2))
++    bin_sqrt = isqrt(binom)
++    nsqrt = isqrt(n + 1)
++    num = bin_sqrt * nsqrt * int(l2)
++    if a == 0:
++        return int(num)
++    bound = num // int(a)
++    if bound < 1:
++        bound = 1
++    return int(bound)
+ 
+ 
+ def dmp_zz_mignotte_bound(f, u, K):
+-    """Mignotte bound for multivariate polynomials in `K[X]`. """
+-    a = dmp_max_norm(f, u, K)
+-    b = abs(dmp_ground_LC(f, u, K))
+-    n = sum(dmp_degree_list(f, u))
++    """Knuth-Cohen style coefficient bound for multivariate polynomials in `K[X]`.
++
++    The total degree is used together with the L2 norm over all ground coefficients.
++    Returns an integer bound.
++    """
++    from math import comb, isqrt
+ 
+-    return K.sqrt(K(n + 1))*2**n*a*b
++    n = sum(dmp_degree_list(f, u))
++    if n < 0:
++        return 0
++    a = abs(dmp_ground_LC(f, u, K))
++    if a == 0:
++        return 0
++    l2 = dmp_l2_norm(f, u, K)
++    try:
++        binom = comb(n, n//2)
++    except Exception:
++        from math import factorial
++        binom = factorial(n) // (factorial(n//2)*factorial(n - n//2))
++    bin_sqrt = isqrt(binom)
++    nsqrt = isqrt(n + 1)
++    num = bin_sqrt * nsqrt * int(l2)
++    bound = num // int(a) if a != 0 else int(num)
++    if bound < 1:
++        bound = 1
++    return int(bound)
+ 
+ 
+ def dup_zz_hensel_step(m, f, g, h, s, t, K):
+@@ -272,7 +318,7 @@ def dup_zz_zassenhaus(f, K):
+     fc = f[-1]
+     A = dup_max_norm(f, K)
+     b = dup_LC(f, K)
+-    B = int(abs(K.sqrt(K(n + 1))*2**n*A*b))
++    B = int(abs(dup_zz_mignotte_bound(f, K)))
+     C = int((n + 1)**(2*n)*A**(2*n - 1))
+     gamma = int(_ceil(2*_log(C, 2)))
+     bound = int(2*gamma*_log(gamma))

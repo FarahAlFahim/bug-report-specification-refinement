@@ -1,0 +1,51 @@
+diff --git a/pylint/lint/pylinter.py b/pylint/lint/pylinter.py
+index e2bbf061..a45469e7 100644
+--- a/pylint/lint/pylinter.py
++++ b/pylint/lint/pylinter.py
+@@ -597,12 +597,40 @@ class PyLinter(
+                         # Skip subtree of already discovered package.
+                         continue
+ 
+-                    if _is_ignored_file(
+-                        root,
+-                        self.config.ignore,
+-                        self.config.ignore_patterns,
+-                        self.config.ignore_paths,
+-                    ):
++                    # When walking directories, treat ignore-paths patterns
++                    # that are meant to match files under a directory (for
++                    # example '^src/gen/.*$') as matching the directory
++                    # itself so the subtree is skipped. Some users write
++                    # patterns that expect the pattern to match items under
++                    # the directory even if it doesn't match the directory
++                    # path exactly (missing trailing part). To handle that
++                    # case we also try matching the pattern against a
++                    # synthetic child path (root + os.sep + 'x').
++                    def _matches_ignore_paths_for_dir(path: str) -> bool:
++                        # Try direct match first
++                        if _is_ignored_file(
++                            path,
++                            self.config.ignore,
++                            self.config.ignore_patterns,
++                            self.config.ignore_paths,
++                        ):
++                            return True
++                        # If not matched, some ignore-paths regexes may be
++                        # written to match items under the directory (e.g.
++                        # '^src/gen/.*$'). Try matching each compiled
++                        # ignore_paths pattern against a synthetic child
++                        # path to detect those cases.
++                        try:
++                            sep = os.sep
++                        except Exception:
++                            sep = "/"
++                        synthetic = path + sep + "__pylint_probe__"
++                        for patt in self.config.ignore_paths:
++                            if patt.match(synthetic):
++                                return True
++                        return False
++
++                    if _matches_ignore_paths_for_dir(root):
+                         skip_subtrees.append(root)
+                         continue
+ 

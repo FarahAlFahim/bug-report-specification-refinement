@@ -1,0 +1,38 @@
+diff --git a/requests/models.py b/requests/models.py
+index c835f24..ad73aa1 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -640,6 +640,14 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except ProtocolError as e:
++                    # Map urllib3 ProtocolError (connection broken, etc.) to
++                    # requests-level ConnectionError so callers can uniformly
++                    # handle connection failures.
++                    raise ConnectionError(e)
++                except TimeoutError as e:
++                    # Map urllib3 timeout to requests-level Timeout.
++                    raise Timeout(e)
+             except AttributeError:
+                 # Standard file-like object.
+                 while True:
+diff --git a/requests/packages/urllib3/response.py b/requests/packages/urllib3/response.py
+index 3c3e4e5..fd0b89a 100644
+--- a/requests/packages/urllib3/response.py
++++ b/requests/packages/urllib3/response.py
+@@ -210,6 +210,14 @@ class HTTPResponse(io.IOBase):
+                 # This includes IncompleteRead.
+                 raise ProtocolError('Connection broken: %r' % e, e)
+ 
++            except (socket.error, OSError) as e:
++                # Underlying socket/file descriptor errors (for example
++                # socket.error: [Errno 104] Connection reset by peer) can be
++                # raised by self._fp.read(). Wrap these in a ProtocolError so
++                # that higher layers (urllib3/requests) can map them to the
++                # appropriate requests-level exceptions.
++                raise ProtocolError('Connection broken: %r' % e, e)
++
+             self._fp_bytes_read += len(data)
+ 
+             try:

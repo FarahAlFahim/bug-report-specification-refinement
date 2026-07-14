@@ -1,0 +1,30 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..882efefeed 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -280,6 +280,25 @@ class Field(RegisterLookupMixin):
+             if isinstance(choices_group, str):
+                 break
+         else:
++            # Shape/format validation passed. Now ensure string choice keys fit max_length.
++            max_length = getattr(self, 'max_length', None)
++            if isinstance(max_length, int):
++                # Consider only plain str keys; skip lazy translation Promises and non-str keys.
++                too_long = [
++                    choice for choice, _ in self.flatchoices
++                    if isinstance(choice, str) and not isinstance(choice, Promise) and len(choice) > max_length
++                ]
++                if too_long:
++                    # Show a short sample of offending values in the message.
++                    sample = ", ".join(repr(c) for c in too_long[:5])
++                    return [
++                        checks.Error(
++                            "Some choices for this field are longer than the field's max_length (%d): %s" % (max_length, sample),
++                            hint="Shorten the choice value(s) or increase the field's max_length.",
++                            obj=self,
++                            id='fields.E122',
++                        )
++                    ]
+             return []
+ 
+         return [

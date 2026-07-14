@@ -1,0 +1,63 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..50af074a30 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,33 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    axis = getattr(ax, "axis", None)
++    if axis is None:
++        return
++    # Try to use the toolkit's AxisDict-like API when available. If the Axes
++    # instance provides a different API (for example axis is a method or the
++    # side objects do not implement .toggle), silently skip to avoid raising
++    # during AxesGrid construction for third-party axes.
++    try:
++        bottom_axis = axis["bottom"]
++    except (TypeError, KeyError, AttributeError):
++        bottom_axis = None
++    if bottom_axis is not None and hasattr(bottom_axis, "toggle"):
++        try:
++            bottom_axis.toggle(ticklabels=bottom_off, label=bottom_off)
++        except Exception:
++            # Be conservative: do not propagate exceptions coming from toggle.
++            pass
++
++    try:
++        left_axis = axis["left"]
++    except (TypeError, KeyError, AttributeError):
++        left_axis = None
++    if left_axis is not None and hasattr(left_axis, "toggle"):
++        try:
++            left_axis.toggle(ticklabels=left_off, label=left_off)
++        except Exception:
++            pass
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +53,20 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        axis_attr = getattr(self, "axis", None)
++        if axis_attr is None:
++            return
++        try:
++            axis = axis_attr[self.orientation]
++        except (TypeError, KeyError, AttributeError):
++            # axis isn't subscriptable or doesn't have the requested side: no-op.
++            return
++        if hasattr(axis, "toggle"):
++            try:
++                axis.toggle(ticklabels=b, label=b)
++            except Exception:
++                # Do not propagate exceptions from toggle; treat as no-op.
++                pass
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

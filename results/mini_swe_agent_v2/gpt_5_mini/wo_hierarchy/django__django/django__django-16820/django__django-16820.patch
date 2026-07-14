@@ -1,0 +1,77 @@
+diff --git a/django/db/migrations/operations/models.py b/django/db/migrations/operations/models.py
+index b89b6b511b..dedb826959 100644
+--- a/django/db/migrations/operations/models.py
++++ b/django/db/migrations/operations/models.py
+@@ -6,6 +6,8 @@ from django.db.models.options import normalize_together
+ from django.utils.functional import cached_property
+ 
+ from .fields import AddField, AlterField, FieldOperation, RemoveField, RenameField
++from django.db.models.indexes import Index
++from django.db.backends.utils import names_digest, split_identifier
+ 
+ 
+ def _check_for_duplicates(arg_name, objs):
+@@ -187,14 +189,59 @@ class CreateModel(ModelOperation):
+             isinstance(operation, AlterTogetherOptionOperation)
+             and self.name_lower == operation.name_lower
+         ):
++            # If the operation changes index_together, convert the tuples
++            # into actual Index() objects with deterministic, non-empty
++            # names so squashed CreateModel.options don't retain the
++            # deprecated 'index_together' key and satisfy ModelState.
++            options = dict(self.options)
++            if operation.option_name == "index_together":
++                # operation.option_value is a set of tuples (or None/empty)
++                index_together = operation.option_value or set()
++                existing_indexes = list(options.get("indexes", []))
++                # Build a deterministic table identifier similar to the
++                # default db_table: "<app_label>_<model_name>". Use
++                # split_identifier to mirror Index.set_name_with_model.
++                table_identifier = f"{app_label}_{self.name_lower}"
++                try:
++                    _, table_name = split_identifier(table_identifier)
++                except Exception:
++                    table_name = table_identifier
++
++                for fields in sorted(index_together):
++                    # fields is a tuple of field names; create an Index
++                    # and assign a deterministic name following the
++                    # same formatting rules as Index.set_name_with_model.
++                    field_list = list(fields)
++                    idx = Index(fields=field_list)
++
++                    # Generate name parts: table (11), first column (7),
++                    # and hash+suffix (names_digest length=6 + suffix).
++                    first_col = (field_list[0] if field_list else "")[:7]
++                    hash_data = [table_name] + field_list + [idx.suffix]
++                    digest = names_digest(*hash_data, length=6)
++                    name = "%s_%s_%s" % (
++                        table_name[:11],
++                        first_col,
++                        "%s_%s" % (digest, idx.suffix),
++                    )
++                    # Truncate/prefix to respect constraints from Index.
++                    if len(name) > idx.max_name_length:
++                        name = name[: idx.max_name_length]
++                    if name and (name[0] == "_" or name[0].isdigit()):
++                        name = "D%s" % name[1:]
++                    idx.name = name
++                    existing_indexes.append(idx)
++
++                options.pop("index_together", None)
++                options["indexes"] = existing_indexes
++            else:
++                options = {**self.options, **{operation.option_name: operation.option_value}}
++
+             return [
+                 CreateModel(
+                     self.name,
+                     fields=self.fields,
+-                    options={
+-                        **self.options,
+-                        **{operation.option_name: operation.option_value},
+-                    },
++                    options=options,
+                     bases=self.bases,
+                     managers=self.managers,
+                 ),

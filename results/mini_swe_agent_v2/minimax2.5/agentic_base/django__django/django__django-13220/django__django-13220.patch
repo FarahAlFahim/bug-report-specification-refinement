@@ -1,0 +1,64 @@
+diff --git a/django/core/exceptions.py b/django/core/exceptions.py
+index dc084b8692..5dc0549b03 100644
+--- a/django/core/exceptions.py
++++ b/django/core/exceptions.py
+@@ -182,6 +182,59 @@ class ValidationError(Exception):
+     def __repr__(self):
+         return 'ValidationError(%s)' % self
+ 
++    def __eq__(self, other):
++        if not isinstance(other, ValidationError):
++            return NotImplemented
++        # Check if both have the same structure type
++        if hasattr(self, 'error_dict') != hasattr(other, 'error_dict'):
++            return False
++        if hasattr(self, 'error_list') != hasattr(other, 'error_list'):
++            return False
++        if hasattr(self, 'message') != hasattr(other, 'message'):
++            return False
++            
++        if hasattr(self, 'error_dict'):
++            if set(self.error_dict.keys()) != set(other.error_dict.keys()):
++                return False
++            for field in self.error_dict:
++                if not self._error_list_eq(self.error_dict[field], other.error_dict[field]):
++                    return False
++            return True
++        elif hasattr(self, 'error_list'):
++            return self._error_list_eq(self.error_list, other.error_list)
++        else:
++            return (
++                self.message == other.message and
++                self.code == other.code and
++                self.params == other.params
++            )
++
++    def _error_list_eq(self, error_list1, error_list2):
++        """Compare two error lists for equality, ignoring order."""
++        if len(error_list1) != len(error_list2):
++            return False
++        # Convert to comparable tuples and sort
++        def to_tuple(e):
++            return (e.message, e.code, e.params)
++        return sorted(map(to_tuple, error_list1)) == sorted(map(to_tuple, error_list2))
++
++    def __hash__(self):
++        if hasattr(self, 'error_dict'):
++            return hash((
++                frozenset(self.error_dict.keys()),
++                tuple(
++                    tuple(
++                        (e.message, e.code, e.params) for e in sorted(errors, key=lambda x: (x.message, x.code, x.params))
++                    ) for field, errors in sorted(self.error_dict.items())
++                )
++            ))
++        elif hasattr(self, 'error_list'):
++            return hash(tuple(
++                (e.message, e.code, e.params) for e in sorted(self.error_list, key=lambda x: (x.message, x.code, x.params))
++            ))
++        else:
++            return hash((self.message, self.code, self.params))
++
+ 
+ class EmptyResultSet(Exception):
+     """A database query predicate is impossible."""

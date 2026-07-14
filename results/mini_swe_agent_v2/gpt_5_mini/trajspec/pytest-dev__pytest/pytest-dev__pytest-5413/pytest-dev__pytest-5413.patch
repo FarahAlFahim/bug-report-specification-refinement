@@ -1,0 +1,29 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index c4ed961ac..8ef78fc35 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -538,8 +538,22 @@ class ExceptionInfo:
+         if self._excinfo is None:
+             return repr(self)
+         entry = self.traceback[-1]
+-        loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
+-        return str(loc)
++        # Historically ExceptionInfo.__str__ delegated to ReprFileLocation,
++        # which truncates the message at the first newline.  For multi-line
++        # exception messages we want to preserve the full text (equivalent to
++        # str(self.value)).  Construct a concise file:lineno prefix but append
++        # the full exception text so that printing the ExceptionInfo shows all
++        # embedded newlines.
++        path = entry.path
++        lineno = entry.lineno + 1
++        msg = self.exconly()
++        # Build a representation similar to how editors recognize location
++        # information, but keep the full message (including newlines).
++        try:
++            prefix = "{}:{}: ".format(path, lineno)
++        except Exception:
++            prefix = "{}:{}: ".format(str(path), lineno)
++        return prefix + msg
+ 
+     def match(self, regexp):
+         """

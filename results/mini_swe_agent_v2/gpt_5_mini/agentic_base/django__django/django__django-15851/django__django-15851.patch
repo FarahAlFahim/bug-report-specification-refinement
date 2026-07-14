@@ -1,0 +1,20 @@
+diff --git a/django/db/backends/postgresql/client.py b/django/db/backends/postgresql/client.py
+index 4c9bd63546..bf4c4616c3 100644
+--- a/django/db/backends/postgresql/client.py
++++ b/django/db/backends/postgresql/client.py
+@@ -32,9 +32,14 @@ class DatabaseClient(BaseDatabaseClient):
+             args += ["-h", host]
+         if port:
+             args += ["-p", str(port)]
++        # psql expects options/flags to appear before the DBNAME. Ensure any
++        # provided parameters (such as -c or --help) are placed before the
++        # database name so they are interpreted as options rather than
++        # positional arguments.
++        if parameters:
++            args.extend(parameters)
+         if dbname:
+             args += [dbname]
+-        args.extend(parameters)
+ 
+         env = {}
+         if passwd:

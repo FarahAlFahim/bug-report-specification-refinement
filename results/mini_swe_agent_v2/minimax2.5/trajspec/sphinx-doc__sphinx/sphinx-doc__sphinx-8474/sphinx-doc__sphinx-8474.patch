@@ -1,0 +1,34 @@
+diff --git a/sphinx/builders/singlehtml.py b/sphinx/builders/singlehtml.py
+index d8ab978ed..0eff071a4 100644
+--- a/sphinx/builders/singlehtml.py
++++ b/sphinx/builders/singlehtml.py
+@@ -155,9 +155,9 @@ class SingleFileHTMLBuilder(StandaloneHTMLBuilder):
+             self.prepare_writing(docnames)  # type: ignore
+ 
+         with progress_message(__('assembling single document')):
+-            doctree = self.assemble_doctree()
+             self.env.toc_secnumbers = self.assemble_toc_secnumbers()
+             self.env.toc_fignumbers = self.assemble_toc_fignumbers()
++            doctree = self.assemble_doctree()
+ 
+         with progress_message(__('writing')):
+             self.write_doc_serialized(self.config.master_doc, doctree)
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index 4bde57930..1b8b50ad0 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -1072,7 +1072,13 @@ class StandardDomain(Domain):
+         else:
+             try:
+                 figure_id = target_node['ids'][0]
+-                return env.toc_fignumbers[docname][figtype][figure_id]
++                if builder.name == 'singlehtml':
++                    # singlehtml uses a different key format: 'docname/figtype'
++                    key = "%s/%s" % (docname, figtype)
++                    fignumbers = env.toc_fignumbers.get(env.config.master_doc, {})
++                    return fignumbers[key][figure_id]
++                else:
++                    return env.toc_fignumbers[docname][figtype][figure_id]
+             except (KeyError, IndexError) as exc:
+                 # target_node is found, but fignumber is not assigned.
+                 # Maybe it is defined in orphaned document.

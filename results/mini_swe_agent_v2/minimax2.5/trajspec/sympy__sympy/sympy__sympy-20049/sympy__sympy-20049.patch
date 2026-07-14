@@ -1,0 +1,117 @@
+diff --git a/sympy/physics/vector/point.py b/sympy/physics/vector/point.py
+index d4e3cfcc90..4cf295b0da 100644
+--- a/sympy/physics/vector/point.py
++++ b/sympy/physics/vector/point.py
+@@ -242,8 +242,9 @@ def acc(self, frame):
+ 
+         _check_frame(frame)
+         if not (frame in self._acc_dict):
+-            if self._vel_dict[frame] != 0:
+-                return (self._vel_dict[frame]).dt(frame)
++            vel = self.vel(frame)
++            if vel != 0:
++                return vel.dt(frame)
+             else:
+                 return Vector(0)
+         return self._acc_dict[frame]
+@@ -307,6 +308,89 @@ def pos_from(self, otherpoint):
+             outvec += plist[i]._pos_dict[plist[i + 1]]
+         return outvec
+ 
++    def _compute_vel_from_pos(self, frame):
++        """Compute velocity from position relationships.
++        
++        This method attempts to compute the velocity of this point in the given
++        frame by traversing the position tree and differentiating position
++        vectors.
++        
++        Parameters
++        ==========
++        
++        frame : ReferenceFrame
++            The frame in which to compute the velocity.
++        
++        Returns
++        =======
++        
++        Vector or None
++            The computed velocity vector, or None if it cannot be computed.
++        """
++        # To compute velocity from position, we need to find a point with
++        # known velocity that is connected through position relationships.
++        # We use BFS to find such a point.
++        # If no point with known velocity is found, we try to compute velocity
++        # from the position vector directly (treating the reference point as
++        # having zero velocity).
++        
++        from collections import deque
++        from sympy.physics.vector.functions import dynamicsymbols
++        
++        # First, try to find a point with known velocity using BFS
++        visited = set()
++        queue = deque([(self, [self])])
++        
++        while queue:
++            current_point, path = queue.popleft()
++            
++            if current_point in visited:
++                continue
++            visited.add(current_point)
++            
++            # Check if this point has velocity defined in the frame
++            if frame in current_point._vel_dict:
++                # Found a point with known velocity!
++                # Compute velocity by traversing the path in reverse
++                vel = current_point.vel(frame)
++                # Go backwards through the path to compute velocity
++                for i in range(len(path) - 1, 0, -1):
++                    prev_point = path[i - 1]
++                    curr_point = path[i]
++                    # The position vector from prev_point to curr_point
++                    if curr_point in prev_point._pos_dict:
++                        pos_vector = prev_point._pos_dict[curr_point]
++                        vel = vel + pos_vector.dt(frame)
++                return vel
++            
++            # Add neighbors to the queue
++            for next_point in current_point._pos_dict.keys():
++                if next_point not in visited:
++                    queue.append((next_point, path + [next_point]))
++            # Also check reverse direction (points that have current_point in their _pos_dict)
++            for next_point in current_point._pdlist[0].keys():
++                if next_point not in visited:
++                    queue.append((next_point, path + [next_point]))
++        
++        # If no point with known velocity was found, try to compute velocity
++        # from the position vector directly by finding any connected point
++        # and treating it as having zero velocity
++        if self._pos_dict:
++            # Get any point that this point has position defined relative to
++            for other_point in self._pos_dict.keys():
++                try:
++                    plist = self._pdict_list(other_point, 0)
++                    vel = Vector(0)
++                    for i in range(len(plist) - 1):
++                        pos_vector = plist[i]._pos_dict[plist[i + 1]]
++                        vel += pos_vector.dt(frame)
++                    if vel != 0:
++                        return vel
++                except ValueError:
++                    continue
++        
++        return None
++
+     def set_acc(self, frame, value):
+         """Used to set the acceleration of this Point in a ReferenceFrame.
+ 
+@@ -519,6 +603,10 @@ def vel(self, frame):
+ 
+         _check_frame(frame)
+         if not (frame in self._vel_dict):
++            # Try to compute velocity from position relationships
++            vel = self._compute_vel_from_pos(frame)
++            if vel is not None:
++                return vel
+             raise ValueError('Velocity of point ' + self.name + ' has not been'
+                              ' defined in ReferenceFrame ' + frame.name)
+         return self._vel_dict[frame]

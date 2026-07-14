@@ -1,0 +1,34 @@
+diff --git a/django/contrib/auth/migrations/0011_update_proxy_permissions.py b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+index 0e66649695..a5a609103f 100644
+--- a/django/contrib/auth/migrations/0011_update_proxy_permissions.py
++++ b/django/contrib/auth/migrations/0011_update_proxy_permissions.py
+@@ -24,10 +24,27 @@ def update_proxy_model_permissions(apps, schema_editor, reverse=False):
+         proxy_content_type = ContentType.objects.get_for_model(Model, for_concrete_model=False)
+         old_content_type = proxy_content_type if reverse else concrete_content_type
+         new_content_type = concrete_content_type if reverse else proxy_content_type
+-        Permission.objects.filter(
++        # Avoid a bulk update here because changing the content_type on a
++        # Permission row may violate the unique_together constraint
++        # (content_type, codename) if a Permission with the same codename
++        # already exists for the target content type. Iterate over the
++        # matched Permission rows and for each row either move it to the
++        # new content_type or remove it if an equivalent Permission already
++        # exists on the target content_type. This ensures the migration
++        # doesn't raise an IntegrityError.
++        for perm in Permission.objects.filter(
+             permissions_query,
+             content_type=old_content_type,
+-        ).update(content_type=new_content_type)
++        ):
++            # If a permission with the same codename already exists for
++            # the target content type, drop the source permission to avoid
++            # creating a duplicate (unique_together violation). Otherwise,
++            # update the permission to point to the new content type.
++            if Permission.objects.filter(content_type=new_content_type, codename=perm.codename).exists():
++                perm.delete()
++            else:
++                perm.content_type = new_content_type
++                perm.save()
+ 
+ 
+ def revert_proxy_model_permissions(apps, schema_editor):

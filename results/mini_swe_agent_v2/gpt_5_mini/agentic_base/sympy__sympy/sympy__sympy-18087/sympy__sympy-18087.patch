@@ -1,0 +1,27 @@
+diff --git a/sympy/core/power.py b/sympy/core/power.py
+index 89e9d96487..8b32a20c7e 100644
+--- a/sympy/core/power.py
++++ b/sympy/core/power.py
+@@ -409,6 +409,22 @@ def _n2(e):
+                 except PrecisionExhausted:
+                     s = None
+ 
++        # Prevent unsafe denesting: do not collapse (b**e)**(1/2) -> b when
++        # e is an even integer and the base b is not provably real. The
++        # correct real-valued simplification would be sqrt(b**2) -> Abs(b),
++        # while for general complex b there is no identity. If other has a
++        # literal 2 as denominator (e.g. 1/2) and e is even, require the
++        # base to be provably extended-real before denesting; otherwise
++        # decline to evaluate so that simplification machinery does not
++        # incorrectly expose a potentially unsafe replacement.
++        try:
++            _half_other = _half(other)
++        except Exception:
++            _half_other = False
++
++        if _half_other and e.is_even and b.is_extended_real is not True:
++            return None
++
+         if s is not None:
+             return s*Pow(b, e*other)
+ 

@@ -1,0 +1,68 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index b34ca3a7de..be58dcaf4e 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -769,6 +769,63 @@ def _eval_rewrite_as_atan2(self, arg, **kwargs):
+         x, y = self.args[0].as_real_imag()
+         return atan2(y, x)
+ 
++    def _eval_refine(self, assumptions):
++        """
++        Refine arg(z) under assumptions about z or its real/imag parts.
++
++        This mirrors the logic used for atan2 in assumptions.refine.refine_atan2
++        and provides canonical principal-branch values when assumptions
++        determine them (e.g. arg(a) -> 0 when a is positive).
++        """
++        from sympy.assumptions import ask, Q
++        from sympy import S
++        from sympy.functions.elementary.trigonometric import atan
++
++        z = self.args[0]
++
++        # If z is explicitly zero, arg(0) is undefined
++        if ask(Q.zero(z), assumptions):
++            return S.NaN
++
++        # If z is real, determine based on sign
++        if ask(Q.real(z), assumptions):
++            # zero already handled above
++            if ask(Q.positive(z), assumptions) or (
++                    ask(Q.nonnegative(z), assumptions) and not ask(Q.zero(z), assumptions)):
++                return S.Zero
++            if ask(Q.negative(z), assumptions):
++                return S.Pi
++
++        # If z is purely imaginary, check imaginary part sign
++        if ask(Q.imaginary(z), assumptions):
++            # z = I * t, so inspect im(z)
++            _, im_part = z.as_real_imag()
++            if ask(Q.positive(im_part), assumptions):
++                return S.Pi/2
++            if ask(Q.negative(im_part), assumptions):
++                return -S.Pi/2
++
++        # Fallback: try atan2-style refinements based on real/imag parts
++        x, y = z.as_real_imag()
++        # atan2 refinements; these mirror refine_atan2
++        if ask(Q.real(y) & Q.positive(x), assumptions):
++            return atan(y / x)
++        if ask(Q.negative(y) & Q.negative(x), assumptions):
++            return atan(y / x) - S.Pi
++        if ask(Q.positive(y) & Q.negative(x), assumptions):
++            return atan(y / x) + S.Pi
++        if ask(Q.zero(y) & Q.negative(x), assumptions):
++            return S.Pi
++        if ask(Q.positive(y) & Q.zero(x), assumptions):
++            return S.Pi/2
++        if ask(Q.negative(y) & Q.zero(x), assumptions):
++            return -S.Pi/2
++        if ask(Q.zero(y) & Q.zero(x), assumptions):
++            return S.NaN
++
++        # No refinement possible
++        return None
++
+ 
+ class conjugate(Function):
+     """

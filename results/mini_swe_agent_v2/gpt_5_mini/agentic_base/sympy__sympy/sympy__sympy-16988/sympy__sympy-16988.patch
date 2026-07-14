@@ -1,0 +1,18 @@
+diff --git a/sympy/sets/sets.py b/sympy/sets/sets.py
+index 03cf57a30b..6dfb2decdf 100644
+--- a/sympy/sets/sets.py
++++ b/sympy/sets/sets.py
+@@ -1264,7 +1264,13 @@ def __new__(cls, *args, **kwargs):
+ 
+         # Reduce sets using known rules
+         if evaluate:
++            # Expand nested Intersections and filter identity/zero elements
+             args = list(cls._new_args_filter(args))
++            # _new_args_filter does not deduplicate; ensure canonical
++            # ordering and remove duplicate arguments so downstream
++            # routines (e.g. _handle_finite_sets) see each unique
++            # argument at most once.
++            args = list(ordered(set(args), Set._infimum_key))
+             return simplify_intersection(args)
+ 
+         args = list(ordered(args, Set._infimum_key))

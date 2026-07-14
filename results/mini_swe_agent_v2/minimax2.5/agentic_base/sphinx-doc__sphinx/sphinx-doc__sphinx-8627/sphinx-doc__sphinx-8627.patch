@@ -1,0 +1,39 @@
+diff --git a/sphinx/domains/python.py b/sphinx/domains/python.py
+index c4d134d08..8fbc92096 100644
+--- a/sphinx/domains/python.py
++++ b/sphinx/domains/python.py
+@@ -1364,8 +1364,14 @@ class PythonDomain(Domain):
+         target = node.get('reftarget')
+         if target is None:
+             return None
+-        else:
+-            return '.'.join(filter(None, [modname, clsname, target]))
++        if '.' in target:
++            # Handle dotted targets like 'struct.Struct' or 'pathlib.Path'
++            # Extract the module portion from the target
++            parts = target.split('.', 1)
++            if modname is None:
++                modname = parts[0]
++            target = parts[1]
++        return '.'.join(filter(None, [modname, clsname, target]))
+ 
+ 
+ def builtin_resolver(app: Sphinx, env: BuildEnvironment,
+@@ -1389,6 +1395,17 @@ def builtin_resolver(app: Sphinx, env: BuildEnvironment,
+         elif istyping(reftarget):
+             # typing class
+             return contnode
++        elif '.' in reftarget:
++            # Handle dotted targets like 'struct.Struct', 'pathlib.Path', etc.
++            # Try to import the module and check if the target is a class
++            modname, _, clsname = reftarget.partition('.')
++            try:
++                import importlib
++                mod = importlib.import_module(modname)
++                if inspect.isclass(getattr(mod, clsname, None)):
++                    return contnode
++            except ImportError:
++                pass
+ 
+     return None
+ 

@@ -1,0 +1,22 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index c4ed961ac..1ae68ef88 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -538,8 +538,15 @@ class ExceptionInfo:
+         if self._excinfo is None:
+             return repr(self)
+         entry = self.traceback[-1]
+-        loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
+-        return str(loc)
++        # Build a file:lineno prefix followed by the full exception text.
++        # Using ReprFileLocation.toterminal truncates messages at the first
++        # newline which loses multi-line exception texts. Construct the
++        # representation directly to preserve embedded newlines produced by
++        # exconly().
++        path = str(entry.path)
++        lineno = entry.lineno + 1
++        msg = self.exconly()
++        return "%s:%d: %s" % (path, lineno, msg)
+ 
+     def match(self, regexp):
+         """

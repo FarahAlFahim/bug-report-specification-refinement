@@ -1,0 +1,45 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..ed13f0a1a 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -111,10 +111,16 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+     """Used to convert the :members: option to auto directives."""
++    # Accept a comma-separated list of ancestor class names.  If given
++    # without an argument (None or True), default to treating 'object'
++    # as the ancestor to ignore (backwards compatible behavior).
+     if arg in (None, True):
+-        return 'object'
++        return {'object'}
++    elif arg is False:
++        return set()
+     else:
+-        return arg
++        # allow comma-separated multiple class names
++        return {x.strip() for x in str(arg).split(',') if x.strip()}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -681,10 +687,18 @@ class Documenter:
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+             if inspect.isclass(self.object):
++                # allow multiple ancestor names in options.inherited_members
++                opt = self.options.inherited_members
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
++                    if cls != self.object:
++                        if isinstance(opt, (set, list, tuple)):
++                            if cls.__name__ in opt:
++                                # given member is a member of specified *super class*
++                                return True
++                        else:
++                            # keep backward compatible: string value
++                            if cls.__name__ == opt:
++                                return True
+                     elif name in cls.__dict__:
+                         return False
+                     elif name in self.get_attr(cls, '__annotations__', {}):

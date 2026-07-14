@@ -1,0 +1,68 @@
+diff --git a/django/db/migrations/utils.py b/django/db/migrations/utils.py
+index d9209f1..b7219ba 100644
+--- a/django/db/migrations/utils.py
++++ b/django/db/migrations/utils.py
+@@ -92,7 +92,14 @@ def field_references(
+             # Reference to field.
+             reference_field_name in through_fields
+         ):
+-            references_through = (remote_field, through_fields)
++            # Store a canonical, hashable representation of through_fields so
++            # callers that may compare or hash the returned references don't
++            # encounter unhashable types (e.g. lists).
++            from django.utils.hashable import make_hashable
++            references_through = (
++                remote_field,
++                None if through_fields is None else make_hashable(through_fields),
++            )
+     if not (references_to or references_through):
+         return False
+     return FieldReference(references_to, references_through)
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index f9002d3..97034e9 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1405,7 +1405,17 @@ class Model(metaclass=ModelBase):
+         fields = (f for f in fields if isinstance(f.remote_field.through, ModelBase))
+ 
+         for f in fields:
+-            signature = (f.remote_field.model, cls, f.remote_field.through, f.remote_field.through_fields)
++            # Canonicalize through_fields to a hashable representation (if present)
++            # so that the signature tuple is safe to compare/hash even when
++            # through_fields was provided as a non-hashable type (e.g. list).
++            from django.utils.hashable import make_hashable
++            through_fields_hashable = None if f.remote_field.through_fields is None else make_hashable(f.remote_field.through_fields)
++            signature = (
++                f.remote_field.model,
++                cls,
++                f.remote_field.through,
++                through_fields_hashable,
++            )
+             if signature in seen_intermediary_signatures:
+                 errors.append(
+                     checks.Error(
+diff --git a/django/db/models/fields/reverse_related.py b/django/db/models/fields/reverse_related.py
+index 7ae0a4d..2903073 100644
+--- a/django/db/models/fields/reverse_related.py
++++ b/django/db/models/fields/reverse_related.py
+@@ -308,9 +308,13 @@ class ManyToManyRel(ForeignObjectRel):
+ 
+     @property
+     def identity(self):
++        # Ensure any unhashable through_fields (e.g. a list) are converted into a
++        # stable, hashable representation before being included in the identity.
++        from django.utils.hashable import make_hashable
++        through_fields_hashable = None if self.through_fields is None else make_hashable(self.through_fields)
+         return super().identity + (
+             self.through,
+-            self.through_fields,
++            through_fields_hashable,
+             self.db_constraint,
+         )
+ 
+@@ -327,4 +331,4 @@ class ManyToManyRel(ForeignObjectRel):
+                 rel = getattr(field, 'remote_field', None)
+                 if rel and rel.model == self.model:
+                     break
+-        return field.foreign_related_fields[0]
++        return field.foreign_related_fields[0]

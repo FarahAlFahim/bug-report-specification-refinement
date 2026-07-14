@@ -1,0 +1,36 @@
+diff --git a/astropy/io/ascii/qdp.py b/astropy/io/ascii/qdp.py
+index 92431f5..43983a4 100644
+--- a/astropy/io/ascii/qdp.py
++++ b/astropy/io/ascii/qdp.py
+@@ -68,7 +68,9 @@ def _line_type(line, delimiter=None):
+     _new_re = rf"NO({sep}NO)+"
+     _data_re = rf"({_decimal_re}|NO|[-+]?nan)({sep}({_decimal_re}|NO|[-+]?nan))*)"
+     _type_re = rf"^\s*((?P<command>{_command_re})|(?P<new>{_new_re})|(?P<data>{_data_re})?\s*(\!(?P<comment>.*))?\s*$"
+-    _line_type_re = re.compile(_type_re)
++    # QDP commands and the NO token are case-insensitive in practice, so compile
++    # the line-type regex with IGNORECASE to accept any letter case.
++    _line_type_re = re.compile(_type_re, re.IGNORECASE)
+     line = line.strip()
+     if not line:
+         return "comment"
+@@ -306,14 +308,17 @@ def _get_tables_from_qdp_file(qdp_file, input_colnames=None, delimiter=None):
+ 
+             values = []
+             for v in line.split(delimiter):
+-                if v == "NO":
++                # Be robust to surrounding whitespace and case for the missing-value
++                # token. Treat any variant like "no", " No ", etc. as masked.
++                vs = v.strip()
++                if vs.upper() == "NO":
+                     values.append(np.ma.masked)
+                 else:
+                     # Understand if number is int or float
+                     try:
+-                        values.append(int(v))
++                        values.append(int(vs))
+                     except ValueError:
+-                        values.append(float(v))
++                        values.append(float(vs))
+             current_rows.append(values)
+             continue
+ 

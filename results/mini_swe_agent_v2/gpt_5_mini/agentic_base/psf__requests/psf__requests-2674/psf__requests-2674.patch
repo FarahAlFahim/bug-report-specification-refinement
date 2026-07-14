@@ -1,0 +1,38 @@
+diff --git a/requests/adapters.py b/requests/adapters.py
+index 841cbbfe..73cda570 100644
+--- a/requests/adapters.py
++++ b/requests/adapters.py
+@@ -25,6 +25,7 @@ from .packages.urllib3.exceptions import MaxRetryError
+ from .packages.urllib3.exceptions import ProxyError as _ProxyError
+ from .packages.urllib3.exceptions import ProtocolError
+ from .packages.urllib3.exceptions import ReadTimeoutError
++from .packages.urllib3.exceptions import TimeoutError as _TimeoutError
+ from .packages.urllib3.exceptions import SSLError as _SSLError
+ from .packages.urllib3.exceptions import ResponseError
+ from .cookies import extract_cookies_to_jar
+@@ -425,11 +426,23 @@ class HTTPAdapter(BaseAdapter):
+             raise ProxyError(e)
+ 
+         except (_SSLError, _HTTPError) as e:
++            # Map urllib3 exceptions to requests' exceptions so callers of
++            # requests.get/... only need to catch requests.exceptions.*
+             if isinstance(e, _SSLError):
+                 raise SSLError(e, request=request)
++            # urllib3's ReadTimeoutError is already mapped to requests.ReadTimeout
+             elif isinstance(e, ReadTimeoutError):
+                 raise ReadTimeout(e, request=request)
+-            else:
+-                raise
++            # urllib3's ConnectTimeoutError and TimeoutError should be mapped
++            # to requests' ConnectTimeout / Timeout respectively.
++            from .packages.urllib3.exceptions import ConnectTimeoutError as _ConnectTimeoutError
++            if isinstance(e, _ConnectTimeoutError):
++                raise ConnectTimeout(e, request=request)
++            if isinstance(e, _TimeoutError):
++                # Generic urllib3 TimeoutError (not a Read/Connect subclass)
++                raise Timeout(e, request=request)
++            # Any other urllib3 HTTPError should be wrapped in a
++            # requests.ConnectionError so callers don't see urllib3 types.
++            raise ConnectionError(e, request=request)
+ 
+         return self.build_response(request, resp)

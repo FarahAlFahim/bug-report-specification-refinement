@@ -1,0 +1,34 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index e0eeccefa6..a12bcf75e9 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1138,6 +1138,10 @@ class QuerySet:
+         """
+         Return a new QuerySet instance that will select only distinct results.
+         """
++        # DISTINCT (including DISTINCT ON ...) is not supported on combined
++        # queries (UNION/INTERSECT/EXCEPT). Guard here so callers receive a
++        # clear NotSupportedError instead of having distinct silently ignored.
++        self._not_support_combined_queries('distinct')
+         assert not self.query.is_sliced, \
+             "Cannot create distinct fields once a slice has been taken."
+         obj = self._chain()
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 09a9d73077..056998a190 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -428,6 +428,14 @@ class SQLCompiler:
+ 
+     def get_combinator_sql(self, combinator, all):
+         features = self.connection.features
++        # DISTINCT / DISTINCT ON is not supported on the result of set
++        # operations (UNION/INTERSECT/EXCEPT). If someone has set distinct
++        # flags on the top-level query, fail early with a clear error instead
++        # of silently ignoring them.
++        if self.query.distinct or self.query.distinct_fields:
++            raise NotSupportedError(
++                'Calling QuerySet.distinct() after %s() is not supported.' % combinator
++            )
+         compilers = [
+             query.get_compiler(self.using, self.connection)
+             for query in self.query.combined_queries if not query.is_empty()

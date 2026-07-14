@@ -1,0 +1,18 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index acd41e9ad3..399a9cd803 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1389,6 +1389,13 @@ def __new__(cls, expr, *variables, **kwargs):
+                 if obj is not None:
+                     # remove the dummy that was used
+                     obj = obj.subs(v, old_v)
++                    # Simplify Derivative(old_v, old_v) to 1
++                    # This handles the case where abs(f(x)).diff(f(x)) should return sign(f(x))
++                    if old_v.is_Symbol or isinstance(old_v, AppliedUndef):
++                        # Check if the result contains Derivative(old_v, old_v) and simplify it
++                        deriv_to_1 = cls(old_v, old_v)
++                        if obj.has(deriv_to_1):
++                            obj = obj.subs(deriv_to_1, S.One)
+                 # restore expr and v
+                 expr = old_expr
+                 v = old_v

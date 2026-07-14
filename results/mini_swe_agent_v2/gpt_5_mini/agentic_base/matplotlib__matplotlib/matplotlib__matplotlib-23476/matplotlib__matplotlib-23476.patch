@@ -1,0 +1,19 @@
+diff --git a/lib/matplotlib/backend_bases.py b/lib/matplotlib/backend_bases.py
+index 9ae2982c62..665390bd01 100644
+--- a/lib/matplotlib/backend_bases.py
++++ b/lib/matplotlib/backend_bases.py
+@@ -1653,7 +1653,13 @@ class FigureCanvasBase:
+         self.toolbar = None  # NavigationToolbar2 will set me
+         self._is_idle_drawing = False
+         # We don't want to scale up the figure DPI more than once.
+-        figure._original_dpi = figure.dpi
++        # Only set _original_dpi if it is not already present.  When
++        # unpickling a Figure, a saved logical DPI may have been restored
++        # into figure._original_dpi; unconditionally overwriting it here
++        # would lose that value and cause HiDPI scaling to multiply DPI on
++        # each unpickle.  See GH issue/PR describing this interaction.
++        if not hasattr(figure, "_original_dpi"):
++            figure._original_dpi = figure.dpi
+         self._device_pixel_ratio = 1
+         super().__init__()  # Typically the GUI widget init (if any).
+ 

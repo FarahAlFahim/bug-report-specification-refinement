@@ -1,0 +1,39 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index 00bbbaf..fc7b93d 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -57,10 +57,31 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, **kwargs):
++        # Accept writer kwargs (e.g. header_rows) and provide sensible defaults
++        # for delimiter_pad and bookend unless explicitly overridden.
++        if 'delimiter_pad' not in kwargs:
++            kwargs['delimiter_pad'] = None
++        if 'bookend' not in kwargs:
++            kwargs['bookend'] = False
++        super().__init__(**kwargs)
++
++        # Adjust data.start_line to account for a variable number of header rows:
++        # data.start_line = header.start_line + len(header.header_rows) + 1
++        n_header_rows = len(getattr(self.header, 'header_rows', [])) if hasattr(self, 'header') else 0
++        header_start = getattr(self.header, 'start_line', 1)
++        # Set on the instance to override the class default (which assumed a single header row).
++        self.data.start_line = header_start + n_header_rows + 1
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
++        # The position/border line is placed after the header rows by the fixed-width writer,
++        # so its index equals the number of header_rows.
++        n_header_rows = len(getattr(self.header, 'header_rows', []))
++        pos = n_header_rows
++        # Be defensive: if pos is out of range, return the lines unchanged.
++        if pos < 0 or pos >= len(lines):
++            return lines
++        border = lines[pos]
++        lines = [border] + lines + [border]
+         return lines

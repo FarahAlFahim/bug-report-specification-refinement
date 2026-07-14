@@ -1,0 +1,40 @@
+diff --git a/sympy/printing/codeprinter.py b/sympy/printing/codeprinter.py
+index 98f8615621..ecd67a8745 100644
+--- a/sympy/printing/codeprinter.py
++++ b/sympy/printing/codeprinter.py
+@@ -127,10 +127,34 @@ def _handle_assign_to(expr, assign_to):
+                     raise ValueError('Failed to assign an expression of length {} to {} variables'.format(len(expr), len(assign_to)))
+                 return CodeBlock(*[_handle_assign_to(lhs, rhs) for lhs, rhs in zip(expr, assign_to)])
+             if isinstance(assign_to, str):
++                # If the target is a string, try to preserve matrix shape
++                # information when the expression refers to a MatrixSymbol
++                # with the same name.  This allows client code that for
++                # whatever reason passes a printed name (e.g. from
++                # sympy.printing.ccode(sym)) to still get shape-aware
++                # assignments when the expression contains a MatrixSymbol
++                # temporary created by cse().
+                 if expr.is_Matrix:
+                     assign_to = MatrixSymbol(assign_to, *expr.shape)
+                 else:
+-                    assign_to = Symbol(assign_to)
++                    try:
++                        # avoid importing at module level
++                        from sympy.matrices.expressions import MatrixSymbol as _MS
++                    except Exception:
++                        _MS = None
++                    if _MS is not None:
++                        # look for a MatrixSymbol in the expression that has
++                        # the same printed/real name as the requested
++                        # assign_to string and use its shape metadata
++                        mss = [m for m in getattr(expr, 'atoms', lambda *a: [])(_MS)
++                               if getattr(m, 'name', None) == assign_to]
++                        if mss:
++                            m = mss[0]
++                            assign_to = _MS(assign_to, m.rows, m.cols)
++                        else:
++                            assign_to = Symbol(assign_to)
++                    else:
++                        assign_to = Symbol(assign_to)
+             elif not isinstance(assign_to, Basic):
+                 raise TypeError("{} cannot assign to object of type {}".format(
+                         type(self).__name__, type(assign_to)))

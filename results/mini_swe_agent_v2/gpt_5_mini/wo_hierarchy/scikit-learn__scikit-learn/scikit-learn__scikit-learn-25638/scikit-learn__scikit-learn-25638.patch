@@ -1,0 +1,84 @@
+diff --git a/sklearn/utils/multiclass.py b/sklearn/utils/multiclass.py
+index 5eaef2fde..0e4d89da6 100644
+--- a/sklearn/utils/multiclass.py
++++ b/sklearn/utils/multiclass.py
+@@ -23,7 +23,42 @@ from ..utils._array_api import get_namespace
+ def _unique_multiclass(y):
+     xp, is_array_api = get_namespace(y)
+     if hasattr(y, "__array__") or is_array_api:
+-        return xp.unique_values(xp.asarray(y))
++        arr = xp.asarray(y)
++        # If pandas extension dtypes produced an object-dtype array, try to
++        # coerce pandas missing values (pd.NA) to np.nan and convert pandas
++        # / numpy scalar objects to native python/numpy types so that
++        # unique/sorting behave consistently with native numpy dtypes.
++        if arr.dtype == object:
++            try:
++                import pandas as _pd
++
++                _isna = _pd.isna
++            except Exception:
++                def _isna(x):
++                    try:
++                        return x is None or (isinstance(x, float) and np.isnan(x))
++                    except Exception:
++                        return False
++
++            coerced = []
++            # iterate over flattened array to handle arbitrary shapes
++            for val in arr.flat:
++                if _isna(val):
++                    coerced.append(np.nan)
++                    continue
++                # Unwrap numpy/pandas scalars to native python scalars where
++                # possible to allow numpy to infer a numeric dtype.
++                try:
++                    if hasattr(val, "item"):
++                        coerced.append(val.item())
++                    else:
++                        coerced.append(val)
++                except Exception:
++                    coerced.append(val)
++
++            coerced_arr = xp.asarray(np.asarray(coerced))
++            return xp.unique_values(coerced_arr)
++        return xp.unique_values(arr)
+     else:
+         return set(y)
+ 
+@@ -340,9 +375,32 @@ def type_of_target(y, input_name=""):
+             return "binary"  # []
+         # 2-D empty array: [[]]
+         return "unknown"
+-    if not issparse(y) and y.dtype == object and not isinstance(y.flat[0], str):
+-        # [obj_1] and not ["label_1"]
+-        return "unknown"
++    if not issparse(y) and y.dtype == object:
++        # For object-dtype arrays (commonly originating from pandas
++        # extension dtypes), determine whether they contain only missing
++        # values. Skip missing values (pd.NA, np.nan, None) when inspecting
++        # the first element. If all values are missing, the target type is
++        # unknown; otherwise continue normal inference based on the first
++        # non-missing element.
++        try:
++            import pandas as _pd
++
++            _isna = _pd.isna
++        except Exception:
++            def _isna(x):
++                try:
++                    return x is None or (isinstance(x, float) and np.isnan(x))
++                except Exception:
++                    return False
++
++        first_non_missing = None
++        for val in y.flat:
++            if _isna(val):
++                continue
++            first_non_missing = val
++            break
++        if first_non_missing is None:
++            return "unknown"
+ 
+     # Check if multioutput
+     if y.ndim == 2 and y.shape[1] > 1:

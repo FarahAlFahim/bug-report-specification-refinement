@@ -1,0 +1,46 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 8ba346adbe..ead7682326 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -1002,18 +1002,29 @@ def __trigsimp(expr, deep=False):
+             for pattern, result in matchers_add:
+                 if not _dotrig(expr, pattern):
+                     continue
+-                expr = TR10i(expr)
+-                if expr.has(HyperbolicFunction):
+-                    res = expr.match(pattern)
+-                    # if "d" contains any trig or hyperbolic funcs with
+-                    # argument "a" or "b" then skip the simplification;
+-                    # this isn't perfect -- see tests
+-                    if res is None or not (a in res and b in res) or any(
+-                        w.args[0] in (res[a], res[b]) for w in res[d].atoms(
+-                            TrigonometricFunction, HyperbolicFunction)):
+-                        continue
+-                    expr = result.subs(res)
+-                    break
++                # Normalize sum-of-products first; TR10i may change the
++                # structure of expr (especially for numeric args) so try
++                # matching against the original expression first and then
++                # against the TR10i-normalized expression.
++                tr = TR10i(expr)
++                # Try matching against the original expression and, if that
++                # fails, against the normalized one.
++                res = expr.match(pattern)
++                if res is None:
++                    res = tr.match(pattern)
++                # if we didn't get a match or required wildcards 'a'/'b'
++                # aren't present then skip the simplification
++                if res is None or not (a in res and b in res):
++                    continue
++                # if "d" contains any trig or hyperbolic funcs with
++                # argument "a" or "b" then skip the simplification;
++                # this isn't perfect -- see tests
++                if d in res and any(
++                        w.args[0] in (res[a], res[b]) for w in
++                        res[d].atoms(TrigonometricFunction, HyperbolicFunction)):
++                    continue
++                expr = result.subs(res)
++                break
+ 
+         # Reduce any lingering artifacts, such as sin(x)**2 changing
+         # to 1 - cos(x)**2 when sin(x)**2 was "simpler"

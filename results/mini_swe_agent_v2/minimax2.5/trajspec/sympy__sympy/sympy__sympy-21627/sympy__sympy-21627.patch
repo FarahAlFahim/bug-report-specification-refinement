@@ -1,0 +1,28 @@
+diff --git a/sympy/functions/elementary/hyperbolic.py b/sympy/functions/elementary/hyperbolic.py
+index 892e19cabb..c2f8eecb3c 100644
+--- a/sympy/functions/elementary/hyperbolic.py
++++ b/sympy/functions/elementary/hyperbolic.py
+@@ -499,6 +499,11 @@ def _eval_is_finite(self):
+         arg = self.args[0]
+         return arg.is_finite
+ 
++    def _eval_is_zero(self):
++        arg = self.args[0]
++        if arg.is_zero:
++            return False
++
+ 
+ class tanh(HyperbolicFunction):
+     r"""
+@@ -1360,6 +1365,11 @@ def inverse(self, argindex=1):
+         """
+         return cosh
+ 
++    def _eval_is_zero(self):
++        arg = self.args[0]
++        if arg == S.One:
++            return True
++
+ 
+ class atanh(InverseHyperbolicFunction):
+     """

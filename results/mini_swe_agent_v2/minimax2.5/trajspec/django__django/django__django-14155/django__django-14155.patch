@@ -1,0 +1,36 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..35674329b4 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -45,12 +45,28 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
++        # Unwrap functools.partial to get the underlying function.
++        func_to_check = func
++        if isinstance(func, functools.partial):
++            func_to_check = func.func
++        if not hasattr(func_to_check, '__name__'):
+             # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++            self._func_path = func_to_check.__class__.__module__ + '.' + func_to_check.__class__.__name__
+         else:
+             # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            self._func_path = func_to_check.__module__ + '.' + func_to_check.__name__
++        
++        # If func is a functools.partial, include its arguments in the path for identification.
++        if isinstance(func, functools.partial):
++            self._func_path = '%s(%s)' % (
++                self._func_path,
++                ', '.join(repr(a) for a in func.args),
++            )
++            if func.keywords:
++                self._func_path = '%s, %s' % (
++                    self._func_path,
++                    ', '.join('%s=%r' % (k, v) for k, v in func.keywords.items()),
++                )
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])

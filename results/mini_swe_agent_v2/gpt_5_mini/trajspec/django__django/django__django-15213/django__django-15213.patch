@@ -1,0 +1,40 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..05ae24edf0 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,34 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        """
++        Compile the wrapped expression for use in a SELECT context.
++
++        Some inner expressions (notably WhereNode) use sentinel return
++        values ('', []) to indicate a "matches everything" condition when
++        rendered for WHERE clauses. Forwarding that empty SQL fragment into
++        a SELECT clause produces invalid SQL (for example ``SELECT AS foo``).
++
++        Treat an empty SQL fragment from the inner expression as a
++        truthy boolean for SELECT contexts by substituting an explicit
++        boolean literal (Value(True)). Finally, apply select_format so
++        backends that don't support boolean expressions in SELECT get a
++        CASE WHEN wrapper.
++        """
++        sql, params = compiler.compile(self.expression)
++        # WhereNode.as_sql and similar may return ('', []) to signal
++        # a "matches everything" sentinel intended for WHERE context.
++        # An empty sql is not a valid SELECT expression, so substitute
++        # an explicit TRUE literal instead.
++        if not sql:
++            # Use the local Value class (defined in this module) to avoid
++            # importing the django.db.models package here.
++            true_value = Value(True, output_field=self.output_field)
++            sql, params = compiler.compile(true_value)
++        # Let the expression/output_field perform any DB-specific
++        # formatting for SELECT lists (e.g. CASE WHEN for Oracle).
++        sql, params = self.select_format(compiler, sql, params)
++        return sql, params
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

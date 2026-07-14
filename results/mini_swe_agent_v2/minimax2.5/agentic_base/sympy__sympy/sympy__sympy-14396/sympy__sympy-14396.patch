@@ -1,0 +1,50 @@
+diff --git a/sympy/polys/polyoptions.py b/sympy/polys/polyoptions.py
+index 6e504a3057..c65bb997ea 100644
+--- a/sympy/polys/polyoptions.py
++++ b/sympy/polys/polyoptions.py
+@@ -405,9 +405,10 @@ class Domain(with_metaclass(OptionType, Option)):
+     _re_realfield = re.compile(r"^(R|RR)(_(\d+))?$")
+     _re_complexfield = re.compile(r"^(C|CC)(_(\d+))?$")
+     _re_finitefield = re.compile(r"^(FF|GF)\((\d+)\)$")
+-    _re_polynomial = re.compile(r"^(Z|ZZ|Q|QQ)\[(.+)\]$")
++    _re_polynomial = re.compile(r"^(Z|ZZ|Q|QQ|R|RR|C|CC)\[(.+)\]$")
+     _re_fraction = re.compile(r"^(Z|ZZ|Q|QQ)\((.+)\)$")
+     _re_algebraic = re.compile(r"^(Q|QQ)\<(.+)\>$")
++    _re_polynomial_field = re.compile(r"^(R|RR|C|CC)_(\d+)\[(.+)\]$")
+ 
+     @classmethod
+     def preprocess(cls, domain):
+@@ -459,8 +460,12 @@ def preprocess(cls, domain):
+ 
+                 if ground in ['Z', 'ZZ']:
+                     return sympy.polys.domains.ZZ.poly_ring(*gens)
+-                else:
++                elif ground in ['Q', 'QQ']:
+                     return sympy.polys.domains.QQ.poly_ring(*gens)
++                elif ground in ['R', 'RR']:
++                    return sympy.polys.domains.RR.poly_ring(*gens)
++                elif ground in ['C', 'CC']:
++                    return sympy.polys.domains.CC.poly_ring(*gens)
+ 
+             r = cls._re_fraction.match(domain)
+ 
+@@ -480,6 +485,19 @@ def preprocess(cls, domain):
+                 gens = list(map(sympify, r.groups()[1].split(',')))
+                 return sympy.polys.domains.QQ.algebraic_field(*gens)
+ 
++            r = cls._re_polynomial_field.match(domain)
++
++            if r is not None:
++                ground, prec, gens = r.groups()
++
++                gens = list(map(sympify, gens.split(',')))
++                prec = int(prec)
++
++                if ground in ['R', 'RR']:
++                    return sympy.polys.domains.RealField(prec).poly_ring(*gens)
++                else:
++                    return sympy.polys.domains.ComplexField(prec).poly_ring(*gens)
++
+         raise OptionError('expected a valid domain specification, got %s' % domain)
+ 
+     @classmethod

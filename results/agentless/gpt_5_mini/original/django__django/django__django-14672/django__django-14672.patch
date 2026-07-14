@@ -1,0 +1,19 @@
+diff --git a/django/db/models/fields/reverse_related.py b/django/db/models/fields/reverse_related.py
+index 7ae0a4d..d85f61e 100644
+--- a/django/db/models/fields/reverse_related.py
++++ b/django/db/models/fields/reverse_related.py
+@@ -308,9 +308,13 @@ class ManyToManyRel(ForeignObjectRel):
+ 
+     @property
+     def identity(self):
++        # through_fields can be a list (which is unhashable). Use make_hashable
++        # to ensure the identity tuple is hashable (see similar handling for
++        # limit_choices_to elsewhere).
++        from django.utils.inspect import make_hashable
+         return super().identity + (
+             self.through,
+-            self.through_fields,
++            make_hashable(self.through_fields),
+             self.db_constraint,
+         )
+ 

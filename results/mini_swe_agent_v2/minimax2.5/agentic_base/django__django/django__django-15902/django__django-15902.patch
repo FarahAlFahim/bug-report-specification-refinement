@@ -1,0 +1,26 @@
+diff --git a/django/forms/utils.py b/django/forms/utils.py
+index 905babce4d..697882671d 100644
+--- a/django/forms/utils.py
++++ b/django/forms/utils.py
+@@ -66,12 +66,16 @@ class RenderableMixin:
+         template = template_name or self.template_name
+         context = context or self.get_context()
+         if (
+-            template == "django/forms/default.html"
+-            or template == "django/forms/formsets/default.html"
+-        ):
+-            warnings.warn(
+-                DEFAULT_TEMPLATE_DEPRECATION_MSG, RemovedInDjango50Warning, stacklevel=2
++            self.__class__.__name__ == "ManagementForm"
++            or (
++                template != "django/forms/default.html"
++                and template != "django/forms/formsets/default.html"
+             )
++        ):
++            return mark_safe(renderer.render(template, context))
++        warnings.warn(
++            DEFAULT_TEMPLATE_DEPRECATION_MSG, RemovedInDjango50Warning, stacklevel=2
++        )
+         return mark_safe(renderer.render(template, context))
+ 
+     __str__ = render

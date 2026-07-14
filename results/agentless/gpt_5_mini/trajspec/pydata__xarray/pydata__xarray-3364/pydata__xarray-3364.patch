@@ -1,0 +1,114 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index 1ac1b8e..4ce513c 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -1,4 +1,6 @@
++
+ import pandas as pd
++import numpy as np
+ 
+ from . import dtypes, utils
+ from .alignment import align
+@@ -308,19 +310,34 @@ def _dataset_concat(
+     variables_to_merge = (coord_names | data_names) - concat_over - dim_names
+ 
+     result_vars = {}
++
+     if variables_to_merge:
++        # Prepare lists of Variable objects (one per input dataset) to pass to
++        # unique_variable. If a dataset is missing a variable that should be
++        # merged, create a placeholder Variable filled with the appropriate
++        # missing-value sentinel and with dimensions/shapes consistent with
++        # the other inputs.
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++        for var in variables_to_merge:
++            # reference variable taken from first dataset (variables_to_merge
++            # are derived from the first dataset's variables), used as template
++            template = datasets[0].variables[var]
++            # compute shape for each dataset using dims_sizes (which excludes the
++            # concat dim) falling back to the template's shape when necessary
++            template_dim_sizes = {d: s for d, s in zip(template.dims, template.shape)}
++            for ds in datasets:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # create placeholder filled with promoted NA for this dtype
++                    promoted_dtype, fill_value = dtypes.maybe_promote(template.dtype)
++                    shape = tuple(dims_sizes.get(d, template_dim_sizes.get(d, 1)) for d in template.dims)
++                    data = np.full(shape, fill_value, dtype=promoted_dtype)
++                    # preserve attrs/encoding minimally from template to keep
++                    # behavior consistent with unique_variable expectations
++                    placeholder = Variable(template.dims, data, attrs=None, encoding=None)
++                    to_merge[var].append(placeholder)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(
+@@ -328,6 +345,7 @@ def _dataset_concat(
+             )
+     else:
+         result_vars = {}
++
+     result_vars.update(dim_coords)
+ 
+     # assign attrs and encoding from first dataset
+@@ -358,11 +376,44 @@ def _dataset_concat(
+     # n.b. this loop preserves variable order, needed for groupby.
+     for k in datasets[0].variables:
+         if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
+-            combined = concat_vars(vars, dim, positions)
++            # Collect existing variables for this name to determine common dims
++            existing_vars = [ds.variables[k] for ds in datasets if k in ds.variables]
++            if not existing_vars:
++                # shouldn't happen: concat_over variables are present in at least
++                # one dataset, but guard defensively
++                raise ValueError("%r is not present in any dataset." % k)
++
++            # determine common dims across the available variables
++            common_dims = tuple(pd.unique([d for v in existing_vars for d in v.dims]))
++            if dim not in common_dims:
++                common_dims = (dim,) + common_dims
++
++            # Build a list of variable objects (one per dataset). For datasets
++            # missing this variable, create a placeholder Variable with the
++            # correct dimensions and shape for that dataset, filled with the
++            # appropriate promoted NA.
++            vars_for_concat = []
++            # choose a template dtype from the first existing variable
++            template = existing_vars[0]
++            promoted_dtype, fill_value = dtypes.maybe_promote(template.dtype)
++
++            for ds_idx, ds in enumerate(datasets):
++                if k in ds.variables:
++                    var = ds.variables[k]
++                    # ensure var has common dims (may expand along non-concat dims)
++                    if var.dims != common_dims:
++                        common_shape = tuple(dims_sizes.get(d, concat_dim_lengths[ds_idx]) for d in common_dims)
++                        var = var.set_dims(common_dims, common_shape)
++                    vars_for_concat.append(var)
++                else:
++                    # placeholder shape: use dims_sizes for non-concat dims and
++                    # concat_dim_lengths[ds_idx] for the concat dimension
++                    common_shape = tuple(dims_sizes.get(d, concat_dim_lengths[ds_idx]) for d in common_dims)
++                    data = np.full(common_shape, fill_value, dtype=promoted_dtype)
++                    placeholder = Variable(common_dims, data, attrs=None, encoding=None)
++                    vars_for_concat.append(placeholder)
++
++            combined = concat_vars(vars_for_concat, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined
+ 

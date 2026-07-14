@@ -1,0 +1,13 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 4b0814f76..0f1928d04 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -725,7 +725,7 @@ class Documenter:
+             elif want_all and special_member_re.match(membername):
+                 # special __methods__
+                 if self.options.special_members and membername in self.options.special_members:
+-                    if membername == '__doc__':
++                    if membername in ('__doc__', '__annotations__'):
+                         keep = False
+                     elif is_filtered_inherited_member(membername):
+                         keep = False

@@ -1,0 +1,28 @@
+diff --git a/django/db/backends/ddl_references.py b/django/db/backends/ddl_references.py
+index c06386a2fa..97f3c6653c 100644
+--- a/django/db/backends/ddl_references.py
++++ b/django/db/backends/ddl_references.py
+@@ -213,9 +213,22 @@ class Expressions(TableColumns):
+         if self.table != old_table:
+             return
+         expressions = deepcopy(self.expressions)
++        # Re-generate the column list from the (deep-copied) expressions
++        # and only assign an alias to Col objects when the query/compiler
++        # was created to produce aliased column names. Some callers create
++        # compilers with alias_cols=False (index/constraint DDL generation)
++        # and expect unqualified column identifiers. Unconditionally
++        # setting col.alias here would force a qualified identifier (alias.col)
++        # into compiled expressions and break backends like SQLite which
++        # prohibit the '.' operator in index expressions.
+         self.columns = []
++        alias_cols = getattr(self.compiler.query, 'alias_cols', True)
+         for col in self.compiler.query._gen_cols([expressions]):
+-            col.alias = new_table
++            # Only set the alias if the query intended columns to be
++            # rendered with their table/alias qualification.
++            if alias_cols:
++                col.alias = new_table
++            self.columns.append(col.target.column)
+         self.expressions = expressions
+         super().rename_table_references(old_table, new_table)
+ 

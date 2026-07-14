@@ -1,0 +1,37 @@
+diff --git a/django/db/backends/base/creation.py b/django/db/backends/base/creation.py
+index 503f7f56fd..cf61bc293e 100644
+--- a/django/db/backends/base/creation.py
++++ b/django/db/backends/base/creation.py
+@@ -99,12 +99,31 @@ class BaseDatabaseCreation:
+         """
+         # Iteratively return every object for all models to serialize.
+         def get_objects():
++            # Only attempt to serialize apps that have migrations applied
++            # to the current database or apps that are unmigrated (i.e.
++            # have no migrations on disk). Using applied migrations avoids
++            # trying to query tables for apps that merely have migrations
++            # on disk but whose migrations were not applied (for example
++            # when TEST.MIGRATE is False).
+             from django.db.migrations.loader import MigrationLoader
+             loader = MigrationLoader(self.connection)
++
++            # Build a set of app labels that have at least one applied
++            # migration in the database. loader.applied_migrations is a
++            # mapping keyed by (app_label, migration_name).
++            applied_apps = {app for (app, _migration) in loader.applied_migrations}
++
+             for app_config in apps.get_app_configs():
++                # Include app if it's unmigrated (no migrations on disk) or
++                # if it has applied migrations in the database. This avoids
++                # touching apps that only have migrations on disk but whose
++                # tables don't exist in the DB.
+                 if (
+                     app_config.models_module is not None and
+-                    app_config.label in loader.migrated_apps and
++                    (
++                        app_config.label in applied_apps or
++                        app_config.label in loader.unmigrated_apps
++                    ) and
+                     app_config.name not in settings.TEST_NON_SERIALIZED_APPS
+                 ):
+                     for model in app_config.get_models():

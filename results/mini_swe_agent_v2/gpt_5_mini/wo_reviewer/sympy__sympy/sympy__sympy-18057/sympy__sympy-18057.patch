@@ -1,0 +1,46 @@
+diff --git a/sympy/core/sympify.py b/sympy/core/sympify.py
+index ed4ea6ce5e..d4813bca89 100644
+--- a/sympy/core/sympify.py
++++ b/sympy/core/sympify.py
+@@ -262,6 +262,12 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+     -2*(-(-x + 1/x)/(x*(x - 1/x)**2) - 1/(x*(x - 1/x))) - 1
+ 
+     """
++    # keep the original value so that we know whether the caller
++    # actually passed a string. Previously we converted any object
++    # to unicode() and parsed it which caused arbitrary __repr__ to
++    # be executed. We must only call the parser when the original
++    # input was a string.
++    original_a = a
+     is_sympy = getattr(a, '__sympy__', None)
+     if is_sympy is not None:
+         return a
+@@ -354,14 +360,20 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+             # Not all iterables are rebuildable with their type.
+             pass
+ 
+-    # At this point we were given an arbitrary expression
+-    # which does not inherit from Basic and doesn't implement
+-    # _sympy_ (which is a canonical and robust way to convert
+-    # anything to SymPy expression).
+-    #
+-    # As a last chance, we try to take "a"'s normal form via unicode()
+-    # and try to parse it. If it fails, then we have no luck and
+-    # return an exception
++    # At this point we were given an arbitrary expression which does not
++    # inherit from Basic and doesn't implement _sympy_. As a last chance
++    # we previously attempted to convert the object to unicode() and
++    # parse it, but that unconditionally invoked __repr__/__str__ and
++    # allowed execution of arbitrary code. Only attempt parsing if the
++    # original input was actually a string. Otherwise signal failure so
++    # callers (for example Expr.__eq__) can handle the non-string object
++    # safely.
++    if not isinstance(original_a, string_types):
++        # Maintain previous behaviour for 'strict' callers: strict=True
++        # would have raised earlier; here we raise SympifyError to signal
++        # that sympification failed for non-string arbitrary objects.
++        raise SympifyError(a)
++
+     try:
+         from .compatibility import unicode
+         a = unicode(a)

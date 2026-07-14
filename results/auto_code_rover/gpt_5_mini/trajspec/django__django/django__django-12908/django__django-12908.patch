@@ -1,0 +1,16 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index e0eeccefa6..2bffa9ccd3 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1140,6 +1140,11 @@ class QuerySet:
+         """
+         assert not self.query.is_sliced, \
+             "Cannot create distinct fields once a slice has been taken."
++        # DISTINCT/DISTINCT ON is not supported after combining querysets (union,
++        # intersection, difference). Refuse the operation early so we don't
++        # record distinct_fields on a combined Query (which the compiler would
++        # otherwise ignore).
++        self._not_support_combined_queries('distinct')
+         obj = self._chain()
+         obj.query.add_distinct_fields(*field_names)
+         return obj

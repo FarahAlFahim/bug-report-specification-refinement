@@ -1,0 +1,18 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index a6a3e97..1c20e05 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1124,7 +1124,12 @@ class Query(BaseExpression):
+ 
+     def check_filterable(self, expression):
+         """Raise an error if expression cannot be used in a WHERE clause."""
+-        if not getattr(expression, 'filterable', True):
++        # Only the class-level 'filterable' marker on expression classes should
++        # determine whether something is allowed in a WHERE clause. Using an
++        # instance-level attribute here can accidentally treat arbitrary objects
++        # (for example, model instances with a field named 'filterable') as
++        # non-filterable. Inspect the class attribute instead.
++        if not getattr(expression.__class__, 'filterable', True):
+             raise NotSupportedError(
+                 expression.__class__.__name__ + ' is disallowed in the filter '
+                 'clause.'

@@ -1,0 +1,96 @@
+diff --git a/django/core/management/sql.py b/django/core/management/sql.py
+index 2375cc23ab..72e0f82459 100644
+--- a/django/core/management/sql.py
++++ b/django/core/management/sql.py
+@@ -3,6 +3,40 @@ import sys
+ from django.apps import apps
+ from django.db import models
+ 
++def _bind_managers_to_db(app_config, using):
++    """Temporarily set global managers' _db to the ``using`` alias.
++
++    Returns a list of (model, manager_name, previous_db, previous_hints) so callers can
++    restore previous values.
++    """
++    bound = []
++    for model in app_config.get_models():
++        for manager in model._meta.managers:
++            prev_db = getattr(manager, "_db", None)
++            prev_hints = getattr(manager, "_hints", None)
++            if prev_db:
++                continue
++            try:
++                bound_manager = manager.db_manager(using=using, hints=prev_hints)
++            except Exception:
++                continue
++            model._meta.managers_map = dict(model._meta.managers_map)
++            model._meta.managers_map[bound_manager.name] = bound_manager
++            bound.append((model, manager.name, prev_db, prev_hints))
++    return bound
++
++
++def _restore_managers(bound):
++    for model, name, prev_db, prev_hints in bound:
++        model._meta.managers_map = dict(model._meta.managers_map)
++        try:
++            original = getattr(model, name)
++        except Exception:
++            model._meta.managers_map.pop(name, None)
++            continue
++        model._meta.managers_map[name] = original
++
++
+ 
+ def sql_flush(style, connection, reset_sequences=True, allow_cascade=False):
+     """
+@@ -29,14 +63,18 @@ def emit_pre_migrate_signal(verbosity, interactive, db, **kwargs):
+             stdout.write(
+                 "Running pre-migrate handlers for application %s" % app_config.label
+             )
+-        models.signals.pre_migrate.send(
+-            sender=app_config,
+-            app_config=app_config,
+-            verbosity=verbosity,
+-            interactive=interactive,
+-            using=db,
+-            **kwargs,
+-        )
++        bound = _bind_managers_to_db(app_config, db)
++        try:
++            models.signals.pre_migrate.send(
++                sender=app_config,
++                app_config=app_config,
++                verbosity=verbosity,
++                interactive=interactive,
++                using=db,
++                **kwargs,
++            )
++        finally:
++            _restore_managers(bound)
+ 
+ 
+ def emit_post_migrate_signal(verbosity, interactive, db, **kwargs):
+@@ -49,11 +87,15 @@ def emit_post_migrate_signal(verbosity, interactive, db, **kwargs):
+             stdout.write(
+                 "Running post-migrate handlers for application %s" % app_config.label
+             )
+-        models.signals.post_migrate.send(
+-            sender=app_config,
+-            app_config=app_config,
+-            verbosity=verbosity,
+-            interactive=interactive,
+-            using=db,
+-            **kwargs,
+-        )
++        bound = _bind_managers_to_db(app_config, db)
++        try:
++            models.signals.post_migrate.send(
++                sender=app_config,
++                app_config=app_config,
++                verbosity=verbosity,
++                interactive=interactive,
++                using=db,
++                **kwargs,
++            )
++        finally:
++            _restore_managers(bound)

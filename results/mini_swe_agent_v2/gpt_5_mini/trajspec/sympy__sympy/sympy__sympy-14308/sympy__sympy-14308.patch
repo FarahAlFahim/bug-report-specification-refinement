@@ -1,0 +1,57 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 09e2b00735..d87896ae79 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -906,22 +906,20 @@ def _print_BasisDependent(self, expr):
+             for k, v in inneritems:
+                 #if the coef of the basis vector is 1
+                 #we skip the 1
++                basis_str = self._print(k).parens()[0]
+                 if v == 1:
+-                    o1.append(u"" +
+-                              k._pretty_form)
++                    o1.append(u"" + basis_str)
+                 #Same for -1
+                 elif v == -1:
+-                    o1.append(u"(-1) " +
+-                              k._pretty_form)
++                    o1.append(u"(-1) " + basis_str)
+                 #For a general expr
+                 else:
+                     #We always wrap the measure numbers in
+                     #parentheses
+-                    arg_str = self._print(
+-                        v).parens()[0]
++                    arg_str = self._print(v).parens()[0]
+ 
+-                    o1.append(arg_str + ' ' + k._pretty_form)
+-                vectstrs.append(k._pretty_form)
++                    o1.append(arg_str + ' ' + basis_str)
++                vectstrs.append(basis_str)
+ 
+         #outstr = u("").join(o1)
+         if o1[0].startswith(u" + "):
+diff --git a/sympy/vector/vector.py b/sympy/vector/vector.py
+index c62b1dbf0d..9b3db44330 100755
+--- a/sympy/vector/vector.py
++++ b/sympy/vector/vector.py
+@@ -377,6 +377,9 @@ def free_symbols(self):
+ 
+     __repr__ = __str__
+     _sympystr = __str__
++    def _pretty(self, printer=None):
++        from sympy.printing.pretty.stringpict import prettyForm
++        return prettyForm(self._pretty_form)
+ 
+ 
+ class VectorAdd(BasisDependentAdd, Vector):
+@@ -402,6 +405,9 @@ def __str__(self, printer=None):
+ 
+     __repr__ = __str__
+     _sympystr = __str__
++    def _pretty(self, printer=None):
++        from sympy.printing.pretty.stringpict import prettyForm
++        return prettyForm(self._pretty_form)
+ 
+ 
+ class VectorMul(BasisDependentMul, Vector):

@@ -1,0 +1,39 @@
+diff --git a/sympy/polys/polytools.py b/sympy/polys/polytools.py
+index c9e77a901f..6bb0b89d26 100644
+--- a/sympy/polys/polytools.py
++++ b/sympy/polys/polytools.py
+@@ -5887,7 +5887,33 @@ def key(obj):
+             rep = poly.rep.rep
+             return (len(rep), len(poly.gens), exp, rep)
+ 
+-    return sorted(factors, key=key)
++    factors = sorted(factors, key=key)
++
++    if method == 'sqf':
++        # Group factors by exponent and combine co-prime factors
++        exp_groups = {}
++        for poly, exp in factors:
++            if exp not in exp_groups:
++                exp_groups[exp] = [poly]
++            else:
++                exp_groups[exp].append(poly)
++
++        # Combine factors with the same exponent
++        combined = []
++        for exp, polys in exp_groups.items():
++            if len(polys) == 1:
++                combined.append((polys[0], exp))
++            else:
++                # Multiply all polynomials with the same exponent
++                result = polys[0]
++                for p in polys[1:]:
++                    result = result * p
++                combined.append((result, exp))
++
++        # Re-sort the combined factors
++        return sorted(combined, key=key)
++
++    return factors
+ 
+ 
+ def _factors_product(factors):

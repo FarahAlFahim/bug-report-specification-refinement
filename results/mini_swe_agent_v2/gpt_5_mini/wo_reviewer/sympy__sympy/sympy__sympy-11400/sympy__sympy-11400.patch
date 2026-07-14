@@ -1,0 +1,25 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..6caf6c5c1c 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -251,6 +251,20 @@ def _print_For(self, expr):
+     def _print_sign(self, func):
+         return '((({0}) > 0) - (({0}) < 0))'.format(self._print(func.args[0]))
+ 
++    def _print_sinc(self, expr):
++        """Print sinc(x) as a portable C expression.
++
++        SymPy defines sinc(x) as sin(x)/x with the special-case sinc(0)==1.
++        Emit this as a Piecewise so the existing Piecewise printer will
++        format it as a C conditional (ternary or if/else as appropriate).
++        """
++        from sympy import Piecewise, sin
++        from sympy import Ne, S
++
++        arg = expr.args[0]
++        pw = Piecewise((sin(arg)/arg, Ne(arg, 0)), (S.One, True))
++        return self._print(pw)
++
+     def indent_code(self, code):
+         """Accepts a string of code or a list of code lines"""
+ 

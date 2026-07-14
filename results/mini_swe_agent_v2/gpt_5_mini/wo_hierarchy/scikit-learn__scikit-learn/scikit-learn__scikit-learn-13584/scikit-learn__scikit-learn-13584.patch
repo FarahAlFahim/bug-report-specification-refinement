@@ -1,0 +1,68 @@
+diff --git a/sklearn/utils/_pprint.py b/sklearn/utils/_pprint.py
+index b8686dba5..41fb2ca46 100644
+--- a/sklearn/utils/_pprint.py
++++ b/sklearn/utils/_pprint.py
+@@ -94,9 +94,61 @@ def _changed_params(estimator):
+                         estimator.__init__)
+     init_params = signature(init_func).parameters
+     init_params = {name: param.default for name, param in init_params.items()}
++
++    def _params_equal(a, b):
++        """Return True if parameters a and b should be considered equal.
++
++        Equality rules:
++        - preserve existing scalar-NaN special-case
++        - if either is array-like, compare elementwise and reduce (treat NaNs
++          as equal)
++        - otherwise, fall back to ``==`` and coerce the result to a bool when
++          possible.
++        """
++        # scalar NaN special-case
++        if is_scalar_nan(a) and is_scalar_nan(b):
++            return True
++
++        # Try numpy-aware elementwise comparison when possible
++        try:
++            import numpy as _np
++        except Exception:
++            _np = None
++
++        if _np is not None:
++            is_arr_like = (
++                hasattr(a, "__array__") or hasattr(b, "__array__") or
++                isinstance(a, (list, tuple)) or isinstance(b, (list, tuple))
++            )
++            if is_arr_like:
++                try:
++                    return _np.array_equal(_np.asarray(a), _np.asarray(b),
++                                           equal_nan=True)
++                except Exception:
++                    # Fall through to generic comparison
++                    pass
++
++        # Generic comparison: try a == b and reduce if it yields an array-like
++        try:
++            eq = (a == b)
++        except Exception:
++            return False
++
++        # If eq is array-like (e.g., ndarray of booleans), reduce with all()
++        if hasattr(eq, "__array__"):
++            try:
++                return bool(eq.all())
++            except Exception:
++                return False
++
++        # Otherwise coerce to bool
++        try:
++            return bool(eq)
++        except Exception:
++            return False
++
+     for k, v in params.items():
+-        if (v != init_params[k] and
+-                not (is_scalar_nan(init_params[k]) and is_scalar_nan(v))):
++        if not _params_equal(v, init_params[k]):
+             filtered_params[k] = v
+     return filtered_params
+ 

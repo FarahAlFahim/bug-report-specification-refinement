@@ -1,0 +1,29 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index a346227..00ef983 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -23,12 +23,22 @@ class PolyFit(Stat):
+ 
+         x = data["x"]
+         y = data["y"]
++
++        # Drop any rows with missing x or y so polyfit isn't given NaNs
++        valid = x.notna() & y.notna()
++        x = x[valid]
++        y = y[valid]
++
++        # Need at least order+1 distinct x values to fit the polynomial
+         if x.nunique() <= self.order:
+             # TODO warn?
+             xx = yy = []
+         else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
++            # Ensure numeric numpy arrays are passed to np.polyfit
++            xv = np.asarray(x, dtype=float)
++            yv = np.asarray(y, dtype=float)
++            p = np.polyfit(xv, yv, self.order)
++            xx = np.linspace(xv.min(), xv.max(), self.gridsize)
+             yy = np.polyval(p, xx)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))

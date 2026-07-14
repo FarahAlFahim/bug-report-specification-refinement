@@ -1,0 +1,67 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..6a4c155c22 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -202,6 +202,7 @@ class Field(RegisterLookupMixin):
+         return [
+             *self._check_field_name(),
+             *self._check_choices(),
++            *self._check_max_length_with_choices(),
+             *self._check_db_index(),
+             *self._check_null_allowed_for_primary_keys(),
+             *self._check_backend_specific_checks(**kwargs),
+@@ -291,6 +292,54 @@ class Field(RegisterLookupMixin):
+             )
+         ]
+ 
++    def _check_max_length_with_choices(self):
++        """
++        Validate that max_length is large enough to hold the longest choice value.
++        """
++        if not self.choices or self.max_length is None:
++            return []
++
++        # Collect all choice values
++        choice_values = []
++        for choice in self.choices:
++            # Handle grouped choices: [group_name, [(value, display), ...]]
++            # In this case, group_choices is a list/tuple of (value, display) tuples
++            if (
++                isinstance(choice, (list, tuple)) and
++                len(choice) == 2 and
++                isinstance(choice[1], (list, tuple))
++            ):
++                group_name, group_choices = choice
++                for group_choice in group_choices:
++                    # Only process if it's a valid (value, display) tuple with exactly 2 elements
++                    if (
++                        isinstance(group_choice, (list, tuple)) and
++                        len(group_choice) == 2
++                    ):
++                        value, _ = group_choice
++                        if isinstance(value, str):
++                            choice_values.append(value)
++            # Handle flat choices: [(value, display), ...]
++            elif isinstance(choice, (list, tuple)) and len(choice) == 2:
++                value, human_name = choice
++                # Only process if value is a string (not a nested list/tuple)
++                if isinstance(value, str) and isinstance(human_name, str):
++                    choice_values.append(value)
++
++        # Check if any choice value exceeds max_length
++        if choice_values:
++            max_value_length = max(len(value) for value in choice_values)
++            if max_value_length > self.max_length:
++                return [
++                    checks.Error(
++                        f"'max_length' is too small to hold the longest choice value "
++                        f"({max_value_length} > {self.max_length}).",
++                        obj=self,
++                        id='fields.E009',
++                    )
++                ]
++        return []
++
+     def _check_db_index(self):
+         if self.db_index not in (None, True, False):
+             return [

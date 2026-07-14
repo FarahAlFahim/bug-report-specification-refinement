@@ -1,0 +1,70 @@
+diff --git a/sympy/printing/pycode.py b/sympy/printing/pycode.py
+index 6ec7bd891c..59770ed5a9 100644
+--- a/sympy/printing/pycode.py
++++ b/sympy/printing/pycode.py
+@@ -503,6 +503,17 @@ def _print_MatMul(self, expr):
+             return '({0})'.format(').dot('.join(self._print(i) for i in expr_list))
+         return '({0})'.format(').dot('.join(self._print(i) for i in expr.args))
+ 
++    def _print_Identity(self, expr):
++        """Print an Identity matrix as a call to numpy.eye so that generated
++        numeric code is unambiguous (rather than emitting the literal 'I').
++
++        This ensures that lambdify with the 'numpy' (or 'scipy') module will
++        evaluate Identity(n) at runtime as an actual identity matrix instead
++        of relying on a bare symbol which may be bound to the imaginary unit.
++        """
++        # expr.args[0] is the size 'n' of the Identity(n)
++        return "{0}({1})".format(self._module_format('numpy.eye'), self._print(expr.args[0]))
++
+     def _print_MatPow(self, expr):
+         "Matrix power printer"
+         return '{0}({1}, {2})'.format(self._module_format('numpy.linalg.matrix_power'),
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index a940509b47..4f44080831 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -752,6 +752,43 @@ def _lambdifygenerated(x):
+     else:
+         funcprinter = _EvaluatorPrinter(printer, dummify)
+     funcstr = funcprinter.doprint(funcname, args, expr)
++    # Post-process generated code to ensure that Identity matrices (which
++    # may have been printed as calls to ``eye(n)``) are constructed from
++    # runtime matrix arguments when the size ``n`` is actually the shape
++    # symbol of a MatrixSymbol argument.  For example, when lambdifying
++    # ``A + Identity(n)`` with argument ``A`` (a MatrixSymbol of shape n x n),
++    # replace ``eye(n)`` with ``eye(A.shape[0])`` so that the generated
++    # function works with concrete numpy arrays passed as ``A``.
++    try:
++        from sympy.matrices.expressions.matexpr import MatrixSymbol
++        # Build mapping from symbolic size name -> function argument name
++        sym_to_arg = {}
++        # 'names' is the list of argument variable names computed earlier
++        # and corresponds positionally to 'args'.
++        for arg, argname in zip((args if iterable(args) else (args,)), names):
++            if isinstance(arg, MatrixSymbol):
++                try:
++                    size = arg.shape[0]
++                except Exception:
++                    size = None
++                if size is not None:
++                    # Only consider symbolic sizes
++                    from sympy.core.symbol import Symbol
++                    if isinstance(size, Symbol):
++                        sym_to_arg[str(size)] = argname
++
++        if sym_to_arg:
++            # Replace occurrences like "eye(n)" or "numpy.eye(n)" with
++            # "eye(A.shape[0])" or "numpy.eye(A.shape[0])" respectively.
++            for sym_name, argname in sym_to_arg.items():
++                # Use a regex to find any eye(...) invocation whose single
++                # argument is the symbolic size name.
++                func_re = re.compile(r"(?P<prefix>\b[\w\.]*eye)\(\s*%s\s*\)" % re.escape(sym_name))
++                funcstr = func_re.sub(lambda m: "%s(%s.shape[0])" % (m.group('prefix'), argname), funcstr)
++    except Exception:
++        # If anything goes wrong during this best-effort replacement, fall
++        # back to the unmodified generated code.
++        pass
+ 
+     # Collect the module imports from the code printers.
+     imp_mod_lines = []

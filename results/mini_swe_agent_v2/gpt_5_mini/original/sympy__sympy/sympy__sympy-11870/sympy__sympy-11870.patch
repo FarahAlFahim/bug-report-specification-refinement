@@ -1,0 +1,64 @@
+diff --git a/sympy/simplify/trigsimp.py b/sympy/simplify/trigsimp.py
+index 34a3bab3fc..bb06385b02 100644
+--- a/sympy/simplify/trigsimp.py
++++ b/sympy/simplify/trigsimp.py
+@@ -599,6 +599,59 @@ def signlog(expr, sign=1):
+     # can we ever generate an I where there was none previously?
+     if not (newexpr.has(I) and not expr.has(I)):
+         expr = newexpr
++    # Convert linear combinations of exp(I*x) and exp(-I*x) into
++    # combinations of sin(x) and cos(x). This handles expressions like
++    #   (-I*exp(I*k) + I*exp(-I*k))/2  -> sin(k)
++    # We perform a bottom-up traversal to replace any Add that contains
++    # terms of the form c1*exp(I*arg) + c2*exp(-I*arg) with
++    # (c1+c2)*cos(arg) + I*(c1-c2)*sin(arg).
++    def _exp_add_to_trig(rv):
++        if not rv.is_Add:
++            return rv
++        terms = rv.as_ordered_terms()
++        replace = {}
++        keep = []
++        for t in terms:
++            # try to match coeff * exp(I*arg) or coeff * exp(-I*arg)
++            coeff, rest = t.as_coeff_Mul()
++            matched = False
++            if rest.func is exp:
++                a = rest.args[0]
++                if a.has(I):
++                    try:
++                        num, rest_factors = a.as_coeff_mul()
++                    except Exception:
++                        num = None
++                    if num is not None:
++                        if len(rest_factors) == 1:
++                            possible_arg = rest_factors[0]
++                        else:
++                            possible_arg = a/num
++                        if num in (I, -I):
++                            key = possible_arg
++                            sign = 1 if num is I else -1
++                            replace.setdefault(key, [0, 0])
++                            if sign == 1:
++                                replace[key][0] += coeff
++                            else:
++                                replace[key][1] += coeff
++                            matched = True
++            if not matched:
++                keep.append(t)
++
++        if not replace:
++            return rv
++
++        new_terms = list(keep)
++        for arg, (c_pos, c_neg) in replace.items():
++            A = (c_pos + c_neg)
++            B = I*(c_pos - c_neg)
++            from sympy import cos as _cos, sin as _sin
++            new_terms.append(A*_cos(arg) + B*_sin(arg))
++        return Add(*new_terms)
++
++    from sympy.simplify.simplify import bottom_up as _bottom_up
++    expr = _bottom_up(expr, _exp_add_to_trig)
+     return expr
+ 
+ #-------------------- the old trigsimp routines ---------------------

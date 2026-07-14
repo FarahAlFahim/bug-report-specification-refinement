@@ -1,0 +1,58 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..c0042dde61 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -976,6 +976,53 @@ class CharField(Field):
+                 )
+             ]
+         else:
++            # Additional check: ensure max_length fits the longest choice value.
++            if self.choices is not None:
++                # Collect all choice values (including within optgroups).
++                def _iter_choice_values(choices):
++                    for choices_group in choices:
++                        # Handle grouped choices: (group_name, group_choices)
++                        try:
++                            group_name, group_choices = choices_group
++                        except (TypeError, ValueError):
++                            # Not a group, expected (value, display)
++                            try:
++                                value, _ = choices_group
++                                yield value
++                            except Exception:
++                                continue
++                        else:
++                            # group_choices is iterable of (value, display)
++                            try:
++                                for value, _ in group_choices:
++                                    yield value
++                            except Exception:
++                                # If group_choices isn't iterable as expected,
++                                # yield the group name as a fallback.
++                                yield group_name
++
++
++                # Find the maximum length among string-like choice values.
++                from django.utils.functional import Promise
++                max_choice_len = 0
++                for val in _iter_choice_values(self.choices):
++                    if isinstance(val, (str, Promise)):
++                        try:
++                            l = len(val)
++                        except Exception:
++                            # If len() can't be determined, ignore it here.
++                            continue
++                        if l > max_choice_len:
++                            max_choice_len = l
++                if self.max_length is not None and max_choice_len > self.max_length:
++                    return [
++                        checks.Error(
++                            "'max_length' is too small for some values in 'choices'.",
++                            hint=("Increase 'max_length' or shorten the longest choice value."),
++                            obj=self,
++                            id='fields.E122',
++                        ),
++                    ]
+             return []
+ 
+     def cast_db_type(self, connection):

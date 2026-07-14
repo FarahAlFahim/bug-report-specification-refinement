@@ -1,0 +1,25 @@
+commit 631dfa1f555023340f55cbd0b0c5e84e640369fe
+Author: SWE-bench <setup@swebench.config>
+Date:   Tue May 26 03:32:21 2026 +0000
+
+    Use concrete model PK attname when computing pk_idx in RelatedPopulator to handle proxy models
+
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index be0deb90b0..b7de4555e7 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -2596,7 +2596,13 @@ class RelatedPopulator:
+             )
+ 
+         self.model_cls = klass_info["model"]
+-        self.pk_idx = self.init_list.index(self.model_cls._meta.pk.attname)
++        # If model_cls is a proxy (deferred) model, use the concrete model's
++        # primary key attname to find the index in init_list. The init_list
++        # contains attnames from the concrete fields fetched from the DB,
++        # so looking up the concrete model's PK avoids "not in list" errors
++        # when dealing with proxy models.
++        concrete_opts = self.model_cls._meta.concrete_model._meta
++        self.pk_idx = self.init_list.index(concrete_opts.pk.attname)
+         self.related_populators = get_related_populators(klass_info, select, self.db)
+         self.local_setter = klass_info["local_setter"]
+         self.remote_setter = klass_info["remote_setter"]

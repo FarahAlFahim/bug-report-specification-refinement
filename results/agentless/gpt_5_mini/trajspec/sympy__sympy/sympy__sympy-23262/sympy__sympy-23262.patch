@@ -1,0 +1,27 @@
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index 9dd6fe4..964a22f 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -955,13 +955,19 @@ def _recursive_to_string(doprint, arg):
+     if isinstance(arg, (Basic, MatrixOperations)):
+         return doprint(arg)
+     elif iterable(arg):
++        # Build a string representation for native Python iterables (lists/tuples).
++        # Note: singleton tuples require a trailing comma in Python syntax, e.g. (x,)
++        # so handle that case explicitly.
++        items = ', '.join(_recursive_to_string(doprint, e) for e in arg)
+         if isinstance(arg, list):
+-            left, right = "[]"
++            return '[' + items + ']'
+         elif isinstance(arg, tuple):
+-            left, right = "()"
++            if len(arg) == 1:
++                return '(' + items + ',)'
++            else:
++                return '(' + items + ')'
+         else:
+             raise NotImplementedError("unhandled type: %s, %s" % (type(arg), arg))
+-        return left +', '.join(_recursive_to_string(doprint, e) for e in arg) + right
+     elif isinstance(arg, str):
+         return arg
+     else:

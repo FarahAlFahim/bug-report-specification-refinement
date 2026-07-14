@@ -1,0 +1,47 @@
+diff --git a/lib/matplotlib/artist.py b/lib/matplotlib/artist.py
+index 1f33b9d3ec..a727b497ab 100644
+--- a/lib/matplotlib/artist.py
++++ b/lib/matplotlib/artist.py
+@@ -1304,9 +1304,39 @@ class Artist:
+             normed = self.norm(data)
+             if np.isfinite(normed):
+                 # Midpoints of neighboring color intervals.
+-                neighbors = self.norm.inverse(
+-                    (int(self.norm(data) * n) + np.array([0, 1])) / n)
+-                delta = abs(neighbors - data).max()
++                # Some norms (e.g., BoundaryNorm) are intentionally
++                # non-invertible. Guard against that by falling back to
++                # using stored boundaries when available, or using the
++                # default precision otherwise.
++                try:
++                    neighbors = self.norm.inverse(
++                        (int(self.norm(data) * n) + np.array([0, 1])) / n)
++                    delta = abs(neighbors - data).max()
++                except ValueError:
++                    # Try to obtain bracketing boundaries for discrete
++                    # norms such as BoundaryNorm which store edges in
++                    # ``self.norm.boundaries``.  Similar callers use
++                    # this attribute instead of calling ``inverse``.
++                    b = getattr(self.norm, "boundaries", None)
++                    if b is not None:
++                        # Find the bin that would contain *data* and use
++                        # the surrounding boundaries as neighbors. Use
++                        # np.searchsorted for handling array or scalar
++                        # inputs uniformly.
++                        b = np.asarray(b)
++                        # np.searchsorted returns the index of the first
++                        # boundary greater than data; the lower edge is
++                        # at idx-1 (clamped) and the upper at idx
++                        idx = np.searchsorted(b, data, side="right")
++                        lo = b[np.clip(idx - 1, 0, len(b) - 1)]
++                        hi = b[np.clip(idx, 0, len(b) - 1)]
++                        neighbors = np.array([lo, hi])
++                        delta = abs(neighbors - data).max()
++                    else:
++                        # Give up and fall back to the default number of
++                        # significant digits used below.
++                        g_sig_digits = 3
++                        return "[{:-#.{}g}]".format(data, g_sig_digits)
+                 g_sig_digits = cbook._g_sig_digits(data, delta)
+             else:
+                 g_sig_digits = 3  # Consistent with default below.

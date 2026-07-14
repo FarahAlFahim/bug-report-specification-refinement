@@ -1,0 +1,19 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..88ef2b850e 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1670,6 +1670,14 @@ def eval(x):
+     def expr(self):
+         return self._args[0]
+ 
++    @property
++    def kind(self):
++        """Return the kind of the derivative, which is the kind of the
++        underlying expression.  This mirrors ExprWithLimits.kind used
++        by Integral and ensures matrix/array kinds propagate through
++        differentiation."""
++        return self.expr.kind
++
+     @property
+     def _wrt_variables(self):
+         # return the variables of differentiation without

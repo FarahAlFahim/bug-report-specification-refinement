@@ -1,0 +1,22 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 4038859cfa..bce2c9fde2 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1297,8 +1297,16 @@ class Model(metaclass=ModelBase):
+ 
+     @classmethod
+     def _check_default_pk(cls):
++        # Don't warn for inherited parent-link primary keys. The parent-link
++        # field is created with auto_created=True and parent_link=True, and
++        # later promoted to be the child's primary key. Treat such inherited
++        # PKs as explicitly provided so they don't trigger the DEFAULT_AUTO_FIELD
++        # warning (models.W042).
++        pk = cls._meta.pk
++        is_parent_link = getattr(getattr(pk, 'remote_field', None), 'parent_link', False)
+         if (
+-            cls._meta.pk.auto_created and
++            pk.auto_created and
++            not is_parent_link and
+             not settings.is_overridden('DEFAULT_AUTO_FIELD') and
+             not cls._meta.app_config._is_default_auto_field_overridden
+         ):

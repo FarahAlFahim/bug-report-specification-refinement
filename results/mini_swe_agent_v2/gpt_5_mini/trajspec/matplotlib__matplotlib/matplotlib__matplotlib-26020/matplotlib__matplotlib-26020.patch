@@ -1,0 +1,73 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..5fbf8601ba 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,33 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    # The toolkit's own Axes provides an AxisDict on ax.axis that is
++    # subscriptable and whose items implement .toggle(...).  Third-party
++    # Axes (e.g., GeoAxes) may expose axis as a callable/method instead
++    # of a mapping.  Guard against that by falling back to using
++    # tick_params and setting the axis label visibility when the
++    # AxisDict-like API is not available.
++    try:
++        ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
++    except Exception:
++        try:
++            ax.tick_params(axis="x", labelbottom=not bottom_off)
++            if hasattr(ax, "xaxis") and getattr(ax, "xaxis") is not None:
++                ax.xaxis.label.set_visible(not bottom_off)
++        except Exception:
++            # Give up silently; label-mode functionality should be best-effort
++            # and must not raise during Grid initialization.
++            pass
++
++    try:
++        ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    except Exception:
++        try:
++            ax.tick_params(axis="y", labelleft=not left_off)
++            if hasattr(ax, "yaxis") and getattr(ax, "yaxis") is not None:
++                ax.yaxis.label.set_visible(not left_off)
++        except Exception:
++            pass
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +53,30 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        # As above, support both the toolkit's AxisDict API and third-party
++        # Axes that may not expose a subscriptable axis attribute.  Fall
++        # back to tick_params and axis label visibility when needed.
++        try:
++            axis = self.axis[self.orientation]
++            axis.toggle(ticklabels=b, label=b)
++            return
++        except Exception:
++            pass
++
++        try:
++            if self.orientation in ("left", "right"):
++                # vertical orientation -> y-axis
++                self.tick_params(axis="y", labelleft=b, labelright=b)
++                if hasattr(self, "yaxis") and getattr(self, "yaxis") is not None:
++                    self.yaxis.label.set_visible(b)
++            else:
++                # horizontal orientation -> x-axis
++                self.tick_params(axis="x", labelbottom=b, labeltop=b)
++                if hasattr(self, "xaxis") and getattr(self, "xaxis") is not None:
++                    self.xaxis.label.set_visible(b)
++        except Exception:
++            # Best-effort only; do not raise during initialization.
++            pass
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

@@ -1,0 +1,40 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index c4ed961ac..6dbb36f9c 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -535,11 +535,32 @@ class ExceptionInfo:
+         return fmt.repr_excinfo(self)
+ 
+     def __str__(self):
++        """Return a user-friendly string for the wrapped exception.
++
++        Historically this returned a short file:lineno: <exception-first-line>
++        representation by formatting the result of exconly() through
++        ReprFileLocation which intentionally truncates at the first newline.
++
++        To preserve the full, user-expected exception message (including
++        newlines) when printing the ExceptionInfo object (for example the
++        object bound by ``with pytest.raises(...) as excinfo``), return the
++        string representation of the underlying exception value. This makes
++        ``str(excinfo)`` behave like ``str(exception_instance)`` in a
++        regular except block.
++        """
+         if self._excinfo is None:
+             return repr(self)
+-        entry = self.traceback[-1]
+-        loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
+-        return str(loc)
++        # Use the underlying exception instance's string representation so
++        # multiline messages are preserved and match normal except-block
++        # behaviour. Use value rather than exconly() to avoid truncation.
++        try:
++            return str(self.value)
++        except Exception:
++            # Fallback to the previous behaviour if converting the value
++            # to str fails for some reason.
++            entry = self.traceback[-1]
++            loc = ReprFileLocation(entry.path, entry.lineno + 1, self.exconly())
++            return str(loc)
+ 
+     def match(self, regexp):
+         """

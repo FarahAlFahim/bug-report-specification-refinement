@@ -1,0 +1,33 @@
+diff --git a/django/forms/formsets.py b/django/forms/formsets.py
+index 3adbc6979a..a591c58d68 100644
+--- a/django/forms/formsets.py
++++ b/django/forms/formsets.py
+@@ -3,6 +3,7 @@ from django.forms import Form
+ from django.forms.fields import BooleanField, IntegerField
+ from django.forms.renderers import get_default_renderer
+ from django.forms.utils import ErrorList, RenderableFormMixin
++from django.utils.safestring import mark_safe
+ from django.forms.widgets import CheckboxInput, HiddenInput, NumberInput
+ from django.utils.functional import cached_property
+ from django.utils.translation import gettext_lazy as _
+@@ -48,6 +49,20 @@ class ManagementForm(Form):
+         cleaned_data.setdefault(INITIAL_FORM_COUNT, 0)
+         return cleaned_data
+ 
++    def render(self, template_name=None, context=None, renderer=None):
++        """
++        Render the management form as the concatenation of its hidden fields.
++
++        The management form only outputs hidden inputs and should not trigger
++        the default form template deprecation warning (which applies to
++        full-form templates such as "django/forms/default.html"). By
++        implementing a renderer-independent render() we avoid resolving the
++        form template name and the spurious RemovedInDjango50Warning.
++        """
++        hidden = self.hidden_fields()
++        return mark_safe("".join(str(f) for f in hidden))
++
++
+ 
+ class BaseFormSet(RenderableFormMixin):
+     """

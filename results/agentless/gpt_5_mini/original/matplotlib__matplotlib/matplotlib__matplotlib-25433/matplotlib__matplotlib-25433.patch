@@ -1,0 +1,70 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index f12a9a3..111f0cd 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -549,7 +549,25 @@ class Slider(SliderBase):
+         else:
+             val = self._value_in_bounds(event.xdata)
+         if val not in [None, self.val]:
+-            self.set_val(val)
++            # Ensure that if user callbacks clear/redraw the figure (e.g. call
++            # pyplot.clf() inside an on_changed callback), we do not leave the
++            # canvas with a mouse grab active (which would block further
++            # widget input). Wrap the set_val call so that after callbacks we
++            # detect whether the axes were removed and release the mouse grab.
++            try:
++                self.set_val(val)
++            finally:
++                fig = getattr(self.ax, "figure", None)
++                if fig is None or self.ax not in getattr(fig, "axes", []):
++                    # The axes/figure were cleared in a callback; make sure to
++                    # release any mouse grab and stop drag state.
++                    try:
++                        event.canvas.release_mouse(self.ax)
++                    except Exception:
++                        # Be conservative: ignore backend-specific errors.
++                        pass
++                    self.drag_active = False
++                    return
+ 
+     def _format(self, val):
+         """Pretty-print *val*."""
+@@ -900,10 +918,36 @@ class RangeSlider(SliderBase):
+         if handle is not self._active_handle:
+             self._active_handle = handle
+ 
++        # Call the update and ensure that if user callbacks clear/redraw the
++        # figure (for example via pyplot.clf() inside an on_changed callback)
++        # we do not leave the canvas with a mouse grab active. If the axes
++        # were removed during the callbacks, release the grab and stop drag.
+         if self.orientation == "vertical":
+-            self._update_val_from_pos(event.ydata)
++            try:
++                self._update_val_from_pos(event.ydata)
++            finally:
++                fig = getattr(self.ax, "figure", None)
++                if fig is None or self.ax not in getattr(fig, "axes", []):
++                    try:
++                        event.canvas.release_mouse(self.ax)
++                    except Exception:
++                        pass
++                    self.drag_active = False
++                    self._active_handle = None
++                    return
+         else:
+-            self._update_val_from_pos(event.xdata)
++            try:
++                self._update_val_from_pos(event.xdata)
++            finally:
++                fig = getattr(self.ax, "figure", None)
++                if fig is None or self.ax not in getattr(fig, "axes", []):
++                    try:
++                        event.canvas.release_mouse(self.ax)
++                    except Exception:
++                        pass
++                    self.drag_active = False
++                    self._active_handle = None
++                    return
+ 
+     def _format(self, val):
+         """Pretty-print *val*."""

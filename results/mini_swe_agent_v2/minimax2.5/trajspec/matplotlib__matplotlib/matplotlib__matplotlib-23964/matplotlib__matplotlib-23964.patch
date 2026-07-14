@@ -1,0 +1,24 @@
+diff --git a/lib/matplotlib/backends/backend_ps.py b/lib/matplotlib/backends/backend_ps.py
+index f209e811f1..15c99f93e7 100644
+--- a/lib/matplotlib/backends/backend_ps.py
++++ b/lib/matplotlib/backends/backend_ps.py
+@@ -647,7 +647,8 @@ grestore
+                 thisx += width * scale
+             ps_name = (font.postscript_name
+                        .encode("ascii", "replace").decode("ascii"))
+-            stream.append((ps_name, xs_names))
++            if xs_names:
++                stream.append((ps_name, xs_names))
+ 
+         else:
+             font = self._get_font_ttf(prop)
+@@ -666,7 +667,8 @@ grestore
+                     (item.x, item.ft_object.get_glyph_name(item.glyph_idx))
+                 )
+             # append the last entry
+-            stream.append(curr_stream)
++            if curr_stream:
++                stream.append(curr_stream)
+ 
+         self.set_color(*gc.get_rgb())
+ 

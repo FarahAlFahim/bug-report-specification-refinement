@@ -1,0 +1,132 @@
+diff --git a/src/_pytest/_code/code.py b/src/_pytest/_code/code.py
+index 7b17d7612..2c6ab4dd9 100644
+--- a/src/_pytest/_code/code.py
++++ b/src/_pytest/_code/code.py
+@@ -1,4 +1,5 @@
+ import inspect
++import os
+ import re
+ import sys
+ import traceback
+@@ -560,10 +561,27 @@ class ExceptionInfo(Generic[_E]):
+         """ return True if the exception is an instance of exc """
+         return isinstance(self.value, exc)
+ 
+-    def _getreprcrash(self) -> "ReprFileLocation":
++    def _getreprcrash(
++        self, rootdir: Optional["py.path.local"] = None
++    ) -> "ReprFileLocation":
+         exconly = self.exconly(tryshort=True)
+         entry = self.traceback.getcrashentry()
+         path, lineno = entry.frame.code.raw.co_filename, entry.lineno
++        # If rootdir is provided, make the path relative to rootdir
++        if rootdir is not None:
++            try:
++                # If path is not absolute, resolve it relative to the current working directory
++                if not os.path.isabs(str(path)):
++                    path = os.path.abspath(path)
++                # Use relto to get the path relative to rootdir
++                np = py.path.local(path).relto(rootdir)
++                if np is not None:
++                    path = np
++                else:
++                    # If the path is not relative to rootdir, fall back to bestrelpath
++                    path = rootdir.bestrelpath(path)
++            except OSError:
++                pass
+         return ReprFileLocation(path, lineno + 1, exconly)
+ 
+     def getrepr(
+@@ -575,6 +593,7 @@ class ExceptionInfo(Generic[_E]):
+         funcargs: bool = False,
+         truncate_locals: bool = True,
+         chain: bool = True,
++        rootdir: Optional["py.path.local"] = None,
+     ) -> Union["ReprExceptionInfo", "ExceptionChainRepr"]:
+         """
+         Return str()able representation of this exception info.
+@@ -600,6 +619,12 @@ class ExceptionInfo(Generic[_E]):
+ 
+         :param bool chain: if chained exceptions in Python 3 should be shown.
+ 
++        :param rootdir:
++            The root directory of the test run. If provided, paths will be
++            made relative to this directory instead of the current working
++            directory. This is useful when a fixture changes the working
++            directory before the test runs.
++
+         .. versionchanged:: 3.9
+ 
+             Added the ``chain`` parameter.
+@@ -611,7 +636,7 @@ class ExceptionInfo(Generic[_E]):
+                         self.type, self.value, self.traceback[0]._rawentry
+                     )
+                 ),
+-                self._getreprcrash(),
++                self._getreprcrash(rootdir),
+             )
+ 
+         fmt = FormattedExcinfo(
+@@ -622,6 +647,7 @@ class ExceptionInfo(Generic[_E]):
+             funcargs=funcargs,
+             truncate_locals=truncate_locals,
+             chain=chain,
++            rootdir=rootdir,
+         )
+         return fmt.repr_excinfo(self)
+ 
+@@ -655,6 +681,7 @@ class FormattedExcinfo:
+     funcargs = attr.ib(type=bool, default=False)
+     truncate_locals = attr.ib(type=bool, default=True)
+     chain = attr.ib(type=bool, default=True)
++    rootdir = attr.ib(default=None)
+     astcache = attr.ib(default=attr.Factory(dict), init=False, repr=False)
+ 
+     def _getindent(self, source: "Source") -> int:
+@@ -791,10 +818,23 @@ class FormattedExcinfo:
+     def _makepath(self, path):
+         if not self.abspath:
+             try:
+-                np = py.path.local().bestrelpath(path)
++                if self.rootdir is not None:
++                    # If path is not absolute, we need to resolve it relative to
++                    # the current working directory to get the correct relative path
++                    # to rootdir. This handles the case where a fixture changes
++                    # the working directory before the test runs.
++                    if not os.path.isabs(str(path)):
++                        path = os.path.abspath(path)
++                    # Use relto to get the path relative to rootdir
++                    np = py.path.local(path).relto(self.rootdir)
++                    if np is None:
++                        # If the path is not relative to rootdir, fall back to bestrelpath
++                        np = self.rootdir.bestrelpath(path)
++                else:
++                    np = py.path.local().bestrelpath(path)
+             except OSError:
+                 return path
+-            if len(np) < len(str(path)):
++            if np is not None and len(np) < len(str(path)):
+                 path = np
+         return path
+ 
+@@ -875,7 +915,7 @@ class FormattedExcinfo:
+             if excinfo_:
+                 reprtraceback = self.repr_traceback(excinfo_)
+                 reprcrash = (
+-                    excinfo_._getreprcrash() if self.style != "value" else None
++                    excinfo_._getreprcrash(self.rootdir) if self.style != "value" else None
+                 )  # type: Optional[ReprFileLocation]
+             else:
+                 # fallback to native repr if the exception doesn't have a traceback:
+diff --git a/src/_pytest/nodes.py b/src/_pytest/nodes.py
+index 4a79bc861..664507691 100644
+--- a/src/_pytest/nodes.py
++++ b/src/_pytest/nodes.py
+@@ -374,6 +374,7 @@ class Node(metaclass=NodeMeta):
+             style=style,
+             tbfilter=False,  # pruned already, or in --fulltrace mode.
+             truncate_locals=truncate_locals,
++            rootdir=self.config.rootdir,
+         )
+ 
+     def repr_failure(

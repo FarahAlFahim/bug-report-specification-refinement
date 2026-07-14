@@ -1,0 +1,180 @@
+diff --git a/sympy/utilities/codegen.py b/sympy/utilities/codegen.py
+index f0befb2bd..265ea9a09 100644
+--- a/sympy/utilities/codegen.py
++++ b/sympy/utilities/codegen.py
+@@ -718,12 +718,21 @@ def routine(self, name, expr, argument_sequence=None, global_vars=None):
+ 
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
++            # preserve the original user-supplied objects so we can infer
++            # dimensions for MatrixSymbol arguments that don't appear in the
++            # expressions
++            orig_sequence = list(argument_sequence)
+             new_sequence = []
+-            for arg in argument_sequence:
++            original_map = {}
++            for arg in orig_sequence:
+                 if isinstance(arg, IndexedBase):
+-                    new_sequence.append(arg.label)
++                    key = arg.label
++                    new_sequence.append(key)
++                    original_map[key] = arg
+                 else:
+-                    new_sequence.append(arg)
++                    key = arg
++                    new_sequence.append(key)
++                    original_map[key] = arg
+             argument_sequence = new_sequence
+ 
+             missing = [x for x in arg_list if x.name not in argument_sequence]
+@@ -739,7 +748,17 @@ def routine(self, name, expr, argument_sequence=None, global_vars=None):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # try to infer dimensions from the original user-supplied
++                    # argument (e.g. a MatrixSymbol). If available, preserve
++                    # the dimensions metadata so array arguments remain arrays
++                    orig = original_map.get(symbol, None)
++                    if orig is not None and hasattr(orig, 'shape') and getattr(orig, 'shape'):
++                        dims = []
++                        for dim in orig.shape:
++                            dims.append((S.Zero, dim - 1))
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_val, local_vars, global_vars)
+@@ -1381,12 +1400,21 @@ def routine(self, name, expr, argument_sequence, global_vars):
+ 
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
++            # preserve the original user-supplied objects so we can infer
++            # dimensions for MatrixSymbol arguments that don't appear in the
++            # expressions
++            orig_sequence = list(argument_sequence)
+             new_sequence = []
+-            for arg in argument_sequence:
++            original_map = {}
++            for arg in orig_sequence:
+                 if isinstance(arg, IndexedBase):
+-                    new_sequence.append(arg.label)
++                    key = arg.label
++                    new_sequence.append(key)
++                    original_map[key] = arg
+                 else:
+-                    new_sequence.append(arg)
++                    key = arg
++                    new_sequence.append(key)
++                    original_map[key] = arg
+             argument_sequence = new_sequence
+ 
+             missing = [x for x in arg_list if x.name not in argument_sequence]
+@@ -1402,7 +1430,17 @@ def routine(self, name, expr, argument_sequence, global_vars):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # try to infer dimensions from the original user-supplied
++                    # argument (e.g. a MatrixSymbol). If available, preserve
++                    # the dimensions metadata so array arguments remain arrays
++                    orig = original_map.get(symbol, None)
++                    if orig is not None and hasattr(orig, 'shape') and getattr(orig, 'shape'):
++                        dims = []
++                        for dim in orig.shape:
++                            dims.append((S.Zero, dim - 1))
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_vals, local_vars, global_vars)
+@@ -1589,12 +1627,21 @@ def routine(self, name, expr, argument_sequence, global_vars):
+ 
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
++            # preserve the original user-supplied objects so we can infer
++            # dimensions for MatrixSymbol arguments that don't appear in the
++            # expressions
++            orig_sequence = list(argument_sequence)
+             new_sequence = []
+-            for arg in argument_sequence:
++            original_map = {}
++            for arg in orig_sequence:
+                 if isinstance(arg, IndexedBase):
+-                    new_sequence.append(arg.label)
++                    key = arg.label
++                    new_sequence.append(key)
++                    original_map[key] = arg
+                 else:
+-                    new_sequence.append(arg)
++                    key = arg
++                    new_sequence.append(key)
++                    original_map[key] = arg
+             argument_sequence = new_sequence
+ 
+             missing = [x for x in arg_list if x.name not in argument_sequence]
+@@ -1610,7 +1657,17 @@ def routine(self, name, expr, argument_sequence, global_vars):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # try to infer dimensions from the original user-supplied
++                    # argument (e.g. a MatrixSymbol). If available, preserve
++                    # the dimensions metadata so array arguments remain arrays
++                    orig = original_map.get(symbol, None)
++                    if orig is not None and hasattr(orig, 'shape') and getattr(orig, 'shape'):
++                        dims = []
++                        for dim in orig.shape:
++                            dims.append((S.Zero, dim - 1))
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_vals, local_vars, global_vars)
+@@ -1820,12 +1877,21 @@ def routine(self, name, expr, argument_sequence, global_vars):
+ 
+         if argument_sequence is not None:
+             # if the user has supplied IndexedBase instances, we'll accept that
++            # preserve the original user-supplied objects so we can infer
++            # dimensions for MatrixSymbol arguments that don't appear in the
++            # expressions
++            orig_sequence = list(argument_sequence)
+             new_sequence = []
+-            for arg in argument_sequence:
++            original_map = {}
++            for arg in orig_sequence:
+                 if isinstance(arg, IndexedBase):
+-                    new_sequence.append(arg.label)
++                    key = arg.label
++                    new_sequence.append(key)
++                    original_map[key] = arg
+                 else:
+-                    new_sequence.append(arg)
++                    key = arg
++                    new_sequence.append(key)
++                    original_map[key] = arg
+             argument_sequence = new_sequence
+ 
+             missing = [x for x in arg_list if x.name not in argument_sequence]
+@@ -1841,7 +1907,17 @@ def routine(self, name, expr, argument_sequence, global_vars):
+                 try:
+                     new_args.append(name_arg_dict[symbol])
+                 except KeyError:
+-                    new_args.append(InputArgument(symbol))
++                    # try to infer dimensions from the original user-supplied
++                    # argument (e.g. a MatrixSymbol). If available, preserve
++                    # the dimensions metadata so array arguments remain arrays
++                    orig = original_map.get(symbol, None)
++                    if orig is not None and hasattr(orig, 'shape') and getattr(orig, 'shape'):
++                        dims = []
++                        for dim in orig.shape:
++                            dims.append((S.Zero, dim - 1))
++                        new_args.append(InputArgument(symbol, dimensions=dims))
++                    else:
++                        new_args.append(InputArgument(symbol))
+             arg_list = new_args
+ 
+         return Routine(name, arg_list, return_vals, local_vars, global_vars)

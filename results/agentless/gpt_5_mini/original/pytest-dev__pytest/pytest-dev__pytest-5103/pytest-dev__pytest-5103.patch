@@ -1,0 +1,16 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 4810cdd..9fb6703 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -1013,7 +1013,10 @@ warn_explicit(
+         for keyword in call.keywords:
+             res, expl = self.visit(keyword.value)
+             new_kwargs.append(ast.keyword(keyword.arg, res))
+-            arg_expls.append(keyword.arg + "=" + expl)
++            if keyword.arg:
++                arg_expls.append(keyword.arg + "=" + expl)
++            else:  # **args have `arg` keywords with an .arg of None
++                arg_expls.append("**" + expl)
+         if call.starargs:
+             new_star, expl = self.visit(call.starargs)
+             arg_expls.append("*" + expl)

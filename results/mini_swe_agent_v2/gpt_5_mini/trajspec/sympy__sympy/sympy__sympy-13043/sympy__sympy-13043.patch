@@ -1,0 +1,39 @@
+diff --git a/sympy/integrals/intpoly.py b/sympy/integrals/intpoly.py
+index fc72bd206f..4f4ab9aeb6 100644
+--- a/sympy/integrals/intpoly.py
++++ b/sympy/integrals/intpoly.py
+@@ -12,6 +12,7 @@
+ from __future__ import print_function, division
+ 
+ from functools import cmp_to_key
++from sympy.core.compatibility import default_sort_key
+ 
+ from sympy.core import S, diff, Expr, Symbol
+ 
+@@ -569,6 +570,12 @@ def decompose(expr, separate=False):
+             degrees = [(sum(degree_list(monom, *symbols)), monom)
+                        for monom in expr.args]
+             if separate:
++                # Return a deterministically-ordered list of monomials.
++                # Use total degree as the primary key and SymPy's
++                # default_sort_key as a tie-breaker so ordering does not
++                # depend on expr.args iteration order or dict insertion
++                # order.
++                degrees.sort(key=lambda dm: (dm[0], default_sort_key(dm[1])))
+                 return [monom[1] for monom in degrees]
+             else:
+                 for monom in degrees:
+@@ -593,7 +600,12 @@ def decompose(expr, separate=False):
+         poly_dict[0] = expr
+ 
+     if separate:
+-        return list(poly_dict.values())
++        # Ensure a deterministic ordering of the returned list of
++        # homogeneous polynomials. Sort by degree (the dict key) and
++        # then by default_sort_key of the polynomial to break ties.
++        items = list(poly_dict.items())
++        items.sort(key=lambda kv: (kv[0], default_sort_key(kv[1])))
++        return [v for (_k, v) in items]
+     return poly_dict
+ 
+ 

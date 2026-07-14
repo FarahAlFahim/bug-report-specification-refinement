@@ -1,0 +1,74 @@
+diff --git a/src/_pytest/assertion/util.py b/src/_pytest/assertion/util.py
+index 762e5761d..884568d21 100644
+--- a/src/_pytest/assertion/util.py
++++ b/src/_pytest/assertion/util.py
+@@ -257,22 +257,61 @@ def _compare_eq_sequence(left, right, verbose=0):
+     explanation = []
+     len_left = len(left)
+     len_right = len(right)
+-    for i in range(min(len_left, len_right)):
+-        if left[i] != right[i]:
+-            explanation += [
+-                "At index {} diff: {!r} != {!r}".format(i, left[i], right[i])
+-            ]
+-            break
++
++    # Handle bytes and bytearray - they return int on indexing, not bytes
++    if isinstance(left, (bytes, bytearray)):
++        if isinstance(right, (bytes, bytearray)):
++            for i in range(min(len_left, len_right)):
++                # Convert int back to bytes for proper comparison
++                left_i = bytes([left[i]])
++                right_i = bytes([right[i]])
++                if left_i != right_i:
++                    explanation += [
++                        "At index {} diff: {!r} != {!r}".format(i, left_i, right_i)
++                    ]
++                    break
++        else:
++            for i in range(min(len_left, len_right)):
++                left_i = bytes([left[i]])
++                if left_i != right[i:i+1]:
++                    explanation += [
++                        "At index {} diff: {!r} != {!r}".format(i, left_i, right[i:i+1])
++                    ]
++                    break
++    elif isinstance(right, (bytes, bytearray)):
++        for i in range(min(len_left, len_right)):
++            right_i = bytes([right[i]])
++            if left[i:i+1] != right_i:
++                explanation += [
++                    "At index {} diff: {!r} != {!r}".format(i, left[i:i+1], right_i)
++                ]
++                break
++    else:
++        for i in range(min(len_left, len_right)):
++            if left[i] != right[i]:
++                explanation += [
++                    "At index {} diff: {!r} != {!r}".format(i, left[i], right[i])
++                ]
++                break
++
+     len_diff = len_left - len_right
+ 
+     if len_diff:
+         if len_diff > 0:
+             dir_with_more = "Left"
+-            extra = saferepr(left[len_right])
++            # Convert int to bytes for bytes/bytearray
++            if isinstance(left, (bytes, bytearray)):
++                extra = saferepr(bytes([left[len_right]]))
++            else:
++                extra = saferepr(left[len_right])
+         else:
+             len_diff = 0 - len_diff
+             dir_with_more = "Right"
+-            extra = saferepr(right[len_left])
++            # Convert int to bytes for bytes/bytearray
++            if isinstance(right, (bytes, bytearray)):
++                extra = saferepr(bytes([right[len_left]]))
++            else:
++                extra = saferepr(right[len_left])
+ 
+         if len_diff == 1:
+             explanation += [

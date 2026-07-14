@@ -1,0 +1,28 @@
+diff --git a/seaborn/axisgrid.py b/seaborn/axisgrid.py
+index 21c0562..b510876 100644
+--- a/seaborn/axisgrid.py
++++ b/seaborn/axisgrid.py
+@@ -1285,6 +1285,23 @@ class PairGrid(Grid):
+             self.hue_names = hue_names
+             self.hue_vals = data[hue]
+ 
++            # If a hue_order was provided that does not include all values of the
++            # hue variable, follow the historical seaborn behavior and plot only
++            # those levels. To achieve that, subset the dataset (and the stored
++            # hue values) to rows whose hue is in the requested hue_order.
++            # This avoids mismatches between the grouping keys and the requested
++            # order that can lead to type errors (e.g. ufunc 'isnan' on string
++            # dtypes) when later code attempts numeric operations on non-numeric
++            # groups.
++            if hue_order is not None:
++                try:
++                    mask = data[hue].isin(hue_order)
++                except Exception:
++                    # In case .isin fails for some exotic dtype, don't filter.
++                    mask = pd.Series(True, index=data.index)
++                data = data.loc[mask]
++                self.hue_vals = self.hue_vals.loc[mask]
++
+         # Additional dict of kwarg -> list of values for mapping the hue var
+         self.hue_kws = hue_kws if hue_kws is not None else {}
+ 

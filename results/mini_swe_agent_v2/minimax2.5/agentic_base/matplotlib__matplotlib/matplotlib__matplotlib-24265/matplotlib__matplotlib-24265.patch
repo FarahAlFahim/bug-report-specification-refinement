@@ -1,0 +1,97 @@
+diff --git a/lib/matplotlib/style/core.py b/lib/matplotlib/style/core.py
+index fb0a5426e6..f5eb07a13c 100644
+--- a/lib/matplotlib/style/core.py
++++ b/lib/matplotlib/style/core.py
+@@ -44,6 +44,29 @@ STYLE_BLACKLIST = {
+     'figure.raise_window', 'savefig.directory', 'tk.window_focus',
+     'docstring.hardcopy', 'date.epoch'}
+ 
++# Mapping of deprecated seaborn style names to their new names
++_DEPRECATED_SEABORN_STYLES = {
++    s: s.replace("seaborn", "seaborn-v0_8")
++    for s in [
++        "seaborn",
++        "seaborn-bright",
++        "seaborn-colorblind",
++        "seaborn-dark",
++        "seaborn-darkgrid",
++        "seaborn-dark-palette",
++        "seaborn-deep",
++        "seaborn-muted",
++        "seaborn-notebook",
++        "seaborn-paper",
++        "seaborn-pastel",
++        "seaborn-poster",
++        "seaborn-talk",
++        "seaborn-ticks",
++        "seaborn-white",
++        "seaborn-whitegrid",
++    ]
++}
++
+ 
+ def _remove_blacklisted_style_params(d, warn=True):
+     o = {}
+@@ -89,7 +112,7 @@ def use(style):
+         | dict | Dictionary with valid key/value pairs for                   |
+         |      | `matplotlib.rcParams`.                                      |
+         +------+-------------------------------------------------------------+
+-        | Path | A path-like object which is a path to a style file.         |
++        | Path | A path-like object which is a path to a style file.        |
+         +------+-------------------------------------------------------------+
+         | list | A list of style specifiers (str, Path or dict) applied from |
+         |      | first to last in the list.                                  |
+@@ -113,31 +136,14 @@ def use(style):
+     def fix_style(s):
+         if isinstance(s, str):
+             s = style_alias.get(s, s)
+-            if s in [
+-                "seaborn",
+-                "seaborn-bright",
+-                "seaborn-colorblind",
+-                "seaborn-dark",
+-                "seaborn-darkgrid",
+-                "seaborn-dark-palette",
+-                "seaborn-deep",
+-                "seaborn-muted",
+-                "seaborn-notebook",
+-                "seaborn-paper",
+-                "seaborn-pastel",
+-                "seaborn-poster",
+-                "seaborn-talk",
+-                "seaborn-ticks",
+-                "seaborn-white",
+-                "seaborn-whitegrid",
+-            ]:
++            if s in _DEPRECATED_SEABORN_STYLES:
+                 _api.warn_deprecated(
+                     "3.6", message="The seaborn styles shipped by Matplotlib "
+                     "are deprecated since %(since)s, as they no longer "
+                     "correspond to the styles shipped by seaborn. However, "
+                     "they will remain available as 'seaborn-v0_8-<style>'. "
+                     "Alternatively, directly use the seaborn API instead.")
+-                s = s.replace("seaborn", "seaborn-v0_8")
++                s = _DEPRECATED_SEABORN_STYLES[s]
+         return s
+ 
+     for style in map(fix_style, styles):
+@@ -178,7 +184,7 @@ def context(style, after_reset=False):
+         | dict | Dictionary with valid key/value pairs for                   |
+         |      | `matplotlib.rcParams`.                                      |
+         +------+-------------------------------------------------------------+
+-        | Path | A path-like object which is a path to a style file.         |
++        | Path | A path-like object which is a path to a style file.        |
+         +------+-------------------------------------------------------------+
+         | list | A list of style specifiers (str, Path or dict) applied from |
+         |      | first to last in the list.                                  |
+@@ -255,6 +261,10 @@ def reload_library():
+     """Reload the style library."""
+     global library
+     library = update_user_library(_base_library)
++    # Add deprecated seaborn style names as aliases to the new names
++    for old_name, new_name in _DEPRECATED_SEABORN_STYLES.items():
++        if new_name in library and old_name not in library:
++            library[old_name] = library[new_name]
+     available[:] = sorted(library.keys())
+ 
+ 

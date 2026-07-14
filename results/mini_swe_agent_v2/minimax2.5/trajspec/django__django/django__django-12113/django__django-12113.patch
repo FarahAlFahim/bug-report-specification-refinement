@@ -1,0 +1,27 @@
+diff --git a/django/test/testcases.py b/django/test/testcases.py
+index 23459f22cd..2c495b3225 100644
+--- a/django/test/testcases.py
++++ b/django/test/testcases.py
+@@ -1082,6 +1082,22 @@ class TestCase(TransactionTestCase):
+         for db_name in cls._databases_names():
+             atomics[db_name] = transaction.atomic(using=db_name)
+             atomics[db_name].__enter__()
++        # For multiple file-based SQLite databases, serialize the operations
++        # by entering and exiting the atomic blocks sequentially to avoid
++        # database locking issues.
++        if cls._databases_support_transactions():
++            sqlite_file_based = set()
++            for db_name in cls._databases_names():
++                conn = connections[db_name]
++                if conn.vendor == 'sqlite' and not conn.is_in_memory_db():
++                    sqlite_file_based.add(db_name)
++            if len(sqlite_file_based) > 1:
++                # Re-enter atomics sequentially for file-based SQLite databases
++                for db_name in sqlite_file_based:
++                    atomics[db_name].__exit__(None, None, None)
++                for db_name in sqlite_file_based:
++                    atomics[db_name] = transaction.atomic(using=db_name)
++                    atomics[db_name].__enter__()
+         return atomics
+ 
+     @classmethod

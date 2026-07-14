@@ -1,0 +1,18 @@
+diff --git a/sphinx/domains/std.py b/sphinx/domains/std.py
+index 4bde57930..f1897257f 100644
+--- a/sphinx/domains/std.py
++++ b/sphinx/domains/std.py
+@@ -843,6 +843,13 @@ class StandardDomain(Domain):
+         if figtype is None:
+             return None
+ 
++        # For std-domain enumerable nodes, numbering is only assigned when
++        # the node actually has a caption/title (see TocTreeCollector.assign_figure_numbers).
++        # Avoid attempting to lookup a fignumber for uncaptioned std nodes
++        # (e.g. tables without caption) to prevent spurious warnings.
++        if figtype != 'section' and self.get_numfig_title(target_node) is None:
++            return contnode
++
+         if figtype != 'section' and env.config.numfig is False:
+             logger.warning(__('numfig is disabled. :numref: is ignored.'), location=node)
+             return contnode

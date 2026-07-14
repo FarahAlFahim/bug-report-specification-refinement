@@ -1,0 +1,50 @@
+diff --git a/pylint/lint/run.py b/pylint/lint/run.py
+index 778e64441..d882c59fa 100644
+--- a/pylint/lint/run.py
++++ b/pylint/lint/run.py
+@@ -14,6 +14,7 @@ from typing import Any
+ from pylint import config
+ from pylint.config.config_initialization import _config_initialization
+ from pylint.config.exceptions import ArgumentPreprocessingError
++from pylint.config.exceptions import _UnrecognizedOptionError
+ from pylint.config.utils import _preprocess_options
+ from pylint.constants import full_version
+ from pylint.lint.base_options import _make_run_options
+@@ -132,9 +133,34 @@ group are mutually exclusive.",
+         linter.disable("I")
+         linter.enable("c-extension-no-member")
+ 
+-        args = _config_initialization(
+-            linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
+-        )
++        try:
++            args = _config_initialization(
++                linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
++            )
++        except _UnrecognizedOptionError as exc:
++            # _config_initialization already records the unrecognized-option
++            # message on the linter, but since configuration initialization
++            # failed we need to provide a user-friendly error and exit
++            # without a traceback (similar to other early exits).
++            # Print usage/help then a concise error like other CLI tools.
++            try:
++                help_text = linter.help()
++            except Exception:
++                help_text = None
++            if help_text:
++                print(help_text)
++            # Format unrecognized options like a typical CLI (short -x or --long)
++            formatted = []
++            for opt in exc.options:
++                if len(opt) == 1:
++                    formatted.append(f"-{opt}")
++                else:
++                    formatted.append(f"--{opt}")
++            print(
++                f"pylint: error: unrecognized arguments: {' '.join(formatted)}",
++                file=sys.stderr,
++            )
++            sys.exit(32)
+ 
+         if linter.config.jobs < 0:
+             print(
