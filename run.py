@@ -5,8 +5,8 @@ Usage:
     python run.py <phase> [options]
 
 Phases:
-    enhance               Generate TrajSpec reports
-    vanilla_baseline      Generate Agentic-Base reports
+    enhance               Generate ExploreSpec reports
+    vanilla_baseline      Generate SHERLOC reports
     raw_traj_ablation     Ablation: raw Thoughts instead of compressed analysis
     merge                 Merge original + generated reports
 """

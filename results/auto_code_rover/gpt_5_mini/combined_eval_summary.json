@@ -6,8 +6,8 @@
   "expected_total": 100,
   "variants": [
     "original",
-    "agentic_base",
-    "trajspec"
+    "sherloc",
+    "explorespec"
   ],
   "per_variant": {
     "original": {
@@ -16,14 +16,14 @@
       "total_resolved_at_1": 47,
       "overall_pass_at_1": 0.47
     },
-    "agentic_base": {
-      "label": "Agentic-Base Reports",
+    "sherloc": {
+      "label": "SHERLOC Reports",
       "total_evaluated": 100,
       "total_resolved_at_1": 52,
       "overall_pass_at_1": 0.52
     },
-    "trajspec": {
-      "label": "TrajSpec Reports",
+    "explorespec": {
+      "label": "ExploreSpec Reports",
       "total_evaluated": 100,
       "total_resolved_at_1": 72,
       "overall_pass_at_1": 0.72
@@ -37,11 +37,11 @@
           "resolved_instances": 18,
           "pass_at_1": 0.47368421052631576
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 20,
           "pass_at_1": 0.5263157894736842
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 27,
           "pass_at_1": 0.7105263157894737
         }
@@ -54,11 +54,11 @@
           "resolved_instances": 11,
           "pass_at_1": 0.44
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 13,
           "pass_at_1": 0.52
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 16,
           "pass_at_1": 0.64
         }
@@ -71,11 +71,11 @@
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 2,
           "pass_at_1": 1.0
         }
@@ -88,11 +88,11 @@
           "resolved_instances": 5,
           "pass_at_1": 0.625
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 6,
           "pass_at_1": 0.75
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 7,
           "pass_at_1": 0.875
         }
@@ -105,11 +105,11 @@
           "resolved_instances": 3,
           "pass_at_1": 0.375
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 3,
           "pass_at_1": 0.375
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 6,
           "pass_at_1": 0.75
         }
@@ -122,11 +122,11 @@
           "resolved_instances": 1,
           "pass_at_1": 0.3333333333333333
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 1,
           "pass_at_1": 0.3333333333333333
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 3,
           "pass_at_1": 1.0
         }
@@ -139,11 +139,11 @@
           "resolved_instances": 2,
           "pass_at_1": 0.4
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 3,
           "pass_at_1": 0.6
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 4,
           "pass_at_1": 0.8
         }
@@ -156,11 +156,11 @@
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 2,
           "pass_at_1": 1.0
         }
@@ -173,11 +173,11 @@
           "resolved_instances": 3,
           "pass_at_1": 0.6
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 2,
           "pass_at_1": 0.4
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 3,
           "pass_at_1": 0.6
         }
@@ -190,11 +190,11 @@
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 1,
           "pass_at_1": 0.5
         }
@@ -207,11 +207,11 @@
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "agentic_base": {
+        "sherloc": {
           "resolved_instances": 1,
           "pass_at_1": 0.5
         },
-        "trajspec": {
+        "explorespec": {
           "resolved_instances": 1,
           "pass_at_1": 0.5
         }
@@ -221,503 +221,503 @@
   "variants_resolved_comparison": {
     "astropy__astropy-12907": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "astropy__astropy-14182": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "astropy__astropy-14365": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-10914": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-11001": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-11099": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-11179": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-11422": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-11620": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-11742": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-11905": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-11999": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-12113": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-12284": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-12308": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-12497": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-12589": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-12747": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-12908": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-13028": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-13033": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-13230": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-13321": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-13658": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-13768": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-14155": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-14382": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-14534": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-14608": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-14667": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-14672": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-14730": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-14787": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-14915": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-14997": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-15061": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "django__django-15213": {
       "original": true,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-15320": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-15400": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "django__django-15781": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "django__django-17087": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "matplotlib__matplotlib-18869": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "matplotlib__matplotlib-23913": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "matplotlib__matplotlib-25311": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "matplotlib__matplotlib-25332": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "matplotlib__matplotlib-25433": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "matplotlib__matplotlib-25498": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "matplotlib__matplotlib-26011": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "matplotlib__matplotlib-26020": {
       "original": true,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "mwaskom__seaborn-2848": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "mwaskom__seaborn-3010": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "psf__requests-1963": {
       "original": true,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "psf__requests-2148": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "pydata__xarray-3364": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "pydata__xarray-5131": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "pylint-dev__pylint-5859": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "pylint-dev__pylint-6506": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "pytest-dev__pytest-11143": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "pytest-dev__pytest-5103": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "pytest-dev__pytest-5221": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "pytest-dev__pytest-7373": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "pytest-dev__pytest-7432": {
       "original": true,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "scikit-learn__scikit-learn-10297": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "scikit-learn__scikit-learn-10508": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "scikit-learn__scikit-learn-10949": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "scikit-learn__scikit-learn-11281": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "scikit-learn__scikit-learn-13241": {
       "original": true,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "scikit-learn__scikit-learn-14983": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "scikit-learn__scikit-learn-15512": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "scikit-learn__scikit-learn-25570": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sphinx-doc__sphinx-10325": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sphinx-doc__sphinx-7686": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sphinx-doc__sphinx-7975": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "sphinx-doc__sphinx-8595": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sphinx-doc__sphinx-8801": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-11400": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-12419": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-13177": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-13437": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-13480": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-13647": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-13971": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-14774": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-14817": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-15308": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-15345": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-15609": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-15678": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-17655": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "sympy__sympy-18057": {
       "original": false,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-19487": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-20442": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-21171": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     },
     "sympy__sympy-21614": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-21847": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-22005": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "sympy__sympy-22714": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": true
+      "sherloc": false,
+      "explorespec": true
     },
     "sympy__sympy-23262": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-24213": {
       "original": true,
-      "agentic_base": true,
-      "trajspec": true
+      "sherloc": true,
+      "explorespec": true
     },
     "sympy__sympy-24909": {
       "original": false,
-      "agentic_base": false,
-      "trajspec": false
+      "sherloc": false,
+      "explorespec": false
     }
   }
 }

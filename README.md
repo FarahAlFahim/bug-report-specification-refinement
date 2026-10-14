@@ -7,14 +7,14 @@ The implementation supports the variants used in the paper:
 | Paper name | Repository phase / source | Description |
 |---|---|---|
 | Original Reports | `data/by_repo/*.json` | Official SWE-bench Lite bug reports, grouped by repository. |
-| Agentic-Base Reports | `vanilla_baseline` / `src/agents/vanilla_baseline.py` | A basic tool-augmented agent without protocol-guided exploration, hierarchical compression, or reviewer validation. |
-| TrajSpec Reports | `enhance` / `src/agents/multi_agent.py` | The main pipeline: protocol-guided exploration, hierarchical trajectory compression, final report generation, and reviewer validation. |
+| SHERLOC Reports | `vanilla_baseline` / `src/agents/vanilla_baseline.py` | A basic tool-augmented agent without protocol-guided exploration, hierarchical compression, or reviewer validation. |
+| ExploreSpec Reports | `enhance` / `src/agents/multi_agent.py` | The main pipeline: protocol-guided exploration, hierarchical trajectory compression, final report generation, and reviewer validation. |
 | w/o Hierarchy | `raw_traj_ablation` / `src/agents/raw_trajectory_ablation.py` | Ablation that replaces the compressed analysis with raw agent thoughts while keeping report generation and reviewer validation. |
 | w/o Reviewer | pre-reviewer output from `enhance` | Ablation saved by the main pipeline before the reviewer agent runs. |
 
 ### Trajectory-Collection Agent
 
-In this artifact, TrajSpec's unverified trajectory-collection run is implemented by a tool-augmented agent operating on the original bug report and pre-fix repository snapshot. The agent searches and inspects repository code, invokes code-navigation and code-graph tools, reasons about candidate failure explanations, and records the resulting thought-action-observation trajectory. The implementation uses a five-checkpoint investigation procedure to examine the defect, relevant source files, architectural relationships, and assumptions underlying a candidate fix. If the investigation stops prematurely, it resumes from the latest completed checkpoint while preserving the accumulated trajectory. The resulting trajectory is subsequently used for hierarchical specification evidence abstraction.
+In this artifact, ExploreSpec's unverified trajectory-collection run is implemented by a tool-augmented agent operating on the original bug report and pre-fix repository snapshot. The agent searches and inspects repository code, invokes code-navigation and code-graph tools, reasons about candidate failure explanations, and records the resulting thought-action-observation trajectory. The implementation uses a five-checkpoint investigation procedure to examine the defect, relevant source files, architectural relationships, and assumptions underlying a candidate fix. If the investigation stops prematurely, it resumes from the latest completed checkpoint while preserving the accumulated trajectory. The resulting trajectory is subsequently used for hierarchical specification evidence abstraction.
 
 ## Repository Layout
 
@@ -110,14 +110,14 @@ To regenerate reports from scratch, provide a precomputed code graph index with 
 
 ## Running Variants
 
-### TrajSpec Reports
+### ExploreSpec Reports
 
 ```bash
 python run.py enhance \
   --repo-instances data/by_repo/astropy__astropy.json \
   --repo-codegraph-index data/code_graph/astropy__astropy.json \
   --repo-local-path /path/to/astropy \
-  --output data/output/gpt_5_mini/trajspec/astropy__astropy.json
+  --output data/output/gpt_5_mini/explorespec/astropy__astropy.json
 ```
 
 The `enhance` phase writes two outputs:
@@ -125,23 +125,23 @@ The `enhance` phase writes two outputs:
 | Output | Meaning |
 |---|---|
 | `data/output/.../wo_reviewer/<repo>.json` | Pre-reviewer report, used as the w/o Reviewer ablation. |
-| path passed to `--output` | Post-reviewer TrajSpec report. |
+| path passed to `--output` | Post-reviewer ExploreSpec report. |
 
 Use `--single-enhanced-file` to choose the pre-reviewer output path explicitly.
 
-### Agentic-Base Reports
+### SHERLOC Reports
 
 ```bash
 python run.py vanilla_baseline \
   --repo-instances data/by_repo/astropy__astropy.json \
   --repo-codegraph-index data/code_graph/astropy__astropy.json \
   --repo-local-path /path/to/astropy \
-  --output data/output/gpt_5_mini/agentic_base/astropy__astropy.json
+  --output data/output/gpt_5_mini/sherloc/astropy__astropy.json
 ```
 
 ### w/o Hierarchy Ablation
 
-This phase starts from TrajSpec pre-reviewer or post-reviewer entries that contain `chat_history`, then regenerates the report using raw agent thoughts rather than `compressed_analysis`.
+This phase starts from ExploreSpec pre-reviewer or post-reviewer entries that contain `chat_history`, then regenerates the report using raw agent thoughts rather than `compressed_analysis`.
 
 ```bash
 python run.py raw_traj_ablation \
@@ -159,8 +159,8 @@ Use `merge` to put generated reports back into an original SWE-bench-style file.
 ```bash
 python run.py merge \
   --merge-original data/by_repo/astropy__astropy.json \
-  --merge-enhanced data/output/gpt_5_mini/trajspec/astropy__astropy.json \
-  --merge-output data/output/merged/gpt_5_mini/trajspec/astropy__astropy.json
+  --merge-enhanced data/output/gpt_5_mini/explorespec/astropy__astropy.json \
+  --merge-output data/output/merged/gpt_5_mini/explorespec/astropy__astropy.json
 ```
 
 ## Common Options
@@ -181,8 +181,8 @@ python run.py merge \
 | Prompt | Used by |
 |---|---|
 | `classification.txt` | `classify_report` tool. |
-| `agent_instruction_multi_agent.txt` | TrajSpec explorer agent. |
-| `agent_instruction_no_protocol.txt` | Agentic-Base explorer agent. |
+| `agent_instruction_multi_agent.txt` | ExploreSpec explorer agent. |
+| `agent_instruction_no_protocol.txt` | SHERLOC explorer agent. |
 | `compress_chat_history.txt` | Hierarchical trajectory compression. |
 | `final_report.txt` | Final report generation for all active variants. |
-| `reviewer_multi_agent.txt` | Reviewer agent for TrajSpec and w/o Hierarchy. |
+| `reviewer_multi_agent.txt` | Reviewer agent for ExploreSpec and w/o Hierarchy. |

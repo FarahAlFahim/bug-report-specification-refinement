@@ -8,27 +8,27 @@ This directory contains downstream repair artifacts used to evaluate the report 
 │   └── gpt_5_mini/
 │       ├── combined_eval_summary.json
 │       ├── original/
-│       ├── agentic_base/
-│       └── trajspec/
+│       ├── sherloc/
+│       └── explorespec/
 ├── agentless/
 │   └── gpt_5_mini/
 │       ├── combined_eval_summary.json
 │       ├── original/
-│       ├── agentic_base/
-│       └── trajspec/
+│       ├── sherloc/
+│       └── explorespec/
 └── mini_swe_agent_v2/
     ├── gpt_5_mini/
     │   ├── combined_eval_summary.json
     │   ├── original/
-    │   ├── agentic_base/
-    │   ├── trajspec/
+    │   ├── sherloc/
+    │   ├── explorespec/
     │   ├── wo_reviewer/
     │   └── wo_hierarchy/
     └── minimax2.5/
         ├── combined_eval_summary.json
         ├── original/
-        ├── agentic_base/
-        └── trajspec/
+        ├── sherloc/
+        └── explorespec/
 ```
 
 Each report-variant directory follows this structure:
@@ -46,4 +46,4 @@ Each `combined_eval_summary.json` reports aggregate, per-repository, and per-ins
 
 Mini-SWE-Agent V2 uses all 300 canonical SWE-bench Lite instances. AutoCodeRover and Agentless use the same 100-instance subset recorded in `data/evaluation_subset_100.json`. AutoCodeRover trajectories retain its native structured trajectory data. Agentless trajectories are JSON containers holding the corresponding localization and repair stage logs.
 
-The MiniMax M2.5 evaluation includes Original Reports, Agentic-Base Reports, and TrajSpec Reports. The w/o Reviewer and w/o Hierarchy ablations were evaluated only with GPT-5-mini and therefore do not appear under `minimax2.5/`.
+The MiniMax M2.5 evaluation includes Original Reports, SHERLOC Reports, and ExploreSpec Reports. The w/o Reviewer and w/o Hierarchy ablations were evaluated only with GPT-5-mini and therefore do not appear under `minimax2.5/`.

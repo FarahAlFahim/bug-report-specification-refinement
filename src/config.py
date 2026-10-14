@@ -67,8 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Phases:
-  enhance            Generate TrajSpec reports
-  vanilla_baseline   Generate Agentic-Base reports
+  enhance            Generate ExploreSpec reports
+  vanilla_baseline   Generate SHERLOC reports
   raw_traj_ablation  Ablation: raw Thoughts instead of compressed analysis
   merge              Merge original + generated reports
 
@@ -76,12 +76,12 @@ Examples:
   python run.py enhance --repo-instances data/by_repo/django__django.json \\
       --repo-codegraph-index data/code_graph/django__django.json \\
       --repo-local-path /path/to/django \\
-      --output data/output/trajspec/django__django.json
+      --output data/output/explorespec/django__django.json
 
   python run.py vanilla_baseline --repo-instances data/by_repo/django__django.json \\
       --repo-codegraph-index data/code_graph/django__django.json \\
       --repo-local-path /path/to/django \\
-      --output data/output/agentic_base/django__django.json
+      --output data/output/sherloc/django__django.json
 
   python run.py raw_traj_ablation \\
       --repo-instances data/output/wo_reviewer/django__django.json \\
@@ -91,7 +91,7 @@ Examples:
       --output data/output/wo_hierarchy/django__django.json
 
   python run.py merge --merge-original data/by_repo/django__django.json \\
-      --merge-enhanced data/output/trajspec/django__django.json \\
+      --merge-enhanced data/output/explorespec/django__django.json \\
       --merge-output data/output/merged/django__django.json
 """
     )
