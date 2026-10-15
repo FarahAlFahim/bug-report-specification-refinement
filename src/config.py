@@ -47,6 +47,11 @@ class Config:
     token_est_per_line: int = 3
     max_context_tokens: int = 250000
 
+    # --- SHERLOC (reference defaults) ---
+    sherloc_total_steps: int = 20
+    sherloc_max_seq_length: int = 262144
+    sherloc_tokens_to_generate: int = 81920
+
     # --- Filtering ---
     instance_id_filter: List[str] = field(default_factory=list)
     exclude_tests: bool = True
@@ -68,7 +73,7 @@ def build_parser() -> argparse.ArgumentParser:
         epilog="""
 Phases:
   enhance            Generate ExploreSpec reports
-  vanilla_baseline   Generate SHERLOC reports
+  sherloc            Generate SHERLOC reports
   raw_traj_ablation  Ablation: raw Thoughts instead of compressed analysis
   merge              Merge original + generated reports
 
@@ -78,8 +83,7 @@ Examples:
       --repo-local-path /path/to/django \\
       --output data/output/explorespec/django__django.json
 
-  python run.py vanilla_baseline --repo-instances data/by_repo/django__django.json \\
-      --repo-codegraph-index data/code_graph/django__django.json \\
+  python run.py sherloc --repo-instances data/by_repo/django__django.json \\
       --repo-local-path /path/to/django \\
       --output data/output/sherloc/django__django.json
 
@@ -97,7 +101,7 @@ Examples:
     )
 
     p.add_argument("phase", nargs="?", default="enhance",
-                   choices=["enhance", "vanilla_baseline", "raw_traj_ablation", "merge"],
+                   choices=["enhance", "sherloc", "raw_traj_ablation", "merge"],
                    help="Pipeline phase to run (default: enhance)")
 
     # --- Paths ---
@@ -144,6 +148,15 @@ Examples:
     p.add_argument("--subgraph-hops", dest="subgraph_hops", type=int, default=2)
     p.add_argument("--max-context-tokens", dest="max_context_tokens", type=int,
                    default=defaults.max_context_tokens)
+    p.add_argument("--sherloc-total-steps", dest="sherloc_total_steps", type=int,
+                   default=defaults.sherloc_total_steps,
+                   help="SHERLOC exploration step budget")
+    p.add_argument("--sherloc-max-seq-length", dest="sherloc_max_seq_length", type=int,
+                   default=defaults.sherloc_max_seq_length,
+                   help="Context window assumed by SHERLOC's context management")
+    p.add_argument("--sherloc-tokens-to-generate", dest="sherloc_tokens_to_generate", type=int,
+                   default=defaults.sherloc_tokens_to_generate,
+                   help="SHERLOC per-call generation cap")
 
     # --- Filtering ---
     p.add_argument("--instance-ids", dest="instance_id_filter", nargs="*", default=[],

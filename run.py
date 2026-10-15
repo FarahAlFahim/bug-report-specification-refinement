@@ -6,7 +6,7 @@ Usage:
 
 Phases:
     enhance               Generate ExploreSpec reports
-    vanilla_baseline      Generate SHERLOC reports
+    sherloc               Generate SHERLOC reports
     raw_traj_ablation     Ablation: raw Thoughts instead of compressed analysis
     merge                 Merge original + generated reports
 """
@@ -28,8 +28,8 @@ def main():
         from src.agents.multi_agent import run_pipeline
         run_pipeline(cfg)
 
-    elif cfg.phase == "vanilla_baseline":
-        from src.agents.vanilla_baseline import run_pipeline
+    elif cfg.phase == "sherloc":
+        from src.agents.sherloc import run_pipeline
         run_pipeline(cfg)
 
     elif cfg.phase == "raw_traj_ablation":
