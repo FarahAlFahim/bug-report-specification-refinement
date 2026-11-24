@@ -25,8 +25,8 @@
     "explorespec": {
       "label": "ExploreSpec Reports",
       "total_evaluated": 300,
-      "total_resolved_at_1": 193,
-      "overall_pass_at_1": 0.6433333333333333
+      "total_resolved_at_1": 196,
+      "overall_pass_at_1": 0.6533333333333333
     }
   },
   "per_repository": {
@@ -59,8 +59,8 @@
           "pass_at_1": 0.6228070175438597
         },
         "explorespec": {
-          "resolved_instances": 83,
-          "pass_at_1": 0.7280701754385965
+          "resolved_instances": 84,
+          "pass_at_1": 0.7368421052631579
         }
       }
     },
@@ -212,8 +212,8 @@
           "pass_at_1": 0.5
         },
         "explorespec": {
-          "resolved_instances": 9,
-          "pass_at_1": 0.5625
+          "resolved_instances": 10,
+          "pass_at_1": 0.625
         }
       }
     },
@@ -229,8 +229,8 @@
           "pass_at_1": 0.4675324675324675
         },
         "explorespec": {
-          "resolved_instances": 43,
-          "pass_at_1": 0.5584415584415584
+          "resolved_instances": 44,
+          "pass_at_1": 0.5714285714285714
         }
       }
     }
@@ -789,7 +789,7 @@
     "django__django-16400": {
       "original": true,
       "sherloc": false,
-      "explorespec": false
+      "explorespec": true
     },
     "django__django-16408": {
       "original": false,
@@ -1334,7 +1334,7 @@
     "sphinx-doc__sphinx-8627": {
       "original": true,
       "sherloc": false,
-      "explorespec": false
+      "explorespec": true
     },
     "sphinx-doc__sphinx-8713": {
       "original": true,
@@ -1374,7 +1374,7 @@
     "sympy__sympy-12236": {
       "original": true,
       "sherloc": false,
-      "explorespec": false
+      "explorespec": true
     },
     "sympy__sympy-12419": {
       "original": true,
