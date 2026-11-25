@@ -1,0 +1,30 @@
+diff --git a/sklearn/preprocessing/label.py b/sklearn/preprocessing/label.py
+index 61b8d4a21..4f3a895fb 100644
+--- a/sklearn/preprocessing/label.py
++++ b/sklearn/preprocessing/label.py
+@@ -127,6 +127,12 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         check_is_fitted(self, 'classes_')
+         y = column_or_1d(y, warn=True)
+ 
++        # Reject zero-length y explicitly to provide a consistent error
++        # message across dtypes instead of relying on downstream
++        # implementations that may raise low-level TypeErrors.
++        if _num_samples(y) == 0:
++            raise ValueError('y has 0 samples: %r' % (y,))
++
+         classes = np.unique(y)
+         if len(np.intersect1d(classes, self.classes_)) < len(classes):
+             diff = np.setdiff1d(classes, self.classes_)
+@@ -148,6 +154,12 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         """
+         check_is_fitted(self, 'classes_')
+ 
++        # Ensure y is not empty to provide a consistent error message
++        # as expected by the test-suite. Use _num_samples on the input
++        # sequence prior to operations that assume non-empty arrays.
++        if _num_samples(y) == 0:
++            raise ValueError('y has 0 samples: %r' % (y,))
++
+         diff = np.setdiff1d(y, np.arange(len(self.classes_)))
+         if len(diff):
+             raise ValueError(

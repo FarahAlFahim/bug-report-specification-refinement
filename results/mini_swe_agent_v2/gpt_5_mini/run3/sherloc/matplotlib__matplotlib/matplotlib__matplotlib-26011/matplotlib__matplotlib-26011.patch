@@ -1,0 +1,39 @@
+diff --git a/lib/matplotlib/axis.py b/lib/matplotlib/axis.py
+index e6e7e29f11..d4505a6045 100644
+--- a/lib/matplotlib/axis.py
++++ b/lib/matplotlib/axis.py
+@@ -1239,14 +1239,32 @@ class Axis(martist.Artist):
+ 
+         if emit:
+             self.axes.callbacks.process(f"{name}lim_changed", self.axes)
+-            # Call all of the other axes that are shared with this one
++            # Call all of the other axes that are shared with this one.
++            #
++            # We update the sibling Axis objects with emit=False to avoid
++            # re-entering propagation (which would otherwise cause
++            # recursion/cycles).  However, updating with emit=False would
++            # also suppress invoking callbacks registered on the sibling
++            # Axes.  To ensure that every Axes whose view limits changed
++            # still receives its '<name>lim_changed' callbacks, explicitly
++            # process the sibling Axes' callback registries here after
++            # their Axis objects have been updated.
+             for other in self._get_shared_axes():
+                 if other is not self.axes:
++                    # Update the Axis data without emitting to avoid
++                    # recursive propagation back to this Axis.
+                     other._axis_map[name]._set_lim(
+                         v0, v1, emit=False, auto=auto)
++                    # Explicitly notify callbacks registered on the sibling
++                    # Axes that their limits have changed.
++                    try:
++                        other.callbacks.process(f"{name}lim_changed", other)
++                    except Exception:
++                        # Be conservative: don't let callback errors break
++                        # the limit-setting logic.
++                        _log.exception("Exception in processing sibling callbacks")
+                     if other.figure != self.figure:
+                         other.figure.canvas.draw_idle()
+-
+         self.stale = True
+         return v0, v1
+ 

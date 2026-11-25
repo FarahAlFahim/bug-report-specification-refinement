@@ -1,0 +1,52 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..bfb66ea7df 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -45,12 +45,20 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # For display purposes, unwrap functools.partial to show the
++        # underlying callable's dotted path (module + qualname/classname).
++        # Do not modify self.func/runtime values — only compute a
++        # human-friendly path used in __repr__ and view_name.
++        display_callable = func
++        if isinstance(func, functools.partial):
++            display_callable = func.func
++
++        if not hasattr(display_callable, '__name__'):
++            # A class-based view or callable object
++            self._func_path = display_callable.__class__.__module__ + '.' + display_callable.__class__.__name__
+         else:
+-            # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            # A function-based view: prefer qualname for nested functions
++            self._func_path = display_callable.__module__ + '.' + display_callable.__qualname__
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])
+@@ -59,8 +67,20 @@ class ResolverMatch:
+         return (self.func, self.args, self.kwargs)[index]
+ 
+     def __repr__(self):
++        # Include any functools.partial pre-bound args/keywords in the
++        # displayed args/kwargs for easier debugging, but do not alter
++        # the actual self.args/self.kwargs used at runtime.
++        display_args = self.args
++        display_kwargs = self.kwargs
++        if isinstance(self.func, functools.partial):
++            pre_args = getattr(self.func, 'args', ()) or ()
++            pre_kwargs = getattr(self.func, 'keywords', {}) or {}
++            display_args = tuple(pre_args) + tuple(self.args)
++            # URL-resolved kwargs should override any pre-bound partial keywords
++            display_kwargs = {**pre_kwargs, **self.kwargs}
++
+         return "ResolverMatch(func=%s, args=%s, kwargs=%s, url_name=%s, app_names=%s, namespaces=%s, route=%s)" % (
+-            self._func_path, self.args, self.kwargs, self.url_name,
++            self._func_path, display_args, display_kwargs, self.url_name,
+             self.app_names, self.namespaces, self.route,
+         )
+ 

@@ -1,0 +1,31 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 16dff6a1cd..06c020cc89 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -388,6 +388,13 @@ class Collector:
+         # number of objects deleted for each model label
+         deleted_counter = Counter()
+ 
++        # Keep track of models that were considered for deletion. This
++        # includes models with instances collected in self.data as well as
++        # querysets added to fast_deletes.  This allows us to return a
++        # consistent per-model dict even when no objects were actually
++        # deleted (e.g. fast delete query returned 0).
++        models_considered = set(self.data.keys()) | {qs.model for qs in self.fast_deletes}
++
+         # Optimize for the case with a single obj and no dependencies
+         if len(self.data) == 1 and len(instances) == 1:
+             instance = list(instances)[0]
+@@ -442,4 +449,11 @@ class Collector:
+         for model, instances in self.data.items():
+             for instance in instances:
+                 setattr(instance, model._meta.pk.attname, None)
+-        return sum(deleted_counter.values()), dict(deleted_counter)
++        # Ensure every considered model appears in the returned dict. For
++        # models that weren't deleted, include a zero count to keep the
++        # return format consistent between fast-delete and non-fast-delete
++        # code paths.
++        result_dict = dict(deleted_counter)
++        for model in models_considered:
++            result_dict.setdefault(model._meta.label, 0)
++        return sum(deleted_counter.values()), result_dict

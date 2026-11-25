@@ -1,0 +1,56 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..0e123970ef 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -12,7 +12,7 @@
+ """
+ from __future__ import division, print_function
+ 
+-from sympy import Function, Symbol, solve
++from sympy import Function, Symbol, solve, Eq
+ from sympy.core.compatibility import (
+     is_sequence, range, string_types, ordered)
+ from sympy.core.containers import OrderedSet
+@@ -565,13 +565,33 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # allow Eq(...) inputs by converting to lhs - rhs
++    if isinstance(eq, Eq):
++        eq = eq.lhs - eq.rhs
++
+     if is_sequence(y):
+         dep = set(y)
+         y = y[0]
+     elif isinstance(y, Symbol):
+         dep = {y}
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        # allow function applications like f(x) as the dependent variable
++        # by replacing them with a temporary Symbol and restoring later
++        if getattr(y, 'is_Function', False) or (hasattr(y, 'free_symbols') and y.free_symbols):
++            orig_y = y
++            base = getattr(getattr(y, 'func', None), '__name__', None) or getattr(y, 'name', 'y')
++            sym_name = base if base is not None else 'y'
++            i = 0
++            # avoid clashes with existing symbols in eq
++            free = set(getattr(eq, 'free_symbols', set()))
++            while Symbol(sym_name) in free:
++                i += 1
++                sym_name = "%s_%d" % (base, i)
++            y = Symbol(sym_name)
++            eq = eq.subs({orig_y: y})
++            dep = {y}
++        else:
++            raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
+ 
+     f = dict([(s, Function(
+         s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+@@ -586,7 +606,6 @@ def idiff(eq, y, x, n=1):
+         eq = dydx - yp
+         dydx = dydx.diff(x)
+ 
+-
+ def intersection(*entities, **kwargs):
+     """The intersection of a collection of GeometryEntity instances.
+ 

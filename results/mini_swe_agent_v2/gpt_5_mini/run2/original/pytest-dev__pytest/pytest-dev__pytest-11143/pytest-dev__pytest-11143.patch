@@ -1,0 +1,24 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 157903faf..00adaee8d 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -742,7 +742,18 @@ class AssertionRewriter(ast.NodeVisitor):
+                     nodes.append(field)
+ 
+     @staticmethod
+-    def is_rewrite_disabled(docstring: str) -> bool:
++    def is_rewrite_disabled(docstring: Optional[str]) -> bool:
++        """Return True if rewriting is disabled via the module's docstring.
++
++        Historically this assumed the module __doc__ was always a string, but
++        in some cases (for example when the first expression in a module is a
++        literal number) AST/module introspection can yield non-string values
++        which would cause a TypeError when using the `in` operator. Guard
++        against non-string docstrings and only search the marker in actual
++        strings.
++        """
++        if not isinstance(docstring, str):
++            return False
+         return "PYTEST_DONT_REWRITE" in docstring
+ 
+     def variable(self) -> str:

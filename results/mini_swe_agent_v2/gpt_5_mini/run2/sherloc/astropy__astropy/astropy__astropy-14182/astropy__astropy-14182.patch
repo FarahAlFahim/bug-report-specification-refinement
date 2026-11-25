@@ -1,0 +1,21 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8ef..c42f3516f 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -57,8 +57,14 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, delimiter_pad=None, bookend=False, header_rows=None):
++        # Allow writer kwargs such as ``header_rows`` to be forwarded from the
++        # io.ascii writer factory.  FixedWidth.__init__ expects header_rows and
++        # uses it to set header/data start lines, so accept and forward it here
++        # to maintain consistent behavior with other fixed-width writers.
++        super().__init__(
++            delimiter_pad=delimiter_pad, bookend=bookend, header_rows=header_rows
++        )
+ 
+     def write(self, lines):
+         lines = super().write(lines)

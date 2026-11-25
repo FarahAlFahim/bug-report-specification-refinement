@@ -1,0 +1,25 @@
+diff --git a/django/db/migrations/serializer.py b/django/db/migrations/serializer.py
+index d88cda6e20..fcf7da345c 100644
+--- a/django/db/migrations/serializer.py
++++ b/django/db/migrations/serializer.py
+@@ -168,9 +168,17 @@ class FunctionTypeSerializer(BaseSerializer):
+         ):
+             klass = self.value.__self__
+             module = klass.__module__
+-            return "%s.%s.%s" % (module, klass.__name__, self.value.__name__), {
+-                "import %s" % module
+-            }
++            # Use the class __qualname__ to preserve nested class
++            # qualification (e.g. Outer.Inner) instead of __name__ which
++            # would drop the outer class. Also reject local classes whose
++            # qualname contains '<' to mirror the free-function branch.
++            if "<" not in klass.__qualname__:
++                return "%s.%s.%s" % (
++                    module, klass.__qualname__, self.value.__name__
++                ), {"import %s" % module}
++            raise ValueError(
++                "Could not find function %s in %s.\n" % (self.value.__name__, module)
++            )
+         # Further error checking
+         if self.value.__name__ == "<lambda>":
+             raise ValueError("Cannot serialize function: lambda")

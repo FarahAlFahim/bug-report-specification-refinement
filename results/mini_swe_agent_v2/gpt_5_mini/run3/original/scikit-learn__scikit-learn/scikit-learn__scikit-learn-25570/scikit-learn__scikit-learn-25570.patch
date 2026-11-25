@@ -1,0 +1,43 @@
+diff --git a/sklearn/compose/_column_transformer.py b/sklearn/compose/_column_transformer.py
+index a26145117..361295f71 100644
+--- a/sklearn/compose/_column_transformer.py
++++ b/sklearn/compose/_column_transformer.py
+@@ -862,12 +862,35 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+                 if not self.verbose_feature_names_out:
+                     return output
+ 
+-                transformer_names = [
++                # Build transformer names aligned with the outputs in Xs.
++                # `_iter(fitted=True, replace_strings=True)` may skip
++                # transformers that have an empty column selection. To
++                # ensure we prefix the feature names correctly we advance
++                # the iterator for each produced output in Xs so that the
++                # pairing (transformer_name, feature_names_out) matches
++                # the order of Xs. This avoids mismatches when some
++                # transformers had zero selected columns during fit.
++                transformer_iter = (
+                     t[0] for t in self._iter(fitted=True, replace_strings=True)
+-                ]
++                )
+                 feature_names_outs = [X.columns for X in Xs]
++                transformer_with_feature_names_out = []
++                try:
++                    for cols in feature_names_outs:
++                        name = next(transformer_iter)
++                        transformer_with_feature_names_out.append((name, cols))
++                except StopIteration:
++                    # Fallback: if the iterator is exhausted unexpectedly,
++                    # fall back to zipping the available names and outputs.
++                    transformer_names = [
++                        t[0] for t in self._iter(fitted=True, replace_strings=True)
++                    ]
++                    transformer_with_feature_names_out = list(
++                        zip(transformer_names, feature_names_outs)
++                    )
++
+                 names_out = self._add_prefix_for_feature_names_out(
+-                    list(zip(transformer_names, feature_names_outs))
++                    transformer_with_feature_names_out
+                 )
+                 output.columns = names_out
+                 return output

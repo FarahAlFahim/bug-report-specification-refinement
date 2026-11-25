@@ -1,0 +1,21 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..bcf680839e 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -864,6 +864,16 @@ def _print_Abs(self, expr, exp=None):
+             return tex
+     _print_Determinant = _print_Abs
+ 
++    def _print_Trace(self, expr, exp=None):
++        """Print Trace for matrix expressions using \operatorname{Tr} so that
++        the inner matrix expression is printed with the normal LaTeX printer.
++        """
++        tex = r"\operatorname{Tr}\left(%s\right)" % self._print(expr.args[0])
++        if exp is not None:
++            return r"%s^{%s}" % (tex, exp)
++        else:
++            return tex
++
+     def _print_re(self, expr, exp=None):
+         tex = r"\Re{%s}" % self.parenthesize(expr.args[0], PRECEDENCE['Atom'])
+ 

@@ -1,0 +1,43 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..3257ee6d78 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -280,6 +280,38 @@ class Field(RegisterLookupMixin):
+             if isinstance(choices_group, str):
+                 break
+         else:
++            # All choice tuples are well-formed. Perform additional checks
++            # regarding stored choice key lengths vs. the field's max_length.
++            # We only measure concrete string keys; lazy translation Promise
++            # instances are skipped because their length is unknown until
++            # evaluated.
++            try:
++                # Compute the maximum length among choice keys that are
++                # plain strings.
++                longest = 0
++                for choice, _ in self.flatchoices:
++                    if isinstance(choice, str):
++                        l = len(choice)
++                        if l > longest:
++                            longest = l
++            except Exception:
++                # Be conservative: if flatchoices iteration fails for any
++                # unexpected reason, skip the length check.
++                longest = 0
++
++            if isinstance(self.max_length, int) and self.max_length > 0 and longest > self.max_length:
++                return [
++                    checks.Error(
++                        "Some 'choices' have values longer than the field's 'max_length'.",
++                        hint=(
++                            "The longest choice value is %d characters long, but "
++                            "the field's max_length is %d. Either increase "
++                            "max_length or shorten the choice values." % (longest, self.max_length)
++                        ),
++                        obj=self,
++                        id='fields.E122',
++                    )
++                ]
+             return []
+ 
+         return [

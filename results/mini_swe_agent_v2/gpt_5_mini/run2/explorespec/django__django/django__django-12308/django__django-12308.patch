@@ -1,0 +1,41 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..5d15454a68 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,5 +1,6 @@
+ import datetime
+ import decimal
++import json
+ from collections import defaultdict
+ 
+ from django.core.exceptions import FieldDoesNotExist
+@@ -398,6 +399,15 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    elif getattr(models, 'JSONField', None) is not None and isinstance(field, models.JSONField):
++        # Use the field's encoder if provided so admin display matches
++        # the field's serialization semantics (see models.JSONField).
++        try:
++            return json.dumps(value, cls=getattr(field, 'encoder', None))
++        except (TypeError, ValueError):
++            # Fall back to the generic value display if the value isn't
++            # serializable by the encoder.
++            return display_for_value(value, empty_value_display)
+     else:
+         return display_for_value(value, empty_value_display)
+ 
+@@ -417,6 +427,13 @@ def display_for_value(value, empty_value_display, boolean=False):
+         return formats.localize(value)
+     elif isinstance(value, (int, decimal.Decimal, float)):
+         return formats.number_format(value)
++    elif isinstance(value, dict):
++        # Represent dicts as JSON so that keys/strings are double-quoted
++        # (consistent with JSONField storage and forms.JSONField).
++        try:
++            return json.dumps(value)
++        except (TypeError, ValueError):
++            return str(value)
+     elif isinstance(value, (list, tuple)):
+         return ', '.join(str(v) for v in value)
+     else:

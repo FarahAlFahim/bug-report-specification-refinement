@@ -1,0 +1,59 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 9b00e24509..f1b31932f4 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -32,8 +32,28 @@ from .utils import get_callable
+ class ResolverMatch:
+     def __init__(self, func, args, kwargs, url_name=None, app_names=None, namespaces=None, route=None, tried=None):
+         self.func = func
+-        self.args = args
+-        self.kwargs = kwargs
++
++        # If the resolved callable is a functools.partial, expose the
++        # underlying callable path and merge the partial-provided args and
++        # kwargs into the effective args/kwargs for representation. The
++        # original self.func remains the same (the partial object) so that
++        # callers can still inspect it if needed.
++        if isinstance(func, functools.partial):
++            # Merge positional args: partial.args come before URL-captured
++            # args.
++            partial_args = tuple(func.args or ())
++            args = tuple(args or ())
++            self.args = partial_args + args
++
++            # Merge keyword args: partial.keywords provide defaults which are
++            # overridden by URL-captured kwargs.
++            partial_kwargs = func.keywords or {}
++            kwargs = kwargs or {}
++            merged = {**partial_kwargs, **kwargs}
++            self.kwargs = merged
++        else:
++            self.args = args
++            self.kwargs = kwargs
+         self.url_name = url_name
+         self.route = route
+         self.tried = tried
+@@ -45,12 +65,19 @@ class ResolverMatch:
+         self.namespaces = [x for x in namespaces if x] if namespaces else []
+         self.namespace = ':'.join(self.namespaces)
+ 
+-        if not hasattr(func, '__name__'):
+-            # A class-based view
+-            self._func_path = func.__class__.__module__ + '.' + func.__class__.__name__
++        # Derive the dotted path from the underlying callable. If func is a
++        # functools.partial, use the wrapped function (partial.func) so that
++        # the representation shows the actual view rather than
++        # 'functools.partial'.
++        real_func = func.func if isinstance(func, functools.partial) else func
++        if not hasattr(real_func, '__name__'):
++            # A class-based view or callable object
++            self._func_path = real_func.__class__.__module__ + '.' + real_func.__class__.__name__
+         else:
+             # A function-based view
+-            self._func_path = func.__module__ + '.' + func.__name__
++            # Use __name__ rather than __qualname__ for compatibility with
++            # previous behaviour in this module.
++            self._func_path = real_func.__module__ + '.' + real_func.__name__
+ 
+         view_path = url_name or self._func_path
+         self.view_name = ':'.join(self.namespaces + [view_path])

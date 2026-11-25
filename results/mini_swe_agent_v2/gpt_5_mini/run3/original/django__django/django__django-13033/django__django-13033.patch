@@ -1,0 +1,87 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index d65141b834..47a14124a1 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1469,6 +1469,25 @@ class Query(BaseExpression):
+                     # QuerySet.annotate() may introduce fields that aren't
+                     # attached to a model.
+                     model = None
++                # Special-case lookups against the field's attname (e.g.
++                # 'foreignkey_id'). When a user references the attname we
++                # should treat it as a concrete/local column access rather
++                # than traversing the relation. This avoids creating an
++                # extra join (and accidentally picking up the related
++                # model's default ordering) for lookups like
++                # 'record__root_id'.
++                from django.db.models.fields import Field as _Field
++                if isinstance(field, _Field) and name == getattr(field, 'attname', None):
++                    # Local concrete field access; don't follow relation.
++                    final_field = field
++                    targets = (field,)
++                    if fail_on_missing and pos + 1 != len(names):
++                        raise FieldError(
++                            "Cannot resolve keyword %r into field. Join on '%s' not permitted." % (names[pos + 1], name)
++                        )
++                    # We've resolved the lookup to a concrete field, stop
++                    # further processing of this name.
++                    break
+             else:
+                 # We didn't find the current field, so move position back
+                 # one step.
+@@ -1896,6 +1915,7 @@ class Query(BaseExpression):
+         If 'ordering' is empty, clear all ordering from the query.
+         """
+         errors = []
++        validated = []
+         for item in ordering:
+             if isinstance(item, str):
+                 if '.' in item:
+@@ -1909,15 +1929,36 @@ class Query(BaseExpression):
+                     continue
+                 if item == '?':
+                     continue
++                # Preserve any descending marker so we can reapply it to
++                # the normalized lookup.
++                descending = False
+                 if item.startswith('-'):
++                    descending = True
+                     item = item[1:]
+                 if item in self.annotations:
++                    # Ordering by an annotation alias is valid; keep it as-is.
++                    validated.append(("-" if descending else "") + item)
+                     continue
+                 if self.extra and item in self.extra:
++                    # Ordering by an extra select alias is valid; keep it.
++                    validated.append(("-" if descending else "") + item)
+                     continue
++                # Allow shorthand lookups that reference the attname
++                # of a related field (e.g. 'record__root_id'). Treat
++                # these as the explicit relation lookup ('record__root__id')
++                # so that we reference the actual id column on the
++                # related model instead of traversing the relationship
++                # incorrectly (which could pick up the related model's
++                # default ordering and create extra joins).
++                parts = item.split(LOOKUP_SEP)
++                if len(parts) > 1 and parts[-1].endswith('_id'):
++                    # Convert ['...','root_id'] -> ['...','root','id']
++                    parts = parts[:-1] + [parts[-1][:-3], 'id']
++                    item = LOOKUP_SEP.join(parts)
+                 # names_to_path() validates the lookup. A descriptive
+                 # FieldError will be raise if it's not.
+                 self.names_to_path(item.split(LOOKUP_SEP), self.model._meta)
++                validated.append(("-" if descending else "") + item)
+             elif not hasattr(item, 'resolve_expression'):
+                 errors.append(item)
+             if getattr(item, 'contains_aggregate', False):
+@@ -1928,7 +1969,10 @@ class Query(BaseExpression):
+         if errors:
+             raise FieldError('Invalid order_by arguments: %s' % errors)
+         if ordering:
+-            self.order_by += ordering
++            # Use the validated/normalized ordering items rather than the
++            # raw arguments so that any shorthand lookups were expanded
++            # correctly above.
++            self.order_by += tuple(validated)
+         else:
+             self.default_ordering = False
+ 

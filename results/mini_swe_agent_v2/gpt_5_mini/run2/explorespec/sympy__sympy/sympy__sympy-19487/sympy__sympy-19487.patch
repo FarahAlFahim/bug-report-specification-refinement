@@ -1,0 +1,21 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..78d344a207 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -394,6 +394,16 @@ def _eval_rewrite_as_Heaviside(self, arg, **kwargs):
+         if arg.is_extended_real:
+             return Heaviside(arg, H0=S(1)/2) * 2 - 1
+ 
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        """
++        Rewrite sign(z) in terms of Abs.  To preserve the behaviour at
++        zero (sign(0) == 0) we return a Piecewise that equals 0 when the
++        argument is zero and z/Abs(z) otherwise.  This prevents creating
++        an undefined 0/0 numeric form when rewriting.
++        """
++        from sympy import Piecewise, Eq
++        return Piecewise((S.Zero, Eq(arg, 0)), (arg/Abs(arg), True))
++
+     def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 

@@ -1,0 +1,90 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..109a5f8162 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,48 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    def _safe_toggle(ax, key, ticklabels=None, label=None):
++        """Toggle axis label/ticklabels in a way that works for both
++        mpl_toolkits.axes_grid1.mpl_axes.Axes (which exposes an
++        AxisDict via the ``axis`` property) and for regular Matplotlib
++        Axes where ``ax.axis`` is the axis() callable.
++
++        If the specialized AxisDict is present, use its .toggle method.
++        Otherwise, fall back to manipulating the xaxis/yaxis ticklabels
++        and label visibility via tick_params and set_visible.
++        """
++        try:
++            # Try the mapping-style API first (AxisDict)
++            axis = ax.axis[key]
++        except Exception:
++            # Fallback for normal Axes where ax.axis is a method
++            if key in ("bottom", "top"):
++                # x-axis
++                if ticklabels is not None:
++                    param = {"labelbottom": ticklabels} if key == "bottom" else {"labeltop": ticklabels}
++                    ax.xaxis.set_tick_params(**param)
++                if label is not None:
++                    if label:
++                        ax.xaxis.set_label_position(key)
++                        ax.xaxis.label.set_visible(True)
++                    else:
++                        ax.xaxis.label.set_visible(False)
++            elif key in ("left", "right"):
++                # y-axis
++                if ticklabels is not None:
++                    param = {"labelleft": ticklabels} if key == "left" else {"labelright": ticklabels}
++                    ax.yaxis.set_tick_params(**param)
++                if label is not None:
++                    if label:
++                        ax.yaxis.set_label_position(key)
++                        ax.yaxis.label.set_visible(True)
++                    else:
++                        ax.yaxis.label.set_visible(False)
++        else:
++            axis.toggle(ticklabels=ticklabels, label=label)
++
++    _safe_toggle(ax, "bottom", ticklabels=bottom_off, label=bottom_off)
++    _safe_toggle(ax, "left", ticklabels=left_off, label=left_off)
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +68,32 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        # Use the same safe approach as _tick_only: some Axes expose
++        # a mapping-style ``axis`` (AxisDict) while others have
++        # ``axis`` as the axis() method.  Handle both cases.
++        try:
++            axis = self.axis[self.orientation]
++        except Exception:
++            if self.orientation in ("bottom", "top"):
++                if b:
++                    self.xaxis.set_label_position(self.orientation)
++                    self.xaxis.label.set_visible(True)
++                    self.xaxis.set_tick_params(labelbottom=(self.orientation=="bottom"),
++                                               labeltop=(self.orientation=="top"))
++                else:
++                    self.xaxis.label.set_visible(False)
++                    self.xaxis.set_tick_params(labelbottom=False, labeltop=False)
++            else:
++                if b:
++                    self.yaxis.set_label_position(self.orientation)
++                    self.yaxis.label.set_visible(True)
++                    self.yaxis.set_tick_params(labelleft=(self.orientation=="left"),
++                                               labelright=(self.orientation=="right"))
++                else:
++                    self.yaxis.label.set_visible(False)
++                    self.yaxis.set_tick_params(labelleft=False, labelright=False)
++        else:
++            axis.toggle(ticklabels=b, label=b)
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

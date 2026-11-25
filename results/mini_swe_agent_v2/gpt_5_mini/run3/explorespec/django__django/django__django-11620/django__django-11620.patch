@@ -1,0 +1,60 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..081408487d 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -25,6 +25,7 @@ from django.utils.translation import get_language
+ 
+ from .converters import get_converter
+ from .exceptions import NoReverseMatch, Resolver404
++from django.http import Http404
+ from .utils import get_callable
+ 
+ 
+@@ -258,7 +259,7 @@ class RoutePattern(CheckURLMixin):
+                 converter = self.converters[key]
+                 try:
+                     kwargs[key] = converter.to_python(value)
+-                except ValueError:
++                except (ValueError, Http404):
+                     return None
+             return path[match.end():], (), kwargs
+         return None
+@@ -540,8 +541,14 @@ class URLResolver:
+             for pattern in self.url_patterns:
+                 try:
+                     sub_match = pattern.resolve(new_path)
+-                except Resolver404 as e:
+-                    sub_tried = e.args[0].get('tried')
++                except (Resolver404, Http404) as e:
++                    # Treat Http404 raised during sub-resolution as a non-match
++                    sub_tried = None
++                    if isinstance(e, Resolver404):
++                        try:
++                            sub_tried = e.args[0].get('tried')
++                        except Exception:
++                            sub_tried = None
+                     if sub_tried is not None:
+                         tried.extend([pattern] + t for t in sub_tried)
+                     else:
+diff --git a/django/views/debug.py b/django/views/debug.py
+index cb3e8c7ec1..50c050ba22 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -5,7 +5,7 @@ import types
+ from pathlib import Path
+ 
+ from django.conf import settings
+-from django.http import HttpResponse, HttpResponseNotFound
++from django.http import HttpResponse, HttpResponseNotFound, Http404
+ from django.template import Context, Engine, TemplateDoesNotExist
+ from django.template.defaultfilters import pprint
+ from django.urls import Resolver404, resolve
+@@ -483,7 +483,7 @@ def technical_404_response(request, exception):
+     caller = ''
+     try:
+         resolver_match = resolve(request.path)
+-    except Resolver404:
++    except (Resolver404, Http404):
+         pass
+     else:
+         obj = resolver_match.func

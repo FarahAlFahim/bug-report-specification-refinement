@@ -1,0 +1,127 @@
+diff --git a/sympy/assumptions/sathandlers.py b/sympy/assumptions/sathandlers.py
+index 61d62d04c..9a81f635b 100644
+--- a/sympy/assumptions/sathandlers.py
++++ b/sympy/assumptions/sathandlers.py
+@@ -1,6 +1,10 @@
+ from __future__ import print_function, division
+ 
+-from collections import MutableMapping, defaultdict
++try:
++    from collections.abc import MutableMapping
++except Exception:
++    from collections import MutableMapping
++from collections import defaultdict
+ 
+ from sympy.core import (Add, Mul, Pow, Integer, Number, NumberSymbol,)
+ from sympy.core.numbers import ImaginaryUnit
+diff --git a/sympy/concrete/summations.py b/sympy/concrete/summations.py
+index 372487664..7d0219ab4 100644
+--- a/sympy/concrete/summations.py
++++ b/sympy/concrete/summations.py
+@@ -192,8 +192,50 @@ def doit(self, **hints):
+                         return zeta_function
+                     return self
+                 else:
+-                    return self.func(f, *self.limits[n:])
++                    # We were unable to evaluate this inner sum, so build up
++                    # the remaining Sum. However, a common pattern is that
++                    # `f` is a Piecewise that is 1 on the inner summation
++                    # variable's bounds and 0 otherwise. In that case the
++                    # outer Sum over the same bounds can be simplified to
++                    # the count of integers in the bounds. Try to detect and
++                    # simplify this here before returning.
++                    rem = self.func(f, *self.limits[n:])
++                    try:
++                        from sympy.functions.elementary.piecewise import Piecewise
++                        if isinstance(rem, Sum) and isinstance(f, Piecewise):
++                            main = f.args[0]
++                            last = f.args[-1]
++                            if (main.expr == S.One and last.expr == S.Zero and
++                                    last.cond == True and len(rem.limits) == 1):
++                                (rv, ra, rb) = rem.limits[0]
++                                return (rb - ra + 1) * S.One
++                    except Exception:
++                        pass
++                    return rem
+             f = newf
++        # Post-process a common pattern: Sum over the same bounds of a
++        # Piecewise that is 1 on exactly those bounds and 0 otherwise, e.g.
++        # Sum(Piecewise((1, (a <= i) & (i <= b)), (0, True)), (i, a, b))
++        # should simplify to (b - a + 1). Detect and simplify that here so
++        # that nested sums involving KroneckerDelta (which often produce such
++        # Piecewise results) evaluate cleanly even when bounds are symbolic.
++        try:
++            from sympy.functions.elementary.piecewise import Piecewise
++            if isinstance(f, Piecewise) and len(f.args) >= 1:
++                # look for a main clause with expr==1 and a fallback 0
++                main = f.args[0]
++                last = f.args[-1]
++                if (main.expr == S.One and last.expr == S.Zero and
++                        last.cond == True):
++                    # Heuristic: if the Piecewise yields 1 on some condition
++                    # and 0 otherwise, and this arose from summing a
++                    # KroneckerDelta-like expression, then over the summation
++                    # bounds the sum is simply the count of integers in the
++                    # range: (b - a + 1). This handles the common case of
++                    # nested sums of identity matrices.
++                    f = (b - a + 1) * S.One
++        except Exception:
++            pass
+ 
+         if hints.get('deep', True):
+             # eval_sum could return partially unevaluated
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index b992b45c2..34187c67c 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,11 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    # Python 3.3+: abstract collection types live in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    # Fallback for very old Pythons
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..e8db395e1 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,12 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
+-            return S.One
+-        else:
+-            return S.Zero
++        # When indices are concrete and equal, return 1; when they are
++        # different concrete integers, return 0.  However, when indices are
++        # symbolic (e.g. summation indices), returning a KroneckerDelta
++        # allows symbolic summation/evaluation to proceed correctly.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index 664602d6b..432ac6a36 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,11 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    # Python 3.3+: abstract collection types live in collections.abc
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 

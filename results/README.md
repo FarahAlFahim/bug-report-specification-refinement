@@ -18,13 +18,25 @@ This directory contains downstream repair artifacts used to evaluate the report 
 │       └── explorespec/
 └── mini_swe_agent_v2/
     ├── gpt_5_mini/
-    │   ├── combined_eval_summary.json
-    │   ├── ExploreSpec_Paired_Gain_Manual_Study.xlsx
-    │   ├── original/
-    │   ├── sherloc/
-    │   ├── explorespec/
-    │   ├── wo_reviewer/
-    │   └── wo_hierarchy/
+    │   ├── 100_instances_run_comparison.json
+    │   ├── run1/                  # 300 instances
+    │   │   ├── combined_eval_summary.json
+    │   │   ├── ExploreSpec_Paired_Gain_Manual_Study.xlsx
+    │   │   ├── original/
+    │   │   ├── sherloc/
+    │   │   ├── explorespec/
+    │   │   ├── wo_reviewer/
+    │   │   └── wo_hierarchy/
+    │   ├── run2/                  # Fixed stratified random 100-instance subset
+    │   │   ├── combined_eval_summary.json
+    │   │   ├── original/
+    │   │   ├── sherloc/
+    │   │   └── explorespec/
+    │   └── run3/                  # Fixed stratified random 100-instance subset
+    │       ├── combined_eval_summary.json
+    │       ├── original/
+    │       ├── sherloc/
+    │       └── explorespec/
     └── minimax2.5/
         ├── combined_eval_summary.json
         ├── original/
@@ -32,7 +44,7 @@ This directory contains downstream repair artifacts used to evaluate the report 
         └── explorespec/
 ```
 
-Each report-variant directory follows this structure:
+Each report-variant directory, whether directly under a model or under a model run, follows this structure:
 
 ```text
 <report_variant>/
@@ -45,13 +57,19 @@ Each report-variant directory follows this structure:
 
 Each `combined_eval_summary.json` reports aggregate, per-repository, and per-instance results across the available report variants. Each variant's `evaluation_results.jsonl` indexes its resolved statuses, patches, and compressed trajectories.
 
-Mini-SWE-Agent V2 uses all 300 canonical SWE-bench Lite instances. AutoCodeRover and Agentless use the same 100-instance subset recorded in `data/evaluation_subset_100.json`. AutoCodeRover trajectories retain its native structured trajectory data. Agentless trajectories are JSON containers holding the corresponding localization and repair stage logs.
+Mini-SWE-Agent V2 GPT-5-mini run 1 and MiniMax M2.5 use all 300 canonical SWE-bench Lite instances. A stratified random sample of 100 instances was drawn once and fixed in `data/evaluation_subset_100.json`. The same subset was reused for AutoCodeRover and Agentless to evaluate generalization across repair agents, and for GPT-5-mini runs 2 and 3 to measure LLM run-to-run variability. AutoCodeRover trajectories retain its native structured trajectory data. Agentless trajectories are JSON containers holding the corresponding localization and repair stage logs.
+
+## GPT-5-mini Repeated Runs
+
+The three Mini-SWE-Agent V2 GPT-5-mini runs are stored separately. Run 1 evaluates the full 300-instance benchmark. Runs 2 and 3 repeat the experiment on the fixed stratified random 100-instance subset to measure run-to-run variability with the same model and repair agent.
+
+`mini_swe_agent_v2/gpt_5_mini/100_instances_run_comparison.json` records the per-instance outcomes and aggregate counts for that fixed subset across all three runs. Each run's `combined_eval_summary.json` is the authoritative source for its aggregate, per-repository, and per-instance results; scores are not duplicated here to avoid stale documentation.
 
 The MiniMax M2.5 evaluation includes Original Reports, SHERLOC Reports, and ExploreSpec Reports. The w/o Reviewer and w/o Hierarchy ablations were evaluated only with GPT-5-mini and therefore do not appear under `minimax2.5/`.
 
 ## Paired-Gain Manual Study
 
-`mini_swe_agent_v2/gpt_5_mini/ExploreSpec_Paired_Gain_Manual_Study.xlsx` contains the manual analysis of why refined reports help. It covers the 56 instances in the GPT-5-mini setting where Mini-SWE-Agent V2 fails with the original report but succeeds with the ExploreSpec report (`original` is `false` and `explorespec` is `true` in `variants_resolved_comparison` of `combined_eval_summary.json`). Because the repair agent, model, and experimental setting are unchanged, these cases compare the information available to the same agent before and after refinement.
+`mini_swe_agent_v2/gpt_5_mini/run1/ExploreSpec_Paired_Gain_Manual_Study.xlsx` contains the manual analysis of why refined reports help. It covers the 56 run-1 instances where Mini-SWE-Agent V2 fails with the original report but succeeds with the ExploreSpec report (`original` is `false` and `explorespec` is `true` in `run1/combined_eval_summary.json`). Because the repair agent, model, and experimental setting are unchanged, these cases compare the information available to the same agent before and after refinement.
 
 For each instance, the original and refined reports, the corresponding repair trajectories and submitted patches, the relevant pre-fix source code, and the developer repair were compared. The analysis examines whether ExploreSpec adds or clarifies information about the failure mechanism, the behavioral requirement, and the implementation scope, and assigns each instance one primary repair-relevant information difference:
 
@@ -75,4 +93,4 @@ The workbook contains:
 | `Summary` | Study scope, the analysis procedure, label definitions and counts, evidence-level counts, and per-repository case counts. Counts are formulas over the repository sheets. |
 | One sheet per repository (`astropy`, `django`, …, `sympy`) | One row per instance with the original bug report, the ExploreSpec report, the developer (gold) patch, the failure mechanism and developer fix, observations on each report, the paired trajectory evidence, the evidence strength, and the final label. |
 
-Evidence strength records how directly the paired trajectories support the report difference: `Strong` (35 cases) and `Moderate` (17 cases) together form the 52 cases above, and `Limited` (4 cases) corresponds to the four Other effects cases. The repair trajectories and submitted patches referenced by the study are in `mini_swe_agent_v2/gpt_5_mini/original/` and `mini_swe_agent_v2/gpt_5_mini/explorespec/` under `<repository>/<instance_id>/`.
+Evidence strength records how directly the paired trajectories support the report difference: `Strong` (35 cases) and `Moderate` (17 cases) together form the 52 cases above, and `Limited` (4 cases) corresponds to the four Other effects cases. The repair trajectories and submitted patches referenced by the study are in `mini_swe_agent_v2/gpt_5_mini/run1/original/` and `mini_swe_agent_v2/gpt_5_mini/run1/explorespec/` under `<repository>/<instance_id>/`.

@@ -1,0 +1,25 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..5d46dbfc66 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -38,8 +38,19 @@ def doit(p, q):
+ 
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
++            # If the dividend equals the divisor (or its negation) the
++            # remainder is zero. Also, if the dividend is an integer and
++            # the divisor is 1 the remainder is zero.  Be careful when
++            # the dividend is a power whose base equals the modulus: the
++            # algebraic simplification a**n % a -> 0 only holds when the
++            # modulus is symbolic or an exact integer. It does not hold
++            # for inexact numeric bases (e.g. Float or non-integer
++            # Rational) where numeric modulo semantics differ.  Apply the
++            # power-base simplification only when q is not a Number or is
++            # an integer.
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    (p.is_Pow and p.exp.is_Integer and p.base == q and
++                        (not q.is_Number or q.is_integer)) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

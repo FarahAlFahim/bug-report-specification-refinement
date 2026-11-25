@@ -1,0 +1,39 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..0f451ccc1c 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -286,6 +286,12 @@ handler_map : dict or None
+     The custom dictionary mapping instances or types to a legend
+     handler. This *handler_map* updates the default handler map
+     found at `matplotlib.legend.Legend.get_legend_handler_map`.
++
++draggable : bool, default: False
++    Whether the legend should be draggable with the mouse immediately
++    after creation. If ``True``, the legend will have mouse dragging
++    enabled (equivalent to calling ``Legend.set_draggable(True)`` after
++    creation).
+ """)
+ 
+ 
+@@ -342,6 +348,7 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
++        draggable=False,
+         ncol=1  # synonym for ncols (backward compatibility)
+     ):
+         """
+@@ -539,6 +546,13 @@ class Legend(Artist):
+         self.set_title(title, prop=title_prop_fp)
+         self._draggable = None
+ 
++        # If requested, enable draggable behavior at creation time.
++        if draggable:
++            # set_draggable returns the DraggableLegend instance when
++            # enabling dragging; we don't need to keep the return value
++            # here because it is stored on the Legend instance.
++            self.set_draggable(True)
++
+         # set the text color
+ 
+         color_getters = {  # getter function depends on line or patch

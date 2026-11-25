@@ -1,0 +1,50 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 901918674a..35d8ef53c8 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -614,8 +614,20 @@ def _print_BasisDependent(self, expr):
+ 
+     def _print_Indexed(self, expr):
+         tex_base = self._print(expr.base)
+-        tex = '{'+tex_base+'}'+'_{%s}' % ','.join(
+-            map(self._print, expr.indices))
++        # Print indices but avoid leading super/sub markers from
++        # individual index prints. _print_Symbol (and others) may
++        # return strings starting with '_' or '^' (e.g. for a Symbol
++        # named '_i_1' it returns '_i_{1}'). Since we wrap the whole
++        # index list in a single _{...}, strip any leading '_' or '^'
++        # to prevent a double subscript like _{_i_1} which is invalid
++        # LaTeX.
++        idxs = []
++        for ind in expr.indices:
++            s = self._print(ind)
++            if s.startswith('_') or s.startswith('^'):
++                s = s[1:]
++            idxs.append(s)
++        tex = '{%s}_{%s}' % (tex_base, ','.join(idxs))
+         return tex
+ 
+     def _print_IndexedBase(self, expr):
+@@ -1437,8 +1449,20 @@ def _print_MatrixBase(self, expr):
+                            = _print_MatrixBase
+ 
+     def _print_MatrixElement(self, expr):
+-        return self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True) \
+-            + '_{%s, %s}' % (expr.i, expr.j)
++        base = self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True)
++        # use the LaTeX printer for the row/col indices. Some index
++        # prints may start with a leading '_' or '^' (for example a
++        # Symbol named '_i_1' is printed as '_i_{1}'). Since we are
++        # formatting the indices inside a single _{...}, strip any
++        # leading '_' or '^' to avoid double subscripts like
++        # _{_i_1} which is invalid LaTeX.
++        i_tex = self._print(expr.i)
++        j_tex = self._print(expr.j)
++        if i_tex.startswith('_') or i_tex.startswith('^'):
++            i_tex = i_tex[1:]
++        if j_tex.startswith('_') or j_tex.startswith('^'):
++            j_tex = j_tex[1:]
++        return base + '_{%s, %s}' % (i_tex, j_tex)
+ 
+     def _print_MatrixSlice(self, expr):
+         def latexslice(x):

@@ -1,0 +1,43 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..e9352a2c65 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1150,6 +1150,14 @@ class Subquery(BaseExpression, Combinable):
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+         self.query = getattr(queryset, 'query', queryset)
++        # Ensure the inner Query object is marked as a subquery so that
++        # Query.as_sql() will wrap the SQL in parentheses. Some callers may
++        # pass a Query object that isn't flagged as a subquery, which would
++        # cause Subquery.as_sql() to incorrectly slice off the first and
++        # last characters of the SQL. Only set the flag when the inner
++        # object supports it.
++        if hasattr(self.query, 'subquery'):
++            self.query.subquery = True
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1165,6 +1173,11 @@ class Subquery(BaseExpression, Combinable):
+     def copy(self):
+         clone = super().copy()
+         clone.query = clone.query.clone()
++        # Ensure cloned query is marked as a subquery as well. clone.query may
++        # be a Query instance which needs the flag to produce parenthesized
++        # SQL.
++        if hasattr(clone.query, 'subquery'):
++            clone.query.subquery = True
+         return clone
+ 
+     @property
+@@ -1178,6 +1191,11 @@ class Subquery(BaseExpression, Combinable):
+         connection.ops.check_expression_support(self)
+         template_params = {**self.extra, **extra_context}
+         query = query or self.query
++        # Ensure the query we're about to compile is flagged as a subquery so
++        # that its SQL will be wrapped in parentheses. This covers the case
++        # where a caller provides a query via the `query` parameter.
++        if hasattr(query, 'subquery'):
++            query.subquery = True
+         subquery_sql, sql_params = query.as_sql(compiler, connection)
+         template_params['subquery'] = subquery_sql[1:-1]
+ 

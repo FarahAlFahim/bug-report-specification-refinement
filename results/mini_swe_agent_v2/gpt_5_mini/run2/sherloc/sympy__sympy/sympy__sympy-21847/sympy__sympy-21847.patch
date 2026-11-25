@@ -1,0 +1,28 @@
+diff --git a/sympy/polys/monomials.py b/sympy/polys/monomials.py
+index 0e84403307..1df78cdb7a 100644
+--- a/sympy/polys/monomials.py
++++ b/sympy/polys/monomials.py
+@@ -127,7 +127,10 @@ def itermonomials(variables, max_degrees, min_degrees=None):
+                 for variable in item:
+                     if variable != 1:
+                         powers[variable] += 1
+-                if max(powers.values()) >= min_degree:
++                # The total degree of a monomial is the sum of exponents
++                # across all variables. Use the sum of powers to enforce
++                # the minimum total degree condition (see PR description).
++                if sum(powers.values()) >= min_degree:
+                     monomials_list_comm.append(Mul(*item))
+             yield from set(monomials_list_comm)
+         else:
+@@ -139,7 +142,10 @@ def itermonomials(variables, max_degrees, min_degrees=None):
+                 for variable in item:
+                     if variable != 1:
+                         powers[variable] += 1
+-                if max(powers.values()) >= min_degree:
++                                # For non-commutative variables the same total-degree
++                # check applies: include monomials whose sum of exponents
++                # meets the minimum degree.
++                if sum(powers.values()) >= min_degree:
+                     monomials_list_non_comm.append(Mul(*item))
+             yield from set(monomials_list_non_comm)
+     else:

@@ -1,0 +1,214 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..f59e8a1ec 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -549,6 +549,56 @@ def _call_reprcompare(ops, results, expls, each_obj):
+     return expl
+ 
+ 
++def _format_all_any(expl_list, is_any, call_text):
++    """Format explanation for all()/any() comprehensions.
++
++    expl_list is a list of tuples (value, repr_str) collected at runtime
++    for each evaluated element. We find the first element that determines
++    the result (first False for all(), first True for any()) and return a
++    short explanation mentioning its index and representation.
++    """
++    try:
++        is_any = bool(is_any)
++    except Exception:
++        is_any = False
++
++    index = None
++    for i, item in enumerate(expl_list):
++        try:
++            val = item[0]
++        except Exception:
++            val = item
++        try:
++            truth = bool(val)
++        except Exception:
++            truth = False
++        if is_any:
++            if truth:
++                index = i
++                break
++        else:
++            if not truth:
++                index = i
++                break
++
++    if index is None:
++        # No failing element found; fall back to simple call text.
++        return str(call_text)
++
++    try:
++        val, repr_str = expl_list[index]
++    except Exception:
++        val = expl_list[index]
++        repr_str = _saferepr(val)
++
++    res_expl = _saferepr(val)
++    # Include index and the representation of the element to help locate
++    # the failing value.
++    return "%s\n{first failing element at index %d = %s\n}" % (
++        res_expl, index, repr_str
++    )
++
++
+ unary_map = {ast.Not: "not %s", ast.Invert: "~%s", ast.USub: "-%s", ast.UAdd: "+%s"}
+ 
+ binop_map = {
+@@ -968,6 +1018,86 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Special-case builtins all()/any() with a comprehension argument
++        # so we can unroll the comprehension and produce per-element
++        # explanations while preserving short-circuit semantics.
++        # Only trigger for direct builtin name usage.
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            is_any = call.func.id == "any"
++            comp = call.args[0]
++            # Create a list to collect per-element (value, repr) pairs.
++            expl_list = self.assign(ast.List([], ast.Load()))
++            app = ast.Attribute(expl_list, "append", ast.Load())
++            # result and found flags
++            result_var = self.variable()
++            init = ast.Assign([ast.Name(result_var, ast.Store())], _NameConstant(is_any))
++            self.statements.append(init)
++            found_var = self.variable()
++            self.statements.append(ast.Assign([ast.Name(found_var, ast.Store())], _NameConstant(False)))
++
++            # Build nested loops from comp.generators
++            def build_inner(generators, inner_body):
++                if not generators:
++                    return inner_body
++                gen = generators[0]
++                # Use the original iter expression to avoid duplicating side-effects
++                target = gen.target
++                iter_node = gen.iter
++                body = build_inner(generators[1:], inner_body)
++                # wrap with ifs for gen.ifs
++                for ifnode in reversed(gen.ifs):
++                    body = [ast.If(ifnode, body, [])]
++                return [ast.For(target, iter_node, body, False)]
++
++            # Prepare inner body: evaluate elt, append (value, repr), update result and found flag
++            save_statements = self.statements
++            inner_statements = []
++            self.statements = inner_statements
++            # Visit the element expression so any sub-expressions are rewritten inside the loop
++            res, expl = self.visit(comp.elt)
++            # append (res, saferepr(res))
++            tuple_node = ast.Tuple([res, self.helper("_saferepr", res)], ast.Load())
++            inner_statements.append(ast.Expr(ast_Call(app, [tuple_node], [])))
++            # update result_var
++            if is_any:
++                assign_result = ast.Assign(
++                    [ast.Name(result_var, ast.Store())],
++                    ast.BoolOp(ast.Or(), [ast.Name(result_var, ast.Load()), res]),
++                )
++                # if res: mark found and break
++                set_found = ast.Assign([ast.Name(found_var, ast.Store())], _NameConstant(True))
++                inner_statements.append(assign_result)
++                inner_statements.append(ast.If(res, [set_found, ast.Break()], []))
++            else:
++                assign_result = ast.Assign(
++                    [ast.Name(result_var, ast.Store())],
++                    ast.BoolOp(ast.And(), [ast.Name(result_var, ast.Load()), res]),
++                )
++                set_found = ast.Assign([ast.Name(found_var, ast.Store())], _NameConstant(True))
++                inner_statements.append(assign_result)
++                inner_statements.append(ast.If(ast.UnaryOp(ast.Not(), res), [set_found, ast.Break()], []))
++
++            # Restore statements and insert the nested loops
++            self.statements = save_statements
++            loops = build_inner(comp.generators, inner_statements)
++            # After each loop, break out if found_var set; to propagate, we add a check after outermost loop as well
++            # If loops is a list (outermost), append to statements
++            for loop in loops:
++                self.statements.append(loop)
++                # propagate found
++                self.statements.append(ast.If(ast.Name(found_var, ast.Load()), [ast.Break()], []))
++
++            # explanation via helper
++            call_text = "%s(%s)" % (call.func.id, "...")
++            expl_template = self.helper("_format_all_any", expl_list, ast.Num(int(is_any)), ast.Str(call_text))
++            expl = self.pop_format_context(expl_template)
++            return ast.Name(result_var, ast.Load()), self.explanation_param(expl)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+@@ -1001,6 +1131,65 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
++        # same special-casing as for 3.5+ call nodes
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            is_any = call.func.id == "any"
++            comp = call.args[0]
++            expl_list = self.assign(ast.List([], ast.Load()))
++            app = ast.Attribute(expl_list, "append", ast.Load())
++            result_var = self.variable()
++            self.statements.append(ast.Assign([ast.Name(result_var, ast.Store())], _NameConstant(is_any)))
++            found_var = self.variable()
++            self.statements.append(ast.Assign([ast.Name(found_var, ast.Store())], _NameConstant(False)))
++
++            def build_inner(generators, inner_body):
++                if not generators:
++                    return inner_body
++                gen = generators[0]
++                target = gen.target
++                iter_node = gen.iter
++                body = build_inner(generators[1:], inner_body)
++                for ifnode in reversed(gen.ifs):
++                    body = [ast.If(ifnode, body, [])]
++                return [ast.For(target, iter_node, body, False)]
++
++            save_statements = self.statements
++            inner_statements = []
++            self.statements = inner_statements
++            res, expl = self.visit(comp.elt)
++            tuple_node = ast.Tuple([res, self.helper("_saferepr", res)], ast.Load())
++            inner_statements.append(ast.Expr(ast_Call(app, [tuple_node], [])))
++            if is_any:
++                assign_result = ast.Assign([
++                    ast.Name(result_var, ast.Store())
++                ], ast.BoolOp(ast.Or(), [ast.Name(result_var, ast.Load()), res]))
++                set_found = ast.Assign([ast.Name(found_var, ast.Store())], _NameConstant(True))
++                inner_statements.append(assign_result)
++                inner_statements.append(ast.If(res, [set_found, ast.Break()], []))
++            else:
++                assign_result = ast.Assign([
++                    ast.Name(result_var, ast.Store())
++                ], ast.BoolOp(ast.And(), [ast.Name(result_var, ast.Load()), res]))
++                set_found = ast.Assign([ast.Name(found_var, ast.Store())], _NameConstant(True))
++                inner_statements.append(assign_result)
++                inner_statements.append(ast.If(ast.UnaryOp(ast.Not(), res), [set_found, ast.Break()], []))
++
++            self.statements = save_statements
++            loops = build_inner(comp.generators, inner_statements)
++            for loop in loops:
++                self.statements.append(loop)
++                self.statements.append(ast.If(ast.Name(found_var, ast.Load()), [ast.Break()], []))
++
++            call_text = "%s(%s)" % (call.func.id, "...")
++            expl_template = self.helper("_format_all_any", expl_list, ast.Num(int(is_any)), ast.Str(call_text))
++            expl = self.pop_format_context(expl_template)
++            return ast.Name(result_var, ast.Load()), self.explanation_param(expl)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []

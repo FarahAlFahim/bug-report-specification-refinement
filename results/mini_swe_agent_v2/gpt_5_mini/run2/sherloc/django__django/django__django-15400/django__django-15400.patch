@@ -1,0 +1,17 @@
+diff --git a/django/utils/functional.py b/django/utils/functional.py
+index 9e1be0fe0f..b9b1dff989 100644
+--- a/django/utils/functional.py
++++ b/django/utils/functional.py
+@@ -372,6 +372,12 @@ class LazyObject:
+     __iter__ = new_method_proxy(iter)
+     __len__ = new_method_proxy(len)
+     __contains__ = new_method_proxy(operator.contains)
++    # Reflected addition: other + lazy_object should delegate to the
++    # wrapped object once initialized. new_method_proxy expects a
++    # function taking (wrapped, *args) so supply a callable that returns
++    # other + wrapped.
++    __radd__ = new_method_proxy(lambda wrapped, other: other + wrapped)
++
+ 
+ 
+ def unpickle_lazyobject(wrapped):

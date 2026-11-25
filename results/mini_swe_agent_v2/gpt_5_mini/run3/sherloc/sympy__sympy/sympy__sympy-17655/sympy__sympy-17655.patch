@@ -1,0 +1,38 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..80d25f11b7 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -23,6 +23,7 @@
+ 
+ from sympy.core import S, sympify, Expr
+ from sympy.core.compatibility import is_sequence
++from sympy.core.mul import Mul
+ from sympy.core.containers import Tuple
+ from sympy.simplify import nsimplify, simplify
+ from sympy.geometry.exceptions import GeometryError
+@@ -120,6 +121,25 @@ def __new__(cls, *args, **kwargs):
+             if len(coords) == kwargs.get('dim', len(coords)):
+                 return coords
+ 
++        # If coords is a Mul containing a Point factor (e.g. 2*Point(1, 1))
++        # then treat this as a scaled Point and return that Point.
++        # This makes Point(2*Point(...)) behave like Point(Point(...) * 2)
++        # and allows operations such as Point(...) + 2*Point(...) to work.
++        if isinstance(coords, Mul):
++            args = list(coords.args)
++            for i, f in enumerate(args):
++                if getattr(f, 'is_Point', False):
++                    # Compute the scalar by multiplying together all
++                    # factors in the Mul except the Point factor. This
++                    # avoids performing division with a Point (which can
++                    # trigger unsupported power/division operations).
++                    other_factors = [args[j] for j in range(len(args)) if j != i]
++                    if other_factors:
++                        scalar = Mul(*other_factors)
++                    else:
++                        scalar = S.One
++                    return f * scalar
++
+         if not is_sequence(coords):
+             raise TypeError(filldedent('''
+                 Expecting sequence of coordinates, not `{}`'''

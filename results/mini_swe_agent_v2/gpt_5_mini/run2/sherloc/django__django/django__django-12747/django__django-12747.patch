@@ -1,0 +1,39 @@
+diff --git a/django/db/models/deletion.py b/django/db/models/deletion.py
+index 16dff6a1cd..65fea50f1a 100644
+--- a/django/db/models/deletion.py
++++ b/django/db/models/deletion.py
+@@ -395,7 +395,12 @@ class Collector:
+                 with transaction.mark_for_rollback_on_error():
+                     count = sql.DeleteQuery(model).delete_batch([instance.pk], self.using)
+                 setattr(instance, model._meta.pk.attname, None)
+-                return count, {model._meta.label: count}
++                # Only include model label in the per-model dict when a row
++                # was actually deleted. This keeps the returned per-model
++                # dictionary consistent (empty when nothing was deleted).
++                if count:
++                    return count, {model._meta.label: count}
++                return count, {}
+ 
+         with transaction.atomic(using=self.using, savepoint=False):
+             # send pre_delete signals
+@@ -408,7 +413,9 @@ class Collector:
+             # fast deletes
+             for qs in self.fast_deletes:
+                 count = qs._raw_delete(using=self.using)
+-                deleted_counter[qs.model._meta.label] += count
++                # Only record per-model counts when something was deleted.
++                if count:
++                    deleted_counter[qs.model._meta.label] += count
+ 
+             # update fields
+             for model, instances_for_fieldvalues in self.field_updates.items():
+@@ -426,7 +433,8 @@ class Collector:
+                 query = sql.DeleteQuery(model)
+                 pk_list = [obj.pk for obj in instances]
+                 count = query.delete_batch(pk_list, self.using)
+-                deleted_counter[model._meta.label] += count
++                if count:
++                    deleted_counter[model._meta.label] += count
+ 
+                 if not model._meta.auto_created:
+                     for obj in instances:

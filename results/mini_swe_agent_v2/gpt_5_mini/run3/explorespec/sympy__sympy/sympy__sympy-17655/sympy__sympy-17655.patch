@@ -1,0 +1,59 @@
+diff --git a/sympy/geometry/entity.py b/sympy/geometry/entity.py
+index ee5c910268..1e8a387708 100644
+--- a/sympy/geometry/entity.py
++++ b/sympy/geometry/entity.py
+@@ -139,7 +139,13 @@ def __repr__(self):
+ 
+     def __rmul__(self, a):
+         """Implementation of reverse multiplication method."""
+-        return a.__mul__(self)
++        # Delegate reversed multiplication to the geometry object's
++        # multiplication implementation. Numeric __mul__ (e.g. Float.__mul__)
++        # will often return a generic Mul when the other operand is a
++        # GeometryEntity, which breaks operations like ``2*Point``. By
++        # calling self.__mul__(a) we ensure that the geometry class can
++        # implement the intended scalar*geometry semantics (see Point.__mul__).
++        return self.__mul__(a)
+ 
+     def __rsub__(self, a):
+         """Implementation of reverse subtraction method."""
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..83b91d13f2 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,8 +213,34 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+ 
+         """
++        # Allow expressions like scalar*Point (which may appear as Mul)
++        # to be treated as Points by moving the scalar multiplication
++        # into the geometry object's __mul__ implementation.
++        # Examples: 2*Point(1, 1) -> Point(1,1).__mul__(2)
++        maybe_other = other
+         try:
+-            s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
++            # If other is a Mul containing a Point, try to convert it
++            # to a Point by applying the scalar to the Point.
++            if isinstance(other, Expr) and getattr(other, 'is_Mul', False):
++                # find point-like args
++                point_args = [a for a in other.args if getattr(a, 'is_Point', False)]
++                if len(point_args) == 1:
++                    p = point_args[0]
++                    # scalar is the product of the remaining args
++                    from sympy import Mul as _Mul
++                    scalar_args = [a for a in other.args if a is not p]
++                    if scalar_args:
++                        scalar = _Mul(*scalar_args)
++                    else:
++                        scalar = S.One
++                    # apply scalar to the point using Point.__mul__
++                    maybe_other = p*scalar
++        except Exception:
++            # if anything goes wrong, fall back to original behavior
++            maybe_other = other
++
++        try:
++            s, o = Point._normalize_dimension(self, Point(maybe_other, evaluate=False))
+         except TypeError:
+             raise GeometryError("Don't know how to add {} and a Point object".format(other))
+ 

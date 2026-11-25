@@ -1,0 +1,53 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..9a6c99f1f 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -109,12 +109,29 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+     return {x.strip() for x in arg.split(',') if x.strip()}
+ 
+ 
+-def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++def inherited_members_option(arg: Any) -> Union[object, Set[str], None]:
++    """Convert the :inherited-members: option to a canonical collection.
++
++    Historically this returned the string 'object' for the flag/no-arg
++    case and otherwise passed the raw value through.  That encoded the
++    single-name assumption and prevented specifying multiple base class
++    names (comma-separated or as a sequence).  Return a set of names in
++    all cases to make membership checks straightforward while preserving
++    the truthiness semantics used elsewhere.
++    """
++    # flag / no-arg: behave like the historical sentinel 'object'
+     if arg in (None, True):
+-        return 'object'
+-    else:
+-        return arg
++        return { 'object' }
++    # explicit false (unlikely for directives.flag-style options)
++    if arg is False:
++        return None
++
++    # if a sequence (list/tuple/set) was supplied by the directive
++    if isinstance(arg, (list, tuple, set)):
++        return { str(x).strip() for x in arg if str(x).strip() }
++
++    # otherwise treat the argument as a comma-separated string
++    return { x.strip() for x in str(arg).split(',') if x.strip() }
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -681,8 +698,12 @@ class Documenter:
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+             if inspect.isclass(self.object):
++                inherited = self.options.inherited_members
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
++                    # options.inherited_members is canonicalized to a collection
++                    # by inherited_members_option; check membership instead of
++                    # equality so multiple names are supported.
++                    if inherited and cls.__name__ in inherited and cls != self.object:
+                         # given member is a member of specified *super class*
+                         return True
+                     elif name in cls.__dict__:

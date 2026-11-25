@@ -1,0 +1,22 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..30b41ac3d6 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -256,6 +256,17 @@ def _solve_reduced_system(system, gens, entry=False):
+         if not zeros:
+             return []
+ 
++        # If the Groebner basis consists of only a single univariate
++        # polynomial but the caller requested multiple generators,
++        # then the system is positive-dimensional (there are free
++        # variables) and we should not return incomplete 1-tuples.
++        # Signal that only zero-dimensional systems are supported.
++        if len(basis) == 1 and len(gens) > 1:
++            raise NotImplementedError(filldedent('''
++only zero-dimensional systems supported
++(finite number of solutions)
++'''))
++
+         if len(basis) == 1:
+             return [(zero,) for zero in zeros]
+ 

@@ -1,0 +1,22 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c9218c1f..470fe3fc 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -154,7 +154,16 @@ class HueMapping(SemanticMapping):
+             try:
+                 normed = self.norm(key)
+             except TypeError as err:
+-                if np.isnan(key):
++                # If the normalization object is not callable (e.g. for
++                # categorical mappings norm is None) or the key cannot be
++                # handled by the norm, fall back to treating the value as
++                # missing/omitted and return a transparent color. Use
++                # pandas.isna to test for missingness so that non-numeric
++                # keys (like strings) do not trigger a numpy ufunc
++                # TypeError. If a norm object is present (numeric mapping)
++                # and it raised TypeError for this key, re-raise the error
++                # as it likely indicates a different problem.
++                if pd.isna(key) or self.norm is None:
+                     value = (0, 0, 0, 0)
+                 else:
+                     raise err

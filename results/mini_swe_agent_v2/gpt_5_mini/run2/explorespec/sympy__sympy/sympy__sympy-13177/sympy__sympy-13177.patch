@@ -1,0 +1,24 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..2bdde419f3 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -38,8 +38,18 @@ def doit(p, q):
+ 
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
++            # Only simplify to zero when there is a provable numeric
++            # divisibility relationship. The previous code treated
++            # p == q**n as divisible for any Integer n which is
++            # incorrect for n <= 0 and when q is not an integer
++            # (e.g. Mod(x**2, x) should not simplify to 0 symbolically
++            # because for non-integer x the numeric remainder is not 0).
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    # p == q**n: only when n is a positive integer and
++                    # q is provably integer can we conclude numeric
++                    # divisibility (p/q is an integer)
++                    (p.is_Pow and p.exp.is_Integer and p.exp.is_positive
++                     and p.base == q and q.is_integer) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

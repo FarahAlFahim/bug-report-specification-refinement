@@ -1,0 +1,64 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..fc78a2bd93 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -86,7 +86,25 @@ def __mul__(self, other):
+         fact = self.scale_factor * other.scale_factor
+ 
+         if fact == 1:
+-            return 1
++            # If the other object is a Quantity, prefer returning the
++            # canonical prefixed Quantity registered in the unit system
++            # (e.g., milliwatt) when available. Falling back to returning
++            # the bare unit is better than collapsing to the bare number 1.
++            try:
++                from sympy.physics.units import UnitSystem
++            except Exception:
++                UnitSystem = None
++
++            if isinstance(other, Quantity) and UnitSystem is not None:
++                # Look for a globally registered prefixed quantity whose
++                # scale factor and base unit match this prefix and the
++                # operand unit.
++                for q, (mul_factor, base_unit) in UnitSystem._quantity_scale_factors_global.items():
++                    if mul_factor == self.scale_factor and base_unit == other:
++                        return q
++            # No canonical prefixed quantity found: return the unit itself
++            # (the numeric scales cancel out), rather than the bare number 1.
++            return other
+         elif isinstance(other, Prefix):
+             # simplify prefix
+             for p in PREFIXES:
+@@ -103,14 +121,24 @@ def __truediv__(self, other):
+         fact = self.scale_factor / other.scale_factor
+ 
+         if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
+-            for p in PREFIXES:
+-                if PREFIXES[p].scale_factor == fact:
+-                    return PREFIXES[p]
+-            return fact
+-
+-        return self.scale_factor / other
++            # Similar to __mul__, prefer returning a canonical prefixed
++            # Quantity when available instead of collapsing to 1.
++            try:
++                from sympy.physics.units import UnitSystem
++            except Exception:
++                UnitSystem = None
++
++            # other may be a Quantity-like object
++            try:
++                from sympy.physics.units import Quantity
++            except Exception:
++                Quantity = None
++
++            if Quantity is not None and isinstance(other, Quantity) and UnitSystem is not None:
++                for q, (mul_factor, base_unit) in UnitSystem._quantity_scale_factors_global.items():
++                    if mul_factor == self.scale_factor and base_unit == other:
++                        return q
++            return other
+ 
+     def __rtruediv__(self, other):
+         if other == 1:

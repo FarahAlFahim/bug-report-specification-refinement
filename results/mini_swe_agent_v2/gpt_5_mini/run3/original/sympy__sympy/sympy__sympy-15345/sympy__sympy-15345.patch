@@ -1,0 +1,32 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..a4347fa1d 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -101,6 +101,27 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_LatticeOp(self, expr):
++        """Print lattice operations (like Max/Min) using Mathematica
++        square-bracket function syntax and preserve the argument order.
++
++        The default StrPrinter implementation sorts the arguments and
++        uses parentheses (e.g. "Max(2, x)"). For Mathematica output we
++        want to preserve the original argument order and use
++        square brackets (e.g. "Max[x, 2]").
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
++    def _print_MinMaxBase(self, expr):
++        """Print Min/Max (MinMaxBase) using Mathematica syntax.
++
++        This handles classes like Max and Min which inherit from
++        MinMaxBase. MinMaxBase appears earlier in the MRO than Expr,
++        so defining this ensures that Min/Max are printed with
++        Mathematica-style square brackets and preserve argument order.
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

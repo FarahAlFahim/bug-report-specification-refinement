@@ -1,0 +1,49 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..e5df03675 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -19,18 +19,39 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    """
++    Evaluate expression ``expr`` in globals dict ``d`` with caching.
++
++    The cache key must include a stable identity for the evaluation context
++    (the globals dict) in addition to the expression text because the same
++    expression string can evaluate differently in different module globals.
++    We derive a module identity from ``d.get('__file__')`` and
++    ``d.get('__name__')`` when available, and fall back to the id() of the
++    globals dict to avoid cross-module contamination when those entries are
++    absent.
++    """
++    default = {}  # type: Dict[object, object]
+     evalcache = config._store.setdefault(evalcache_key, default)
++
++    # derive a stable-enough identity for the globals dict
++    mod_file = d.get("__file__") if isinstance(d.get("__file__"), (str, type(None))) else None
++    mod_name = d.get("__name__") if isinstance(d.get("__name__"), (str, type(None))) else None
++    if mod_file is None and mod_name is None:
++        # fallback to the dict object's id to partition the cache per-globals
++        # when typical module identity entries are not present
++        module_identity = ("<globals-id>", id(d))
++    else:
++        module_identity = (mod_file, mod_name)
++
++    key = (expr, module_identity)
+     try:
+-        return evalcache[expr]
++        return evalcache[key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        evalcache[key] = x = eval(exprcode, d)
+         return x
+-
+-
+ class MarkEvaluator:
+     def __init__(self, item: Item, name: str) -> None:
+         self.item = item

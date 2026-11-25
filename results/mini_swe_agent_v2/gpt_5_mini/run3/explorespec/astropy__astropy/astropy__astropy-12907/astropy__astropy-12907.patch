@@ -1,0 +1,27 @@
+diff --git a/astropy/modeling/separable.py b/astropy/modeling/separable.py
+index a308e2729..ca76e1a6b 100644
+--- a/astropy/modeling/separable.py
++++ b/astropy/modeling/separable.py
+@@ -236,13 +236,19 @@ def _cstack(left, right):
+     if isinstance(left, Model):
+         cleft = _coord_matrix(left, 'left', noutp)
+     else:
+-        cleft = np.zeros((noutp, left.shape[1]))
++        # preserve dtype when embedding an existing coord_matrix ndarray
++        cleft = np.zeros((noutp, left.shape[1]), dtype=left.dtype)
+         cleft[: left.shape[0], : left.shape[1]] = left
+     if isinstance(right, Model):
+         cright = _coord_matrix(right, 'right', noutp)
+     else:
+-        cright = np.zeros((noutp, right.shape[1]))
+-        cright[-right.shape[0]:, -right.shape[1]:] = 1
++        # If the right operand is already a coord_matrix ndarray (i.e. the
++        # result of recursive separability computation for a subtree), we
++        # must preserve its encoded structure rather than overwriting it
++        # with literal ones. Create an appropriately-typed zero array and
++        # copy the incoming block into the right-bottom corner.
++        cright = np.zeros((noutp, right.shape[1]), dtype=right.dtype)
++        cright[-right.shape[0]:, -right.shape[1]:] = right
+ 
+     return np.hstack([cleft, cright])
+ 

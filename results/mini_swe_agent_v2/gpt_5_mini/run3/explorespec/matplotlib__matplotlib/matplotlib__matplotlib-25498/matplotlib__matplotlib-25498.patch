@@ -1,0 +1,40 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..11f50a8182 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -508,6 +508,13 @@ class Colorbar:
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
++            # Ensure the new norm is initialized from the mappable's data
++            # (see ScalarMappable.autoscale_None) before adopting it.  This
++            # avoids falling back to a 0..1 range which is not appropriate
++            # for some Norm subclasses (e.g., LogNorm) and can lead to
++            # ZeroDivisionError in their inverse methods.
++            if mappable.get_array() is not None:
++                mappable.autoscale_None()
+             self.norm = mappable.norm
+             self._reset_locator_formatter_scale()
+ 
+@@ -1102,8 +1109,19 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
++            # Try to initialize the norm from the associated mappable's
++            # data (this is what ScalarMappable.autoscale_None does). If a
++            # mappable was provided and has an array, use it to populate
++            # norm.vmin/vmax. Only if that does not initialize the norm do
++            # we fall back to a generic 0..1 range. This avoids assigning
++            # vmin==0 for Norms (e.g., LogNorm) where zero is invalid.
++            mappable = getattr(self, 'mappable', None)
++            if mappable is not None and mappable.get_array() is not None:
++                mappable.autoscale_None()
++            if not self.norm.scaled():
++                # last resort fallback to 0..1
++                self.norm.vmin = 0
++                self.norm.vmax = 1
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

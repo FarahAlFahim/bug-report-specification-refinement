@@ -1,0 +1,81 @@
+diff --git a/django/core/management/base.py b/django/core/management/base.py
+index d37d43d5c5..ca7a1a2238 100644
+--- a/django/core/management/base.py
++++ b/django/core/management/base.py
+@@ -130,6 +130,76 @@ class DjangoHelpFormatter(HelpFormatter):
+     def add_arguments(self, actions):
+         super().add_arguments(self._reordered_actions(actions))
+ 
++    def _split_lines(self, text, width):
++        """
++        Preserve existing line breaks in help text so that descriptions
++        and examples written with newlines/indentation keep their formatting.
++
++        The default argparse implementation collapses all whitespace
++        and wraps the whole block as a single paragraph. Here we split
++        the incoming text on existing line breaks and wrap each line
++        independently, preserving blank lines as paragraph separators
++        and retaining indentation where possible.
++        """
++        import textwrap
++
++        # Split into existing lines to preserve manual newlines/indentation.
++        lines = text.splitlines()
++        wrapped_lines = []
++        for line in lines:
++            if not line:
++                # Preserve blank lines
++                wrapped_lines.append("")
++                continue
++            # If the line begins with whitespace, treat it as preformatted
++            # (e.g., an indented example) and don't reflow it. This preserves
++            # intended indentation and prevents long sample commands from
++            # being wrapped mid-command.
++            if line[:1].isspace():
++                wrapped_lines.append(line)
++                continue
++            # Wrap this single line without replacing or dropping
++            # existing internal whitespace so indentation is kept.
++            parts = textwrap.wrap(
++                line,
++                width,
++                replace_whitespace=False,
++                drop_whitespace=False,
++            )
++            # If wrap returned nothing (e.g., an empty line), keep an empty
++            # string to preserve spacing.
++            if not parts:
++                wrapped_lines.append("")
++            else:
++                wrapped_lines.extend(parts)
++        return wrapped_lines
++
++    def _format_text(self, text):
++        """
++        Format a block of text, preserving explicit newlines and indentation.
++
++        Unlike the default argparse implementation which collapses all
++        whitespace into a single paragraph, treat each input line as its
++        own paragraph so that manual newlines (for examples, usage, etc.)
++        are preserved in the help output.
++        """
++        if '%(prog)' in text:
++            text = text % dict(prog=self._prog)
++        text_width = max(self._width - self._current_indent, 11)
++        indent = ' ' * self._current_indent
++
++        lines = []
++        for line in text.splitlines():
++            if not line.strip():
++                # Preserve blank lines
++                lines.append('')
++                continue
++            wrapped = self._split_lines(line, text_width)
++            for w in wrapped:
++                lines.append(indent + w)
++
++        return '\n'.join(lines) + '\n\n'
++
+ 
+ class OutputWrapper(TextIOBase):
+     """

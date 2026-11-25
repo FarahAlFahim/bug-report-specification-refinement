@@ -1,0 +1,35 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..f469bf287a 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -462,14 +462,28 @@ class IsNull(BuiltinLookup):
+     lookup_name = 'isnull'
+     prepare_rhs = False
+ 
++    def get_prep_lookup(self):
++        """
++        Ensure that the RHS for an __isnull lookup is a boolean value
++        or an expression. Previously, non-boolean truthy/falsey values
++        were accepted which is undocumented and could lead to surprising
++        behaviour (for example, failing to promote JOIN types). Raise a
++        TypeError for non-boolean direct values to avoid confusion.
++        """
++        # Allow expressions (including Query/Value/Func expressions).
++        if hasattr(self.rhs, 'resolve_expression'):
++            return self.rhs
++        # Only boolean True/False are allowed as direct values.
++        if not isinstance(self.rhs, bool):
++            raise TypeError("The '__isnull' lookup expects a boolean value (True/False).")
++        return self.rhs
++
+     def as_sql(self, compiler, connection):
+         sql, params = compiler.compile(self.lhs)
+         if self.rhs:
+             return "%s IS NULL" % sql, params
+         else:
+             return "%s IS NOT NULL" % sql, params
+-
+-
+ @Field.register_lookup
+ class Regex(BuiltinLookup):
+     lookup_name = 'regex'

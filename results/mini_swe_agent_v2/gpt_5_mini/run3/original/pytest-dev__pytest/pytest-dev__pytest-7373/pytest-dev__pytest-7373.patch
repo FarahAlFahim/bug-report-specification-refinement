@@ -1,0 +1,37 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..77158bc2e 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -15,20 +15,19 @@ from _pytest.nodes import Item
+ from _pytest.store import StoreKey
+ 
+ 
+-evalcache_key = StoreKey[Dict[str, Any]]()
+-
+-
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
+-    evalcache = config._store.setdefault(evalcache_key, default)
+-    try:
+-        return evalcache[expr]
+-    except KeyError:
+-        import _pytest._code
+-
+-        exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
+-        return x
++    """Evaluate the given expression in the provided globals.
++
++    Historically this used a global cache keyed only by the expression
++    string. That caused incorrect results when the same expression string
++    appeared in different modules with different globals. To avoid stale
++    results we avoid caching here and always compile & evaluate using the
++    provided globals mapping.
++    """
++    import _pytest._code
++
++    exprcode = _pytest._code.compile(expr, mode="eval")
++    return eval(exprcode, d)
+ 
+ 
+ class MarkEvaluator:

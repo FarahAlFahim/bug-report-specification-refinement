@@ -1,0 +1,55 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..0ee2afd7 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -21,21 +21,40 @@ class PolyFit(Stat):
+ 
+     def _fit_predict(self, data):
+ 
+-        x = data["x"]
+-        y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
++        # Coerce inputs to numeric and drop missing values. The groupby
++        # machinery can pass slices of the original DataFrame that still
++        # contain None/NaN or object-dtype entries. numpy.polyfit and the
++        # underlying linear algebra routines do not reliably handle these
++        # and may raise a LinAlgError. Ensure we operate on clean numeric
++        # arrays and fail gracefully (returning an empty result) when there
++        # are insufficient valid observations or when fitting fails.
++        df = pd.DataFrame({"x": data["x"], "y": data["y"]})
++
++        # Convert to numeric, coerce invalid parsing to NaN, then drop
++        # any rows with missing x or y.
++        df["x"] = pd.to_numeric(df["x"], errors="coerce")
++        df["y"] = pd.to_numeric(df["y"], errors="coerce")
++        df = df.dropna(subset=("x", "y"))
++
++        if df["x"].nunique() <= self.order:
++            # Not enough unique x values to fit the requested polynomial.
+             xx = yy = []
+         else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++            x = df["x"].to_numpy()
++            y = df["y"].to_numpy()
++            try:
++                p = np.polyfit(x, y, self.order)
++            except np.linalg.LinAlgError:
++                # If the linear algebra routine fails (e.g., SVD did not
++                # converge), do not raise — return an empty result so the
++                # plotting code can continue without a fitted curve.
++                xx = yy = []
++            else:
++                xx = np.linspace(x.min(), x.max(), self.gridsize)
++                yy = np.polyval(p, xx)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 
+-    # TODO we should have a way of identifying the method that will be applied
+-    # and then only define __call__ on a base-class of stats with this pattern
+-
+     def __call__(self, data, groupby, orient, scales):
+ 
+         return groupby.apply(data, self._fit_predict)

@@ -1,0 +1,17 @@
+diff --git a/django/db/backends/sqlite3/creation.py b/django/db/backends/sqlite3/creation.py
+index d97052f52d..12dd9954e2 100644
+--- a/django/db/backends/sqlite3/creation.py
++++ b/django/db/backends/sqlite3/creation.py
+@@ -95,7 +95,11 @@ class DatabaseCreation(BaseDatabaseCreation):
+         TEST NAME. See https://www.sqlite.org/inmemorydb.html
+         """
+         test_database_name = self._get_test_db_name()
+-        sig = [self.connection.settings_dict['NAME']]
++        # Include the computed test database name in the signature so that
++        # persistent per-alias TEST['NAME'] values are considered when
++        # deduplicating test databases. Keep the special-case for in-memory
++        # databases which must remain distinct per alias.
++        sig = [self.connection.settings_dict['NAME'], test_database_name]
+         if self.is_in_memory_db(test_database_name):
+             sig.append(self.connection.alias)
+         return tuple(sig)

@@ -1,0 +1,41 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..0bdcb93623 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,7 +825,35 @@ def _print_MatAdd(self, expr):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine whether the matrix term is negative without
++                # attempting to sympify raw internals (like MatrixSymbol names).
++                # Prefer structural extraction of a scalar coefficient for
++                # MatMul/MatExpr (as exposed by as_coeff_mmul/as_coeff_matrices).
++                neg = False
++                try:
++                    # MatMul exposes as_coeff_mmul which returns (coeff, mmul).
++                    if hasattr(item, 'as_coeff_mmul'):
++                        coeff = item.as_coeff_mmul()[0]
++                        neg = getattr(coeff, 'is_negative', False)
++                    elif hasattr(item, 'as_coeff_matrices'):
++                        coeff = item.as_coeff_matrices()[0]
++                        neg = getattr(coeff, 'is_negative', False)
++                    else:
++                        # Fallback: inspect the already-rendered term text
++                        # and see if it starts with a minus sign.
++                        txt = pform.parens()[0].lstrip()
++                        neg = txt.startswith('-')
++                except Exception:
++                    # Be conservative on errors: treat as non-negative so
++                    # we don't raise while printing; fallback to textual
++                    # inspection as last resort.
++                    try:
++                        txt = pform.parens()[0].lstrip()
++                        neg = txt.startswith('-')
++                    except Exception:
++                        neg = False
++
++                if neg:
+                     s = prettyForm(*stringPict.next(s, ' '))
+                     pform = self._print(item)
+                 else:

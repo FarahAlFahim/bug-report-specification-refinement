@@ -1,0 +1,18 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 73c20334d0..59504354de 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -152,7 +152,12 @@ def __new__(cls, *args, **kwargs):
+                         'warn' or 'ignore'.'''))
+         if any(coords[dim:]):
+             raise ValueError('Nonzero coordinates cannot be removed.')
+-        if any(a.is_number and im(a) for a in coords):
++        # Reject numeric coordinates that are provably non-real.
++        # Avoid relying on im(a) truthiness since when global
++        # evaluation is disabled unevaluated im(...) nodes can be
++        # present and are truthy in Python. Use is_real to check
++        # for numeric coordinates known to be non-real.
++        if any(a.is_number and (a.is_real is False) for a in coords):
+             raise ValueError('Imaginary coordinates are not permitted.')
+         if not all(isinstance(a, Expr) for a in coords):
+             raise TypeError('Coordinates must be valid SymPy expressions.')

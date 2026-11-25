@@ -1,0 +1,73 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..28477f8fcf 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -13,8 +13,39 @@ from .mpl_axes import Axes
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    # Some Axes classes (including the toolkit's own) expose an
++    # AxisDict-like mapping on ``ax.axis`` so that expressions like
++    # ``ax.axis["bottom"]`` return an object with a ``toggle`` method.
++    # Third-party Axes (e.g. Cartopy GeoAxes) may expose ``axis`` as a
++    # callable method or some other object that is not subscriptable.
++    # Guard against that here: if we cannot retrieve a per-side axis
++    # object supporting ``toggle``, silently skip toggling for that
++    # side.  This preserves the intended behaviour for AxisDict-aware
++    # axes while avoiding TypeError during Grid initialization.
++    def _maybe_toggle(ax_obj, key, **kw):
++        try:
++            axis_obj = ax_obj.axis[key]
++        except Exception:
++            # Not subscriptable or other failure; try to access
++            # attribute-style (some custom Axes might expose
++            # ``axis`` as an attribute implementing __getitem__). If
++            # ``axis`` is callable (the common Matplotlib Axes.axis
++            # method), we give up because it does not expose per-side
++            # Axis objects.
++            axis_attr = getattr(ax_obj, "axis", None)
++            if callable(axis_attr):
++                return
++            try:
++                axis_obj = axis_attr[key]
++            except Exception:
++                return
++
++        toggle = getattr(axis_obj, "toggle", None)
++        if callable(toggle):
++            toggle(**kw)
++
++    _maybe_toggle(ax, "bottom", ticklabels=bottom_off, label=bottom_off)
++    _maybe_toggle(ax, "left", ticklabels=left_off, label=left_off)
+ 
+ 
+ class CbarAxesBase:
+@@ -28,8 +59,24 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
+-        axis.toggle(ticklabels=b, label=b)
++        # See comment in _tick_only: some Axes expose an AxisDict-like
++        # API on ``axis`` while others do not.  If we cannot obtain a
++        # per-orientation axis object exposing ``toggle``, do nothing
++        # rather than raising during initialization.
++        try:
++            axis_obj = self.axis[self.orientation]
++        except Exception:
++            axis_attr = getattr(self, "axis", None)
++            if callable(axis_attr):
++                return
++            try:
++                axis_obj = axis_attr[self.orientation]
++            except Exception:
++                return
++
++        toggle = getattr(axis_obj, "toggle", None)
++        if callable(toggle):
++            toggle(ticklabels=b, label=b)
+ 
+ 
+ _cbaraxes_class_factory = cbook._make_class_factory(CbarAxesBase, "Cbar{}")

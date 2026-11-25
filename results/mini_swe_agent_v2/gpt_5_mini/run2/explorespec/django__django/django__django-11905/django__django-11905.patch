@@ -1,0 +1,37 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..0d3dce77ee 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -462,9 +462,31 @@ class IsNull(BuiltinLookup):
+     lookup_name = 'isnull'
+     prepare_rhs = False
+ 
++    def get_prep_lookup(self):
++        """
++        Coerce direct RHS values to an actual boolean so that lookup code
++        and query-side logic (which relies on identity checks like
++        `condition.rhs is True`) behave consistently. If the RHS is an
++        expression or already prepared (has as_sql/resolve_expression),
++        leave it alone.
++        """
++        # If RHS is an expression or a lookup-prepared value, don't coerce.
++        if hasattr(self.rhs, 'resolve_expression') or hasattr(self.rhs, 'as_sql'):
++            return self.rhs
++        # Leave None as-is; higher-level code maps None to the isnull
++        # lookup (e.g. build_lookup()). For any other direct literal,
++        # coerce to a boolean value so that join-promotion and other
++        # logic that checks `is True` / `is False` see actual booleans.
++        if self.rhs is None:
++            return None
++        return bool(self.rhs)
++
+     def as_sql(self, compiler, connection):
+         sql, params = compiler.compile(self.lhs)
+-        if self.rhs:
++        # Use an identity check against True so that only an actual
++        # boolean True emits IS NULL. RHS values are coerced to booleans
++        # by get_prep_lookup when they are direct literals.
++        if self.rhs is True:
+             return "%s IS NULL" % sql, params
+         else:
+             return "%s IS NOT NULL" % sql, params

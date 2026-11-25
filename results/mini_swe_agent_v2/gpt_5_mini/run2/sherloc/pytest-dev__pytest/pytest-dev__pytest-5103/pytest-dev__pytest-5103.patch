@@ -1,0 +1,121 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..00944a371 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,6 +968,116 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
++        # Special-case builtin all()/any() called with a single
++        # comprehension argument so we can unroll the comprehension
++        # and produce per-element explanations (preserving
++        # short-circuit semantics).
++        # Detect simple name calls to builtins 'all'/'any'.
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            name = call.func.id
++            comp = call.args[0]
++            # result and stop flag
++            res_var = self.variable()
++            stop_var = self.variable()
++            # initialize result and stop
++            init_val = _NameConstant(False) if name == "any" else _NameConstant(True)
++            self.statements.append(ast.Assign([ast.Name(res_var, ast.Store())], init_val))
++            self.statements.append(ast.Assign([ast.Name(stop_var, ast.Store())], _NameConstant(False)))
++
++            # list to collect per-element explanations
++            expl_list = self.assign(ast.List([], ast.Load()))
++            app = ast.Attribute(expl_list, "append", ast.Load())
++
++            # Build inner-most body where the element expression is visited.
++            inner_body = []
++
++            # Temporarily set statements so that visited nodes for the
++            # element expression are placed inside the loop body.
++            save_statements = self.statements
++            save_on_failure = getattr(self, 'on_failure', [])
++
++            # We'll append calls to expl_list in on_failure so they run
++            # only if the assertion fails. Use the same pattern as
++            # visit_BoolOp.  Create an outer formatting context for the
++            # whole all()/any() call and an inner one for each element.
++            self.push_format_context()
++            self.statements = inner_body
++            self.push_format_context()
++            elt_res, elt_expl = self.visit(comp.elt)
++            expl_format = self.pop_format_context(ast.Str(elt_expl))
++            call_app = ast_Call(app, [expl_format], [])
++            # Assign the element result to the result var inside the loop body.
++            inner_body.insert(0, ast.Assign([ast.Name(res_var, ast.Store())], elt_res))
++            # Record the append to be executed on failure.
++            save_on_failure.append(ast.Expr(call_app))
++            self.on_failure = save_on_failure
++
++            # If short-circuit condition met, set stop flag and break.
++            if name == "all":
++                cond = ast.UnaryOp(ast.Not(), ast.Name(res_var, ast.Load()))
++            else:
++                cond = ast.Name(res_var, ast.Load())
++            inner_body.append(
++                ast.If(
++                    cond,
++                    [
++                        ast.Assign([ast.Name(stop_var, ast.Store())], _NameConstant(True)),
++                        ast.Break(),
++                    ],
++                    [],
++                )
++            )
++
++            # Restore statements to build outer loops and attach inner_body.
++            self.statements = save_statements
++
++            # Build nested loops from generators
++            loop = inner_body
++            gens = list(comp.generators)
++            for gen in reversed(gens):
++                # wrap current loop body with any ifs
++                body_with_ifs = loop
++                for if_cond in reversed(gen.ifs):
++                    body_with_ifs = [ast.If(if_cond, body_with_ifs, [])]
++                # create For node
++                for_node = ast.For(gen.target, gen.iter, body_with_ifs, [])
++                # After the for, check stop_var to break outer loops if needed
++                loop = [for_node, ast.If(ast.Name(stop_var, ast.Load()), [ast.Break()], [])]
++
++            # Append the outermost loop(s) to statements
++            for stmt in loop:
++                self.statements.append(stmt)
++
++            # Build explanation using existing helper for boolop-like lists.
++            is_or = int(name == "any")
++            expl_template = self.helper("_format_boolop", expl_list, ast.Num(is_or))
++            expl = self.pop_format_context(expl_template)
++            res = ast.Name(res_var, ast.Load())
++            return res, self.explanation_param(expl)
++
++        # Special-case builtin all()/any() called with a single
++        # comprehension argument so we can unroll the comprehension
++        # and produce per-element explanations (preserving
++        # short-circuit semantics).
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            # Reuse the logic from visit_Call_35 by delegating to that
++            # path: construct an artificial Call node and call
++            # visit_Call_35.  Simpler is to inline similar handling,
++            # but for brevity call the other implementation.
++            return self.visit_Call_35(call)
++
+         new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []

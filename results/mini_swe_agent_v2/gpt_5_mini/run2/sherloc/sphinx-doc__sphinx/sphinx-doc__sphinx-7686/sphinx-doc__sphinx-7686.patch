@@ -1,0 +1,63 @@
+diff --git a/sphinx/ext/autosummary/__init__.py b/sphinx/ext/autosummary/__init__.py
+index 0cdd88feb..43873e5e7 100644
+--- a/sphinx/ext/autosummary/__init__.py
++++ b/sphinx/ext/autosummary/__init__.py
+@@ -779,6 +779,6 @@ def setup(app: Sphinx) -> Dict[str, Any]:
+     app.add_config_value('autosummary_generate_overwrite', True, False)
+     app.add_config_value('autosummary_mock_imports',
+                          lambda config: config.autodoc_mock_imports, 'env')
+-    app.add_config_value('autosummary_imported_members', [], False, [bool])
++    app.add_config_value('autosummary_imported_members', False, False, [bool])
+ 
+     return {'version': sphinx.__display_version__, 'parallel_read_safe': True}
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..c37373924 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -245,16 +245,29 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns = {}  # type: Dict[str, Any]
+     ns.update(context)
+ 
+-    if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
+-        ns['functions'], ns['all_functions'] = \
+-            get_members(obj, {'function'}, imported=imported_members)
+-        ns['classes'], ns['all_classes'] = \
+-            get_members(obj, {'class'}, imported=imported_members)
+-        ns['exceptions'], ns['all_exceptions'] = \
+-            get_members(obj, {'exception'}, imported=imported_members)
+-        ns['attributes'], ns['all_attributes'] = \
+-            get_module_attrs(ns['members'])
++if doc.objtype == 'module':
++        # respect the autosummary_imported_members flag when building the
++        # 'members' list for module templates. If imported_members is True
++        # use the raw dir(obj); otherwise filter out attributes whose
++        # __module__ does not match the module being documented. Use
++        # safe_getattr to avoid triggering AttributeError on access (mirrors
++        # get_members behaviour).
++        if imported_members:
++            ns['members'] = dir(obj)
++        else:
++            members = []  # type: List[str]
++            for name in dir(obj):
++                try:
++                    value = safe_getattr(obj, name)
++                except AttributeError:
++                    continue
++                if getattr(value, '__module__', None) == obj.__name__:
++                    members.append(name)
++            ns['members'] = members
++        ns['functions'], ns['all_functions'] =             get_members(obj, {'function'}, imported=imported_members)
++        ns['classes'], ns['all_classes'] =             get_members(obj, {'class'}, imported=imported_members)
++        ns['exceptions'], ns['all_exceptions'] =             get_members(obj, {'exception'}, imported=imported_members)
++        ns['attributes'], ns['all_attributes'] =             get_module_attrs(ns['members'])
+         ispackage = hasattr(obj, '__path__')
+         if ispackage and recursive:
+             ns['modules'], ns['all_modules'] = get_modules(obj)
+@@ -582,4 +595,4 @@ def main(argv: List[str] = sys.argv[1:]) -> None:
+ 
+ 
+ if __name__ == '__main__':
+-    main()
++    main()
+\ No newline at end of file

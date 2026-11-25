@@ -1,0 +1,63 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..b81ae2f8dc 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -117,6 +117,50 @@ class RelatedField(FieldCacheMixin, Field):
+             *self._check_clashes(),
+         ]
+ 
++    def _check_related_name_for_symmetrical(self, from_model=None, **kwargs):
++        """Ensure developers don't define a related_name on symmetrical
++        self-referential ManyToManyFields where no reverse relation is
++        created.
++
++        If a ManyToManyField is symmetrical and relates to the same model
++        (including when using the string 'self'), the reverse accessor is
++        not created. Defining a related_name in this situation is likely
++        a user mistake and should raise an error.
++        """
++        errors = []
++        # Only consider explicit related_name provided by the user.
++        if self._related_name is None:
++            return errors
++
++        # Resolve the target model relative to the model this field is on.
++        if from_model is None:
++            # Nothing to validate against if we don't know the model yet.
++            return errors
++
++        try:
++            to_model = resolve_relation(from_model, self.remote_field.model)
++        except Exception:
++            # If resolution fails, don't raise here; other checks will handle it.
++            return errors
++
++        # If this is a symmetrical m2m pointing to the same model, there is
++        # no reverse relation, so defining related_name is invalid.
++        if self.remote_field.symmetrical and to_model == from_model:
++            errors.append(
++                checks.Error(
++                    "ManyToManyField defines a related_name for a symmetrical "
++                    "self-referential relationship, but symmetrical relationships "
++                    "do not create a reverse relation.",
++                    hint=(
++                        "Remove the related_name argument or set symmetrical=False "
++                        "to create a reverse relation."
++                    ),
++                    obj=self,
++                    id='fields.E341',
++                )
++            )
++        return errors
++
+     def _check_related_name_is_valid(self):
+         import keyword
+         related_name = self.remote_field.related_name
+@@ -1212,6 +1256,7 @@ class ManyToManyField(RelatedField):
+             *super().check(**kwargs),
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
++            *self._check_related_name_for_symmetrical(**kwargs),
+             *self._check_ignored_options(**kwargs),
+             *self._check_table_uniqueness(**kwargs),
+         ]

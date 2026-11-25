@@ -1,0 +1,42 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..09b6549826 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -248,17 +248,33 @@ def _solve_reduced_system(system, gens, entry=False):
+                 (finite number of solutions)
+                 '''))
+ 
+-        gens = f.gens
++        
++        # do not overwrite the requested 'gens' with f.gens: that may
++        # drop variables that were requested by the caller (see issue
++        # where calling solve_poly_system((y - 1,), x, y) returned 1-tuples).
+         gen = gens[-1]
+-
++        
+         zeros = list(roots(f.ltrim(gen)).keys())
+-
++        
+         if not zeros:
+             return []
+-
++        
+         if len(basis) == 1:
++            # If the Groebner basis consists of only a univariate
++            # polynomial but the caller requested more than one
++            # generator, the system is positive-dimensional (there
++            # are infinitely many solutions for the other variables)
++            # and should not be reported as a finite list of
++            # incomplete 1-tuples. Signal that only zero-dimensional
++            # systems are supported.
++            if len(gens) > 1:
++                raise NotImplementedError(filldedent('''
++                    only zero-dimensional systems supported
++                    (finite number of solutions)
++                    '''))
+             return [(zero,) for zero in zeros]
+ 
++
+         solutions = []
+ 
+         for zero in zeros:

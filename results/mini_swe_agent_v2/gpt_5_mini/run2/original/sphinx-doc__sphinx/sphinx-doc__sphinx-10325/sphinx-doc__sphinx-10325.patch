@@ -1,0 +1,53 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..d8c1aa45d 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -110,11 +110,26 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :members: option to auto directives.
++
++    Historically this option accepted either no argument (meaning
++    "object"), or a single class name. Allow comma-separated lists
++    of class names (e.g. "list, set, tuple") by returning a set of
++    names. Keep backwards-compatible return values for falsy
++    options.
++    """
+     if arg in (None, True):
+-        return 'object'
++        return {'object'}
++    elif arg is False:
++        return set()
++    elif isinstance(arg, str):
++        return {x.strip() for x in arg.split(',') if x.strip()}
+     else:
+-        return arg
++        # if some other type is passed (e.g. a sequence), convert to set
++        try:
++            return set(arg)
++        except Exception:
++            return {str(arg)}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -681,8 +696,17 @@ class Documenter:
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+             if inspect.isclass(self.object):
++                # options.inherited_members may be a set of class names (new behavior),
++                # or a single string (backwards compatibility).  Normalize to a
++                # predicate that checks whether a class should be filtered.
++                targets = self.options.inherited_members
++                def is_target(clsname: str) -> bool:
++                    if isinstance(targets, (set, list, tuple)):
++                        return clsname in targets
++                    return clsname == targets
++
+                 for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
++                    if is_target(cls.__name__) and cls != self.object:
+                         # given member is a member of specified *super class*
+                         return True
+                     elif name in cls.__dict__:

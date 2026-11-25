@@ -1,0 +1,39 @@
+diff --git a/sympy/matrices/expressions/diagonal.py b/sympy/matrices/expressions/diagonal.py
+index a0dc57a35..22bf76bb1 100644
+--- a/sympy/matrices/expressions/diagonal.py
++++ b/sympy/matrices/expressions/diagonal.py
+@@ -8,7 +8,12 @@ class DiagonalMatrix(MatrixExpr):
+     shape = property(lambda self: (self.arg.shape[0], self.arg.shape[0]))
+ 
+     def _entry(self, i, j):
+-        return S.Zero if i != j else self.arg[i, 0]
++        # Represent diagonal entries using a KroneckerDelta factor so that
++        # symbolic summation machinery can detect the delta and simplify
++        # sums correctly. Using literal S.Zero for symbolic off-diagonal
++        # indices loses the necessary symbolic relation between indices.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j) * self.arg[i, 0]
+ 
+ class DiagonalOf(MatrixExpr):
+     arg = property(lambda self: self.args[0])
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..1eb97e92c 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,12 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
+-            return S.One
+-        else:
+-            return S.Zero
++        # Use KroneckerDelta to represent identity entries symbolically so
++        # that summation machinery can simplify sums involving symbolic
++        # indices. For concrete integer indices this behaves the same as
++        # returning 1 or 0.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One

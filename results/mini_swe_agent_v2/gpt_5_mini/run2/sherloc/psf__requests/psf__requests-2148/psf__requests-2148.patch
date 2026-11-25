@@ -1,0 +1,60 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..7ebeb04e 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -19,7 +19,7 @@ from .cookies import cookiejar_from_dict, get_cookie_header
+ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+-from .packages.urllib3.exceptions import DecodeError
++from .packages.urllib3.exceptions import DecodeError, ProtocolError
+ from .exceptions import (
+     HTTPError, RequestException, MissingSchema, InvalidURL,
+     ChunkedEncodingError, ContentDecodingError)
+@@ -30,6 +30,7 @@ from .utils import (
+ from .compat import (
+     cookielib, urlunparse, urlsplit, urlencode, str, bytes, StringIO,
+     is_py2, chardet, json, builtin_str, basestring, IncompleteRead)
++import socket
+ from .status_codes import codes
+ 
+ #: The set of HTTP status codes that indicate an automatically
+@@ -647,6 +648,12 @@ class Response(object):
+                     if not chunk:
+                         break
+                     yield chunk
++            except (ProtocolError, socket.error) as e:
++                # Map lower-level exceptions into requests' ConnectionError so
++                # callers see a consistent requests-level exception rather than
++                # a raw socket.error or urllib3 ProtocolError when errors
++                # occur while streaming the response body.
++                raise ConnectionError(e)
+ 
+             self._content_consumed = True
+ 
+diff --git a/requests/packages/urllib3/response.py b/requests/packages/urllib3/response.py
+index 7e0d47fa..a9ea9e62 100644
+--- a/requests/packages/urllib3/response.py
++++ b/requests/packages/urllib3/response.py
+@@ -1,5 +1,6 @@
+ import zlib
+ import io
++import socket
+ from socket import timeout as SocketTimeout
+ 
+ from ._collections import HTTPHeaderDict
+@@ -210,6 +211,14 @@ class HTTPResponse(io.IOBase):
+                 # This includes IncompleteRead.
+                 raise ProtocolError('Connection broken: %r' % e, e)
+ 
++            except socket.error as e:
++                # Map low-level socket errors into a urllib3 ProtocolError so
++                # callers higher up (requests) can translate them into a
++                # requests-level ConnectionError.  This prevents raw
++                # socket.error exceptions from bubbling out of urllib3 when
++                # they occur while reading the response body.
++                raise ProtocolError('Connection broken: %r' % e, e)
++
+             self._fp_bytes_read += len(data)
+ 
+             try:

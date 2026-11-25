@@ -1,0 +1,23 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..262be56876 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -38,8 +38,17 @@ def doit(p, q):
+ 
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
++            # Only treat p == q**n as divisible by q when the exponent n is a
++            # positive integer and q is known to be integer.  The previous
++            # behavior treated any Integer exponent (including non-positive
++            # ones) as evidence of divisibility which is incorrect for
++            # numeric remainder semantics (e.g. Mod(x**2, x) should not be
++            # simplified to 0 symbolically because for x=1.5 the remainder
++            # is 0.75). Requiring q.is_integer avoids incorrectly applying
++            # this rule when q may be non-integer.
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    (p.is_Pow and p.exp.is_Integer and p.exp.is_positive
++                     and q.is_integer and p.base == q) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

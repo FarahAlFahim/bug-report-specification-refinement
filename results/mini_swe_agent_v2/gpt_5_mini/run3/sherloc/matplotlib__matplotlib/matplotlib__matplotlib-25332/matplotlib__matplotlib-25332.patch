@@ -1,0 +1,13 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c09564d08f..e751251e29 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -808,7 +808,7 @@ class Grouper:
+         weakrefs are removed via clean() before serialization.
+         """
+         self.clean()
+-        groups = [[obj for obj in group if obj is not None]
++        groups = [[r() for r in group if r() is not None]
+                   for group in {id(g): g for g in self._mapping.values()}.values()]
+         return {"groups": groups}
+ 

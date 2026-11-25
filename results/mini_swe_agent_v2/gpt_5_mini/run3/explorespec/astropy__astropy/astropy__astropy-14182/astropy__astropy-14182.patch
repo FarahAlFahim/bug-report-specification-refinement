@@ -1,0 +1,47 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8ef..efd9923b9 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -57,10 +57,38 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, **writer_kwargs):
++        # Accept and forward writer kwargs (e.g., header_rows) like other
++        # FixedWidth-based writers.  Force the RST-specific delimiter and
++        # bookend settings but allow header_rows and other kwargs to be
++        # passed through.
++        super().__init__(delimiter_pad=None, bookend=False, **writer_kwargs)
++
++        # The data.start_line for RST depends on the header start and the
++        # number of header rows plus the position line.  Ensure it is set
++        # consistently for any number of header rows.
++        # General relationship: data.start_line = header.start_line +
++        #                        len(header.header_rows) + 1
++        self.data.start_line = self.header.start_line + len(self.header.header_rows) + 1
+ 
+     def write(self, lines):
++        """Wrap the fixed-width output with the RST top/bottom border.
++
++        The border (position) line is emitted by the FixedWidthData.write
++        immediately after the header rows.  Therefore its index in the
++        list returned by super().write() is equal to the number of
++        header rows.  Use that index rather than a hard-coded value so
++        multi-row headers are handled correctly.
++        """
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
+-        return lines
++        # Determine the index of the position/border line: it is added by
++        # FixedWidthData.write after the header rows, so its index equals
++        # len(self.header.header_rows).  Guard against odd inputs.
++        pos_index = len(getattr(self.header, "header_rows", []))
++        if not lines:
++            return lines
++        if pos_index < 0 or pos_index >= len(lines):
++            # Fallback to second line if something unexpected happened
++            pos_index = 1 if len(lines) > 1 else 0
++        border = lines[pos_index]
++        return [border] + lines + [border]

@@ -1,0 +1,69 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..332fcca777 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -13,6 +13,7 @@
+ from __future__ import division, print_function
+ 
+ from sympy import Function, Symbol, solve
++from sympy.core.relational import Relational
+ from sympy.core.compatibility import (
+     is_sequence, range, string_types, ordered)
+ from sympy.core.containers import OrderedSet
+@@ -565,16 +566,50 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # Accept relational equations like Eq(lhs, rhs) by converting them
++    # to an expression equal to zero (lhs - rhs).
++    if isinstance(eq, Relational):
++        eq = eq.lhs - eq.rhs
++
++    # Normalize dependent variable(s) y. Accept either Symbols, a
++    # sequence of Symbols/applied functions (e.g. f(x)), or a single
++    # applied function. Applied functions are normalized to a Symbol
++    # with the same function name so that derivative symbols created
++    # below match Derivative(Function('f')(x), x) produced by
++    # differentiating eq.
++    applied_map = {}
+     if is_sequence(y):
+-        dep = set(y)
+-        y = y[0]
++        new_y = []
++        dep = set()
++        for yi in y:
++            if isinstance(yi, Symbol):
++                dep.add(yi)
++                new_y.append(yi)
++            else:
++                # assume an applied function like f(x)
++                name = getattr(getattr(yi, 'func', None), '__name__', None) or str(getattr(yi, 'func', yi))
++                s = Symbol(name)
++                applied_map[s] = yi
++                dep.add(s)
++                new_y.append(s)
++        y = new_y[0]
+     elif isinstance(y, Symbol):
+         dep = {y}
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
+-
+-    f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
++        # single applied function, normalize to a Symbol
++        name = getattr(getattr(y, 'func', None), '__name__', None) or str(getattr(y, 'func', y))
++        s = Symbol(name)
++        applied_map[s] = y
++        dep = {s}
++        y = s
++
++    # Build substitution mapping for bare dependent symbols that appear
++    # as free symbols in eq: map Symbol('a') -> Function('a')(x)
++    f = dict([(s, Function(s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
++
++    # If the user supplied applied functions (or eq already contains
++    # applied functions), we don't need to substitute those; the
++    # derivative symbol used for solving should match Function(name)(x).diff(x)
+     dydx = Function(y.name)(x).diff(x)
+     eq = eq.subs(f)
+     derivs = {}

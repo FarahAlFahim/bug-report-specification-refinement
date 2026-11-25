@@ -1,0 +1,28 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..25b545694d 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -462,6 +462,23 @@ class IsNull(BuiltinLookup):
+     lookup_name = 'isnull'
+     prepare_rhs = False
+ 
++    def get_prep_lookup(self):
++        """
++        Ensure that only boolean (or expression/None) values are used with
++        the __isnull lookup. Using non-boolean values is undocumented and
++        can lead to surprising behavior because of truthy/falsey
++        evaluation. Raise a ValueError for non-boolean literal RHS values.
++        """
++        # Allow expressions (they will be resolved later) and None.
++        if hasattr(self.rhs, 'resolve_expression'):
++            return self.rhs
++        if self.rhs is None:
++            return None
++        # Only boolean literal values are permitted.
++        if isinstance(self.rhs, bool):
++            return self.rhs
++        raise ValueError("The '__isnull' lookup requires a boolean value.")
++
+     def as_sql(self, compiler, connection):
+         sql, params = compiler.compile(self.lhs)
+         if self.rhs:

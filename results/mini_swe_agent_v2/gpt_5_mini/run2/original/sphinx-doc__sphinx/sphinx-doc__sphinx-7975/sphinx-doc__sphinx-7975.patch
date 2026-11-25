@@ -1,0 +1,28 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 5af213932..5d155aad8 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -172,5 +172,21 @@ class IndexEntries:
+                     return _('Symbols')
+             else:
+                 return v[2]
+-        return [(key_, list(group))
+-                for (key_, group) in groupby(newlist, keyfunc3)]
++        # groupby only merges consecutive items with the same key. That
++        # can lead to multiple separate "Symbols" groups when symbol
++        # entries appear both before and after letter entries. To ensure
++        # a single group per heading (e.g. one "Symbols"), collect the
++        # groups into an ordered mapping and merge groups with the same
++        # key while preserving the order of first occurrence.
++        from collections import OrderedDict
++
++        grouped = OrderedDict()  # type: ignore
++        for (key_, group) in groupby(newlist, keyfunc3):
++            items = list(group)
++            if key_ in grouped:
++                # extend the already collected group
++                grouped[key_].extend(items)
++            else:
++                grouped[key_] = items
++
++        return list(grouped.items())

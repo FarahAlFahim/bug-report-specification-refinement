@@ -1,0 +1,96 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..45a3c05019 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -13,6 +13,7 @@
+ from __future__ import division, print_function
+ 
+ from sympy import Function, Symbol, solve
++from sympy.core.relational import Relational
+ from sympy.core.compatibility import (
+     is_sequence, range, string_types, ordered)
+ from sympy.core.containers import OrderedSet
+@@ -565,17 +566,67 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # Accept relational input like Eq(lhs, rhs) by converting to lhs - rhs
++    if isinstance(eq, Relational):
++        eq = eq.lhs - eq.rhs
++
++    # Normalize dependent variables. Accept Symbols, sequences of Symbols,
++    # or applied function forms like f(x). For applied functions provided by
++    # the caller, map them to a temporary Symbol with the same name so that
++    # derivative symbols line up with eq.diff(x).
+     if is_sequence(y):
+-        dep = set(y)
+-        y = y[0]
+-    elif isinstance(y, Symbol):
+-        dep = {y}
++        deps = list(y)
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        deps = [y]
++
++    dep_syms = set()
++    applied_map = {}  # Symbol -> applied function (e.g., Symbol('f') -> f(x))
++    for dep in deps:
++        # If it's a bare Symbol, keep it
++        if getattr(dep, 'is_Symbol', False):
++            dep_syms.add(dep)
++        else:
++            # Assume an applied function like f(x); derive a symbol name
++            # from the function and remember the applied form.
++            try:
++                fname = dep.func.__name__
++            except Exception:
++                fname = getattr(dep, 'name', str(dep.func))
++            s = Symbol(fname)
++            dep_syms.add(s)
++            applied_map[s] = dep
++
++    # Build substitutions for any bare dependent symbols that appear in eq.
++    # If the user supplied an applied function for a dependent symbol, use
++    # that applied form; otherwise create Function(symbol_name)(x).
++    f = {}
++    for s in eq.free_symbols:
++        if s == x:
++            continue
++        if s in dep_syms:
++            if s in applied_map:
++                f[s] = applied_map[s]
++            else:
++                f[s] = Function(s.name)(x)
++
++    # Determine the primary dependent variable (first in deps), and its
++    # derivative symbol to solve for. Use the applied form if one was
++    # provided by the caller so that eq.diff(x) and dydx match.
++    first_dep = deps[0]
++    if getattr(first_dep, 'is_Symbol', False):
++        y_sym = first_dep
++        dydx = Function(y_sym.name)(x).diff(x)
++    else:
++        # first_dep is an applied function like f(x)
++        try:
++            fname = first_dep.func.__name__
++        except Exception:
++            fname = getattr(first_dep, 'name', str(first_dep.func))
++        y_sym = Symbol(fname)
++        # Prefer the actual applied form if provided, else construct one
++        applied = applied_map.get(y_sym, Function(y_sym.name)(x))
++        dydx = applied.diff(x)
+ 
+-    f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+-    dydx = Function(y.name)(x).diff(x)
+     eq = eq.subs(f)
+     derivs = {}
+     for i in range(n):
+@@ -586,7 +637,6 @@ def idiff(eq, y, x, n=1):
+         eq = dydx - yp
+         dydx = dydx.diff(x)
+ 
+-
+ def intersection(*entities, **kwargs):
+     """The intersection of a collection of GeometryEntity instances.
+ 

@@ -1,0 +1,51 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..ff975398 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -309,15 +309,20 @@ def _dataset_concat(
+ 
+     result_vars = {}
+     if variables_to_merge:
++        from .common import _full_like_variable
++
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+         for ds in datasets:
+             absent_merge_vars = variables_to_merge - set(ds.variables)
++            # instead of raising, create missing variables filled with fill_value
+             if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
++                for var in absent_merge_vars:
++                    # base the missing variable on the variable from the first dataset
++                    base_var = datasets[0].variables[var]
++                    # create a variable like base_var but filled with fill_value
++                    missing_var = _full_like_variable(base_var, fill_value)
++                    ds.variables[var] = missing_var
+ 
+             for var in variables_to_merge:
+                 to_merge[var].append(ds.variables[var])
+@@ -358,10 +363,17 @@ def _dataset_concat(
+     # n.b. this loop preserves variable order, needed for groupby.
+     for k in datasets[0].variables:
+         if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
++            # if some datasets are missing this variable, create missing
++            # variables filled with fill_value so concatenation can proceed
++            missing = [i for i, ds in enumerate(datasets) if k not in ds.variables]
++            if missing:
++                base_var = datasets[0].variables[k]
++                from .common import _full_like_variable
++
++                for i in missing:
++                    datasets[i].variables[k] = _full_like_variable(base_var, fill_value)
++
++            vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+             combined = concat_vars(vars, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined

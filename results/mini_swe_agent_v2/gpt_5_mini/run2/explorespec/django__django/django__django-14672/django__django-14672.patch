@@ -1,0 +1,64 @@
+diff --git a/django/db/migrations/utils.py b/django/db/migrations/utils.py
+index 97bd96a90a..a0a77d7ae0 100644
+--- a/django/db/migrations/utils.py
++++ b/django/db/migrations/utils.py
+@@ -3,6 +3,7 @@ import re
+ from collections import namedtuple
+ 
+ from django.db.models.fields.related import RECURSIVE_RELATIONSHIP_CONSTANT
++from django.utils.hashable import make_hashable
+ 
+ FieldReference = namedtuple('FieldReference', 'to through')
+ 
+@@ -92,7 +93,10 @@ def field_references(
+             # Reference to field.
+             reference_field_name in through_fields
+         ):
+-            references_through = (remote_field, through_fields)
++            # through_fields may be a non-hashable iterable (e.g. list),
++            # so canonicalize it to a hashable representation for stable
++            # comparisons.
++            references_through = (remote_field, make_hashable(through_fields) if through_fields is not None else None)
+     if not (references_to or references_through):
+         return False
+     return FieldReference(references_to, references_through)
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index f208067aae..63ac8c55b0 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -1404,8 +1404,14 @@ class Model(metaclass=ModelBase):
+         # Skip when the relationship model wasn't found.
+         fields = (f for f in fields if isinstance(f.remote_field.through, ModelBase))
+ 
++        from django.utils.hashable import make_hashable
+         for f in fields:
+-            signature = (f.remote_field.model, cls, f.remote_field.through, f.remote_field.through_fields)
++            signature = (
++                f.remote_field.model,
++                cls,
++                f.remote_field.through,
++                make_hashable(f.remote_field.through_fields) if f.remote_field.through_fields is not None else None,
++            )
+             if signature in seen_intermediary_signatures:
+                 errors.append(
+                     checks.Error(
+diff --git a/django/db/models/fields/reverse_related.py b/django/db/models/fields/reverse_related.py
+index ccc2223a5f..4bb977d4b4 100644
+--- a/django/db/models/fields/reverse_related.py
++++ b/django/db/models/fields/reverse_related.py
+@@ -308,9 +308,14 @@ class ManyToManyRel(ForeignObjectRel):
+ 
+     @property
+     def identity(self):
++        # through_fields may be an unhashable iterable (e.g. list). Use
++        # make_hashable to canonicalize it to a stable, hashable
++        # representation so that the resulting identity tuple is itself
++        # hashable. This mirrors the treatment of limit_choices_to above.
++        through_fields = make_hashable(self.through_fields) if self.through_fields is not None else None
+         return super().identity + (
+             self.through,
+-            self.through_fields,
++            through_fields,
+             self.db_constraint,
+         )
+ 

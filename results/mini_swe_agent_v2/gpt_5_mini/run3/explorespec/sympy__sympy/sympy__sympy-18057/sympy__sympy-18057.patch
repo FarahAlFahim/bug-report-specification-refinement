@@ -1,0 +1,19 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 24d89897f7..c3fee5f229 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -121,7 +121,13 @@ def _hashable_content(self):
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
++            # Use strict sympification here to avoid falling back to
++            # parsing the repr() of arbitrary objects.  The non-strict
++            # sympify path can stringify unknown objects and pass the
++            # resulting text to the parser which may execute code or
++            # otherwise have side effects.  Basic.__eq__ already uses
++            # _sympify (strict=True) for this reason.
++            other = _sympify(other)
+             if not isinstance(other, Expr):
+                 return False
+         except (SympifyError, SyntaxError):

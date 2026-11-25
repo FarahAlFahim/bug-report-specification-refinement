@@ -1,0 +1,19 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..39f80668f1 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -848,10 +848,10 @@ class MultiWidget(Widget):
+         context['widget']['subwidgets'] = subwidgets
+         return context
+ 
+-    def id_for_label(self, id_):
+-        if id_:
+-            id_ += '_0'
+-        return id_
++    # Inherit Widget.id_for_label: don't force an index suffix on the
++    # generated id. Some subclasses (e.g. ChoiceWidget) handle adding an
++    # index when appropriate via their own configuration (add_id_index),
++    # so MultiWidget should not assume a "_0" suffix.
+ 
+     def value_from_datadict(self, data, files, name):
+         return [

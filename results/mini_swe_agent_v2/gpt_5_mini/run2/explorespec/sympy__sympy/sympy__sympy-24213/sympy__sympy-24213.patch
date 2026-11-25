@@ -1,0 +1,63 @@
+diff --git a/sympy/physics/units/systems/si.py b/sympy/physics/units/systems/si.py
+index 700495ad9d..084ac4cb10 100644
+--- a/sympy/physics/units/systems/si.py
++++ b/sympy/physics/units/systems/si.py
+@@ -333,9 +333,12 @@
+ ):
+     dimex = SI.get_dimensional_expr(_scale_factor)
+     if dimex != 1:
+-        # XXX: equivalent_dims is an instance method taking two arguments in
+-        # addition to self so this can not work:
+-        if not DimensionSystem.equivalent_dims(_dimension, Dimension(dimex)):  # type: ignore
++        # Use the DimensionSystem instance associated with the SI system to
++        # check canonical dimensional equivalence. The instance method
++        # equivalent_dims compares dimensional dependency dictionaries and
++        # is the canonical test for dimensional equivalence.
++        dimsys = SI.get_dimension_system()
++        if not dimsys.equivalent_dims(_dimension, Dimension(dimex)):
+             raise ValueError("quantity value and dimension mismatch")
+ del _scale_factor, _dimension
+ 
+diff --git a/sympy/physics/units/unitsystem.py b/sympy/physics/units/unitsystem.py
+index a436880c4b..d93e204739 100644
+--- a/sympy/physics/units/unitsystem.py
++++ b/sympy/physics/units/unitsystem.py
+@@ -173,15 +173,32 @@ def _collect_factor_and_dimension(self, expr):
+         elif isinstance(expr, Add):
+             factor, dim = self._collect_factor_and_dimension(expr.args[0])
+             for addend in expr.args[1:]:
+-                addend_factor, addend_dim = \
+-                    self._collect_factor_and_dimension(addend)
++                addend_factor, addend_dim =                     self._collect_factor_and_dimension(addend)
++                # Use the DimensionSystem to determine canonical dimensional
++                # equivalence rather than relying on structural equality of
++                # Dimension objects. If dimensions are equivalent, pick a
++                # canonical Dimension built from the dimensional
++                # dependencies; otherwise raise an error.
++                dimsys = self.get_dimension_system()
+                 if dim != addend_dim:
+-                    raise ValueError(
+-                        'Dimension of "{}" is {}, '
+-                        'but it should be {}'.format(
+-                            addend, addend_dim, dim))
++                    if dimsys is not None and dimsys.equivalent_dims(dim, addend_dim):
++                        deps = dimsys.get_dimensional_dependencies(dim)
++                        # build canonical dimension from dependencies
++                        can = Dimension._from_dimensional_dependencies(deps)
++                        if can == 1:
++                            dim = Dimension(1)
++                        elif isinstance(can, Dimension):
++                            dim = can
++                        else:
++                            dim = Dimension(can)
++                    else:
++                        raise ValueError(
++                            'Dimension of "{}" is {}, '
++                            'but it should be {}'.format(
++                                addend, addend_dim, dim))
+                 factor += addend_factor
+             return factor, dim
++
+         elif isinstance(expr, Derivative):
+             factor, dim = self._collect_factor_and_dimension(expr.args[0])
+             for independent, count in expr.variable_count:

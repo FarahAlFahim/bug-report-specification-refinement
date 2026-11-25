@@ -1,0 +1,116 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..536cf6cad1 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -79,38 +79,66 @@ def __repr__(self):
+                 str(self.name), str(self.abbrev), self._exponent, self.base)
+ 
+     def __mul__(self, other):
+-        from sympy.physics.units import Quantity
+-        if not isinstance(other, (Quantity, Prefix)):
+-            return super().__mul__(other)
+-
+-        fact = self.scale_factor * other.scale_factor
+-
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        # Multiplication with prefixes should behave differently depending
++        # on whether the right-hand side is another Prefix or a Quantity.
++        #
++        # If multiplying two prefixes, try to simplify/compose them and when
++        # their combined factor equals 1 return 1. However, when multiplying a
++        # prefix with a Quantity we must not return 1 just because the
++        # numeric scale factors cancel out (this can happen when the
++        # Quantity's scale factor embeds a different prefix, e.g. watt uses
++        # kilogram which embeds the kilo prefix). In that case the correct
++        # result is the prefixed Quantity (or the scaled Quantity), not the
++        # dimensionless 1.
++
++        if isinstance(other, Prefix):
++            fact = self.scale_factor * other.scale_factor
++            if fact == 1:
++                return 1
+             # simplify prefix
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
+-        return self.scale_factor * other
++        from sympy.physics.units import Quantity, UnitSystem
++        if isinstance(other, Quantity):
++            # If a prefixed Quantity was pre-defined (see prefix_unit),
++            # return that Quantity (e.g. milli * watt -> milliwatt). The
++            # UnitSystem keeps a global map of prefixed quantities to their
++            # (scale_factor, reference_unit); we can look-up the Quantity
++            # that matches (self.scale_factor, other).
++            for qty, tup in UnitSystem._quantity_scale_factors_global.items():
++                # tup is (scale_factor, reference_quantity)
++                if tup == (self.scale_factor, other):
++                    return qty
++            # Fallback: apply numeric scale factor to the quantity.
++            return self.scale_factor * other
++
++        return super().__mul__(other)
+ 
+     def __truediv__(self, other):
+-        if not hasattr(other, "scale_factor"):
+-            return super().__truediv__(other)
++        # Similar logic as in __mul__: handle Prefix/Quantity cases
++        # separately. If dividing by a Prefix, try to simplify to another
++        # Prefix or to 1. If dividing by a Quantity, return the appropriate
++        # scaled expression and do not collapse to 1 when numeric factors
++        # cancel.
+ 
+-        fact = self.scale_factor / other.scale_factor
++        from sympy.physics.units import Quantity
+ 
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        if isinstance(other, Prefix):
++            fact = self.scale_factor / other.scale_factor
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
+-        return self.scale_factor / other
++        if isinstance(other, Quantity):
++            return self.scale_factor / other
++
++        return super().__truediv__(other)
+ 
+     def __rtruediv__(self, other):
+         if other == 1:
+diff --git a/sympy/physics/units/quantities.py b/sympy/physics/units/quantities.py
+index cc19e72aea..922839573f 100644
+--- a/sympy/physics/units/quantities.py
++++ b/sympy/physics/units/quantities.py
+@@ -105,6 +105,23 @@ def _eval_is_constant(self):
+     def _eval_Abs(self):
+         return self
+ 
++    def __mul__(self, other):
++        """
++        Ensure multiplication with a Prefix returns the prefixed Quantity.
++        Delegate to Prefix.__mul__ when appropriate so that both
++        `milli * watt` and `watt * milli` produce the same prefixed unit.
++        """
++        from sympy.physics.units.prefixes import Prefix
++        if isinstance(other, Prefix):
++            return other * self
++        return super().__mul__(other)
++
++    def __rmul__(self, other):
++        from sympy.physics.units.prefixes import Prefix
++        if isinstance(other, Prefix):
++            return other * self
++        return super().__rmul__(other)
++
+     def _eval_subs(self, old, new):
+         if isinstance(new, Quantity) and self != old:
+             return self

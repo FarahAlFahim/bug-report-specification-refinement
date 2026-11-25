@@ -1,0 +1,25 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 1a55d3d417..73ee966fb7 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,10 +764,18 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            # Only avoid installing the generated accessor if the class
++            # itself defines get_<field>_display. An accessor inherited
++            # from a parent (for example, from an abstract base's field)
++            # should be rebound to the Field instance being contributed to
++            # this class so that it resolves labels from the concrete
++            # Field.flatchoices. Using cls.__dict__ ensures we don't treat
++            # inherited accessors as explicit user overrides.
++            accessor_name = 'get_%s_display' % self.name
++            if accessor_name not in cls.__dict__:
+                 setattr(
+                     cls,
+-                    'get_%s_display' % self.name,
++                    accessor_name,
+                     partialmethod(cls._get_FIELD_display, field=self),
+                 )
+ 

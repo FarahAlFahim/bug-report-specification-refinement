@@ -1,0 +1,31 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 69a2d9298f..e9ff6a3c39 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -280,6 +280,14 @@ class SQLCompiler:
+                 else:
+                     sql, params = self.compile(Value(empty_result_set_value))
+             else:
++                # Some expressions (for example, the negation of an empty-IN
++                # lookup) compile to an empty SQL string ("") to indicate a
++                # predicate that matches everything. In SELECT/annotation
++                # contexts we must render a valid SQL expression, so treat a
++                # returned empty string as a portable always-true literal
++                # ('1') before applying select_format().
++                if not sql:
++                    sql, params = '1', ()
+                 sql, params = col.select_format(self, sql, params)
+             ret.append((col, (sql, params), alias))
+         return ret, klass_info, annotations
+@@ -1663,6 +1671,11 @@ class SQLAggregateCompiler(SQLCompiler):
+         sql, params = [], []
+         for annotation in self.query.annotation_select.values():
+             ann_sql, ann_params = self.compile(annotation)
++            # See comment in get_select(): treat an empty SQL string as an
++            # always-true literal so the annotation renders valid SQL in the
++            # SELECT list.
++            if not ann_sql:
++                ann_sql, ann_params = '1', ()
+             ann_sql, ann_params = annotation.select_format(self, ann_sql, ann_params)
+             sql.append(ann_sql)
+             params.extend(ann_params)

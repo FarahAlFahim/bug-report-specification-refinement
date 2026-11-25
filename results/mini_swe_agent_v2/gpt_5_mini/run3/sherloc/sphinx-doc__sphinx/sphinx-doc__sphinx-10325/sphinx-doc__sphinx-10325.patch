@@ -1,0 +1,73 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..8b29ba46d 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -110,12 +110,21 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :inherited-members: option to auto directives.
++
++    Accepts:
++    - None/True: legacy sentinel 'object' (include inherited members)
++    - False: meaning no inherited members
++    - a single class name string, or a comma-separated list of class names.
++    Returns either the legacy sentinel string, False, or a set of class name strings.
++    """
+     if arg in (None, True):
+         return 'object'
++    elif arg is False:
++        return False
+     else:
+-        return arg
+-
++        # parse comma-separated list of class names into a set
++        return {x.strip() for x in str(arg).split(',') if x.strip()}
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+     """Used to convert the :members: option to auto directives."""
+@@ -680,17 +689,34 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
++            if not inspect.isclass(self.object):
++                return False
++
++            inh = self.options.inherited_members
++            # inh can be: 'object' (legacy sentinel), False, or a set of class name strings
++            for cls in self.object.__mro__:
++                # if this class is listed in the inherited-members option, and it's not the
++                # class we're documenting itself, then members from that class should be
++                # considered filtered/ignored (unless overridden by being defined on the
++                # subclass or having annotations or coming from ObjectMember info).
++                if inh and inh is not False and inh != 'object':
++                    # inh is a set of class names
++                    if cls.__name__ in inh and cls != self.object:
+                         # given member is a member of specified *super class*
+                         return True
+-                    elif name in cls.__dict__:
+-                        return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
+-                        return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+-                        return False
++                elif inh == 'object':
++                    # legacy behavior: include inherited members but do not filter by base
++                    # class name; keep processing to find whether the member is actually
++                    # defined in a base class
++                    pass
++
++                # if the member is defined on this cls, then it's not filtered as inherited
++                if name in cls.__dict__:
++                    return False
++                if name in self.get_attr(cls, '__annotations__', {}):
++                    return False
++                if isinstance(obj, ObjectMember) and obj.class_ is cls:
++                    return False
+ 
+             return False
+ 

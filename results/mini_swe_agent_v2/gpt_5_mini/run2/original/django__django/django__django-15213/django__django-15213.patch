@@ -1,0 +1,25 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..5fa766db25 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -981,6 +981,20 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+     def as_sql(self, compiler, connection):
+         return compiler.compile(self.expression)
+ 
++    def select_format(self, compiler, sql, params):
++        """
++        Delegate select formatting to the wrapped expression when possible.
++
++        This ensures that wrapping a WHERE-like expression (for example a
++        resolved Q/WhereNode) with an ExpressionWrapper preserves any
++        backend-specific formatting such as CASE WHEN wrapping for boolean
++        expressions. If the wrapped expression doesn't provide select_format,
++        fall back to the default behavior.
++        """
++        if hasattr(self.expression, 'select_format'):
++            return self.expression.select_format(compiler, sql, params)
++        return super().select_format(compiler, sql, params)
++
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)
+ 

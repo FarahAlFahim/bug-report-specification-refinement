@@ -1,0 +1,48 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..5ab8bd599 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -246,7 +246,18 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        # Build members list honoring the imported_members flag so that
++        # templates see the same membership as get_members() does.
++        members = []
++        for name in dir(obj):
++            try:
++                value = safe_getattr(obj, name)
++            except AttributeError:
++                continue
++            # include imported members only when requested
++            if imported_members or getattr(value, '__module__', None) == obj.__name__:
++                members.append(name)
++        ns['members'] = members
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \
+@@ -259,9 +270,20 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+         if ispackage and recursive:
+             ns['modules'], ns['all_modules'] = get_modules(obj)
+     elif doc.objtype == 'class':
+-        ns['members'] = dir(obj)
+-        ns['inherited_members'] = \
+-            set(dir(obj)) - set(obj.__dict__.keys())
++        # For classes, filter members similarly to modules so templates
++        # and module-attribute detection operate on the same view.
++        members = []
++        all_dir = list(dir(obj))
++        for name in all_dir:
++            try:
++                value = safe_getattr(obj, name)
++            except AttributeError:
++                continue
++            # include imported members only when requested
++            if imported_members or getattr(value, '__module__', None) == obj.__name__:
++                members.append(name)
++        ns['members'] = members
++        ns['inherited_members'] = set(all_dir) - set(obj.__dict__.keys())
+         ns['methods'], ns['all_methods'] = \
+             get_members(obj, {'method'}, ['__init__'])
+         ns['attributes'], ns['all_attributes'] = \

@@ -1,0 +1,25 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..9b1a0a017f 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -120,6 +120,20 @@ def __new__(cls, *args, **kwargs):
+             if len(coords) == kwargs.get('dim', len(coords)):
+                 return coords
+ 
++        # If coords is a Mul containing a Point factor (e.g. 2*Point(1,1))
++        # interpret this as scaling the Point by the product of the
++        # non-Point factors.  We check for Mul specifically to avoid
++        # relying on unsupported arithmetic (like Point**-1).
++        from sympy.core.mul import Mul
++        if isinstance(coords, Mul):
++            # find a Point factor
++            for a in coords.args:
++                if getattr(a, 'is_Point', False):
++                    # scalar is the product of the other args
++                    other_factors = [f for f in coords.args if f is not a]
++                    scalar = Mul(*other_factors)
++                    return a * scalar
++
+         if not is_sequence(coords):
+             raise TypeError(filldedent('''
+                 Expecting sequence of coordinates, not `{}`'''

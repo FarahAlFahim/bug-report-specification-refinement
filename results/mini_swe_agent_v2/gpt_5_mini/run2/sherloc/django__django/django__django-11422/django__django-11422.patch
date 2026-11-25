@@ -1,0 +1,40 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..0c1b279630 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -579,6 +579,35 @@ def run_with_reloader(main_func, *args, **kwargs):
+     try:
+         if os.environ.get(DJANGO_AUTORELOAD_ENV) == 'true':
+             reloader = get_reloader()
++            # Ensure the calling script (typically manage.py) is watched when
++            # running the autoreload child process. When a script is executed
++            # as __main__ it won't necessarily be present in sys.modules and
++            # therefore won't be discovered by iter_all_python_module_files().
++            # See: https://code.djangoproject.com/ticket/XXXXX
++            try:
++                import django.__main__ as _dj_main
++                argv0 = Path(sys.argv[0]) if sys.argv else None
++                if argv0 and argv0.exists():
++                    # Use absolute resolved path for comparison and watching.
++                    argv0_resolved = argv0.resolve().absolute()
++                    try:
++                        django_main_file = Path(_dj_main.__file__).resolve().absolute()
++                    except Exception:
++                        django_main_file = None
++                    if django_main_file is None or argv0_resolved != django_main_file:
++                        # BaseReloader.watch_file requires absolute Path instances.
++                        try:
++                            reloader.watch_file(argv0_resolved)
++                        except Exception:
++                            # Be conservative: don't let a failure to watch the
++                            # file prevent the server from starting.
++                            logger.debug('Failed to add %s to reloader extra_files', argv0_resolved, exc_info=True)
++            except Exception:
++                # Defensive: if importing django.__main__ or accessing
++                # sys.argv fails for any reason, continue without adding
++                # the script to watched files.
++                logger.debug('Could not determine script to watch for autoreload.', exc_info=True)
++
+             logger.info('Watching for file changes with %s', reloader.__class__.__name__)
+             start_django(reloader, main_func, *args, **kwargs)
+         else:

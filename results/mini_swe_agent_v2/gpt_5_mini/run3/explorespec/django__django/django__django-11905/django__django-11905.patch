@@ -1,0 +1,36 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..2c730af129 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -462,9 +462,30 @@ class IsNull(BuiltinLookup):
+     lookup_name = 'isnull'
+     prepare_rhs = False
+ 
++    def get_prep_lookup(self):
++        """
++        Coerce direct RHS values to a strict boolean. The ORM's query-side
++        logic (join-promotion and related checks) expects the RHS for the
++        isnull lookup to be the boolean True object when the special IS NULL
++        semantics are requested. Previously, truthy non-boolean values could
++        be passed through unchanged which led to inconsistent behaviour
++        between SQL emission (which used Python truthiness) and query
++        construction (which checked for identity with True).
++
++        If the RHS is an expression (resolve_expression exists), return it
++        unchanged so it can be compiled as part of the query. For direct
++        values, return bool(self.rhs) to ensure a strict True/False value is
++        stored on the lookup instance.
++        """
++        if hasattr(self.rhs, 'resolve_expression'):
++            return self.rhs
++        return bool(self.rhs)
++
+     def as_sql(self, compiler, connection):
+         sql, params = compiler.compile(self.lhs)
+-        if self.rhs:
++        # Use an identity check against True to align with query-side
++        # behaviour which detects the isnull True case via `condition.rhs is True`.
++        if self.rhs is True:
+             return "%s IS NULL" % sql, params
+         else:
+             return "%s IS NOT NULL" % sql, params

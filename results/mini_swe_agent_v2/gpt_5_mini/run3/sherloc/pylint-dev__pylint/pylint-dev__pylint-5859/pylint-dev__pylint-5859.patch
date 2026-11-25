@@ -1,0 +1,25 @@
+diff --git a/pylint/checkers/misc.py b/pylint/checkers/misc.py
+index 69149e61a..49eda7084 100644
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -120,10 +120,18 @@ class EncodingChecker(BaseChecker):
+         super().open()
+ 
+         notes = "|".join(re.escape(note) for note in self.config.notes)
++        # Use a boundary that asserts the next character is not a word
++        # character. Using a word boundary ("\b") fails for tags that
++        # consist entirely of punctuation (no \w chars) because \b only
++        # matches between word and non-word characters. A negative
++        # lookahead (?!\w) preserves the intent (don't match inside a
++        # larger word) while allowing punctuation-only tags to be
++        # recognized.
++        boundary = r"(?!\w)"
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            regex_string = rf"#\s*({notes}|{self.config.notes_rgx}){boundary}"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes}){boundary}"
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)
+ 

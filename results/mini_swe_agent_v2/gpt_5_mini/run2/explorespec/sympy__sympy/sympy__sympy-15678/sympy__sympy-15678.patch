@@ -1,0 +1,113 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..9f8dc98603 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -535,58 +535,69 @@ def idiff(eq, y, x, n=1):
+     x : the variable that the derivative is being taken with respect to
+     n : the order of the derivative (default is 1)
+ 
+-    Examples
+-    ========
+-
+-    >>> from sympy.abc import x, y, a
+-    >>> from sympy.geometry.util import idiff
+-
+-    >>> circ = x**2 + y**2 - 4
+-    >>> idiff(circ, y, x)
+-    -x/y
+-    >>> idiff(circ, y, x, 2).simplify()
+-    -(x**2 + y**2)/y**3
+-
+-    Here, ``a`` is assumed to be independent of ``x``:
+-
+-    >>> idiff(x + a + y, y, x)
+-    -1
+-
+-    Now the x-dependence of ``a`` is made explicit by listing ``a`` after
+-    ``y`` in a list.
+-
+-    >>> idiff(x + a + y, [y, a], x)
+-    -Derivative(a, x) - 1
+-
+-    See Also
+-    ========
+-
+-    sympy.core.function.Derivative: represents unevaluated derivatives
+-    sympy.core.function.diff: explicitly differentiates wrt symbols
+-
+     """
++    # Accept Relational inputs (Eq, etc.) by converting to an expression
++    try:
++        is_rel = eq.is_Relational
++    except Exception:
++        is_rel = False
++    if is_rel:
++        eq = eq.lhs - eq.rhs
++
++    # Normalize dependent variables
+     if is_sequence(y):
+-        dep = set(y)
+-        y = y[0]
+-    elif isinstance(y, Symbol):
+-        dep = {y}
++        dep_list = list(y)
++        y0 = dep_list[0]
++        dep = set(dep_list)
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        y0 = y
++        if isinstance(y, Symbol):
++            dep = {y}
++        else:
++            # allow applied functions like f(x)
++            dep = {y}
++    # Build mapping from user dependent symbols/expressions to internal Functions
++    f = {}
++    # helper to get a base name for function placeholders
++    def _name_of(d):
++        if isinstance(d, Symbol):
++            return d.name
++        try:
++            return d.func.__name__
++        except Exception:
++            return str(d)
++
++    for d in list(dep):
++        # only substitute if the dependent appears in the equation
++        if eq.has(d):
++            fname = _name_of(d)
++            f[d] = Function(fname)(x)
++
++    # internal derivative symbol for primary dependent
++    if isinstance(y0, Symbol):
++        base = y0.name
++    else:
++        try:
++            base = y0.func.__name__
++        except Exception:
++            base = str(y0)
++    dydx = Function(base)(x).diff(x)
+ 
+-    f = dict([(s, Function(
+-        s.name)(x)) for s in eq.free_symbols if s != x and s in dep])
+-    dydx = Function(y.name)(x).diff(x)
++    # substitute dependents in equation with internal placeholders
+     eq = eq.subs(f)
+     derivs = {}
+     for i in range(n):
+-        yp = solve(eq.diff(x), dydx)[0].subs(derivs)
++        sols = solve(eq.diff(x), dydx)
++        if not sols:
++            raise ValueError('could not solve for derivative')
++        yp = sols[0].subs(derivs)
+         if i == n - 1:
++            # restore original dependent expressions
+             return yp.subs([(v, k) for k, v in f.items()])
+         derivs[dydx] = yp
+         eq = dydx - yp
+         dydx = dydx.diff(x)
+ 
+-
+ def intersection(*entities, **kwargs):
+     """The intersection of a collection of GeometryEntity instances.
+ 

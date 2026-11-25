@@ -1,0 +1,43 @@
+diff --git a/django/db/models/lookups.py b/django/db/models/lookups.py
+index 9344979c56..8ae2f5d7f4 100644
+--- a/django/db/models/lookups.py
++++ b/django/db/models/lookups.py
+@@ -463,11 +463,33 @@ class IsNull(BuiltinLookup):
+     prepare_rhs = False
+ 
+     def as_sql(self, compiler, connection):
+-        sql, params = compiler.compile(self.lhs)
+-        if self.rhs:
+-            return "%s IS NULL" % sql, params
+-        else:
+-            return "%s IS NOT NULL" % sql, params
++        # Compile the LHS first.
++        lhs_sql, lhs_params = compiler.compile(self.lhs)
++
++        # If the RHS is a direct Python value, only booleans are allowed.
++        if self.rhs_is_direct_value():
++            if not isinstance(self.rhs, bool):
++                raise ValueError("The RHS to an '__isnull' lookup must be a boolean (True or False) or an expression.")
++            if self.rhs:
++                return "%s IS NULL" % lhs_sql, lhs_params
++            else:
++                return "%s IS NOT NULL" % lhs_sql, lhs_params
++
++        # If the RHS is an expression, evaluate it at SQL runtime. The
++        # semantics are: if RHS is true then (lhs IS NULL) else (lhs IS NOT NULL).
++        # This compiles to SQL of the form:
++        #   (rhs AND lhs IS NULL) OR (NOT (rhs) AND lhs IS NOT NULL)
++        # Compile RHS as an expression and combine parameters appropriately.
++        rhs = self.rhs
++        if hasattr(rhs, 'resolve_expression'):
++            rhs = rhs.resolve_expression(compiler.query)
++        rhs_sql, rhs_params = compiler.compile(rhs)
++
++        sql = '(%s AND %s IS NULL) OR (NOT (%s) AND %s IS NOT NULL)' % (
++            rhs_sql, lhs_sql, rhs_sql, lhs_sql,
++        )
++        params = list(rhs_params) + list(lhs_params) + list(rhs_params) + list(lhs_params)
++        return sql, params
+ 
+ 
+ @Field.register_lookup

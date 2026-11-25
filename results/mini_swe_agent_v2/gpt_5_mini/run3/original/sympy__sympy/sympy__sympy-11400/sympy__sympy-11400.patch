@@ -1,0 +1,24 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..d5d3d2d64f 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -218,6 +218,19 @@ def _print_ITE(self, expr):
+         _piecewise = Piecewise((expr.args[1], expr.args[0]), (expr.args[2], True))
+         return self._print(_piecewise)
+ 
++    def _print_sinc(self, expr):
++        """Print sinc(x). C does not have a standard sinc in math.h, so
++        print it as a Piecewise: sin(x)/x for x != 0, and 1 otherwise.
++        This mirrors the behaviour of the sinc function in SymPy.
++        """
++        from sympy import sin
++        from sympy import Piecewise
++        from sympy import Ne
++
++        x = expr.args[0]
++        pw = Piecewise((sin(x)/x, Ne(x, 0)), (1, True))
++        return self._print(pw)
++
+     def _print_MatrixElement(self, expr):
+         return "{0}[{1}]".format(expr.parent, expr.j +
+                 expr.i*expr.parent.shape[1])

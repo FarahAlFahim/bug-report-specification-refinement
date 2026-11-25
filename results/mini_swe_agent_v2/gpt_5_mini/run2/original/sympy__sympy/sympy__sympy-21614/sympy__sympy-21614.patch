@@ -1,0 +1,19 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..29b580e5b4 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1230,6 +1230,14 @@ class Derivative(Expr):
+     """
+ 
+     is_Derivative = True
++    @property
++    def kind(self):
++        """
++        Kind of the derivative. Delegate to the wrapped expression so that
++        operations like Derivative(MatrixSymbol, x).kind return a MatrixKind
++        when appropriate.
++        """
++        return self.expr.kind
+ 
+     @property
+     def _diff_wrt(self):

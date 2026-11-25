@@ -1,0 +1,55 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..ffd511ccea 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -1102,8 +1102,48 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
++            # If the norm has not been scaled yet, try to initialize it from
++            # the mappable's data (this mirrors ScalarMappable.autoscale_None
++            # behavior).  This is important for non-linear norms (e.g.
++            # LogNorm) which require positive vmin/vmax; blindly setting a
++            # default 0..1 range can lead to division-by-zero in
++            # norm.inverse. If no mappable data is available, fall back to
++            # the previous 0..1 behavior for plain linear Normalize, but
++            # avoid vmin==0 for log-like norms.
++            mappable = getattr(self, 'mappable', None)
++            initialized = False
++            if mappable is not None and getattr(mappable, 'get_array', None) is not None:
++                arr = mappable.get_array()
++                if arr is not None:
++                    try:
++                        # Let the mappable initialize the norm if possible.
++                        mappable.autoscale_None()
++                        initialized = True
++                    except Exception:
++                        # If that fails, try to call the norm's
++                        # autoscale_None directly with the array.
++                        try:
++                            self.norm.autoscale_None(arr)
++                            initialized = True
++                        except Exception:
++                            initialized = False
++            if not initialized:
++                # No data to infer vmin/vmax from.  Use conservative
++                # fallbacks: for plain linear Normalize, keep the historical
++                # 0..1 fallback; for log-like norms, avoid vmin==0 which
++                # would break inverse transforms.
++                if (type(self.norm) is colors.Normalize or
++                        getattr(self.norm, '_scale', None) is None):
++                    self.norm.vmin = 0
++                    self.norm.vmax = 1
++                else:
++                    # For log-like or other non-linear norms, choose a
++                    # small positive vmin to avoid division-by-zero in
++                    # inverse implementations. Use the smallest positive
++                    # normal float as a conservative choice.
++                    tiny = float(__import__('numpy').finfo(float).tiny)
++                    self.norm.vmin = tiny
++                    self.norm.vmax = 1.0
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

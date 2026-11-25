@@ -1,0 +1,25 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 1a55d3d417..2b2b455223 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -764,10 +764,18 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            if not hasattr(cls, 'get_%s_display' % self.name):
++            # Only set the get_FOO_display on the class if it hasn't been
++            # explicitly defined on this class. Using hasattr() here would
++            # return True for attributes inherited from a base class, which
++            # prevents subclasses that override 'choices' from getting their
++            # own display method bound to the subclass field. Check the
++            # class __dict__ to allow subclasses to receive their own
++            # get_FOO_display even when a base class provides one.
++            method_name = 'get_%s_display' % self.name
++            if method_name not in cls.__dict__:
+                 setattr(
+                     cls,
+-                    'get_%s_display' % self.name,
++                    method_name,
+                     partialmethod(cls._get_FIELD_display, field=self),
+                 )
+ 

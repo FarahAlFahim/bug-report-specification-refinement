@@ -1,0 +1,22 @@
+diff --git a/sympy/matrices/expressions/trace.py b/sympy/matrices/expressions/trace.py
+index 4a07d6a1f4..7d3348ba85 100644
+--- a/sympy/matrices/expressions/trace.py
++++ b/sympy/matrices/expressions/trace.py
+@@ -72,6 +72,17 @@ def _eval_rewrite_as_Sum(self, **kwargs):
+         i = Dummy('i')
+         return Sum(self.arg[i, i], (i, 0, self.arg.rows-1)).doit()
+ 
++    def _latex(self, printer):
++        """LaTeX printer hook for Matrix Trace.
++
++        This allows the LatexPrinter to dispatch to the object's own
++        implementation (via Printer.printmethod) so that Trace instances
++        are printed as Tr(...) with their inner argument recursively
++        printed using the LaTeX printer.
++        """
++        contents = printer._print(self.arg)
++        return r'\mbox{Tr}\left(%s\right)' % (contents)
++
+ 
+ def trace(expr):
+     """ Trace of a Matrix.  Sum of the diagonal elements

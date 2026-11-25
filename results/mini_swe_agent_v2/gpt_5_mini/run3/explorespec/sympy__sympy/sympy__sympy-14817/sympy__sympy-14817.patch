@@ -1,0 +1,33 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..35bb83623d 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -825,7 +825,27 @@ def _print_MatAdd(self, expr):
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine whether the matrix term has a leading negative
++                # sign by inspecting its scalar coefficient rather than
++                # sympifying internal args (which can be raw strings for
++                # MatrixSymbol names and may raise SympifyError).  Use the
++                # structural API as_coeff_mmul when available.  If we cannot
++                # determine negativity, fall back to treating the term as
++                # non-negative (so we insert ' + ').
++                is_negative = False
++                try:
++                    coeff = item.as_coeff_mmul()[0]
++                    # coeff.is_negative can be True/False/None; only treat
++                    # as negative when it is explicitly True.
++                    if getattr(coeff, 'is_negative', False) is True:
++                        is_negative = True
++                except Exception:
++                    # If structural extraction fails for any reason, fall
++                    # back to non-negative behaviour to avoid sympifying
++                    # raw internals and raising SympifyError.
++                    is_negative = False
++
++                if is_negative:
+                     s = prettyForm(*stringPict.next(s, ' '))
+                     pform = self._print(item)
+                 else:

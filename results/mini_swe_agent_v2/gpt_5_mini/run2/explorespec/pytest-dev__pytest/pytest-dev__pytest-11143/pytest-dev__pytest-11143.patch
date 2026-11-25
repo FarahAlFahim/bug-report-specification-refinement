@@ -1,0 +1,47 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 157903faf..55ce0bc23 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -677,10 +677,23 @@ class AssertionRewriter(ast.NodeVisitor):
+                 and isinstance(item, ast.Expr)
+                 and isinstance(item.value, ast.Constant)
+             ):
+-                doc = item.value.value
+-                if self.is_rewrite_disabled(doc):
+-                    return
+-                expect_docstring = False
++                # Only treat a Constant as the module docstring if its
++                # runtime value is a string. The AST may represent other
++                # constants (e.g. numbers) as ast.Constant; forwarding a
++                # non-str into is_rewrite_disabled would raise a TypeError
++                # because that function uses the 'in' operator. See
++                # issue: first top-level expression is a non-string Constant.
++                val = item.value.value
++                if isinstance(val, str):
++                    doc = val
++                    if self.is_rewrite_disabled(doc):
++                        return
++                    expect_docstring = False
++                else:
++                    # Non-string constant encountered where a docstring
++                    # might be; do not treat it as a docstring and stop
++                    # looking for one.
++                    expect_docstring = False
+             elif (
+                 isinstance(item, ast.ImportFrom)
+                 and item.level == 0
+@@ -742,8 +755,12 @@ class AssertionRewriter(ast.NodeVisitor):
+                     nodes.append(field)
+ 
+     @staticmethod
+-    def is_rewrite_disabled(docstring: str) -> bool:
+-        return "PYTEST_DONT_REWRITE" in docstring
++    def is_rewrite_disabled(docstring: Optional[str]) -> bool:
++        """Return True if rewriting should be disabled based on the
++        module docstring. Only string docstrings are considered; any
++        non-string value is treated as if there is no sentinel.
++        """
++        return isinstance(docstring, str) and "PYTEST_DONT_REWRITE" in docstring
+ 
+     def variable(self) -> str:
+         """Get a new variable."""

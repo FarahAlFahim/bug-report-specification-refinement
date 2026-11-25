@@ -1,0 +1,87 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..99eaf8bd9e 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,6 +955,7 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_choices_max_length(**kwargs),
+         ]
+ 
+     def _check_max_length_attribute(self, **kwargs):
+@@ -978,6 +979,74 @@ class CharField(Field):
+         else:
+             return []
+ 
++    def _check_choices_max_length(self, **kwargs):
++        """
++        Ensure that max_length is large enough to contain the longest
++        choice value. Skip check for lazy (Promise) values where length
++        can't be determined.
++        """
++        errors = []
++        if not self.choices:
++            return errors
++
++        # If max_length is not an int (other checks cover that), bail out.
++        try:
++            max_len = int(self.max_length)
++        except Exception:
++            return errors
++
++        longest = None
++        longest_len = 0
++
++        def consider(value):
++            nonlocal longest, longest_len
++            # Don't attempt to measure lazy translation objects.
++            if isinstance(value, Promise):
++                return
++            try:
++                s = str(value)
++            except Exception:
++                return
++            l = len(s)
++            if l > longest_len:
++                longest_len = l
++                longest = s
++
++        # Choices can be an iterable of (value, display) or grouped choices
++        for choice in self.choices:
++            # grouped choices: (group_name, [(value, label), ...])
++            if isinstance(choice, (list, tuple)) and len(choice) == 2:
++                key, val = choice
++                # Detect optgroup by seeing if val is iterable of pairs
++                if is_iterable(val) and not isinstance(val, (str, Promise)):
++                    for sub in val:
++                        try:
++                            consider(sub[0])
++                        except Exception:
++                            continue
++                    continue
++                else:
++                    consider(key)
++                    continue
++
++            # Fallback: treat the whole thing as a value
++            consider(choice)
++
++        if longest_len and longest_len > max_len:
++            errors.append(
++                checks.Error(
++                    "The 'max_length' of this field is too small for the longest choice.",
++                    hint=(
++                        "The longest choice is %d characters long ('%s') but 'max_length' is %d. "
++                        "Increase 'max_length' or shorten the choice values."
++                    ) % (longest_len, longest, max_len),
++                    obj=self,
++                    id='fields.E122',
++                )
++            )
++
++        return errors
++
+     def cast_db_type(self, connection):
+         if self.max_length is None:
+             return connection.ops.cast_char_field_without_max_length

@@ -1,0 +1,34 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index d85d79617..9ad886d76 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -1074,7 +1074,15 @@ class ModuleDocumenter(Documenter):
+     def get_object_members(self, want_all: bool) -> Tuple[bool, ObjectMembers]:
+         members = self.get_module_members()
+         if want_all:
+-            if not self.__all__:
++            # distinguish between ``__all__`` being absent (None) and
++            # explicitly present but empty (e.g. __all__ = []).  The
++            # contract of inspect.getall() returns None when __all__ is
++            # absent, and a Sequence (possibly empty) when present. Using
++            # a truthiness check here conflates the two cases and causes
++            # an explicit empty __all__ to be treated as if __all__ were
++            # absent.  See issue: explicit empty __all__ should suppress
++            # members.
++            if self.__all__ is None:
+                 # for implicit module members, check __module__ to avoid
+                 # documenting imported objects
+                 return True, list(members.values())
+@@ -1099,7 +1107,11 @@ class ModuleDocumenter(Documenter):
+ 
+     def sort_members(self, documenters: List[Tuple["Documenter", bool]],
+                      order: str) -> List[Tuple["Documenter", bool]]:
+-        if order == 'bysource' and self.__all__:
++        # Only apply __all__-based ordering if __all__ is present
++        # (i.e. not None). An explicit empty __all__ ([]) means there
++        # are no exported members and ordering/selection should still
++        # respect that.
++        if order == 'bysource' and self.__all__ is not None:
+             # Sort alphabetically first (for members not listed on the __all__)
+             documenters.sort(key=lambda e: e[0].name)
+ 

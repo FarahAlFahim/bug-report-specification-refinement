@@ -1,0 +1,27 @@
+diff --git a/astropy/modeling/separable.py b/astropy/modeling/separable.py
+index a308e2729..baf51278e 100644
+--- a/astropy/modeling/separable.py
++++ b/astropy/modeling/separable.py
+@@ -236,13 +236,19 @@ def _cstack(left, right):
+     if isinstance(left, Model):
+         cleft = _coord_matrix(left, 'left', noutp)
+     else:
+-        cleft = np.zeros((noutp, left.shape[1]))
++        # preserve dtype of the provided coord matrix
++        cleft = np.zeros((noutp, left.shape[1]), dtype=left.dtype)
+         cleft[: left.shape[0], : left.shape[1]] = left
+     if isinstance(right, Model):
+         cright = _coord_matrix(right, 'right', noutp)
+     else:
+-        cright = np.zeros((noutp, right.shape[1]))
+-        cright[-right.shape[0]:, -right.shape[1]:] = 1
++        # preserve dtype and copy the already-computed coord matrix for
++        # the right child into the bottom-right block. Previously this
++        # incorrectly filled the block with ones which assumed a fully
++        # connected right child; copying the array preserves nested
++        # separability structure.
++        cright = np.zeros((noutp, right.shape[1]), dtype=right.dtype)
++        cright[-right.shape[0]:, -right.shape[1]:] = right
+ 
+     return np.hstack([cleft, cright])
+ 

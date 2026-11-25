@@ -1,0 +1,43 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..735f972300 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -1,5 +1,6 @@
+ import datetime
+ import decimal
++import json
+ from collections import defaultdict
+ 
+ from django.core.exceptions import FieldDoesNotExist
+@@ -379,6 +380,7 @@ def help_text_for_field(name, model):
+ 
+ def display_for_field(value, field, empty_value_display):
+     from django.contrib.admin.templatetags.admin_list import _boolean_icon
++    from django.forms.fields import InvalidJSONInput
+ 
+     if getattr(field, 'flatchoices', None):
+         return dict(field.flatchoices).get(value, empty_value_display)
+@@ -398,6 +400,23 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    # JSONField should be rendered as valid JSON text (double-quoted)
++    # when shown readonly in the admin. The form field's prepare_value
++    # already returns json.dumps(...), but display_for_field bypasses the
++    # form field, so special-case models.JSONField here. If the stored
++    # value represents an invalid JSON input (InvalidJSONInput), show it
++    # unchanged.
++    elif isinstance(field, models.JSONField):
++        # Preserve raw invalid JSON input unchanged.
++        if isinstance(value, InvalidJSONInput):
++            return value
++        try:
++            # Use the field's encoder if provided.
++            return json.dumps(value, cls=getattr(field, 'encoder', None))
++        except TypeError:
++            # Fallback to the Python representation if value isn't JSON
++            # serializable for some reason.
++            return str(value)
+     else:
+         return display_for_value(value, empty_value_display)
+ 

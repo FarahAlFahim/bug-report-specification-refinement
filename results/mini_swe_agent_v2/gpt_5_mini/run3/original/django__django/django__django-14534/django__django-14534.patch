@@ -1,0 +1,21 @@
+diff --git a/django/forms/boundfield.py b/django/forms/boundfield.py
+index 2ff8b0ee26..01edaac5e2 100644
+--- a/django/forms/boundfield.py
++++ b/django/forms/boundfield.py
+@@ -277,6 +277,16 @@ class BoundWidget:
+ 
+     @property
+     def id_for_label(self):
++        """
++        Return the id attribute to be used by a <label for="..."> for this
++        subwidget. Prefer the explicit 'id' from the widget data attrs (as
++        provided by ChoiceWidget.create_option), falling back to the legacy
++        id_{name}_{index} construction for widgets that don't provide an id.
++        """
++        attrs = self.data.get('attrs', {}) or {}
++        id_from_attrs = attrs.get('id')
++        if id_from_attrs:
++            return id_from_attrs
+         return 'id_%s_%s' % (self.data['name'], self.data['index'])
+ 
+     @property

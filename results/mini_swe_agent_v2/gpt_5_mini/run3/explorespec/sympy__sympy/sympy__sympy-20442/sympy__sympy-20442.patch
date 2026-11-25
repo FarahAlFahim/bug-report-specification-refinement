@@ -1,0 +1,46 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..2244d149bd 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -31,6 +31,41 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
++
++    # Validate that the least-squares solution actually satisfies the
++    # exact dimensional relation camat * res_exponents == exprmat.
++    # If it does not (within a small numerical tolerance for Float
++    # entries) then the expression cannot be represented exactly in
++    # terms of the provided target units and we should return None so
++    # callers treat it as non-convertible.
++    if res_exponents is None:
++        return None
++
++    # Compute the residual
++    try:
++        residual = camat * res_exponents - exprmat
++    except Exception:
++        # If multiplication fails for some reason, be conservative
++        # and report non-convertible.
++        return None
++
++    # Check whether residual is (close to) zero. For exact arithmetic
++    # this will be exactly zero; for floating point results allow a
++    # small tolerance.
++    tol = 1e-12
++    for i in range(residual.rows):
++        val = residual[i, 0]
++        # If symbolic/non-numeric, we cannot validate — treat as
++        # non-convertible to avoid spurious decompositions.
++        if not (hasattr(val, 'is_number') and val.is_number):
++            return None
++        try:
++            # Convert to float for numerical tolerance check
++            if abs(float(val)) > tol:
++                return None
++        except Exception:
++            return None
++
+     return res_exponents
+ 
+ 

@@ -1,0 +1,39 @@
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..9f7620fae 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -363,7 +363,33 @@ def doit(self, **kwargs):
+             args = [arg.doit(**kwargs) for arg in self.args]
+         else:
+             args = self.args
+-        return args[0][args[1], args[2]]
++        # Special-case Identity so that symbolic indices are represented
++        # as KroneckerDelta rather than eagerly reduced to 0 when
++        # equality between indices is undecidable. This preserves
++        # information for the summation machinery which can simplify
++        # sums over KroneckerDelta correctly.
++        parent, i, j = args[0], args[1], args[2]
++        from sympy import KroneckerDelta
++        # If parent is an Identity matrix, avoid calling its _entry
++        # with symbolic indices that might be equal after substitution.
++        if getattr(parent, 'is_Identity', False):
++            eq = i == j
++            # If equality is definitely True/False return explicit 1/0
++            if eq is S.true or eq is True:
++                return S.One
++            if eq is S.false or eq is False:
++                # If both indices are concrete integers then 0 is safe
++                if (isinstance(i, (int, Integer)) or getattr(i, 'is_integer', False)) and                    (isinstance(j, (int, Integer)) or getattr(j, 'is_integer', False)):
++                    return S.Zero
++                # Otherwise, return KroneckerDelta to represent undecidable
++                # equality symbolically so that Sum/Mathematical engines can
++                # perform index substitutions.
++                return KroneckerDelta(i, j)
++            # If eq is symbolic (e.g. an Eq or relational), represent as
++            # KroneckerDelta so downstream routines can simplify it.
++            return KroneckerDelta(i, j)
++
++        return parent[i, j]
+ 
+     def _eval_derivative(self, v):
+         if not isinstance(v, MatrixElement):

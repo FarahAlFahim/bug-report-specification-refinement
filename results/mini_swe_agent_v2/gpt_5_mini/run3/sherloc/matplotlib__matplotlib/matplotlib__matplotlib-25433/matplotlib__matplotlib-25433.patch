@@ -1,0 +1,48 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..d09c74054d 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -927,6 +927,43 @@ default: %(va)s
+                         return last_ax
+             return None
+ 
++        # If the canvas has state that references this axes (for example)
++        # widgets that have grabbed the mouse or acquired the canvas widget
++        # lock), ensure those references are cleared so that newly created
++        # widgets after a redraw can properly obtain those resources.
++        canvas = getattr(self, 'canvas', None)
++        if canvas is not None:
++            # If this Axes currently holds the mouse grab on the canvas,
++            # release it.  This can happen if a widget callback (e.g.
++            # RangeSlider.on_changed) calls ``clf()`` while a drag is in
++            # progress.
++            try:
++                if getattr(canvas, 'mouse_grabber', None) is ax:
++                    # Use the canvas API to release the mouse grab so any
++                    # backend-specific bookkeeping is respected.
++                    canvas.release_mouse(ax)
++            except Exception:
++                # Be conservative: do not let canvas issues abort axes
++                # removal.
++                pass
++
++            # If the canvas widgetlock is held by a widget tied to this
++            # Axes, release that owner so the lock does not remain held by a
++            # stale object.
++            wl = getattr(canvas, 'widgetlock', None)
++            if wl is not None:
++                owner = getattr(wl, '_owner', None)
++                if owner is not None and getattr(owner, 'ax', None) is ax:
++                    try:
++                        wl.release(owner)
++                    except Exception:
++                        # As a last resort, clear the private owner slot so
++                        # the lock is not permanently held.
++                        try:
++                            wl._owner = None
++                        except Exception:
++                            pass
++
+         self._axstack.remove(ax)
+         self._axobservers.process("_axes_change_event", self)
+         self.stale = True

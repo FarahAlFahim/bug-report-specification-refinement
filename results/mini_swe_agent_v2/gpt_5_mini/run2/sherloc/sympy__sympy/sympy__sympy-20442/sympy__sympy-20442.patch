@@ -1,0 +1,39 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..9d3018a9cb 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -30,8 +30,32 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     camat = Matrix([[dimension_system.get_dimensional_dependencies(i, mark_dimensionless=True).get(j, 0) for i in target_dims] for j in canon_dim_units])
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+-    res_exponents = camat.solve_least_squares(exprmat, method=None)
+-    return res_exponents
++    # We require an exact solution for unit conversion: the dimensional
++    # exponents of the target units must exactly reproduce the
++    # expression's dimensional exponents. Using a least-squares
++    # approximation can produce spurious fractional powers (see PR
++    # description), so attempt to solve exactly.  If the system is
++    # inconsistent return ``None`` to indicate conversion is not
++    # possible in the requested target units.  If there are free
++    # parameters (underdetermined) substitute zeros for them to obtain a
++    # particular solution.
++    try:
++        sol, params = camat.gauss_jordan_solve(exprmat)
++    except ValueError:
++        # No exact solution exists
++        return None
++
++    # If there are free parameters (params is non-empty), choose the
++    # particular solution obtained by setting them to zero.  This is a
++    # valid exact solution when the system is underdetermined; any
++    # particular solution would do for the purposes of constructing the
++    # conversion expression.
++    if params.rows != 0 and params.cols != 0:
++        mapping = {params[i, j]: 0 for i in range(params.rows)
++                                  for j in range(params.cols)}
++        sol = sol.xreplace(mapping)
++
++    return sol
+ 
+ 
+ def convert_to(expr, target_units, unit_system="SI"):

@@ -1,0 +1,22 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 157903faf..c05beaa6c 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -742,7 +742,16 @@ class AssertionRewriter(ast.NodeVisitor):
+                     nodes.append(field)
+ 
+     @staticmethod
+-    def is_rewrite_disabled(docstring: str) -> bool:
++    def is_rewrite_disabled(docstring: Optional[str]) -> bool:
++        """Return True if rewriting is disabled via the module docstring.
++
++        Be tolerant of non-string values: only treat strings as docstrings.
++        Some modules may have a first top-level ast.Constant that is not a
++        string (for example a numeric literal). In that case we must not try
++        to search the sentinel in it as that would raise a TypeError.
++        """
++        if not isinstance(docstring, str):
++            return False
+         return "PYTEST_DONT_REWRITE" in docstring
+ 
+     def variable(self) -> str:

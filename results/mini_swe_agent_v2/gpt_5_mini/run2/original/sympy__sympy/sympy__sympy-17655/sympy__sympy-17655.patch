@@ -1,0 +1,33 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..6a684aac28 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -213,6 +213,28 @@ def __add__(self, other):
+         sympy.geometry.point.Point.translate
+ 
+         """
++        # Handle cases like `scalar * Point`, where `other` is a Mul that
++        # contains a Point factor (e.g. 2.0*Point2D(1, 1)). Convert that to
++        # a Point instance so the normal addition logic can proceed.
++        from sympy import Mul
++        if isinstance(other, Mul):
++            for f in other.args:
++                if isinstance(f, Point):
++                    try:
++                        # Build the scalar by multiplying together all
++                        # Mul args that are not the Point itself. This
++                        # avoids attempting to divide by a Point (which
++                        # would require Point to support power -1).
++                        from sympy import Mul as _Mul
++                        scalar_args = [a for a in other.args if not isinstance(a, Point)]
++                        scalar = _Mul(*scalar_args) if scalar_args else S.One
++                        other = f * scalar
++                        break
++                    except Exception:
++                        # if anything goes wrong, fall back to the normal
++                        # behavior which will raise an informative error
++                        pass
++
+         try:
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:

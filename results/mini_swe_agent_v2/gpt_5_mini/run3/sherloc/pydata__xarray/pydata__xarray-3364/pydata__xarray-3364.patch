@@ -1,0 +1,155 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..828e920b 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -311,21 +311,55 @@ def _dataset_concat(
+     if variables_to_merge:
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++        # For variables to merge, allow missing variables by filling with
++        # placeholder variables using dims_sizes and the provided fill_value.
++        for var in variables_to_merge:
++            # find a reference variable (one dataset that has this var)
++            ref_var = None
++            for ds in datasets:
++                if var in ds.variables:
++                    ref_var = ds.variables[var]
++                    break
++            if ref_var is None:
++                # shouldn't happen, but skip defensively
++                continue
++
++            for ds in datasets:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # build a placeholder with the same dims as ref_var
++                    placeholder_shape = tuple(dims_sizes.get(d, 1) for d in ref_var.dims)
++                    if fill_value is dtypes.NA:
++                        dtype, filler = dtypes.maybe_promote(ref_var.dtype)
++                    else:
++                        dtype = ref_var.dtype
++                        filler = fill_value
++                    data = __import__('numpy').full(placeholder_shape, filler, dtype=dtype)
++                    to_merge[var].append(Variable(ref_var.dims, data))
+ 
+         for var in variables_to_merge:
+-            result_vars[var] = unique_variable(
+-                var, to_merge[var], compat=compat, equals=equals.get(var, None)
+-            )
++            # Only consider actual variables (not placeholders) when
++            # checking for uniqueness/compatibility. Missing variables are
++            # treated as filled with fill_value.
++            actual_vars = [ds.variables[var] for ds in datasets if var in ds.variables]
++            # Fallback: if no actual vars found, use the first element
++            if not actual_vars:
++                chosen = to_merge[var][0]
++            elif len(actual_vars) == 1 or compat == 'override':
++                chosen = actual_vars[0]
++            else:
++                chosen = unique_variable(var, actual_vars, compat=compat, equals=equals.get(var, None))
++
++            # ensure chosen variable has appropriate dims/sizes
++            try:
++                # broadcast dimension sizes if necessary
++                dim_lengths = {d: dims_sizes[d] for d in chosen.dims if d in dims_sizes}
++                chosen = chosen.set_dims(dim_lengths)
++            except Exception:
++                pass
++
++            result_vars[var] = chosen
+     else:
+         result_vars = {}
+     result_vars.update(dim_coords)
+@@ -345,7 +379,7 @@ def _dataset_concat(
+         # ensure each variable with the given name shares the same
+         # dimensions and the same shape for all of them except along the
+         # concat dimension
+-        common_dims = tuple(pd.unique([d for v in vars for d in v.dims]))
++        common_dims = tuple(pd.Index([d for v in vars for d in v.dims]).unique())
+         if dim not in common_dims:
+             common_dims = (dim,) + common_dims
+         for var, dim_len in zip(vars, concat_dim_lengths):
+@@ -355,13 +389,46 @@ def _dataset_concat(
+             yield var
+ 
+     # stack up each variable to fill-out the dataset (in order)
+-    # n.b. this loop preserves variable order, needed for groupby.
+-    for k in datasets[0].variables:
++    # We preserve variable order by taking variables from the first dataset
++    # followed by first-seen variables from subsequent datasets.
++    ordered_vars = []
++    seen = set()
++    for ds in datasets:
++        for k in ds.variables:
++            if k in seen:
++                continue
++            seen.add(k)
++            ordered_vars.append(k)
++
++    for k in ordered_vars:
+         if k in concat_over:
+-            try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
+-            except KeyError:
+-                raise ValueError("%r is not present in all datasets." % k)
++            # build list of vars for this name, inserting placeholders for
++            # datasets that don't have the variable
++            vars_list = []
++            # find a reference var for dims/types
++            ref_var = None
++            for ds in datasets:
++                if k in ds.variables:
++                    ref_var = ds.variables[k]
++                    break
++            if ref_var is None:
++                # shouldn't happen, skip
++                continue
++
++            for ds in datasets:
++                if k in ds.variables:
++                    vars_list.append(ds.variables[k])
++                else:
++                    placeholder_shape = tuple(dims_sizes.get(d, 1) for d in ref_var.dims)
++                    if fill_value is dtypes.NA:
++                        dtype, filler = dtypes.maybe_promote(ref_var.dtype)
++                    else:
++                        dtype = ref_var.dtype
++                        filler = fill_value
++                    data = __import__('numpy').full(placeholder_shape, filler, dtype=dtype)
++                    vars_list.append(Variable(ref_var.dims, data))
++
++            vars = ensure_common_dims(vars_list)
+             combined = concat_vars(vars, dim, positions)
+             assert isinstance(combined, Variable)
+             result_vars[k] = combined
+diff --git a/xarray/core/dtypes.py b/xarray/core/dtypes.py
+index 4db2990a..9c5e90c0 100644
+--- a/xarray/core/dtypes.py
++++ b/xarray/core/dtypes.py
+@@ -35,10 +35,12 @@ NINF = AlwaysLessThan()
+ # instead of following NumPy's own type-promotion rules. These type promotion
+ # rules match pandas instead. For reference, see the NumPy type hierarchy:
+ # https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.scalars.html
++_np_unicode = getattr(np, "unicode_", getattr(np, "str_", None))
++_np_character = getattr(np, "character", None)
+ PROMOTE_TO_OBJECT = [
+-    {np.number, np.character},  # numpy promotes to character
+-    {np.bool_, np.character},  # numpy promotes to character
+-    {np.bytes_, np.unicode_},  # numpy promotes to unicode
++    {np.number, _np_character},  # numpy promotes to character
++    {np.bool_, _np_character},  # numpy promotes to character
++    {np.bytes_, _np_unicode},  # numpy promotes to unicode
+ ]
+ 
+ 

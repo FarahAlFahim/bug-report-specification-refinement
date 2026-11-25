@@ -1,0 +1,18 @@
+diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py
+index a3ae1f048e..14ddc8fec2 100644
+--- a/django/db/backends/sqlite3/base.py
++++ b/django/db/backends/sqlite3/base.py
+@@ -182,6 +182,13 @@ class DatabaseWrapper(BaseDatabaseWrapper):
+             'detect_types': Database.PARSE_DECLTYPES | Database.PARSE_COLNAMES,
+             **settings_dict['OPTIONS'],
+         }
++        # Provide a sensible default timeout to reduce "database is locked"
++        # errors when using file-backed SQLite databases (for example when
++        # running tests with --keepdb). Users can override this by setting
++        # the ``timeout`` option in DATABASES['OPTIONS'].
++        if 'timeout' not in kwargs:
++            kwargs['timeout'] = 5.0
++
+         # Always allow the underlying SQLite connection to be shareable
+         # between multiple threads. The safe-guarding will be handled at a
+         # higher level by the `BaseDatabaseWrapper.allow_thread_sharing`

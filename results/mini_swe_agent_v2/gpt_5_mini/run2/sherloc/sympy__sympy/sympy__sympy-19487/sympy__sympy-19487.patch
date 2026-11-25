@@ -1,0 +1,21 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..cee1407a87 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -622,6 +622,16 @@ def _eval_rewrite_as_Heaviside(self, arg, **kwargs):
+         if arg.is_extended_real:
+             return arg*(Heaviside(arg) - Heaviside(-arg))
+ 
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        """Rewrite sign(z) in terms of Abs as z/Abs(z).
++
++        Note: the identity sign(z) == z/Abs(z) holds for nonzero z; at z=0
++        the left-hand side evaluates to 0 while the right-hand side is
++        0/Abs(0) (which is undefined numerically). This method provides the
++        symbolic rewrite; it does not change evaluation semantics.
++        """
++        return arg/Abs(arg)
++
+     def _eval_rewrite_as_Piecewise(self, arg, **kwargs):
+         if arg.is_extended_real:
+             return Piecewise((arg, arg >= 0), (-arg, True))

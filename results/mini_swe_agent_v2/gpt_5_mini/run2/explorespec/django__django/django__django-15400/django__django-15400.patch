@@ -1,0 +1,70 @@
+diff --git a/django/utils/functional.py b/django/utils/functional.py
+index 9e1be0fe0f..cb1f0a5f2f 100644
+--- a/django/utils/functional.py
++++ b/django/utils/functional.py
+@@ -373,6 +373,65 @@ class LazyObject:
+     __len__ = new_method_proxy(len)
+     __contains__ = new_method_proxy(operator.contains)
+ 
++    # Binary, reflected and unary operators. The lazy proxy needs to expose
++    # these special methods at the class level so that Python's operator
++    # dispatch (including reflected operations when the left operand returns
++    # NotImplemented) will invoke the wrapped object's implementations.
++    __add__ = new_method_proxy(operator.add)
++    __radd__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__radd__', lambda o: NotImplemented)(other))
++
++    __sub__ = new_method_proxy(operator.sub)
++    __rsub__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rsub__', lambda o: NotImplemented)(other))
++
++    __mul__ = new_method_proxy(operator.mul)
++    __rmul__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rmul__', lambda o: NotImplemented)(other))
++
++    __matmul__ = new_method_proxy(operator.matmul)
++    __rmatmul__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rmatmul__', lambda o: NotImplemented)(other))
++
++    __truediv__ = new_method_proxy(operator.truediv)
++    __rtruediv__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rtruediv__', lambda o: NotImplemented)(other))
++
++    __floordiv__ = new_method_proxy(operator.floordiv)
++    __rfloordiv__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rfloordiv__', lambda o: NotImplemented)(other))
++
++    __mod__ = new_method_proxy(operator.mod)
++    __rmod__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rmod__', lambda o: NotImplemented)(other))
++
++    __divmod__ = new_method_proxy(divmod)
++    __rdivmod__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rdivmod__', lambda o: NotImplemented)(other))
++
++    __pow__ = new_method_proxy(pow)
++    __rpow__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rpow__', lambda o: NotImplemented)(other))
++
++    __lshift__ = new_method_proxy(operator.lshift)
++    __rlshift__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rlshift__', lambda o: NotImplemented)(other))
++
++    __rshift__ = new_method_proxy(operator.rshift)
++    __rrshift__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rrshift__', lambda o: NotImplemented)(other))
++
++    __and__ = new_method_proxy(operator.and_)
++    __rand__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rand__', lambda o: NotImplemented)(other))
++
++    __xor__ = new_method_proxy(operator.xor)
++    __rxor__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__rxor__', lambda o: NotImplemented)(other))
++
++    __or__ = new_method_proxy(operator.or_)
++    __ror__ = new_method_proxy(lambda wrapped, other: getattr(wrapped, '__ror__', lambda o: NotImplemented)(other))
++
++    # Unary
++    __neg__ = new_method_proxy(operator.neg)
++    __pos__ = new_method_proxy(operator.pos)
++    __abs__ = new_method_proxy(abs)
++    __invert__ = new_method_proxy(operator.invert)
++
++    # Conversions
++    __int__ = new_method_proxy(int)
++    __float__ = new_method_proxy(float)
++    __complex__ = new_method_proxy(complex)
++    __index__ = new_method_proxy(operator.index)
++    __round__ = new_method_proxy(round)
++
+ 
+ def unpickle_lazyobject(wrapped):
+     """

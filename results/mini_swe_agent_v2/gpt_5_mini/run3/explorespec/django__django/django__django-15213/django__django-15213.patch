@@ -1,0 +1,27 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..dcc8de91a2 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,21 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        # The wrapped expression may be a WhereNode which uses special
++        # sentinel return values ('', []) to indicate "matches
++        # everything" in a WHERE context. Those sentinels are not valid
++        # SQL fragments for use in a SELECT clause (they would produce
++        # malformed SQL like "SELECT AS alias"). To be robust, if the
++        # inner compile returns an empty SQL string, substitute a SQL
++        # literal representing True so that the SELECT list remains
++        # syntactically valid. We prefer a boolean literal where
++        # supported; falling back to 1/0 is handled by Value(True).
++        sql, params = compiler.compile(self.expression)
++        if not sql:
++            # Use a literal True value for the SELECT clause. Value will
++            # render this appropriately for the backend (e.g. TRUE or 1).
++            return compiler.compile(Value(True))
++        return sql, params
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

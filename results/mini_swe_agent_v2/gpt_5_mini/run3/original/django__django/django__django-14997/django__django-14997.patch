@@ -1,0 +1,22 @@
+diff --git a/django/db/backends/ddl_references.py b/django/db/backends/ddl_references.py
+index c06386a2fa..25efd5e215 100644
+--- a/django/db/backends/ddl_references.py
++++ b/django/db/backends/ddl_references.py
+@@ -233,4 +233,17 @@ class Expressions(TableColumns):
+     def __str__(self):
+         sql, params = self.compiler.compile(self.expressions)
+         params = map(self.quote_value, params)
++        # SQLite does not allow the "." operator in index expressions
++        # (e.g. table.column). When compiling expression-based indexes for
++        # SQLite, remove any table/alias qualifiers from the SQL so the
++        # resulting index expression only contains column references or
++        # function calls. The regex strips quoted or unquoted qualifiers
++        # followed by a dot (e.g. "my_table"., my_table.).
++        try:
++            vendor = getattr(self.compiler.connection, 'vendor', None)
++        except Exception:
++            vendor = None
++        if vendor == 'sqlite':
++            import re
++            sql = re.sub(r'(?:(?:"[^"]+")|[A-Za-z_][A-Za-z0-9_]*)\.', '', sql)
+         return sql % tuple(params)

@@ -1,0 +1,20 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..c71ce45550 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -504,6 +504,15 @@ class Colorbar:
+         and locator will be preserved.
+         """
+         _log.debug('colorbar update normal %r %r', mappable.norm, self.norm)
++        # Ensure the given mappable's norm has appropriate vmin and vmax set
++        # even if mappable.draw has not yet been called.  This is important
++        # for norms (e.g. LogNorm) whose inverse mapping requires a valid
++        # positive vmin/vmax.  See issue where replacing the norm (for
++        # example setting plot.norm = LogNorm()) and calling update would
++        # raise a ZeroDivisionError when the new norm lacked proper vmin.
++        if mappable.get_array() is not None:
++            mappable.autoscale_None()
++
+         self.mappable = mappable
+         self.set_alpha(mappable.get_alpha())
+         self.cmap = mappable.cmap

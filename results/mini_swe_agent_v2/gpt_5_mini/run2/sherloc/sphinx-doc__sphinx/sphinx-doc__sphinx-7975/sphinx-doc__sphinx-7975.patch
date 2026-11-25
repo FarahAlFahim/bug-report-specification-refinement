@@ -1,0 +1,27 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 5af213932..17121c846 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -106,13 +106,20 @@ class IndexEntries:
+                 # using specified category key to sort
+                 key = category_key
+             lckey = unicodedata.normalize('NFD', key.lower())
+-            if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
++            if lckey.startswith('‏'):
+                 lckey = lckey[1:]
+-            if lckey[0:1].isalpha() or lckey.startswith('_'):
++            # Special-case the localized 'Symbols' category: if the explicit
++            # category_key equals the localized 'Symbols' label, treat it as
++            # a symbol group for sorting. Otherwise, alphabetic or '_' keys
++            # are pushed after symbol groups by prefixing chr(127).
++            symbols_label = unicodedata.normalize('NFD', _('Symbols').lower())
++            if lckey != symbols_label and (lckey[0:1].isalpha() or
++                                            lckey.startswith('_')):
+                 lckey = chr(127) + lckey
+             # ensure a determinstic order *within* letters by also sorting on
+             # the entry itself
+             return (lckey, entry[0])
++
+         newlist = sorted(new.items(), key=keyfunc)
+ 
+         if group_entries:

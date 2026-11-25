@@ -1,0 +1,65 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..ccd7575422 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,6 +955,7 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_choices_max_length(**kwargs),
+         ]
+ 
+     def _check_max_length_attribute(self, **kwargs):
+@@ -978,6 +979,52 @@ class CharField(Field):
+         else:
+             return []
+ 
++    def _check_choices_max_length(self, **kwargs):
++        """
++        Ensure that CharField.max_length is large enough to hold the longest
++        choice value when choices are defined. Only string choice values are
++        considered for this check; non-string choices (e.g. integers) are
++        ignored.
++        """
++        errors = []
++        if not self.choices or self.max_length is None:
++            return errors
++
++        def iterate_choice_values(choices):
++            for option_key, option_value in choices:
++                if isinstance(option_value, (list, tuple)):
++                    for opt_key, _ in option_value:
++                        yield opt_key
++                else:
++                    yield option_key
++
++        # Compute the longest string choice value (ignore non-strings).
++        max_choice_length = 0
++        for val in iterate_choice_values(self.choices):
++            if isinstance(val, str):
++                try:
++                    l = len(val)
++                except Exception:
++                    # If length cannot be determined for some reason, skip.
++                    continue
++                if l > max_choice_length:
++                    max_choice_length = l
++
++        if max_choice_length and max_choice_length > self.max_length:
++            errors.append(
++                checks.Error(
++                    "Some 'choices' are longer than 'max_length'.",
++                    hint=(
++                        "Either increase the 'max_length' on this field or "
++                        "shorten the values in 'choices'."
++                    ),
++                    obj=self,
++                    id='fields.E122',
++                )
++            )
++
++        return errors
++
+     def cast_db_type(self, connection):
+         if self.max_length is None:
+             return connection.ops.cast_char_field_without_max_length

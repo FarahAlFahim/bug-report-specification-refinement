@@ -1,0 +1,31 @@
+diff --git a/sklearn/preprocessing/label.py b/sklearn/preprocessing/label.py
+index 61b8d4a21..143db561c 100644
+--- a/sklearn/preprocessing/label.py
++++ b/sklearn/preprocessing/label.py
+@@ -126,6 +126,13 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         """
+         check_is_fitted(self, 'classes_')
+         y = column_or_1d(y, warn=True)
++        # Explicitly reject empty target arrays to provide a consistent
++        # error message across dtypes. See GitHub issue where empty input
++        # could lead to inconsistent TypeErrors depending on the dtype of
++        # self.classes_. The project convention is to raise a ValueError
++        # when y has 0 samples.
++        if _num_samples(y) == 0:
++            raise ValueError('y has 0 samples: %r' % (y,))
+ 
+         classes = np.unique(y)
+         if len(np.intersect1d(classes, self.classes_)) < len(classes):
+@@ -148,6 +155,12 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         """
+         check_is_fitted(self, 'classes_')
+ 
++        # Reject empty input explicitly to ensure a consistent
++        # ValueError message rather than low-level errors depending on
++        # input dtype.
++        if _num_samples(y) == 0:
++            raise ValueError('y has 0 samples: %r' % (y,))
++
+         diff = np.setdiff1d(y, np.arange(len(self.classes_)))
+         if len(diff):
+             raise ValueError(

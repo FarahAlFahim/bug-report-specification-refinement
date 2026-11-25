@@ -1,0 +1,56 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..91b49cfb8d 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -225,6 +225,12 @@ class Query(BaseExpression):
+         # are the fields to defer, or False if these are the only fields to
+         # load.
+         self.deferred_loading = (frozenset(), True)
++        # Invalidate any cached mapping of loaded field names so subsequent
++        # calls will reflect the new deferred_loading state.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+         self._filtered_relations = {}
+ 
+@@ -297,6 +303,12 @@ class Query(BaseExpression):
+         obj.__class__ = self.__class__
+         # Copy references to everything.
+         obj.__dict__ = self.__dict__.copy()
++        # Don't copy cached loaded-field mapping into clones: the mapping
++        # depends on deferred_loading state and must be recomputed for the
++        # clone. Copying the cache can cause stale data to be used when the
++        # clone mutates its deferred_loading. Ensure the cache is removed.
++        if '_loaded_field_names_cache' in obj.__dict__:
++            del obj.__dict__['_loaded_field_names_cache']
+         # Clone attributes that can't use shallow copy.
+         obj.alias_refcount = self.alias_refcount.copy()
+         obj.alias_map = self.alias_map.copy()
+@@ -2087,6 +2099,12 @@ class Query(BaseExpression):
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+             self.deferred_loading = existing.difference(field_names), False
++        # Invalidate any cached mapping of loaded field names so subsequent
++        # calls will reflect the new deferred_loading state.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_immediate_loading(self, field_names):
+         """
+@@ -2111,6 +2129,12 @@ class Query(BaseExpression):
+         else:
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
++        # Invalidate any cached mapping of loaded field names so subsequent
++        # calls will reflect the new deferred_loading state.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def get_loaded_field_names(self):
+         """

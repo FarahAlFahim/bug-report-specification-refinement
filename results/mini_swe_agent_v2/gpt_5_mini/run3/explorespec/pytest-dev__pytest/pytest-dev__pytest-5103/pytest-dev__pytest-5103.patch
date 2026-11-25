@@ -1,0 +1,107 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..1439fefc2 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -968,14 +968,40 @@ warn_explicit(
+         """
+         visit `ast.Call` nodes on Python3.5 and after
+         """
+-        new_func, func_expl = self.visit(call.func)
++        # Special-case common builtins all()/any() when given a generator
++        # expression: materialize the generator into a list for richer
++        # diagnostics so the assertion rewriter can show the evaluated
++        # contents instead of the generator object. We only do this when
++        # the callee is an unqualified name (e.g. `all`) and there is a
++        # single GeneratorExp argument. Note this will change evaluation
++        # (materialize the iterator) which is a deliberate trade-off for
++        # improved diagnostics.
+         arg_expls = []
+         new_args = []
+         new_kwargs = []
+-        for arg in call.args:
+-            res, expl = self.visit(arg)
+-            arg_expls.append(expl)
+-            new_args.append(res)
++
++        special_materialized = None
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        ):
++            # Create a temp = list(<genexp>) using the real builtin list
++            # (inserted as @py_builtins.list by the rewriter imports).
++            list_call = ast_Call(self.builtin("list"), [call.args[0]], [])
++            list_res = self.assign(list_call)
++            # Use the materialized list both as the argument to the call
++            # and for the explanation display.
++            new_args.append(list_res)
++            arg_expls.append(self.explanation_param(self.display(list_res)))
++            special_materialized = list_res
++        else:
++            new_func, func_expl = self.visit(call.func)
++            for arg in call.args:
++                res, expl = self.visit(arg)
++                arg_expls.append(expl)
++                new_args.append(res)
+         for keyword in call.keywords:
+             res, expl = self.visit(keyword.value)
+             new_kwargs.append(ast.keyword(keyword.arg, res))
+@@ -984,6 +1010,12 @@ warn_explicit(
+             else:  # **args have `arg` keywords with an .arg of None
+                 arg_expls.append("**" + expl)
+ 
++        # If we materialized the generator into a list we need to ensure
++        # we still visit the callee to preserve possible shadowing. If
++        # we didn't take the special path above, new_func/func_expl will
++        # already be set.
++        if special_materialized is not None:
++            new_func, func_expl = self.visit(call.func)
+         expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
+         new_call = ast.Call(new_func, new_args, new_kwargs)
+         res = self.assign(new_call)
+@@ -1001,15 +1033,29 @@ warn_explicit(
+         """
+         visit `ast.Call nodes on 3.4 and below`
+         """
+-        new_func, func_expl = self.visit(call.func)
+         arg_expls = []
+         new_args = []
+         new_kwargs = []
+         new_star = new_kwarg = None
+-        for arg in call.args:
+-            res, expl = self.visit(arg)
+-            new_args.append(res)
+-            arg_expls.append(expl)
++
++        special_materialized = None
++        if (
++            isinstance(call.func, ast.Name)
++            and call.func.id in ("all", "any")
++            and len(call.args) == 1
++            and isinstance(call.args[0], ast.GeneratorExp)
++        ):
++            list_call = ast_Call(self.builtin("list"), [call.args[0]], [])
++            list_res = self.assign(list_call)
++            new_args.append(list_res)
++            arg_expls.append(self.explanation_param(self.display(list_res)))
++            special_materialized = list_res
++        else:
++            new_func, func_expl = self.visit(call.func)
++            for arg in call.args:
++                res, expl = self.visit(arg)
++                new_args.append(res)
++                arg_expls.append(expl)
+         for keyword in call.keywords:
+             res, expl = self.visit(keyword.value)
+             new_kwargs.append(ast.keyword(keyword.arg, res))
+@@ -1020,6 +1066,8 @@ warn_explicit(
+         if call.kwargs:
+             new_kwarg, expl = self.visit(call.kwargs)
+             arg_expls.append("**" + expl)
++        if special_materialized is not None:
++            new_func, func_expl = self.visit(call.func)
+         expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
+         new_call = ast.Call(new_func, new_args, new_kwargs, new_star, new_kwarg)
+         res = self.assign(new_call)

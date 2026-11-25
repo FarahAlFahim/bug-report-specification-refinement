@@ -1,0 +1,38 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..88baf39b 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -21,15 +21,26 @@ class PolyFit(Stat):
+ 
+     def _fit_predict(self, data):
+ 
+-        x = data["x"]
+-        y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
++        # Drop missing data in either coordinate before fitting. This makes
++        # the statistic robust to inputs that contain NaN/None values.
++        clean = data.dropna(subset=["x", "y"])
++
++        x = clean["x"]
++        y = clean["y"]
++
++        # If there are not enough unique x values to fit the requested
++        # polynomial order, return an empty frame. Also defensively handle
++        # linear-algebra errors from numpy.polyfit by returning an empty
++        # result instead of raising in the plotting pipeline.
++        if x.nunique() <= self.order or x.shape[0] == 0:
+             xx = yy = []
+         else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++            try:
++                p = np.polyfit(x, y, self.order)
++                xx = np.linspace(x.min(), x.max(), self.gridsize)
++                yy = np.polyval(p, xx)
++            except np.linalg.LinAlgError:
++                xx = yy = []
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 

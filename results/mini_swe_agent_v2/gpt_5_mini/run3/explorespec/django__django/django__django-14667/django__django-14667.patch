@@ -1,0 +1,52 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..418c0e3632 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -225,6 +225,10 @@ class Query(BaseExpression):
+         # are the fields to defer, or False if these are the only fields to
+         # load.
+         self.deferred_loading = (frozenset(), True)
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+         self._filtered_relations = {}
+ 
+@@ -678,7 +682,13 @@ class Query(BaseExpression):
+         "target", and the model and list of fields being added for that model.
+         """
+         field_names, defer = self.deferred_loading
+-        if not field_names:
++        # If there are no field names and we're in "defer" mode, there are
++        # no restrictions to apply (nothing is deferred). However, an empty
++        # immediate-loading set (defer == False with an empty field_names)
++        # is a meaningful state: it means "only include the must-include
++        # fields" (for example, the primary key). Only skip processing when
++        # there are no field names and we're in defer mode.
++        if not field_names and defer:
+             return
+         orig_opts = self.get_meta()
+         seen = {}
+@@ -2087,6 +2097,10 @@ class Query(BaseExpression):
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+             self.deferred_loading = existing.difference(field_names), False
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def add_immediate_loading(self, field_names):
+         """
+@@ -2111,6 +2125,10 @@ class Query(BaseExpression):
+         else:
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+     def get_loaded_field_names(self):
+         """

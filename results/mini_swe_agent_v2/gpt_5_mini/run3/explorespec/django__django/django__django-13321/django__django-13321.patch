@@ -1,0 +1,51 @@
+diff --git a/django/contrib/sessions/backends/base.py b/django/contrib/sessions/backends/base.py
+index 187e14b1b7..f1d57c377b 100644
+--- a/django/contrib/sessions/backends/base.py
++++ b/django/contrib/sessions/backends/base.py
+@@ -1,4 +1,5 @@
+ import base64
++import binascii
+ import logging
+ import string
+ import warnings
+@@ -132,7 +133,14 @@ class SessionBase:
+ 
+     def _legacy_decode(self, session_data):
+         # RemovedInDjango40Warning: pre-Django 3.1 format will be invalid.
+-        encoded_data = base64.b64decode(session_data.encode('ascii'))
++        try:
++            # session_data may not be ASCII or valid base64. Guard against
++            # binascii.Error (from base64 decoding) and UnicodeEncodeError
++            # (from .encode('ascii')). Treat malformed data as an empty
++            # session.
++            encoded_data = base64.b64decode(session_data.encode('ascii'))
++        except (binascii.Error, UnicodeEncodeError):
++            return {}
+         try:
+             # could produce ValueError if there is no ':'
+             hash, serialized = encoded_data.split(b':', 1)
+diff --git a/django/contrib/sessions/backends/db.py b/django/contrib/sessions/backends/db.py
+index 7c905a2c99..1df0524f19 100644
+--- a/django/contrib/sessions/backends/db.py
++++ b/django/contrib/sessions/backends/db.py
+@@ -41,7 +41,19 @@ class SessionStore(SessionBase):
+ 
+     def load(self):
+         s = self._get_session_from_db()
+-        return self.decode(s.session_data) if s else {}
++        if not s:
++            return {}
++        try:
++            return self.decode(s.session_data)
++        except Exception as e:
++            # Any exception decoding session data (for example, legacy
++            # base64 decoding errors) should not cause a 500. Treat the
++            # session as empty and reset the session key so a new session
++            # will be created.
++            logger = logging.getLogger('django.security.%s' % e.__class__.__name__)
++            logger.warning(str(e))
++            self._session_key = None
++            return {}
+ 
+     def exists(self, session_key):
+         return self.model.objects.filter(session_key=session_key).exists()

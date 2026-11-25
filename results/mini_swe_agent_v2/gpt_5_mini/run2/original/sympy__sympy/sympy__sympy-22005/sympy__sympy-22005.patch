@@ -1,0 +1,22 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..8f300307eb 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -238,9 +238,16 @@ def _solve_reduced_system(system, gens, entry=False):
+             else:
+                 return None
+ 
++        # Find polynomials in the Groebner basis that are univariate
++        # in their last variable. A single such polynomial only
++        # guarantees a reduction to a univariate root-finding step if
++        # there is exactly one generator overall. Otherwise the system
++        # may still have infinitely many solutions (e.g. x-1 with
++        # gens (x, y)), so we explicitly require the number of
++        # generators to match.
+         univariate = list(filter(_is_univariate, basis))
+ 
+-        if len(univariate) == 1:
++        if len(univariate) == 1 and len(gens) == 1:
+             f = univariate.pop()
+         else:
+             raise NotImplementedError(filldedent('''

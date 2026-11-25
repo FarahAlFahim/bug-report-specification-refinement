@@ -1,0 +1,81 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..0e62edd47 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -112,9 +112,15 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+     """Used to convert the :members: option to auto directives."""
+     if arg in (None, True):
++        # legacy sentinel: include inherited members, but treat those
++        # originating from 'object' as the class name to ignore
+         return 'object'
++    elif arg is False:
++        # explicit False means do not include inherited members
++        return False
+     else:
+-        return arg
++        # allow comma-separated list of class names, normalize to a set
++        return {x.strip() for x in str(arg).split(',') if x.strip()}
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -680,17 +686,49 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
++            """Return True when the member should be filtered because it is
++            inherited from a base class listed in the :inherited-members: option.
++            """
++            if not inspect.isclass(self.object):
++                return False
++
++            inh = self.options.inherited_members
++            # if the option is False/Falsey, do not include inherited members
++            if not inh:
++                return False
++
++            # treat legacy sentinel 'object' as a special string value
++            # otherwise, inherited_members may be a set of class names
++            names = None
++            if isinstance(inh, str):
++                names = {inh}
++            elif isinstance(inh, (set, list, tuple)):
++                names = set(inh)
++            else:
++                # unknown type: fall back to truthy check
++                names = None
++
++            for cls in self.object.__mro__:
++                # skip the class itself
++                if cls is self.object:
++                    continue
++
++                # if membership set is available, use membership testing
++                if names is not None:
++                    if cls.__name__ in names:
++                        return True
++                else:
++                    # fallback: compare equality as before
++                    if cls.__name__ == inh:
+                         return True
+-                    elif name in cls.__dict__:
+-                        return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
+-                        return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+-                        return False
++
++                # if this class defines the attribute, it is not filtered
++                if name in cls.__dict__:
++                    return False
++                if name in self.get_attr(cls, '__annotations__', {}):
++                    return False
++                if isinstance(obj, ObjectMember) and obj.class_ is cls:
++                    return False
+ 
+             return False
+ 

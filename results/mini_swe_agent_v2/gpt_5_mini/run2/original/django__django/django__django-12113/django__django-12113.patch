@@ -1,0 +1,27 @@
+diff --git a/django/db/backends/sqlite3/base.py b/django/db/backends/sqlite3/base.py
+index a3ae1f048e..6bf9946cd7 100644
+--- a/django/db/backends/sqlite3/base.py
++++ b/django/db/backends/sqlite3/base.py
+@@ -202,6 +202,22 @@ class DatabaseWrapper(BaseDatabaseWrapper):
+     @async_unsafe
+     def get_new_connection(self, conn_params):
+         conn = Database.connect(**conn_params)
++        # For file-based databases, enable WAL mode to improve concurrency and
++        # avoid "database is locked" errors when multiple connections access
++        # the same database (for example, persistent test databases).
++        # Don't enable WAL for in-memory databases (":memory:" or URI
++        # mode=memory) as it's not applicable there.
++        database = conn_params.get('database')
++        try:
++            if database and database != ':memory:' and not (
++                isinstance(database, str) and database.startswith('file:') and 'mode=memory' in database
++            ):
++                # Set a busy timeout (milliseconds) and enable WAL journal mode.
++                conn.execute('PRAGMA busy_timeout = 5000')
++                conn.execute('PRAGMA journal_mode = WAL')
++        except Exception:
++            # If PRAGMA statements fail, continue without raising.
++            pass
+         conn.create_function("django_date_extract", 2, _sqlite_datetime_extract)
+         conn.create_function("django_date_trunc", 2, _sqlite_date_trunc)
+         conn.create_function('django_datetime_cast_date', 3, _sqlite_datetime_cast_date)

@@ -1,0 +1,36 @@
+--- /tmp/orig.py	2026-11-10 03:21:37.719896001 +0000
++++ sklearn/compose/_column_transformer.py	2026-11-10 03:21:17.473133006 +0000
+@@ -866,9 +866,30 @@
+                     t[0] for t in self._iter(fitted=True, replace_strings=True)
+                 ]
+                 feature_names_outs = [X.columns for X in Xs]
+-                names_out = self._add_prefix_for_feature_names_out(
+-                    list(zip(transformer_names, feature_names_outs))
+-                )
++
++                # Zip transformer names with their corresponding feature
++                # names. In some edge cases (e.g. transformers that select
++                # zero columns) the iteration over fitted transformers may
++                # not align with the list of produced outputs (Xs). In that
++                # case, fall back to leaving the DataFrame columns as-is to
++                # avoid length mismatches when assigning new column names.
++                paired = list(zip(transformer_names, feature_names_outs))
++                if not paired:
++                    return output
++
++                names_out = self._add_prefix_for_feature_names_out(paired)
++
++                # As a final sanity check ensure the produced names match
++                # the number of columns in the concatenated output. If they
++                # don't, fall back to using the concatenated feature names
++                # without prefixes (which should match the output) or
++                # simply return the output unchanged.
++                if len(names_out) != output.shape[1]:
++                    try:
++                        names_out = np.concatenate(feature_names_outs)
++                    except Exception:
++                        return output
++
+                 output.columns = names_out
+                 return output
+ 

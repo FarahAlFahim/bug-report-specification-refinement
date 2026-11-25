@@ -1,0 +1,18 @@
+diff --git a/seaborn/_oldcore.py b/seaborn/_oldcore.py
+index c9218c1f..b0fae6b9 100644
+--- a/seaborn/_oldcore.py
++++ b/seaborn/_oldcore.py
+@@ -154,7 +154,12 @@ class HueMapping(SemanticMapping):
+             try:
+                 normed = self.norm(key)
+             except TypeError as err:
+-                if np.isnan(key):
++                # ``np.isnan`` can raise TypeError for non-numeric inputs
++                # (e.g. strings). Use pandas.isna which safely handles
++                # arbitrary Python objects (strings, None, pandas.NA,
++                # numpy.nan, etc.). This lets a user-specified ``hue_order``
++                # that omits some values be handled without error.
++                if pd.isna(key):
+                     value = (0, 0, 0, 0)
+                 else:
+                     raise err

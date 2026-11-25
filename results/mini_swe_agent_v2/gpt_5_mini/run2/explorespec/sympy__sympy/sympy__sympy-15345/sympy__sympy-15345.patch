@@ -1,0 +1,53 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..65ec6a982 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -63,6 +63,9 @@ def __init__(self, settings={}):
+                 userfuncs[k] = [(lambda *x: True, v)]
+                 self.known_functions.update(userfuncs)
+ 
++    # Use the generic Printer/StrPrinter doprint so that dispatching goes
++    # through the Printer machinery and MCodePrinter's own _print_*
++    # methods (including _print_LatticeOp) are considered.
+     doprint = StrPrinter.doprint
+ 
+     def _print_Pow(self, expr):
+@@ -99,8 +102,38 @@ def _print_Function(self, expr):
+             for cond, mfunc in cond_mfunc:
+                 if cond(*expr.args):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
++        # debug marker to see if this method is used during dispatch
++        # (left here temporarily)
++        # print('DEBUG: MCodePrinter._print_LatticeOp called')
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_LatticeOp(self, expr):
++        """Mathematica representation for LatticeOp-derived objects
++
++        LatticeOp (e.g. Max, Min) in SymPy are not Function subclasses and
++        therefore would be dispatched to the generic StrPrinter implementation
++        (which sorts arguments and uses parentheses). For Mathematica we
++        want to preserve the expression argument order and use square
++        brackets: e.g. Max[x, 2].
++        """
++        # debug marker to see if this method is used during dispatch
++        # (left here temporarily)
++        # print('DEBUG: MCodePrinter._print_LatticeOp called')
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
++    def _print_Expr(self, expr):
++        """Ensure that LatticeOp-derived Exprs (e.g. Max/Min) are handled
++        by the Mathematica-specific LatticeOp printer instead of the
++        generic CodePrinter._print_Expr which would prevent reaching
++        _print_LatticeOp due to the class MRO (Expr comes before
++        LatticeOp).
++        """
++        # Import here to avoid importing heavy modules at top-level
++        from sympy.core.operations import LatticeOp
++        if isinstance(expr, LatticeOp):
++            return self._print_LatticeOp(expr)
++        # fall back to the normal expression printing
++        return CodePrinter._print_Expr(self, expr)
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

@@ -1,0 +1,52 @@
+diff --git a/requests/models.py b/requests/models.py
+index 0dc55568..e1f05d57 100644
+--- a/requests/models.py
++++ b/requests/models.py
+@@ -8,6 +8,7 @@ This module contains the primary objects that power Requests.
+ """
+ 
+ import collections
++import socket
+ import datetime
+ 
+ from io import BytesIO, UnsupportedOperation
+@@ -19,10 +20,10 @@ from .cookies import cookiejar_from_dict, get_cookie_header
+ from .packages.urllib3.fields import RequestField
+ from .packages.urllib3.filepost import encode_multipart_formdata
+ from .packages.urllib3.util import parse_url
+-from .packages.urllib3.exceptions import DecodeError
++from .packages.urllib3.exceptions import DecodeError, ProtocolError
+ from .exceptions import (
+     HTTPError, RequestException, MissingSchema, InvalidURL,
+-    ChunkedEncodingError, ContentDecodingError)
++    ChunkedEncodingError, ContentDecodingError, ConnectionError)
+ from .utils import (
+     guess_filename, get_auth_from_url, requote_uri,
+     stream_decode_response_unicode, to_key_val_list, parse_header_links,
+@@ -640,13 +641,21 @@ class Response(object):
+                     raise ChunkedEncodingError(e)
+                 except DecodeError as e:
+                     raise ContentDecodingError(e)
++                except (ProtocolError, socket.error) as e:
++                    # Translate low-level protocol/socket errors into a
++                    # requests-level ConnectionError so callers can catch
++                    # request-related exceptions uniformly.
++                    raise ConnectionError(e, request=self.request)
+             except AttributeError:
+                 # Standard file-like object.
+-                while True:
+-                    chunk = self.raw.read(chunk_size)
+-                    if not chunk:
+-                        break
+-                    yield chunk
++                try:
++                    while True:
++                        chunk = self.raw.read(chunk_size)
++                        if not chunk:
++                            break
++                        yield chunk
++                except (ProtocolError, socket.error) as e:
++                    raise ConnectionError(e, request=self.request)
+ 
+             self._content_consumed = True
+ 

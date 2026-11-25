@@ -1,0 +1,21 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..232927dc52 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -2235,6 +2235,15 @@ def _print_primeomega(self, expr, exp=None):
+         return r'\Omega\left(%s\right)' % self._print(expr.args[0])
+ 
+ 
++    def _print_Trace(self, expr):
++        """Print a matrix Trace in LaTeX.
++
++        Renders as \operatorname{Tr}\left(...
+ight) with the argument recursively
++        LaTeX-printed so that inner expressions (like A^{2}) are formatted.
++        """
++        return r"\operatorname{Tr}{\left(%s\right)}" % self._print(expr.arg)
++
++
+ def translate(s):
+     r'''
+     Check for a modifier ending the string.  If present, convert the

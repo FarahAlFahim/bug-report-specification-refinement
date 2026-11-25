@@ -1,0 +1,18 @@
+diff --git a/sympy/solvers/polysys.py b/sympy/solvers/polysys.py
+index b9809fd4e9..818ee87fbc 100644
+--- a/sympy/solvers/polysys.py
++++ b/sympy/solvers/polysys.py
+@@ -240,7 +240,12 @@ def _solve_reduced_system(system, gens, entry=False):
+ 
+         univariate = list(filter(_is_univariate, basis))
+ 
+-        if len(univariate) == 1:
++        # A single univariate polynomial in the Groebner basis only
++        # guarantees a zero-dimensional (finite) solution set when
++        # there is exactly one generator left.  If there are more
++        # generators remaining, the system is positive-dimensional
++        # (infinitely many solutions) and is not supported here.
++        if len(univariate) == 1 and len(gens) == 1:
+             f = univariate.pop()
+         else:
+             raise NotImplementedError(filldedent('''

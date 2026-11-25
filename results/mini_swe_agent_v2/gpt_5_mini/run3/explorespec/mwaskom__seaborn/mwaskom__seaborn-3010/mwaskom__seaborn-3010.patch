@@ -1,0 +1,40 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..3610d16d 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -20,16 +20,27 @@ class PolyFit(Stat):
+     gridsize: int = 100
+ 
+     def _fit_predict(self, data):
+-
+-        x = data["x"]
+-        y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
++        # Filter out missing observations before any numeric computation.
++        # Stats receive raw subgroup frames from GroupBy.apply, so they must
++        # handle NA filtering themselves.
++        vals = data[["x", "y"]].dropna()
++
++        # If there are not enough unique x values to determine a polynomial
++        # of the requested order, return an empty result rather than
++        # attempting to call into numpy.polyfit which will raise.
++        if vals["x"].nunique() <= self.order:
+             xx = yy = []
+         else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++            # Use the filtered values for fitting. Protect against potential
++            # linear algebra failures by catching exceptions and returning an
++            # empty result on failure.
++            try:
++                p = np.polyfit(vals["x"], vals["y"], self.order)
++            except Exception:
++                xx = yy = []
++            else:
++                xx = np.linspace(vals["x"].min(), vals["x"].max(), self.gridsize)
++                yy = np.polyval(p, xx)
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 

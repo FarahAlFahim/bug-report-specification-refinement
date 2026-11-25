@@ -1,0 +1,18 @@
+diff --git a/sympy/printing/codeprinter.py b/sympy/printing/codeprinter.py
+index b46da624bc..c6e756c673 100644
+--- a/sympy/printing/codeprinter.py
++++ b/sympy/printing/codeprinter.py
+@@ -307,6 +307,13 @@ def _print_Symbol(self, expr):
+             return name
+ 
+     def _print_Function(self, expr):
++        # Special-case functions that aren't in C's math.h but can be
++        # expressed using supported functions. For example, sinc(x) -> sin(x)/x.
++        if expr.func.__name__ == 'sinc':
++            arg = expr.args[0]
++            a = self._print(arg)
++            return "sin(%s)/(%s)" % (a, a)
++
+         if expr.func.__name__ in self.known_functions:
+             cond_func = self.known_functions[expr.func.__name__]
+             func = None

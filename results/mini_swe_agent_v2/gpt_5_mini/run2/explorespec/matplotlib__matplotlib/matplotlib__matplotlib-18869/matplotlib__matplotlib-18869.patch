@@ -1,0 +1,97 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..4cb25dfd70 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -130,27 +130,76 @@ __bibtex__ = r"""@Article{Hunter:2007,
+ }"""
+ 
+ 
++def _get_version_str():
++    """Return the cached __version__ string, computing it if necessary.
++
++    This consolidates the logic to compute the version string so it can be
++    reused for other top-level version attributes (e.g., version_info).
++    """
++    global __version__
++    if "__version__" in globals():
++        return __version__
++    import setuptools_scm
++    # Only shell out to a git subprocess if really needed, and not on a
++    # shallow clone, such as those used by CI, as the latter would trigger
++    # a warning from setuptools_scm.
++    root = Path(__file__).resolve().parents[2]
++    if (root / ".git").exists() and not (root / ".git/shallow").exists():
++        __version__ = setuptools_scm.get_version(
++            root=root,
++            version_scheme="post-release",
++            local_scheme="node-and-date",
++            fallback_version=_version.version,
++        )
++    else:  # Get the version from the _version.py setuptools_scm file.
++        __version__ = _version.version
++    return __version__
++
++
++def _parse_version_info(ver_str):
++    """Return a tuple of ints suitable for comparisons from a version string.
++
++    Prefer using packaging.version.parse(...).release when available; fall
++    back to extracting digit groups. Non-integer parts are ignored.
++    """
++    parsed = parse_version(ver_str)
++    # parsed.release may be an attribute for PEP 440-style Version objects.
++    if hasattr(parsed, "release") and parsed.release:
++        try:
++            # Ensure ints
++            return tuple(int(x) for x in parsed.release)
++        except Exception:
++            pass
++    # Fallback: extract digit groups
++    nums = re.findall(r"\d+", ver_str)
++    if nums:
++        return tuple(int(x) for x in nums)
++    return tuple()
++
++
+ def __getattr__(name):
+     if name == "__version__":
+-        import setuptools_scm
+-        global __version__  # cache it.
+-        # Only shell out to a git subprocess if really needed, and not on a
+-        # shallow clone, such as those used by CI, as the latter would trigger
+-        # a warning from setuptools_scm.
+-        root = Path(__file__).resolve().parents[2]
+-        if (root / ".git").exists() and not (root / ".git/shallow").exists():
+-            __version__ = setuptools_scm.get_version(
+-                root=root,
+-                version_scheme="post-release",
+-                local_scheme="node-and-date",
+-                fallback_version=_version.version,
+-            )
+-        else:  # Get the version from the _version.py setuptools_scm file.
+-            __version__ = _version.version
+-        return __version__
++        return _get_version_str()
++    if name == "version_info":
++        # Compute and cache a comparable tuple attribute derived from
++        # the string __version__ using the packaging parser when possible.
++        global version_info
++        if "version_info" in globals():
++            return version_info
++        ver = _get_version_str()
++        version_info = _parse_version_info(ver)
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 
++def __dir__():
++    # Advertise dynamically provided attributes such as __version__ and
++    # version_info so they show up in dir(matplotlib).
++    names = set(globals().keys())
++    names.update({"__version__", "version_info"})
++    return sorted(names)
++
++
+ def _check_versions():
+ 
+     # Quickfix to ensure Microsoft Visual C++ redistributable

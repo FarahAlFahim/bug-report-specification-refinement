@@ -1,0 +1,58 @@
+diff --git a/django/contrib/syndication/views.py b/django/contrib/syndication/views.py
+index 68ffb0bfe0..931b8f33d1 100644
+--- a/django/contrib/syndication/views.py
++++ b/django/contrib/syndication/views.py
+@@ -199,21 +199,37 @@ class Feed:
+             if updateddate and is_naive(updateddate):
+                 updateddate = make_aware(updateddate, tz)
+ 
+-            feed.add_item(
+-                title=title,
+-                link=link,
+-                description=description,
+-                unique_id=self._get_dynamic_attr('item_guid', item, link),
+-                unique_id_is_permalink=self._get_dynamic_attr(
++            # Prepare item extra kwargs and explicit comments handling.
++            # item_comments takes precedence over any 'comments' key provided
++            # by item_extra_kwargs(item). Remove 'comments' from the extra
++            # kwargs to avoid passing duplicate keyword arguments to
++            # feed.add_item(). See #PR: ensure explicit support for item_comments.
++            extra_kwargs = dict(self.item_extra_kwargs(item) or {})
++            # Use item_comments if provided, otherwise fall back to extras.
++            comments = self._get_dynamic_attr('item_comments', item, extra_kwargs.get('comments'))
++            # Remove 'comments' from extras so it isn't passed twice.
++            extra_kwargs.pop('comments', None)
++
++            item_kwargs = {
++                'title': title,
++                'link': link,
++                'description': description,
++                'unique_id': self._get_dynamic_attr('item_guid', item, link),
++                'unique_id_is_permalink': self._get_dynamic_attr(
+                     'item_guid_is_permalink', item),
+-                enclosures=enclosures,
+-                pubdate=pubdate,
+-                updateddate=updateddate,
+-                author_name=author_name,
+-                author_email=author_email,
+-                author_link=author_link,
+-                categories=self._get_dynamic_attr('item_categories', item),
+-                item_copyright=self._get_dynamic_attr('item_copyright', item),
+-                **self.item_extra_kwargs(item)
+-            )
++                'enclosures': enclosures,
++                'pubdate': pubdate,
++                'updateddate': updateddate,
++                'author_name': author_name,
++                'author_email': author_email,
++                'author_link': author_link,
++                'categories': self._get_dynamic_attr('item_categories', item),
++                'item_copyright': self._get_dynamic_attr('item_copyright', item),
++            }
++            if comments is not None:
++                item_kwargs['comments'] = comments
++
++            item_kwargs.update(extra_kwargs)
++
++            feed.add_item(**item_kwargs)
+         return feed

@@ -1,0 +1,50 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index 9e5b903d59..438ba957e2 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -286,6 +286,18 @@ handler_map : dict or None
+     The custom dictionary mapping instances or types to a legend
+     handler. This *handler_map* updates the default handler map
+     found at `matplotlib.legend.Legend.get_legend_handler_map`.
++draggable : bool, default: False
++    Whether the legend should be draggable with the mouse. If ``True``,
++    the legend will be made draggable on creation. Use ``draggable_use_blit``
++    and ``draggable_update`` to control blitting and update behavior.
++
++draggable_use_blit : bool, default: False
++    If ``True``, use blitting for faster interactive dragging (where
++    supported).
++
++draggable_update : {'loc', 'bbox'}, default: 'loc'
++    What to update when the legend is dragged: `'loc'` updates the
++    ``loc`` parameter of the legend, `'bbox'` updates ``bbox_to_anchor``.
+ """)
+ 
+ 
+@@ -342,6 +354,9 @@ class Legend(Artist):
+         title_fontproperties=None,  # properties for the legend title
+         alignment="center",       # control the alignment within the legend box
+         *,
++        draggable=False,
++        draggable_use_blit=False,
++        draggable_update="loc",
+         ncol=1  # synonym for ncols (backward compatibility)
+     ):
+         """
+@@ -537,7 +552,16 @@ class Legend(Artist):
+             title_prop_fp.set_size(title_fontsize)
+ 
+         self.set_title(title, prop=title_prop_fp)
++
++        # initialize draggable state; keep attribute for get_draggable
+         self._draggable = None
++        # If requested, enable dragging now that the legend box and
++        # offsets/figure have been initialized above (see DraggableLegend
++        # which relies on self._legend_box/figure being set).
++        if draggable:
++            # Use the public API to create the DraggableLegend helper.
++            self.set_draggable(True, use_blit=draggable_use_blit,
++                               update=draggable_update)
+ 
+         # set the text color
+ 

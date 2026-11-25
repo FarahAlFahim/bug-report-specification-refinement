@@ -1,0 +1,20 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 901918674a..a96b219da7 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1435,10 +1435,13 @@ def _print_MatrixBase(self, expr):
+     _print_ImmutableMatrix = _print_ImmutableDenseMatrix \
+                            = _print_Matrix \
+                            = _print_MatrixBase
+-
+     def _print_MatrixElement(self, expr):
++        # Indices must be printed using the active printer so that
++        # Dummy symbols and other index objects are rendered correctly
++        # for LaTeX (see issue with leading '_' from StrPrinter).
++        indices = ', '.join(map(self._print, (expr.i, expr.j)))
+         return self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True) \
+-            + '_{%s, %s}' % (expr.i, expr.j)
++            + '_{%s}' % indices
+ 
+     def _print_MatrixSlice(self, expr):
+         def latexslice(x):

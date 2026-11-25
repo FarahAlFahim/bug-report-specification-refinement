@@ -1,0 +1,41 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..2290b123e 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -19,15 +19,33 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    # Partition the evaluation cache not only by the expression text
++    # but also by a stable identity derived from the evaluation globals
++    # to avoid reusing results across different modules' contexts.
++    # Prefer (__name__, __file__) when available; when those are
++    # missing fall back to using the dict object's id to avoid
++    # accidental conflation (this may reduce cache hits but is safe).
++    default = {}  # type: Dict[object, Dict[str, object]]
+     evalcache = config._store.setdefault(evalcache_key, default)
++
++    name = d.get("__name__")
++    file = d.get("__file__")
++    if name is not None or file is not None:
++        module_key = (name, file)
++    else:
++        # globals dict doesn't contain stable module identity; use id(d)
++        # to avoid conflating unrelated contexts. This prevents cache
++        # reuse in these cases but keeps correctness.
++        module_key = (None, id(d))
++
++    inner = evalcache.setdefault(module_key, {})
+     try:
+-        return evalcache[expr]
++        return inner[expr]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        inner[expr] = x = eval(exprcode, d)
+         return x
+ 
+ 

@@ -1,0 +1,54 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..02bee63dbc 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -24,6 +24,7 @@ from django.utils.regex_helper import normalize
+ from django.utils.translation import get_language
+ 
+ from .converters import get_converter
++from django.http import Http404
+ from .exceptions import NoReverseMatch, Resolver404
+ from .utils import get_callable
+ 
+@@ -259,6 +260,14 @@ class RoutePattern(CheckURLMixin):
+                 try:
+                     kwargs[key] = converter.to_python(value)
+                 except ValueError:
++                    # Converter indicates the pattern doesn't match.
++                    return None
++                except Http404:
++                    # If a converter raises Http404 (for example via
++                    # get_object_or_404), treat it as a non-match during
++                    # URL resolving so that Http404 can be handled by the
++                    # normal exception flow (and the technical 404 page can
++                    # be rendered in DEBUG mode).
+                     return None
+             return path[match.end():], (), kwargs
+         return None
+diff --git a/django/views/debug.py b/django/views/debug.py
+index cb3e8c7ec1..3e76a99673 100644
+--- a/django/views/debug.py
++++ b/django/views/debug.py
+@@ -9,6 +9,7 @@ from django.http import HttpResponse, HttpResponseNotFound
+ from django.template import Context, Engine, TemplateDoesNotExist
+ from django.template.defaultfilters import pprint
+ from django.urls import Resolver404, resolve
++from django.http import Http404
+ from django.utils import timezone
+ from django.utils.datastructures import MultiValueDict
+ from django.utils.encoding import force_str
+@@ -483,8 +484,12 @@ def technical_404_response(request, exception):
+     caller = ''
+     try:
+         resolver_match = resolve(request.path)
+-    except Resolver404:
+-        pass
++    except (Resolver404, Http404):
++        # If resolving the path raises Http404 (for example, a path
++        # converter raised Http404), treat it the same as a Resolver404
++        # here so that building the technical 404 page doesn't itself
++        # raise an exception and turn the response into a 500.
++        resolver_match = None
+     else:
+         obj = resolver_match.func
+ 

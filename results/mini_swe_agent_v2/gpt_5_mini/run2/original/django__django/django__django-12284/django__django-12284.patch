@@ -1,0 +1,50 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 8ea6c05ef9..c5cef4d35c 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -947,7 +947,44 @@ class Model(metaclass=ModelBase):
+         value = getattr(self, field.attname)
+         choices_dict = dict(make_hashable(field.flatchoices))
+         # force_str() to coerce lazy strings.
+-        return force_str(choices_dict.get(make_hashable(value), value), strings_only=True)
++        mapped = choices_dict.get(make_hashable(value))
++        if mapped is not None:
++            return force_str(mapped, strings_only=True)
++
++        # If the field's flatchoices didn't contain the value, it's possible
++        # the model (or one of its base classes) has overridden the
++        # choices list as a class attribute (a common pattern when using
++        # abstract base models). Try to find a choices-like attribute on
++        # the model or its bases that maps the value to a display string.
++        for cls in self.__class__.mro():
++            # Inspect only attributes defined on the class dict to prefer
++            # most-derived definitions and avoid instance attributes.
++            for attr_val in cls.__dict__.values():
++                try:
++                    # An iterable of (key, display) pairs or optgroups.
++                    iterator = iter(attr_val)
++                except TypeError:
++                    continue
++                # Flatten potential optgroups like Field._get_flatchoices.
++                flat = []
++                for item in iterator:
++                    try:
++                        k, v = item
++                    except Exception:
++                        # Not a pair; skip this attribute as it's not choices-like.
++                        flat = None
++                        break
++                    if isinstance(v, (list, tuple)):
++                        flat.extend(v)
++                    else:
++                        flat.append((k, v))
++                if not flat:
++                    continue
++                for k, v in flat:
++                    if make_hashable(k) == make_hashable(value):
++                        return force_str(v, strings_only=True)
++
++        return force_str(value, strings_only=True)
+ 
+     def _get_next_or_previous_by_FIELD(self, field, is_next, **kwargs):
+         if not self.pk:

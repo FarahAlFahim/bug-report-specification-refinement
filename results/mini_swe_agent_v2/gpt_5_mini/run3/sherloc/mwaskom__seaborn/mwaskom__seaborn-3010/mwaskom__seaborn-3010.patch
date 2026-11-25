@@ -1,0 +1,46 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..0b0e568e 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -21,15 +21,34 @@ class PolyFit(Stat):
+ 
+     def _fit_predict(self, data):
+ 
+-        x = data["x"]
+-        y = data["y"]
+-        if x.nunique() <= self.order:
+-            # TODO warn?
++        # Coerce inputs to numeric and drop missing values. This ensures that
++        # downstream linear-algebra operations (numpy.polyfit) receive clean
++        # numeric arrays and won't raise obscure errors when given object-dtype
++        # or NaN-containing data.
++        x = pd.to_numeric(data["x"], errors="coerce")
++        y = pd.to_numeric(data["y"], errors="coerce")
++
++        clean = pd.concat([x, y], axis=1).dropna()
++        if clean.shape[0] == 0:
++            # No valid observations
+             xx = yy = []
+         else:
+-            p = np.polyfit(x, y, self.order)
+-            xx = np.linspace(x.min(), x.max(), self.gridsize)
+-            yy = np.polyval(p, xx)
++            x = clean.iloc[:, 0]
++            y = clean.iloc[:, 1]
++
++            # Need more unique x-values than the polynomial order to fit
++            if x.nunique() <= self.order:
++                xx = yy = []
++            else:
++                # Wrap polyfit in try/except to avoid raising LinAlgError to
++                # the top-level plotting code. If fitting fails, return an
++                # empty result rather than crash the plot.
++                try:
++                    p = np.polyfit(x, y, self.order)
++                    xx = np.linspace(x.min(), x.max(), self.gridsize)
++                    yy = np.polyval(p, xx)
++                except np.linalg.LinAlgError:
++                    xx = yy = []
+ 
+         return pd.DataFrame(dict(x=xx, y=yy))
+ 

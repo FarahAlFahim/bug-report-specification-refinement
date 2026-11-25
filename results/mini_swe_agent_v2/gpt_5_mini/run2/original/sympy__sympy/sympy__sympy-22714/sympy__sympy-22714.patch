@@ -1,0 +1,30 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 73c20334d0..317ad46ee6 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -152,8 +152,23 @@ def __new__(cls, *args, **kwargs):
+                         'warn' or 'ignore'.'''))
+         if any(coords[dim:]):
+             raise ValueError('Nonzero coordinates cannot be removed.')
+-        if any(a.is_number and im(a) for a in coords):
+-            raise ValueError('Imaginary coordinates are not permitted.')
++        # Be defensive here: coordinates may not yet be SymPy Expr
++        # instances (they can come from the parser in various forms).
++        # Only treat truly-numeric SymPy objects as candidates for the
++        # imaginary-coordinate check. If evaluating ``im(a)`` raises
++        # for a non-Expr, attempt to sympify that coordinate and
++        # re-check. This avoids spurious errors when parsing with
++        # evaluate=False or when non-standard objects are passed.
++        for a in coords:
++            try:
++                is_num = getattr(a, 'is_number', False)
++                if is_num and im(a):
++                    raise ValueError('Imaginary coordinates are not permitted.')
++            except Exception:
++                # Try sympifying the coordinate and test again.
++                a2 = sympify(a)
++                if getattr(a2, 'is_number', False) and im(a2):
++                    raise ValueError('Imaginary coordinates are not permitted.')
+         if not all(isinstance(a, Expr) for a in coords):
+             raise TypeError('Coordinates must be valid SymPy expressions.')
+ 

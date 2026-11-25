@@ -1,0 +1,50 @@
+diff --git a/astropy/io/ascii/rst.py b/astropy/io/ascii/rst.py
+index abdeba8ef..ed34ccbb4 100644
+--- a/astropy/io/ascii/rst.py
++++ b/astropy/io/ascii/rst.py
+@@ -27,7 +27,10 @@ class SimpleRSTHeader(FixedWidthHeader):
+ 
+ 
+ class SimpleRSTData(FixedWidthData):
+-    start_line = 3
++    # Do not hardcode start_line here since it depends on the number of
++    # header rows. The appropriate start_line is computed in the RST
++    # writer __init__ after header_rows (if any) have been set.
++    start_line = None
+     end_line = -1
+     splitter_class = FixedWidthTwoLineDataSplitter
+ 
+@@ -57,10 +60,30 @@ class RST(FixedWidth):
+     data_class = SimpleRSTData
+     header_class = SimpleRSTHeader
+ 
+-    def __init__(self):
+-        super().__init__(delimiter_pad=None, bookend=False)
++    def __init__(self, header_rows=None):
++        # Accept and forward writer kwargs (header_rows) to the
++        # FixedWidth base class so that writer-level options such as
++        # header_rows are honored. Mimic the pattern used by the
++        # FixedWidthTwoLine writer.
++        super().__init__(delimiter_pad=None, bookend=False, header_rows=header_rows)
++        # The start of the data depends on the header start line and the
++        # number of header rows plus the position/border line. The general
++        # relationship is: data.start_line = header.start_line +
++        # len(header.header_rows) + 1
++        try:
++            self.data.start_line = self.header.start_line + len(self.header.header_rows) + 1
++        except Exception:
++            # Be conservative: if anything goes wrong (e.g., header attrs not
++            # yet set), fallback to the default behaviour from FixedWidth
++            # which sets data.start_line based on header_rows.
++            pass
+ 
+     def write(self, lines):
+         lines = super().write(lines)
+-        lines = [lines[1]] + lines + [lines[1]]
++        # The border/position line is added by the FixedWidth writer after
++        # the header rows. Its index in the returned lines is therefore
++        # equal to the number of header rows. Use that rather than assuming
++        # a single header row at index 1.
++        idx = len(self.header.header_rows)
++        lines = [lines[idx]] + lines + [lines[idx]]
+         return lines

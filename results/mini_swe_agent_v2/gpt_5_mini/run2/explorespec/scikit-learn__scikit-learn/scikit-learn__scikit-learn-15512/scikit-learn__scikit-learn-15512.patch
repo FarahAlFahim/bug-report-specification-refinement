@@ -1,0 +1,56 @@
+diff --git a/sklearn/cluster/_affinity_propagation.py b/sklearn/cluster/_affinity_propagation.py
+index 4806afee9..0ca66ade2 100644
+--- a/sklearn/cluster/_affinity_propagation.py
++++ b/sklearn/cluster/_affinity_propagation.py
+@@ -152,6 +152,7 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+ 
+     ind = np.arange(n_samples)
+ 
++    converged = False
+     for it in range(max_iter):
+         # tmp = A + S; compute responsibilities
+         np.add(A, S, tmp)
+@@ -193,14 +194,31 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+             se = np.sum(e, axis=1)
+             unconverged = (np.sum((se == convergence_iter) + (se == 0))
+                            != n_samples)
+-            if (not unconverged and (K > 0)) or (it == max_iter):
++            # The algorithm is considered to have converged when every
++            # sample has been consistently identified as either an
++            # exemplar or not for ``convergence_iter`` iterations and at
++            # least one exemplar exists (K > 0).  The previous code
++            # attempted to special-case loop exhaustion with (it ==
++            # max_iter) which is never true inside ``for it in
++            # range(max_iter)``; remove that dead clause and set a
++            # converged flag when breaking so that callers can detect
++            # non-convergence and avoid using the last E computed.
++            if (not unconverged and (K > 0)):
+                 if verbose:
+                     print("Converged after %d iterations." % it)
++                converged = True
+                 break
+     else:
+         if verbose:
+             print("Did not converge")
+ 
++    # If the algorithm did not converge, make sure that we do not reuse
++    # the exemplar indicator E computed from the last iteration.  In that
++    # case, force K == 0 so that the public API communicates non-
++    # convergence (empty centers and labels == -1).
++    if not converged:
++        E = np.zeros(n_samples, dtype=bool)
++
+     I = np.flatnonzero(E)
+     K = I.size  # Identify exemplars
+ 
+@@ -223,7 +241,9 @@ def affinity_propagation(S, preference=None, convergence_iter=15, max_iter=200,
+         warnings.warn("Affinity propagation did not converge, this model "
+                       "will not have any cluster centers.", ConvergenceWarning)
+         labels = np.array([-1] * n_samples)
+-        cluster_centers_indices = []
++        # Ensure a consistent return type: an empty ndarray of dtype int
++        # (matches the documented "array" return type).
++        cluster_centers_indices = np.array([], dtype=int)
+ 
+     if return_n_iter:
+         return cluster_centers_indices, labels, it + 1

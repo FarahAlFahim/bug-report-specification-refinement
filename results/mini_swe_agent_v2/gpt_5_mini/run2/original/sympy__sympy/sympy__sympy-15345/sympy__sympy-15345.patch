@@ -1,0 +1,25 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..0b456439d 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -116,6 +116,20 @@ def _print_Derivative(self, expr):
+         dvars = [i[0] if i[1] == 1 else i for i in expr.variable_count]
+         return "Hold[D[" + ', '.join(self.doprint(a) for a in [dexpr] + dvars) + "]]"
+ 
++    def _print_LatticeOp(self, expr):
++        """Print lattice operations (Min/Max) in Mathematica form.
++
++        The StrPrinter prints LatticeOp by sorting the arguments and using
++        Python-style parentheses, which leads to output like ``Max(2, x)``.
++        Mathematica expects square-bracket function application and the
++        natural argument order (as given in the expression). To match the
++        behavior of other Mathematica printing in this module we use the
++        same ``stringify`` helper that preserves ordering and proper
++        parenthesization.
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
++
+ 
+ def mathematica_code(expr, **settings):
+     r"""Converts an expr to a string of the Wolfram Mathematica code

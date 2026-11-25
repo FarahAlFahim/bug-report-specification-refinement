@@ -1,0 +1,116 @@
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index d4ca323e0..73d756966 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,12 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping, defaultdict
++from collections import defaultdict
++try:
++    # Python 3.3+: Mapping is in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    # Fallback for older Pythons
++    from collections import Mapping
+ from itertools import chain
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+diff --git a/sympy/core/containers.py b/sympy/core/containers.py
+index 15abd93e3..9a28637e5 100644
+--- a/sympy/core/containers.py
++++ b/sympy/core/containers.py
+@@ -14,6 +14,11 @@
+ from sympy.utilities.iterables import iterable
+ 
+ import collections
++try:
++    # Python 3.3+: abstract base classes are in collections.abc
++    from collections.abc import MutableSet
++except Exception:
++    from collections import MutableSet
+ 
+ 
+ class Tuple(Basic):
+@@ -268,7 +273,7 @@ def _sorted_args(self):
+         return tuple(sorted(self.args, key=default_sort_key))
+ 
+ 
+-class OrderedSet(collections.MutableSet):
++class OrderedSet(MutableSet):
+     def __init__(self, iterable=None):
+         if iterable:
+             self.map = collections.OrderedDict((item, None) for item in iterable)
+diff --git a/sympy/matrices/common.py b/sympy/matrices/common.py
+index 056d9bc49..bda690fd7 100644
+--- a/sympy/matrices/common.py
++++ b/sympy/matrices/common.py
+@@ -86,7 +86,12 @@ def entry(i, j):
+                 return self[i, j]
+             elif pos <= j < pos + other.cols:
+                 return other[i, j - pos]
+-            return self[i, j - pos - other.cols]
++            # For columns after the inserted block, map back to the
++            # original column index by subtracting the number of
++            # inserted columns (other.cols). Previously this used
++            # `j - pos - other.cols` which incorrectly shifted the
++            # mapping depending on the insert position.
++            return self[i, j - other.cols]
+ 
+         return self._new(self.rows, self.cols + other.cols,
+                          lambda i, j: entry(i, j))
+diff --git a/sympy/matrices/matrices.py b/sympy/matrices/matrices.py
+index 5e241c68e..ddddf9e24 100644
+--- a/sympy/matrices/matrices.py
++++ b/sympy/matrices/matrices.py
+@@ -2045,7 +2045,7 @@ def _handle_creation_inputs(cls, *args, **kwargs):
+                                  "Both dimensions must be positive".format(rows, cols))
+ 
+             # Matrix(2, 2, lambda i, j: i+j)
+-            if len(args) == 3 and isinstance(args[2], collections.Callable):
++            if len(args) == 3 and callable(args[2]):
+                 op = args[2]
+                 flat_list = []
+                 for i in range(rows):
+diff --git a/sympy/matrices/sparse.py b/sympy/matrices/sparse.py
+index 7701cbc17..8e577c811 100644
+--- a/sympy/matrices/sparse.py
++++ b/sympy/matrices/sparse.py
+@@ -53,7 +53,7 @@ def __new__(cls, *args, **kwargs):
+             self.rows = as_int(args[0])
+             self.cols = as_int(args[1])
+ 
+-            if isinstance(args[2], collections.Callable):
++            if callable(args[2]):
+                 op = args[2]
+                 for i in range(self.rows):
+                     for j in range(self.cols):
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index b3b0237d1..b65ce4826 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,10 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 
+diff --git a/sympy/vector/coordsysrect.py b/sympy/vector/coordsysrect.py
+index ae1feb76e..184197bd6 100644
+--- a/sympy/vector/coordsysrect.py
++++ b/sympy/vector/coordsysrect.py
+@@ -84,7 +84,7 @@ def __new__(cls, name, transformation=None, parent=None, location=None,
+                 else:
+                     transformation = Lambda(transformation[0],
+                                             transformation[1])
+-            elif isinstance(transformation, collections.Callable):
++            elif callable(transformation):
+                 x1, x2, x3 = symbols('x1 x2 x3', cls=Dummy)
+                 transformation = Lambda((x1, x2, x3),
+                                         transformation(x1, x2, x3))

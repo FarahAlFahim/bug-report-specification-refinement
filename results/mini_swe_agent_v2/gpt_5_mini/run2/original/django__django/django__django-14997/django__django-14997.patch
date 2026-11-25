@@ -1,0 +1,32 @@
+--- a/django/db/backends/sqlite3/schema.py
++++ b/django/db/backends/sqlite3/schema.py
+@@ -237,6 +237,29 @@
+             ]
+ 
+         constraints = list(model._meta.constraints)
++        deferred_constraints = []
++        for constraint in list(constraints):
++            # Only UniqueConstraint has the attributes we care about here.
++            if isinstance(constraint, UniqueConstraint) and (
++                constraint.condition or
++                constraint.contains_expressions or
++                constraint.include or
++                constraint.deferrable
++            ):
++                # Remove from the table-level constraints so it is not
++                # inlined into the CREATE TABLE statement (which would
++                # produce invalid SQL for SQLite when expressions are
++                # involved). Instead, add its SQL to deferred_sql so it
++                # will be created after the table exists.
++                constraints.remove(constraint)
++                try:
++                    sql = constraint.create_sql(model, self)
++                except TypeError:
++                    # Backwards compatibility: ensure we call with schema
++                    # editor if signature expects it.
++                    sql = constraint.create_sql(model, schema_editor=self)
++                if sql:
++                    self.deferred_sql.append(sql)
+ 
+         # Provide isolated instances of the fields to the new model body so
+         # that the existing model's internals aren't interfered with when

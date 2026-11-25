@@ -1,0 +1,19 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 84960d77e1..f2322c714d 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1051,7 +1051,13 @@ class Subquery(Expression):
+ 
+     def get_group_by_cols(self, alias=None):
+         if alias:
+-            return [Ref(alias, self)]
++            # Use the subquery expression itself in GROUP BY rather than a
++            # reference to the annotation alias. Returning a Ref to the
++            # alias will emit the alias name in the GROUP BY which can be
++            # ambiguous when the same column name exists in joined tables
++            # (see #31823). Using the subquery ensures the GROUP BY uses
++            # the full subquery SQL (e.g. GROUP BY (SELECT ...)).
++            return [self]
+         external_cols = self.query.get_external_cols()
+         if any(col.possibly_multivalued for col in external_cols):
+             return [self]

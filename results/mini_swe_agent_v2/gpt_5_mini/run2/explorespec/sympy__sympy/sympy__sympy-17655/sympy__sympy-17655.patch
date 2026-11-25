@@ -1,0 +1,56 @@
+diff --git a/sympy/geometry/entity.py b/sympy/geometry/entity.py
+index ee5c910268..0aff708584 100644
+--- a/sympy/geometry/entity.py
++++ b/sympy/geometry/entity.py
+@@ -139,7 +139,12 @@ def __repr__(self):
+ 
+     def __rmul__(self, a):
+         """Implementation of reverse multiplication method."""
+-        return a.__mul__(self)
++        # Delegate reversed multiplication to the geometry object
++        # multiplication implementation.  If ``a`` is a plain number
++        # (e.g. Float) its __mul__ may return a generic Mul rather
++        # than a Point, so calling self.__mul__(a) ensures that
++        # scalar*Point uses Point.__mul__ semantics.
++        return self.__mul__(a)
+ 
+     def __rsub__(self, a):
+         """Implementation of reverse subtraction method."""
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..e8905fcd1e 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -214,7 +214,32 @@ def __add__(self, other):
+ 
+         """
+         try:
+-            s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
++            other_point = Point(other, evaluate=False)
++        except TypeError:
++            # Allow adding expressions like Mul(scalar, Point) where the
++            # numeric multiplication was performed on the left (e.g.
++            # 2.0*Point(1, 1)). In that case the left-operand numeric
++            # multiplication may have produced a Mul containing a Point
++            # factor. Convert that to a proper Point via Point.__mul__ so
++            # that the addition can proceed.
++            from sympy import Mul
++            if isinstance(other, Mul):
++                pt = None
++                scalar = S.One
++                for f in other.args:
++                    if hasattr(f, 'is_Point') and f.is_Point:
++                        pt = f
++                    else:
++                        scalar *= f
++                if pt is not None:
++                    other_point = pt * scalar
++                else:
++                    raise GeometryError("Don't know how to add {} and a Point object".format(other))
++            else:
++                raise GeometryError("Don't know how to add {} and a Point object".format(other))
++
++        try:
++            s, o = Point._normalize_dimension(self, other_point)
+         except TypeError:
+             raise GeometryError("Don't know how to add {} and a Point object".format(other))
+ 

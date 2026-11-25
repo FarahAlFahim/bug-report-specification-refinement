@@ -1,0 +1,33 @@
+diff --git a/lib/matplotlib/cbook.py b/lib/matplotlib/cbook.py
+index c9699b2e21..a85b64be74 100644
+--- a/lib/matplotlib/cbook.py
++++ b/lib/matplotlib/cbook.py
+@@ -847,6 +847,28 @@ class Grouper:
+         return [x() for x in siblings]
+ 
+ 
++    def __getstate__(self):
++        """Return a picklable state for the Grouper.
++
++        The internal representation stores weakref.ReferenceType objects,
++        which are not picklable. We instead store the groups as lists of
++        the actual objects (strong references) and rebuild the weakref-based
++        mapping in ``__setstate__``.
++        """
++        # list(self) will call clean() and return lists of live objects
++        groups = [group for group in self]
++        return {"groups": groups}
++
++    def __setstate__(self, state):
++        """Rebuild the internal weakref mapping from the pickled groups."""
++        self._mapping = {}
++        for group in state.get("groups", []):
++            refs = [weakref.ref(x) for x in group]
++            # point each weakref key to the same group list of weakrefs
++            for r in refs:
++                self._mapping[r] = refs
++
++
+ class GrouperView:
+     """Immutable view over a `.Grouper`."""
+ 

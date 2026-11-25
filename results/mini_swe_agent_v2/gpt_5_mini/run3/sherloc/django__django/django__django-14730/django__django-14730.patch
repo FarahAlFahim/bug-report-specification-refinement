@@ -1,0 +1,53 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..4389f57e48 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1210,6 +1210,7 @@ class ManyToManyField(RelatedField):
+     def check(self, **kwargs):
+         return [
+             *super().check(**kwargs),
++            *self._check_symmetrical_self_referential_related_name(**kwargs),
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
+@@ -1227,6 +1228,40 @@ class ManyToManyField(RelatedField):
+             ]
+         return []
+ 
++    def _check_symmetrical_self_referential_related_name(self, from_model=None, **kwargs):
++        """Ensure that an explicit related_name isn't supplied for a symmetrical self-referential m2m.
++
++        Historically, symmetrical self-referential ManyToManyFields do not
++        create a reverse accessor. If a developer passes an explicit
++        related_name, it gets overwritten with an internal hidden name and
++        the supplied value is ignored. Surface this as a model-check error.
++        """
++        errors = []
++        # If the field was explicitly given a related_name, it's stored on
++        # self._related_name. remote_field.related_name may have been
++        # rewritten during contribute_to_class.
++        if self._related_name is None:
++            return errors
++        # Resolve the target model relative to the source model
++        assert from_model is not None, (
++            "ManyToManyField with intermediate "
++            "tables cannot be checked if you don't pass the model "
++            "where the field is attached to."
++        )
++        to_model = resolve_relation(from_model, self.remote_field.model)
++        self_referential = (from_model == to_model)
++        if self.remote_field.symmetrical and self_referential:
++            errors.append(
++                checks.Error(
++                    "Field defines a symmetrical many-to-many relationship to 'self' and also sets "
++                    "related_name='%s'. The related_name will be ignored because symmetrical "
++                    "self-referential relations do not create a reverse accessor." % (self._related_name,),
++                    obj=self,
++                    id='fields.E341',
++                )
++            )
++        return errors
++
+     def _check_ignored_options(self, **kwargs):
+         warnings = []
+ 

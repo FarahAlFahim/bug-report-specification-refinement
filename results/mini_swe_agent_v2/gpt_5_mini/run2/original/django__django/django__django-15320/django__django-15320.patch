@@ -1,0 +1,19 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..ba14c80086 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1151,6 +1151,14 @@ class Subquery(BaseExpression, Combinable):
+         # Allow the usage of both QuerySet and sql.Query objects.
+         self.query = getattr(queryset, 'query', queryset)
+         self.extra = extra
++        # Mark the inner query as a subquery so it is compiled as such by
++        # backends that need to treat inner queries differently. Some
++        # query-like objects may not have this attribute (e.g. RawQuery),
++        # so set it only if possible.
++        try:
++            self.query.subquery = True
++        except Exception:
++            pass
+         super().__init__(output_field)
+ 
+     def get_source_expressions(self):

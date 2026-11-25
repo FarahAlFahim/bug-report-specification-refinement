@@ -1,0 +1,23 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index ee45bb941e..234fd1c290 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -763,8 +763,16 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            setattr(cls, 'get_%s_display' % self.name,
+-                    partialmethod(cls._get_FIELD_display, field=self))
++            method_name = 'get_%s_display' % self.name
++            # Don't override an explicitly defined method on the model class.
++            # Respect methods declared on the class (cls.__dict__) so that
++            # user-defined get_<field>_display implementations take
++            # precedence over the auto-generated one. This matches the
++            # historical behaviour where model methods could override
++            # generated accessors.
++            if method_name not in cls.__dict__:
++                setattr(cls, method_name,
++                        partialmethod(cls._get_FIELD_display, field=self))
+ 
+     def get_filter_kwargs_for_object(self, obj):
+         """

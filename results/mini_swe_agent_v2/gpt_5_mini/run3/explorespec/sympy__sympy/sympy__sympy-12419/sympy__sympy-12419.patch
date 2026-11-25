@@ -1,0 +1,39 @@
+diff --git a/sympy/matrices/expressions/diagonal.py b/sympy/matrices/expressions/diagonal.py
+index a0dc57a35..611ba97ec 100644
+--- a/sympy/matrices/expressions/diagonal.py
++++ b/sympy/matrices/expressions/diagonal.py
+@@ -8,7 +8,11 @@ class DiagonalMatrix(MatrixExpr):
+     shape = property(lambda self: (self.arg.shape[0], self.arg.shape[0]))
+ 
+     def _entry(self, i, j):
+-        return S.Zero if i != j else self.arg[i, 0]
++        # Represent diagonal entries with an explicit KroneckerDelta
++        # factor so that symbolic summation and index-based
++        # simplifications can detect the equality of indices.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j) * self.arg[i, 0]
+ 
+ class DiagonalOf(MatrixExpr):
+     arg = property(lambda self: self.args[0])
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..6601fbbca 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,13 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
+-        if i == j:
+-            return S.One
+-        else:
+-            return S.Zero
++        # Use KroneckerDelta to represent identity entries so that
++        # symbolic indices are handled correctly by summation and
++        # other index-aware routines. This preserves the delta
++        # structure instead of emitting a literal zero for
++        # non-equal (but symbolically distinct) index objects.
++        from sympy import KroneckerDelta
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One

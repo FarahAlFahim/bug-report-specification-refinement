@@ -1,0 +1,38 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 73c20334d0..a6cdaf3616 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -152,7 +152,12 @@ def __new__(cls, *args, **kwargs):
+                         'warn' or 'ignore'.'''))
+         if any(coords[dim:]):
+             raise ValueError('Nonzero coordinates cannot be removed.')
+-        if any(a.is_number and im(a) for a in coords):
++        # Avoid calling im(a) here because under AST-based parsing with
++        # evaluate=False that can produce unevaluated calls that are
++        # truthy and incorrectly signal an imaginary coordinate. Instead
++        # check the is_real property for numeric values which correctly
++        # distinguishes real and imaginary numeric coordinates.
++        if any(a.is_number and (a.is_real is False) for a in coords):
+             raise ValueError('Imaginary coordinates are not permitted.')
+         if not all(isinstance(a, Expr) for a in coords):
+             raise TypeError('Coordinates must be valid SymPy expressions.')
+diff --git a/sympy/parsing/sympy_parser.py b/sympy/parsing/sympy_parser.py
+index e403654cb4..1824459c84 100644
+--- a/sympy/parsing/sympy_parser.py
++++ b/sympy/parsing/sympy_parser.py
+@@ -1123,8 +1123,14 @@ class EvaluateFalseTransformer(ast.NodeTransformer):
+         ast.BitAnd: 'And',
+         ast.BitXor: 'Not',
+     }
++    # Do not include functions like 'im' and 're' here since they do not
++    # accept an `evaluate` keyword and injecting it changes their runtime
++    # behaviour when the AST is evaluated (see issue where parsing under
++    # with evaluate(False) could incorrectly mark coordinates as
++    # imaginary). Only include functions that are safe to pass
++    # evaluate=False to.
+     functions = (
+-        'Abs', 'im', 're', 'sign', 'arg', 'conjugate',
++        'Abs', 'sign', 'arg', 'conjugate',
+         'acos', 'acot', 'acsc', 'asec', 'asin', 'atan',
+         'acosh', 'acoth', 'acsch', 'asech', 'asinh', 'atanh',
+         'cos', 'cot', 'csc', 'sec', 'sin', 'tan',

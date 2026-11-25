@@ -1,0 +1,46 @@
+diff --git a/lib/matplotlib/figure.py b/lib/matplotlib/figure.py
+index d2568fddbf..c7a8dc494f 100644
+--- a/lib/matplotlib/figure.py
++++ b/lib/matplotlib/figure.py
+@@ -927,6 +927,41 @@ default: %(va)s
+                         return last_ax
+             return None
+ 
++        # If the canvas has state tied to this Axes (mouse grab or
++        # a widgetlock owner), release that state so that removing the
++        # Axes does not leave stale references that block future
++        # widget interaction (see github issue reproduction where a
++        # RangeSlider callback calls clf() while dragging).
++        canvas = getattr(self, 'canvas', None)
++        if canvas is not None:
++            # Release any mouse grab held by this Axes.
++            try:
++                # Use the canvas public API to release the grab; this is
++                # a no-op if the grab is held by a different Axes.
++                canvas.release_mouse(ax)
++            except Exception:
++                # Be conservative: if the canvas implementation raises for
++                # some reason, don't let delaxes fail.
++                pass
++
++            # If a widget bound to this Axes holds the global widgetlock,
++            # release it so that other widgets/tools are not blocked by a
++            # stale owner.
++            wl = getattr(canvas, 'widgetlock', None)
++            if wl is not None:
++                owner = getattr(wl, '_owner', None)
++                if owner is not None and getattr(owner, 'ax', None) is ax:
++                    try:
++                        wl.release(owner)
++                    except Exception:
++                        # As a last resort, clear the internal owner to
++                        # avoid leaving a stale reference; this mirrors the
++                        # intended effect of release().
++                        try:
++                            wl._owner = None
++                        except Exception:
++                            pass
++
+         self._axstack.remove(ax)
+         self._axobservers.process("_axes_change_event", self)
+         self.stale = True

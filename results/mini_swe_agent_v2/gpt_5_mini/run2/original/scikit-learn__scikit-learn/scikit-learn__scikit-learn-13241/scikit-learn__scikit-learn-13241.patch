@@ -1,0 +1,26 @@
+diff --git a/sklearn/decomposition/kernel_pca.py b/sklearn/decomposition/kernel_pca.py
+index bb91d0cbb..b230e8b39 100644
+--- a/sklearn/decomposition/kernel_pca.py
++++ b/sklearn/decomposition/kernel_pca.py
+@@ -220,6 +220,21 @@ class KernelPCA(BaseEstimator, TransformerMixin, _UnstableOn32BitMixin):
+             self.alphas_ = self.alphas_[:, self.lambdas_ > 0]
+             self.lambdas_ = self.lambdas_[self.lambdas_ > 0]
+ 
++        # Make the sign of the eigenvectors deterministic. The sign of
++        # eigenvectors returned by eigh/eigsh is arbitrary; to ensure
++        # reproducible output across runs and platforms we flip the sign
++        # of each component such that the entry with largest absolute
++        # value is positive (consistent with svd_flip behavior used
++        # elsewhere in the codebase).
++        if self.alphas_.size > 0:
++            # For each component (column), find the row index of the
++            # maximal absolute loading and ensure that value is positive.
++            max_abs_rows = np.argmax(np.abs(self.alphas_), axis=0)
++            signs = np.sign(self.alphas_[max_abs_rows, range(self.alphas_.shape[1])])
++            # Replace zeros (all-zero column) with 1 to avoid flipping to 0
++            signs[signs == 0] = 1
++            self.alphas_ *= signs
++
+         return K
+ 
+     def _fit_inverse_transform(self, X_transformed, X):

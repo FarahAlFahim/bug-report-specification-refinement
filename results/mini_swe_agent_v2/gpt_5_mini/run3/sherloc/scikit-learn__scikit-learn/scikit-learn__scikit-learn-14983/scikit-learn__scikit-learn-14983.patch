@@ -1,0 +1,37 @@
+diff --git a/sklearn/model_selection/_split.py b/sklearn/model_selection/_split.py
+index c49a3ce6a..e74c17986 100644
+--- a/sklearn/model_selection/_split.py
++++ b/sklearn/model_selection/_split.py
+@@ -1103,6 +1103,10 @@ class _RepeatedSplits(metaclass=ABCMeta):
+         self.random_state = random_state
+         self.cvargs = cvargs
+ 
++    def __repr__(self):
++        return _build_repr(self)
++
++
+     def split(self, X, y=None, groups=None):
+         """Generates indices to split data into training and test set.
+ 
+@@ -1213,6 +1217,10 @@ class RepeatedKFold(_RepeatedSplits):
+     RepeatedStratifiedKFold: Repeats Stratified K-Fold n times.
+     """
+     def __init__(self, n_splits=5, n_repeats=10, random_state=None):
++        # expose constructor parameters as attributes for repr
++        self.n_splits = n_splits
++        self.n_repeats = n_repeats
++        self.random_state = random_state
+         super().__init__(
+             KFold, n_repeats, random_state, n_splits=n_splits)
+ 
+@@ -1266,6 +1274,10 @@ class RepeatedStratifiedKFold(_RepeatedSplits):
+     RepeatedKFold: Repeats K-Fold n times.
+     """
+     def __init__(self, n_splits=5, n_repeats=10, random_state=None):
++        # expose constructor parameters as attributes for repr
++        self.n_splits = n_splits
++        self.n_repeats = n_repeats
++        self.random_state = random_state
+         super().__init__(
+             StratifiedKFold, n_repeats, random_state, n_splits=n_splits)
+ 

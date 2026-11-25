@@ -1,0 +1,46 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 901918674a..c639f57f35 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -614,8 +614,19 @@ def _print_BasisDependent(self, expr):
+ 
+     def _print_Indexed(self, expr):
+         tex_base = self._print(expr.base)
+-        tex = '{'+tex_base+'}'+'_{%s}' % ','.join(
+-            map(self._print, expr.indices))
++        # Print indices but avoid introducing an extra leading underscore
++        # when an index's printed form already starts with an underscore.
++        # For example, a Dummy named "_i_1" prints as "_i_{1}"; when
++        # wrapped into the Indexed subscript ("_{...}") this would yield
++        # a double underscore sequence which is invalid LaTeX. Strip a
++        # single leading underscore from index strings to prevent this.
++        index_texs = []
++        for idx in expr.indices:
++            s = self._print(idx)
++            if s.startswith('_'):
++                s = s[1:]
++            index_texs.append(s)
++        tex = '{' + tex_base + '}' + '_{%s}' % ','.join(index_texs)
+         return tex
+ 
+     def _print_IndexedBase(self, expr):
+@@ -1437,8 +1448,17 @@ def _print_MatrixBase(self, expr):
+                            = _print_MatrixBase
+ 
+     def _print_MatrixElement(self, expr):
+-        return self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True) \
+-            + '_{%s, %s}' % (expr.i, expr.j)
++        parent = self.parenthesize(expr.parent, PRECEDENCE["Atom"], strict=True)
++        # Use the latex printer for the indices so that super/sub scripts
++        # are handled consistently and avoid leading underscores from
++        # symbol names (e.g. Dummy names like "_i_1").
++        i_tex = self._print(expr.i)
++        j_tex = self._print(expr.j)
++        if i_tex.startswith('_'):
++            i_tex = i_tex[1:]
++        if j_tex.startswith('_'):
++            j_tex = j_tex[1:]
++        return parent + '_{%s, %s}' % (i_tex, j_tex)
+ 
+     def _print_MatrixSlice(self, expr):
+         def latexslice(x):

@@ -1,0 +1,25 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index 43f9e6ad8d..59ed11bda7 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1968,10 +1968,19 @@ def _print_DiracDelta(self, expr, exp=None):
+             tex = r"\left(%s\right)^{%s}" % (tex, exp)
+         return tex
+ 
+-    def _print_SingularityFunction(self, expr):
++    def _print_SingularityFunction(self, expr, exp=None):
++        """
++        Print a SingularityFunction. Accept an optional exp argument so that
++        when a SingularityFunction appears as the base of a power the base
++        printer can be called with exp=... by _print_Pow. If exp is provided
++        wrap the produced LaTeX in parenthesized superscript using the same
++        convention as other function-like printers in this file.
++        """
+         shift = self._print(expr.args[0] - expr.args[1])
+         power = self._print(expr.args[2])
+         tex = r"{\left\langle %s \right\rangle}^{%s}" % (shift, power)
++        if exp:
++            tex = r"\left(%s\right)^{%s}" % (tex, exp)
+         return tex
+ 
+     def _print_Heaviside(self, expr, exp=None):

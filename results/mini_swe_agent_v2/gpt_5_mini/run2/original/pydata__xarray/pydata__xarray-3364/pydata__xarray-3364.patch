@@ -1,0 +1,52 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..0fce2560 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -1,5 +1,7 @@
+ import pandas as pd
+ 
++import numpy as np
++
+ from . import dtypes, utils
+ from .alignment import align
+ from .merge import _VALID_COMPAT, unique_variable
+@@ -314,10 +316,35 @@ def _dataset_concat(
+         for ds in datasets:
+             absent_merge_vars = variables_to_merge - set(ds.variables)
+             if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
++                # create missing variables filled with the appropriate
++                # fill_value (or dtype-specific NA) so that concat behaves
++                # more like pandas.concat and includes variables present in
++                # some datasets but not others.
++                for var in absent_merge_vars:
++                    # find a reference variable to get dims and attrs
++                    ref_var = None
++                    for other in datasets:
++                        if var in other.variables:
++                            ref_var = other.variables[var]
++                            break
++                    if ref_var is None:
++                        # should not happen, but skip defensively
++                        continue
++
++                    # determine fill value: if user supplied a fill_value
++                    # use it, otherwise get dtype-specific NA
++                    if fill_value is dtypes.NA:
++                        promoted_dtype, dtype_fill = dtypes.maybe_promote(
++                            ref_var.dtype
++                        )
++                        fv = dtype_fill
++                        arr = np.full(tuple(dims_sizes.get(d, 1) for d in ref_var.dims), fv, dtype=promoted_dtype)
++                    else:
++                        fv = fill_value
++                        arr = np.full(tuple(dims_sizes.get(d, 1) for d in ref_var.dims), fv)
++
++                    # create a Variable and assign it into the dataset
++                    ds.variables[var] = Variable(ref_var.dims, arr, attrs=ref_var.attrs)
+ 
+             for var in variables_to_merge:
+                 to_merge[var].append(ds.variables[var])

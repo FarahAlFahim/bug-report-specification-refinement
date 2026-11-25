@@ -1,0 +1,46 @@
+diff --git a/lib/matplotlib/__init__.py b/lib/matplotlib/__init__.py
+index b657a35cf7..82d8963f0b 100644
+--- a/lib/matplotlib/__init__.py
++++ b/lib/matplotlib/__init__.py
+@@ -131,7 +131,7 @@ __bibtex__ = r"""@Article{Hunter:2007,
+ 
+ 
+ def __getattr__(name):
+-    if name == "__version__":
++    if name in ("__version__", "version_info"):
+         import setuptools_scm
+         global __version__  # cache it.
+         # Only shell out to a git subprocess if really needed, and not on a
+@@ -147,7 +147,31 @@ def __getattr__(name):
+             )
+         else:  # Get the version from the _version.py setuptools_scm file.
+             __version__ = _version.version
+-        return __version__
++        if name == "__version__":
++            return __version__
++        # Compute version_info derived from __version__
++        global version_info
++        try:
++            pv = parse_version(__version__)
++            # packaging.version.Version has attribute .release which is a
++            # tuple of ints for regular versions.
++            rel = getattr(pv, 'release', None)
++            if rel:
++                version_info = tuple(rel)
++            else:
++                # Fallback: extract numeric components from the string
++                nums = tuple(int(x) for x in re.findall(r"\d+", __version__))
++                if nums:
++                    version_info = nums
++                else:
++                    version_info = (__version__,)
++        except Exception:
++            nums = tuple(int(x) for x in re.findall(r"\d+", __version__))
++            if nums:
++                version_info = nums
++            else:
++                version_info = (__version__,)
++        return version_info
+     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+ 
+ 

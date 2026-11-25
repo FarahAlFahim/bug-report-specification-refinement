@@ -1,0 +1,45 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..5564f758a0 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,39 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        """
++        Compile the wrapped expression, but handle sentinel values that are
++        meaningful in a WHERE context (for example WhereNode.as_sql may
++        return an empty SQL string to indicate a node that "matches
++        everything"). Those sentinels are not valid SQL fragments for use
++        in a SELECT clause. If an empty SQL string is returned, translate
++        it into an appropriate SQL literal based on the output_field
++        (for boolean fields, a TRUE literal).
++        """
++        sql, params = compiler.compile(self.expression)
++        # Some expression types (notably WhereNode) use an empty-string SQL
++        # as a sentinel meaning "matches everything". That sentinel is
++        # valid in WHERE contexts but not in SELECT lists. Convert that
++        # sentinel into a concrete SQL literal. For boolean output fields
++        # use a True value; otherwise fall back to the expression's
++        # empty_result_set_value behaviour.
++        if not sql:
++            # Prefer a boolean True literal when the wrapper represents a
++            # boolean result.
++            try:
++                output_field = self.output_field
++            except Exception:
++                output_field = None
++            if isinstance(output_field, fields.BooleanField):
++                return compiler.compile(Value(True, output_field=output_field))
++            empty_result_set_value = getattr(self, 'empty_result_set_value', NotImplemented)
++            if empty_result_set_value is NotImplemented:
++                # Mirror the compiler.get_select behaviour for EmptyResultSet
++                # by raising EmptyResultSet so the caller can apply its own
++                # fallback.
++                raise EmptyResultSet
++            return compiler.compile(Value(empty_result_set_value, output_field=output_field))
++        return sql, params
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

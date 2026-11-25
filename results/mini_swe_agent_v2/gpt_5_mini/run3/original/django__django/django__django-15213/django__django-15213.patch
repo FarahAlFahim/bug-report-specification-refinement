@@ -1,0 +1,34 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 8642e1f151..2d799e018b 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -979,7 +979,28 @@ class ExpressionWrapper(SQLiteNumericMixin, Expression):
+         return super().get_group_by_cols()
+ 
+     def as_sql(self, compiler, connection):
+-        return compiler.compile(self.expression)
++        # Compile the inner expression and normalize special cases.
++        sql, params = compiler.compile(self.expression)
++        # Some nodes signal an empty result set by returning None as SQL.
++        # Propagate that as EmptyResultSet so callers can handle it.
++        if sql is None:
++            from django.core.exceptions import EmptyResultSet
++            raise EmptyResultSet
++        # An empty string from a WHERE-like node means the expression
++        # matches everything (i.e. boolean True). For boolean annotation
++        # outputs, render as a literal 1 to avoid generating "SELECT AS ...".
++        if sql == '':
++            try:
++                is_boolean = isinstance(self.output_field, fields.BooleanField)
++            except FieldError:
++                is_boolean = False
++            if is_boolean:
++                return '1', ()
++        # Allow the inner expression to adjust its SELECT formatting if
++        # it provides select_format().
++        if hasattr(self.expression, 'select_format'):
++            sql, params = self.expression.select_format(compiler, sql, params)
++        return sql, params
+ 
+     def __repr__(self):
+         return "{}({})".format(self.__class__.__name__, self.expression)

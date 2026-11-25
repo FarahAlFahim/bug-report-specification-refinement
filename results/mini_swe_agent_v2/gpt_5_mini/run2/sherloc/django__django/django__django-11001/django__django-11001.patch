@@ -1,0 +1,52 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 7649c39262..ffb97bec71 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -32,7 +32,28 @@ class SQLCompiler:
+         self.select = None
+         self.annotation_col_map = None
+         self.klass_info = None
+-        self.ordering_parts = re.compile(r'(.*)\s(ASC|DESC)(.*)')
++        # Match an ordering clause and capture the expression without the
++        # trailing ASC/DESC. Use DOTALL so '.' matches newlines (ordering
++        # expressions can be multiline RawSQL) and IGNORECASE to match
++        # ASC/DESC in any case. Use word boundaries and require at least
++        # one whitespace before the direction to avoid accidental matches.
++        self.ordering_parts = re.compile(r'^(.*)\s+(ASC|DESC)\b(.*)$', re.IGNORECASE | re.DOTALL)
++
++    def _without_ordering(self, sql):
++        """
++        Return the ordering expression with any trailing ASC/DESC removed.
++
++        The previous implementation assumed the regex always matched and
++        used group(1) directly which is fragile for multiline SQL. This
++        helper is defensive: if the regex doesn't match, return the whole
++        SQL string unchanged. This value is used as a canonical key for
++        duplicate-detection, so it must reflect the full expression when
++        possible.
++        """
++        m = self.ordering_parts.search(sql)
++        if m:
++            return m.group(1)
++        return sql
+         self._meta_ordering = None
+ 
+     def setup_query(self):
+@@ -353,7 +374,7 @@ class SQLCompiler:
+             # not taken into account so we strip it. When this entire method
+             # is refactored into expressions, then we can check each part as we
+             # generate it.
+-            without_ordering = self.ordering_parts.search(sql).group(1)
++            without_ordering = self._without_ordering(sql)
+             params_hash = make_hashable(params)
+             if (without_ordering, params_hash) in seen:
+                 continue
+@@ -366,7 +387,7 @@ class SQLCompiler:
+         if self.query.distinct and not self.query.distinct_fields:
+             select_sql = [t[1] for t in select]
+             for expr, (sql, params, is_ref) in order_by:
+-                without_ordering = self.ordering_parts.search(sql).group(1)
++                without_ordering = self._without_ordering(sql)
+                 if not is_ref and (without_ordering, params) not in select_sql:
+                     extra_select.append((expr, (without_ordering, params), None))
+         return extra_select

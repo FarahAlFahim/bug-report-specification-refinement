@@ -1,0 +1,30 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 84960d77e1..2acecc5a8f 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -817,6 +817,25 @@ class Ref(Expression):
+         return self
+ 
+     def as_sql(self, compiler, connection):
++        # If this Ref references a Subquery (or Exists), emit the underlying
++        # subquery SQL for GROUP BY (and other) clauses instead of the
++        # quoted alias. Quoting the alias here can produce an unqualified
++        # identifier (for example "status") in GROUP BY which may be
++        # ambiguous if a joined table defines the same column name. By
++        # compiling the source expression we ensure the SQL emitted is the
++        # intended expression (e.g. the SELECT subquery) rather than a
++        # possibly ambiguous quoted alias.
++        try:
++            from django.db.models import expressions as _expressions_module  # pragma: no cover - defensive
++        except Exception:
++            _expressions_module = None
++
++        # Defer importing Subquery name lookup until runtime so the module
++        # initialization order does not matter.
++        Subquery = getattr(_expressions_module, 'Subquery', None)
++        if Subquery is not None and isinstance(self.source, Subquery):
++            return compiler.compile(self.source)
++
+         return connection.ops.quote_name(self.refs), []
+ 
+     def get_group_by_cols(self, alias=None):

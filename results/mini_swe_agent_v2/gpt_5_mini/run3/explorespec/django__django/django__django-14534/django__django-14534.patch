@@ -1,0 +1,24 @@
+diff --git a/django/forms/boundfield.py b/django/forms/boundfield.py
+index 2ff8b0ee26..7fec079f29 100644
+--- a/django/forms/boundfield.py
++++ b/django/forms/boundfield.py
+@@ -277,7 +277,18 @@ class BoundWidget:
+ 
+     @property
+     def id_for_label(self):
+-        return 'id_%s_%s' % (self.data['name'], self.data['index'])
++        # Prefer an explicit per-option id if provided by the widget's
++        # create_option (stored in the option dict's attrs). Fall back to
++        # the legacy reconstructed id for backwards compatibility.
++        attrs = self.data.get('attrs', {}) or {}
++        option_id = attrs.get('id')
++        if option_id:
++            return option_id
++        # Legacy behavior: reconstruct id from name and index.
++        try:
++            return 'id_%s_%s' % (self.data['name'], self.data['index'])
++        except Exception:
++            return None
+ 
+     @property
+     def choice_label(self):

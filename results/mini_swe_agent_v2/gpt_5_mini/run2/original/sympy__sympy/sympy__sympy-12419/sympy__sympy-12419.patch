@@ -1,0 +1,178 @@
+diff --git a/sympy/assumptions/sathandlers.py b/sympy/assumptions/sathandlers.py
+index 61d62d04c..966f0b34f 100644
+--- a/sympy/assumptions/sathandlers.py
++++ b/sympy/assumptions/sathandlers.py
+@@ -1,6 +1,11 @@
+ from __future__ import print_function, division
+ 
+-from collections import MutableMapping, defaultdict
++try:
++    # Python 3.3+: MutableMapping is in collections.abc
++    from collections.abc import MutableMapping
++except Exception:
++    from collections import MutableMapping
++from collections import defaultdict
+ 
+ from sympy.core import (Add, Mul, Pow, Integer, Number, NumberSymbol,)
+ from sympy.core.numbers import ImaginaryUnit
+diff --git a/sympy/concrete/summations.py b/sympy/concrete/summations.py
+index 372487664..df5bf46e8 100644
+--- a/sympy/concrete/summations.py
++++ b/sympy/concrete/summations.py
+@@ -12,6 +12,7 @@
+ from sympy.functions.special.zeta_functions import zeta
+ from sympy.functions.elementary.piecewise import Piecewise
+ from sympy.logic.boolalg import And
++from sympy.simplify import simplify
+ from sympy.polys import apart, PolynomialError
+ from sympy.solvers import solve
+ from sympy.series.limits import limit
+@@ -404,10 +405,46 @@ def is_convergent(self):
+ 
+         # Piecewise function handle
+         if sequence_term.is_Piecewise:
++            # Try to handle simple Piecewise conditions that are inequalities
++            # involving the summation variable (e.g. (0 <= i) & (i <= n - 1)).
++            from sympy.core.relational import Relational
++            from sympy.logic.boolalg import And
++            from sympy import Max, Min
++            results = []
+             for func_cond in sequence_term.args:
+-                if func_cond[1].func is Ge or func_cond[1].func is Gt or func_cond[1] == True:
+-                    return Sum(func_cond[0], (sym, lower_limit, upper_limit)).is_convergent()
+-            return S.true
++                expr_i, cond = func_cond
++                # If the condition is simply True, just sum the corresponding expr
++                if cond == True:
++                    results.append(summation(expr_i, (sym, lower_limit, upper_limit)))
++                    continue
++                # Handle simple conjunctions of inequalities like a <= sym <= b
++                if cond.func is And:
++                    rels = [r for r in cond.args if isinstance(r, Relational)]
++                    if len(rels) >= 1:
++                        # try to find lower and upper bounds on sym
++                        low = lower_limit
++                        high = upper_limit
++                        for r in rels:
++                            if r.lhs == sym:
++                                # sym <op> rhs
++                                if r.rel_op in ('<=', '<'):
++                                    high = Min(high, r.rhs)
++                                elif r.rel_op in ('>=', '>'):
++                                    low = Max(low, r.rhs)
++                            if r.rhs == sym:
++                                # lhs <op> sym
++                                if r.rel_op in ('<=', '<'):
++                                    low = Max(low, r.lhs)
++                                elif r.rel_op in ('>=', '>'):
++                                    high = Min(high, r.lhs)
++                        # count of integer points between low and high (inclusive)
++                        count = simplify(high - low + 1)
++                        results.append(expr_i * count)
++                        continue
++                # fallback: give up trying to analyze piecewise parts
++                return S.true
++            # combine results (they should be additive and non-overlapping)
++            return simplify(Add(*results))
+ 
+         ###  -------- Divergence test ----------- ###
+         try:
+@@ -876,7 +913,43 @@ def eval_sum(f, limits):
+     if definite and (dif < 100):
+         return eval_sum_direct(f, (i, a, b))
+     if isinstance(f, Piecewise):
+-        return None
++        # Try to handle Piecewise whose conditions depend on the summation
++        # variable and are simple inequalities (e.g. (0 <= i) & (i <= n-1)).
++        from sympy.core.relational import Relational
++        from sympy.logic.boolalg import And
++        from sympy import Max, Min
++        results = []
++        (i, a, b) = limits
++        for expr_i, cond in f.args:
++            if cond == True:
++                res = eval_sum(expr_i, limits)
++                if res is None:
++                    return None
++                results.append(res)
++                continue
++            # Handle conjunctions of relational inequalities
++            if cond.func is And:
++                rels = [r for r in cond.args if isinstance(r, Relational)]
++                if rels:
++                    low = a
++                    high = b
++                    for r in rels:
++                        if r.lhs == i:
++                            if r.rel_op in ('<=', '<'):
++                                high = Min(high, r.rhs)
++                            elif r.rel_op in ('>=', '>'):
++                                low = Max(low, r.rhs)
++                        if r.rhs == i:
++                            if r.rel_op in ('<=', '<'):
++                                low = Max(low, r.lhs)
++                            elif r.rel_op in ('>=', '>'):
++                                high = Min(high, r.lhs)
++                    count = simplify(high - low + 1)
++                    results.append(expr_i * count)
++                    continue
++            # give up if we can't analyze
++            return None
++        return simplify(Add(*results))
+     # Try to do it symbolically. Even when the number of terms is known,
+     # this can save time when b-a is big.
+     # We should try to transform to partial fractions
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index b992b45c2..1a198b9f0 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,10 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    # Python 3.3+: Mapping is in collections.abc
++    from collections.abc import Mapping
++except Exception:
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..dab191e67 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -476,10 +476,14 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
++        # When indices are concrete and equal return 1, otherwise return a
++        # KroneckerDelta so that symbolic indices (e.g. Sum over i, j) are
++        # handled correctly.  Returning S.Zero for symbolic unequal indices
++        # causes sums over the identity to collapse to 0.
++        from sympy import KroneckerDelta
+         if i == j:
+             return S.One
+-        else:
+-            return S.Zero
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index 664602d6b..82aa2163d 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,11 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    # Python 3.3+: Callable is in collections.abc
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 

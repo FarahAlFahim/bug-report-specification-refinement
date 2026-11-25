@@ -1,0 +1,25 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..33a12fda32 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -31,6 +31,20 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
++
++    # Only accept the solution if it exactly represents the dimensional
++    # dependencies of the expression in terms of the target units. Using a
++    # least-squares solution can produce spurious fractional exponents when
++    # the target units do not span the expression's dimensions (see PR
++    # description). In that case return None to indicate conversion is not
++    # possible in the requested target units.
++    prod = camat * res_exponents
++    # Check every entry matches exactly; do not accept approximate/least-
++    # squares solutions that do not satisfy camat * x == exprmat.
++    diff = prod - exprmat
++    if any(di != 0 for di in diff):
++        return None
++
+     return res_exponents
+ 
+ 

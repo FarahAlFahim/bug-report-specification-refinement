@@ -1,0 +1,21 @@
+--- a/pylint/checkers/misc.py
++++ b/pylint/checkers/misc.py
+@@ -120,10 +120,16 @@
+         super().open()
+ 
+         notes = "|".join(re.escape(note) for note in self.config.notes)
++        # Use a negative lookahead to ensure the note tag is not followed by
++        # a word character. Historically we used a word boundary (\b) which
++        # fails to match tags that consist entirely of punctuation (for
++        # example "???"). Using (?!\w) preserves the intent of ensuring
++        # the tag isn't immediately followed by identifier characters while
++        # still matching punctuation-only tags.
+         if self.config.notes_rgx:
+-            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})\b"
++            regex_string = rf"#\s*({notes}|{self.config.notes_rgx})(?!\w)"
+         else:
+-            regex_string = rf"#\s*({notes})\b"
++            regex_string = rf"#\s*({notes})(?!\w)"
+ 
+         self._fixme_pattern = re.compile(regex_string, re.I)
+ 

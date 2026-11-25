@@ -1,0 +1,25 @@
+diff --git a/django/core/files/storage.py b/django/core/files/storage.py
+index cbdab1de47..65199bc2eb 100644
+--- a/django/core/files/storage.py
++++ b/django/core/files/storage.py
+@@ -280,8 +280,18 @@ class FileSystemStorage(Storage):
+                 # OK, the file save worked. Break out of the loop.
+                 break
+ 
+-        if self.file_permissions_mode is not None:
+-            os.chmod(full_path, self.file_permissions_mode)
++        # Apply file permissions. Historically, when FILE_UPLOAD_PERMISSIONS
++        # was left unset (None) no chmod was performed which meant files
++        # moved from temporary files could keep restrictive tempfile modes
++        # (e.g. 0o600) while files created by this storage were created with
++        # 0o666 masked by the umask. To ensure consistent permissions for
++        # uploaded files regardless of how they were written, apply an
++        # explicit default of 0o644 when no FILE_UPLOAD_PERMISSIONS value is
++        # configured. The file_permissions_mode attribute itself continues
++        # to reflect the configured setting (or None) so tests and callers
++        # inspecting that attribute are unaffected.
++        mode = self.file_permissions_mode if self.file_permissions_mode is not None else 0o644
++        os.chmod(full_path, mode)
+ 
+         # Store filenames with forward slashes, even on Windows.
+         return name.replace('\\', '/')

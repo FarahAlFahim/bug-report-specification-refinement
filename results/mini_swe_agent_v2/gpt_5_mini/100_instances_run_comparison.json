@@ -1,0 +1,2128 @@
+{
+  "description": "Resolved-at-1 pass/fail comparison for the fixed stratified random 100-instance SWE-bench Lite subset.",
+  "instance_count": 100,
+  "source_notes": [
+    "All repositories use <run_root>/<repo>_tests/combined_eval_summary.json.",
+    "Run1 Astropy sherloc and explorespec use astropy__astropy_tests1/combined_eval_summary.json; Run1 Astropy original remains from astropy__astropy_tests/combined_eval_summary.json.",
+    "Values are derived from variants_resolved_comparison, which records resolved_at_1 per instance."
+  ],
+  "aggregate_pass_counts": {
+    "run1": {
+      "original": 44,
+      "sherloc": 55,
+      "explorespec": 75
+    },
+    "run2": {
+      "original": 45,
+      "sherloc": 54,
+      "explorespec": 76
+    },
+    "run3": {
+      "original": 48,
+      "sherloc": 53,
+      "explorespec": 76
+    }
+  },
+  "instances": [
+    {
+      "instance_id": "astropy__astropy-12907",
+      "repository": "astropy__astropy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "astropy__astropy-14182",
+      "repository": "astropy__astropy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "astropy__astropy-14365",
+      "repository": "astropy__astropy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-10914",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11001",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11099",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11179",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11422",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11620",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11742",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11905",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-11999",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-12113",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-12284",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-12308",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-12497",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-12589",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-12747",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-12908",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-13028",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-13033",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-13230",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-13321",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-13658",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-13768",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14155",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14382",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14534",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14608",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14667",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14672",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14730",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14787",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14915",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-14997",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-15061",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-15213",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-15320",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-15400",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-15781",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "django__django-17087",
+      "repository": "django__django",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-18869",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-23913",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-25311",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-25332",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-25433",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-25498",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-26011",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "matplotlib__matplotlib-26020",
+      "repository": "matplotlib__matplotlib",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "mwaskom__seaborn-2848",
+      "repository": "mwaskom__seaborn",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "mwaskom__seaborn-3010",
+      "repository": "mwaskom__seaborn",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "psf__requests-1963",
+      "repository": "psf__requests",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "psf__requests-2148",
+      "repository": "psf__requests",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "pydata__xarray-3364",
+      "repository": "pydata__xarray",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "pydata__xarray-5131",
+      "repository": "pydata__xarray",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "pylint-dev__pylint-5859",
+      "repository": "pylint-dev__pylint",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "pylint-dev__pylint-6506",
+      "repository": "pylint-dev__pylint",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5103",
+      "repository": "pytest-dev__pytest",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "pytest-dev__pytest-5221",
+      "repository": "pytest-dev__pytest",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7373",
+      "repository": "pytest-dev__pytest",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "pytest-dev__pytest-7432",
+      "repository": "pytest-dev__pytest",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "pytest-dev__pytest-11143",
+      "repository": "pytest-dev__pytest",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-10297",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-10508",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-10949",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-11281",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-13241",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-14983",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-15512",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "scikit-learn__scikit-learn-25570",
+      "repository": "scikit-learn__scikit-learn",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-7686",
+      "repository": "sphinx-doc__sphinx",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-7975",
+      "repository": "sphinx-doc__sphinx",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-8595",
+      "repository": "sphinx-doc__sphinx",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-8801",
+      "repository": "sphinx-doc__sphinx",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sphinx-doc__sphinx-10325",
+      "repository": "sphinx-doc__sphinx",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-11400",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-12419",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-13177",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-13437",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-13480",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-13647",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-13971",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-14774",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-14817",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-15308",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-15345",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-15609",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-15678",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-17655",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-18057",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-19487",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-20442",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-21171",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-21614",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-21847",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-22005",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-22714",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        },
+        "run2": {
+          "original": false,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-23262",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-24213",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run2": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        },
+        "run3": {
+          "original": true,
+          "sherloc": true,
+          "explorespec": true
+        }
+      }
+    },
+    {
+      "instance_id": "sympy__sympy-24909",
+      "repository": "sympy__sympy",
+      "runs": {
+        "run1": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run2": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        },
+        "run3": {
+          "original": false,
+          "sherloc": false,
+          "explorespec": false
+        }
+      }
+    }
+  ]
+}

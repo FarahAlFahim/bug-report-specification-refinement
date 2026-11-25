@@ -1,0 +1,22 @@
+diff --git a/sympy/core/expr.py b/sympy/core/expr.py
+index 24d89897f7..e5397b3ce9 100644
+--- a/sympy/core/expr.py
++++ b/sympy/core/expr.py
+@@ -121,7 +121,16 @@ def _hashable_content(self):
+ 
+     def __eq__(self, other):
+         try:
+-            other = sympify(other)
++            # Use the more strict _sympify here to avoid attempting to
++            # parse/evaluate arbitrary object __repr__ strings. In
++            # particular, calling sympify on an object whose repr looks
++            # like a Python expression (e.g. "x.y") can trigger eval()
++            # during parsing which is unsafe and surprising for an
++            # equality check. _sympify(strict=True) will not accept
++            # strings, so objects with potentially dangerous reprs will
++            # simply fail to sympify and the comparison will return
++            # False.
++            other = _sympify(other)
+             if not isinstance(other, Expr):
+                 return False
+         except (SympifyError, SyntaxError):

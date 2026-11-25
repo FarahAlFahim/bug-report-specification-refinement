@@ -1,0 +1,38 @@
+diff --git a/django/contrib/postgres/forms/array.py b/django/contrib/postgres/forms/array.py
+index 2e19cd574a..66b7fdeee2 100644
+--- a/django/contrib/postgres/forms/array.py
++++ b/django/contrib/postgres/forms/array.py
+@@ -125,9 +125,13 @@ class SplitArrayWidget(forms.Widget):
+         )
+ 
+     def id_for_label(self, id_):
+-        # See the comment for RadioSelect.id_for_label()
++        # For widgets that render multiple input elements, we don't want the
++        # wrapping <label> to point at a single subwidget (which would be the
++        # first one). Returning an empty string signals BoundField.label_tag
++        # to omit the for="..." attribute, mirroring RadioSelect's behavior
++        # which improves accessibility for multi-element widgets.
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def get_context(self, name, value, attrs=None):
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..338fe4ec32 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -849,8 +849,12 @@ class MultiWidget(Widget):
+         return context
+ 
+     def id_for_label(self, id_):
++        # For widgets composed of multiple inputs, do not point the wrapper
++        # <label> at a single subwidget (the first). Return an empty string to
++        # signal that BoundField.label_tag should omit the for attribute,
++        # matching RadioSelect's accessibility-oriented behavior.
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def value_from_datadict(self, data, files, name):

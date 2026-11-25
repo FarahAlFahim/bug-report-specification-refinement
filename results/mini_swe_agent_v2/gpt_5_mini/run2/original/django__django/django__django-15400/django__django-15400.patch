@@ -1,0 +1,21 @@
+diff --git a/django/utils/functional.py b/django/utils/functional.py
+index 9e1be0fe0f..1b28f5c46f 100644
+--- a/django/utils/functional.py
++++ b/django/utils/functional.py
+@@ -373,6 +373,16 @@ class LazyObject:
+     __len__ = new_method_proxy(len)
+     __contains__ = new_method_proxy(operator.contains)
+ 
++    def __radd__(self, other):
++        """
++        Support right-hand addition for lazy objects. Ensure the wrapped
++        object is initialized and perform the addition with the wrapped
++        object on the right-hand side.
++        """
++        if self._wrapped is empty:
++            self._setup()
++        return other + self._wrapped
++
+ 
+ def unpickle_lazyobject(wrapped):
+     """

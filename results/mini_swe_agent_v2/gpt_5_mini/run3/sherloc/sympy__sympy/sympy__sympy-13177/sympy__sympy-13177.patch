@@ -1,0 +1,21 @@
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..f7d47210ec 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -38,8 +38,15 @@ def doit(p, q):
+ 
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
++            # Note: the simplification a**n % a == 0 only holds in the
++            # algebraic/integer divisibility sense. It is not valid for
++            # non-integer numeric bases (Floats or non-integer Rationals),
++            # where the numeric remainder must be computed. Only apply the
++            # short-circuit when the modulus q is not a Number (symbolic)
++            # or when q is an exact integer.
++            pow_case = (p.is_Pow and p.exp.is_Integer and p.base == q)
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    (pow_case and (not q.is_Number or q.is_integer is True)) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

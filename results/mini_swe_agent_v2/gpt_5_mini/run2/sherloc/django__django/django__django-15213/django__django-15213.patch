@@ -1,0 +1,33 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 69a2d9298f..f13d154a5a 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -280,6 +280,15 @@ class SQLCompiler:
+                 else:
+                     sql, params = self.compile(Value(empty_result_set_value))
+             else:
++                # Some expressions (for example, a WhereNode that represents
++                # a predicate that always matches) compile to an empty SQL
++                # string ('') to signal "matches everything". In the
++                # context of a SELECT/annotation this must be rendered as a
++                # valid SQL expression. Substitute a portable always-true
++                # literal in that case ("1") before applying
++                # select_format().
++                if sql == '':
++                    sql, params = '1', ()
+                 sql, params = col.select_format(self, sql, params)
+             ret.append((col, (sql, params), alias))
+         return ret, klass_info, annotations
+@@ -1663,6 +1672,12 @@ class SQLAggregateCompiler(SQLCompiler):
+         sql, params = [], []
+         for annotation in self.query.annotation_select.values():
+             ann_sql, ann_params = self.compile(annotation)
++            # As in get_select(), a compiled annotation may return an empty
++            # SQL string to indicate a predicate that always matches. In
++            # an annotation context we must render a valid SQL expression,
++            # so substitute a portable always-true literal ("1").
++            if ann_sql == '':
++                ann_sql, ann_params = '1', ()
+             ann_sql, ann_params = annotation.select_format(self, ann_sql, ann_params)
+             sql.append(ann_sql)
+             params.extend(ann_params)

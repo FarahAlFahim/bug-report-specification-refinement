@@ -1,0 +1,21 @@
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..9ca85e9d65 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -848,10 +848,12 @@ class MultiWidget(Widget):
+         context['widget']['subwidgets'] = subwidgets
+         return context
+ 
+-    def id_for_label(self, id_):
+-        if id_:
+-            id_ += '_0'
+-        return id_
++    # Use the base Widget.id_for_label implementation. MultiWidget previously
++    # overrode id_for_label to append "_0" to the given id, which caused the
++    # generated label's for attribute to point to the first subwidget (e.g.
++    # "id_0"). This is unnecessary and inconsistent with ChoiceWidget's
++    # handling (which exposes add_id_index), so rely on the default
++    # Widget.id_for_label behaviour instead.
+ 
+     def value_from_datadict(self, data, files, name):
+         return [

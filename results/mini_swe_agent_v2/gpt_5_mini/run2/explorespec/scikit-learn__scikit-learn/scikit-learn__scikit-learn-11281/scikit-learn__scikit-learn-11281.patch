@@ -1,0 +1,74 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..830b7435c 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -240,8 +240,41 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # Persist training set labels (cluster assignments) for API
++        # compatibility with clusterer estimators (e.g., KMeans).
++        # labels_ is the argmax of the posterior responsibilities.
++        try:
++            # _estimate_weighted_log_prob expects the model to be in a valid
++            # fitted state (parameters set above). Use X as provided.
++            self.labels_ = self._estimate_weighted_log_prob(X).argmax(axis=1)
++        except Exception:
++            # In the unlikely event labels cannot be computed, ensure we do
++            # not fail the fit: do not set labels_. This mirrors a best-effort
++            # approach and keeps backward compatibility.
++            if hasattr(self, "labels_"):
++                delattr(self, "labels_")
++
+         return self
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the model to X and return the component labels for X.
++
++        This is a convenience method for compatibility with clusterer
++        estimators which provide fit_predict.
++        """
++        self.fit(X)
++        return getattr(self, "labels_", self.predict(X))
++
++    @property
++    def n_clusters(self):
++        """Alias for ``n_components`` to match clusterer estimator
++        convention.
++
++        This is a read-only property reflecting the number of mixture
++        components.
++        """
++        return self.n_components
++
+     def _e_step(self, X):
+         """E step.
+ 
+diff --git a/sklearn/mixture/bayesian_mixture.py b/sklearn/mixture/bayesian_mixture.py
+index aef6828fa..9b0337b16 100644
+--- a/sklearn/mixture/bayesian_mixture.py
++++ b/sklearn/mixture/bayesian_mixture.py
+@@ -186,6 +186,9 @@ class BayesianGaussianMixture(BaseMixture):
+ 
+     Attributes
+     ----------
++    labels_ : array, shape (n_samples,)
++        Component labels for the training data. Set after calling ``fit``.
++
+     weights_ : array-like, shape (n_components,)
+         The weights of each mixture components.
+ 
+diff --git a/sklearn/mixture/gaussian_mixture.py b/sklearn/mixture/gaussian_mixture.py
+index d58a9e326..3ab5056a5 100644
+--- a/sklearn/mixture/gaussian_mixture.py
++++ b/sklearn/mixture/gaussian_mixture.py
+@@ -522,6 +522,9 @@ class GaussianMixture(BaseMixture):
+ 
+     Attributes
+     ----------
++    labels_ : array, shape (n_samples,)
++        Component labels for the training data. Set after calling ``fit``.
++
+     weights_ : array-like, shape (n_components,)
+         The weights of each mixture components.
+ 

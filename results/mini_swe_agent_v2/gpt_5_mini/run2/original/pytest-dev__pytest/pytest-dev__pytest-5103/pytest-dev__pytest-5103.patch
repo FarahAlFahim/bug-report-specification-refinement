@@ -1,0 +1,111 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..4b258028e 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -986,6 +986,60 @@ warn_explicit(
+ 
+         expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
+         new_call = ast.Call(new_func, new_args, new_kwargs)
++
++        # Special-case: unroll calls like all(...) and any(...) when the
++        # single argument is a generator expression or a list comprehension.
++        if (
++            isinstance(call.func, ast.Name)
++            and getattr(call.func, 'id', None) in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            gen = call.args[0]
++            name = call.func.id
++
++            # result variable
++            res_name = self.variable()
++            init_val = ast.NameConstant(True if name == "all" else False)
++            self.statements.append(ast.Assign([ast.Name(res_name, ast.Store())], init_val))
++
++            # variable to store the interesting element (failing for all,
++            # successful for any)
++            elem_name = self.variable()
++
++            # Build inner body: evaluate the element expression into elem_name,
++            # check condition and set result/break accordingly.
++            assign_elem = ast.Assign([ast.Name(elem_name, ast.Store())], gen.elt)
++            body = [assign_elem]
++
++            if name == "all":
++                cond = ast.UnaryOp(ast.Not(), ast.Name(elem_name, ast.Load()))
++                set_res = ast.Assign([ast.Name(res_name, ast.Store())], ast.NameConstant(False))
++                body.extend([ast.If(cond, [set_res, ast.Break()], [])])
++            else:  # any
++                cond = ast.Name(elem_name, ast.Load())
++                set_res = ast.Assign([ast.Name(res_name, ast.Store())], ast.NameConstant(True))
++                body.extend([ast.If(cond, [set_res, ast.Break()], [])])
++
++            # Build nested loops for comprehensions (support multiple generators)
++            inner = body
++            for comp in reversed(gen.generators):
++                loop_body = inner
++                if comp.ifs:
++                    test = comp.ifs[0]
++                    for extra in comp.ifs[1:]:
++                        test = ast.BoolOp(ast.And(), [test, extra])
++                    loop_body = [ast.If(test, loop_body, [])]
++                inner = [ast.For(comp.target, comp.iter, loop_body, [])]
++
++            self.statements.extend(inner)
++
++            res = ast.Name(res_name, ast.Load())
++            expl_placeholder = self.explanation_param(self.display(res))
++            outer_expl = "(%s)" % expl_placeholder
++            return res, outer_expl
++
+         res = self.assign(new_call)
+         res_expl = self.explanation_param(self.display(res))
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)
+@@ -1022,6 +1076,45 @@ warn_explicit(
+             arg_expls.append("**" + expl)
+         expl = "%s(%s)" % (func_expl, ", ".join(arg_expls))
+         new_call = ast.Call(new_func, new_args, new_kwargs, new_star, new_kwarg)
++
++        if (
++            isinstance(call.func, ast.Name)
++            and getattr(call.func, 'id', None) in ("all", "any")
++            and len(call.args) == 1
++            and not call.keywords
++            and isinstance(call.args[0], (ast.GeneratorExp, ast.ListComp))
++        ):
++            gen = call.args[0]
++            name = call.func.id
++            res_name = self.variable()
++            init_val = ast.NameConstant(True if name == "all" else False)
++            self.statements.append(ast.Assign([ast.Name(res_name, ast.Store())], init_val))
++            elem_name = self.variable()
++            assign_elem = ast.Assign([ast.Name(elem_name, ast.Store())], gen.elt)
++            body = [assign_elem]
++            if name == "all":
++                cond = ast.UnaryOp(ast.Not(), ast.Name(elem_name, ast.Load()))
++                set_res = ast.Assign([ast.Name(res_name, ast.Store())], ast.NameConstant(False))
++                body.extend([ast.If(cond, [set_res, ast.Break()], [])])
++            else:
++                cond = ast.Name(elem_name, ast.Load())
++                set_res = ast.Assign([ast.Name(res_name, ast.Store())], ast.NameConstant(True))
++                body.extend([ast.If(cond, [set_res, ast.Break()], [])])
++            inner = body
++            for comp in reversed(gen.generators):
++                loop_body = inner
++                if comp.ifs:
++                    test = comp.ifs[0]
++                    for extra in comp.ifs[1:]:
++                        test = ast.BoolOp(ast.And(), [test, extra])
++                    loop_body = [ast.If(test, loop_body, [])]
++                inner = [ast.For(comp.target, comp.iter, loop_body, [])]
++            self.statements.extend(inner)
++            res = ast.Name(res_name, ast.Load())
++            expl_placeholder = self.explanation_param(self.display(res))
++            outer_expl = "(%s)" % expl_placeholder
++            return res, outer_expl
++
+         res = self.assign(new_call)
+         res_expl = self.explanation_param(self.display(res))
+         outer_expl = "%s\n{%s = %s\n}" % (res_expl, res_expl, expl)

@@ -1,0 +1,36 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..1cff872a9e 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -821,13 +821,29 @@ def _print_BlockMatrix(self, B):
+     def _print_MatAdd(self, expr):
+         s = None
+         for item in expr.args:
++            # Compute pretty form once
+             pform = self._print(item)
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine sign from the term's leading coefficient rather
++                # than from sympifying internal name strings which may be
++                # arbitrary (and not valid Python expressions). Use
++                # as_coeff_mmul to extract the scalar coefficient when
++                # present and _coeff_isneg to check negativity. This avoids
++                # calling S(...) on MatrixSymbol names and is consistent
++                # with how other printers determine negative terms.
++                try:
++                    coeff, _mm = item.as_coeff_mmul()
++                except Exception:
++                    coeff = None
++
++                neg = False
++                if coeff is not None:
++                    neg = _coeff_isneg(coeff)
++
++                if neg:
+                     s = prettyForm(*stringPict.next(s, ' '))
+-                    pform = self._print(item)
+                 else:
+                     s = prettyForm(*stringPict.next(s, ' + '))
+                 s = prettyForm(*stringPict.next(s, pform))

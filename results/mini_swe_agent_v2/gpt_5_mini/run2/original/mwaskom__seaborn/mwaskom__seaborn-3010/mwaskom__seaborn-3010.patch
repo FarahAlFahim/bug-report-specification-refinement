@@ -1,0 +1,26 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..3f215a5b 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -23,10 +23,20 @@ class PolyFit(Stat):
+ 
+         x = data["x"]
+         y = data["y"]
+-        if x.nunique() <= self.order:
++        # Drop missing values so numerical routines do not receive NaNs
++        mask = x.notna() & y.notna()
++        x = x[mask]
++        y = y[mask]
++
++        # If there are not enough unique x-values to fit the desired order,
++        # return an empty frame.
++        if x.nunique() <= self.order or len(x) == 0:
+             # TODO warn?
+             xx = yy = []
+         else:
++            # Use numpy.polyfit on the cleaned data. polyfit can still raise
++            # if the input is degenerate; allow that to propagate as it's an
++            # unexpected numerical failure.
+             p = np.polyfit(x, y, self.order)
+             xx = np.linspace(x.min(), x.max(), self.gridsize)
+             yy = np.polyval(p, xx)

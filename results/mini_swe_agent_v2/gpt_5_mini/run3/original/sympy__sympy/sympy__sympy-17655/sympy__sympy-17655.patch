@@ -1,0 +1,35 @@
+diff --git a/sympy/geometry/point.py b/sympy/geometry/point.py
+index 7c978c47be..c2d75992ff 100644
+--- a/sympy/geometry/point.py
++++ b/sympy/geometry/point.py
+@@ -32,6 +32,7 @@
+ from sympy.core.numbers import Float
+ from sympy.core.evaluate import global_evaluate
+ from sympy.core.add import Add
++from sympy.core.mul import Mul
+ from sympy.utilities.iterables import uniq
+ from sympy.utilities.misc import filldedent, func_name, Undecidable
+ 
+@@ -214,6 +215,22 @@ def __add__(self, other):
+ 
+         """
+         try:
++            # Handle cases where a scalar (or general Mul) is on the left of
++            # a Point, resulting in a Mul like `2*Point(1, 1)`. In that case
++            # try to extract the Point factor and convert the Mul into a
++            # proper Point by applying the scalar to the Point using the
++            # Point.__mul__ implementation. This ensures expressions like
++            # `point + 2*point2` and `point + sympify(2.0)*point2` work
++            # consistently regardless of operand order.
++            if isinstance(other, Mul):
++                # find Point factors in the product
++                point_factors = [a for a in other.args if isinstance(a, Point)]
++                if len(point_factors) == 1:
++                    point_factor = point_factors[0]
++                    scalar = Mul(*[a for a in other.args if a is not point_factor])
++                    # produce a Point by scaling the found Point
++                    other = point_factor * scalar
++
+             s, o = Point._normalize_dimension(self, Point(other, evaluate=False))
+         except TypeError:
+             raise GeometryError("Don't know how to add {} and a Point object".format(other))

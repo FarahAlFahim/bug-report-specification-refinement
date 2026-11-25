@@ -1,0 +1,34 @@
+diff --git a/django/dispatch/dispatcher.py b/django/dispatch/dispatcher.py
+index b7d9d26389..e65a6a5406 100644
+--- a/django/dispatch/dispatcher.py
++++ b/django/dispatch/dispatcher.py
+@@ -1,6 +1,7 @@
+ import threading
+ import warnings
+ import weakref
++import logging
+ 
+ from django.utils.deprecation import RemovedInDjango40Warning
+ from django.utils.inspect import func_accepts_kwargs
+@@ -203,11 +204,21 @@ class Signal:
+ 
+         # Call each receiver with whatever arguments it can accept.
+         # Return a list of tuple pairs [(receiver, response), ... ].
++        logger = logging.getLogger('django.dispatch')
++
+         responses = []
+         for receiver in self._live_receivers(sender):
+             try:
+                 response = receiver(signal=self, sender=sender, **named)
+             except Exception as err:
++                # Log exceptions from receivers so they are visible in
++                # logging/error-reporting systems (e.g. Sentry). The
++                # exception is still returned as the response for that
++                # receiver to preserve the original send_robust behaviour.
++                logger.exception(
++                    'Exception while calling signal %r receiver %r (sender: %r)',
++                    self, receiver, sender,
++                )
+                 responses.append((receiver, err))
+             else:
+                 responses.append((receiver, response))

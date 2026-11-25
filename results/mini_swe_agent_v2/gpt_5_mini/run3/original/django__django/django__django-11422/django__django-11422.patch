@@ -1,0 +1,29 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..7757195935 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -123,6 +123,24 @@ def iter_modules_and_files(modules, extra_files):
+             origin = spec.loader.archive if isinstance(spec.loader, zipimporter) else spec.origin
+             sys_file_paths.append(origin)
+ 
++    # If the process was started with a script (for example ``manage.py``),
++    # include that script in the watched files. ``sys.modules`` doesn't
++    # contain the top-level script file, so ensure it's observed so changes
++    # to manage.py (or other entry-point scripts) trigger a reload.
++    try:
++        argv0 = sys.argv[0]
++    except Exception:
++        argv0 = None
++    if argv0:
++        try:
++            argv0_path = pathlib.Path(argv0)
++            # Only include if it refers to an existing file on disk.
++            if argv0_path.exists() and argv0_path.is_file():
++                sys_file_paths.append(str(argv0_path))
++        except Exception:
++            # Be conservative: if any error occurs, don't fail the reloader.
++            pass
++
+     results = set()
+     for filename in itertools.chain(sys_file_paths, extra_files):
+         if not filename:

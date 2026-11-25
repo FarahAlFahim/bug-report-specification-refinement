@@ -1,0 +1,35 @@
+diff --git a/django/utils/autoreload.py b/django/utils/autoreload.py
+index 7ca0d68fae..ae0ab93b24 100644
+--- a/django/utils/autoreload.py
++++ b/django/utils/autoreload.py
+@@ -580,6 +580,30 @@ def run_with_reloader(main_func, *args, **kwargs):
+         if os.environ.get(DJANGO_AUTORELOAD_ENV) == 'true':
+             reloader = get_reloader()
+             logger.info('Watching for file changes with %s', reloader.__class__.__name__)
++            # Ensure the calling script (e.g. manage.py) is watched. If the
++            # process was started with `python manage.py runserver`, sys.argv[0]
++            # points to the script file which is not present in sys.modules
++            # (it's executed as __main__). Add it explicitly to extra files so
++            # the StatReloader picks up changes to it.
++            try:
++                import django.__main__ as _django_main
++                script = Path(sys.argv[0])
++                if script.exists():
++                    try:
++                        script_path = script.resolve().absolute()
++                    except Exception:
++                        script_path = script.absolute()
++                    try:
++                        main_path = Path(_django_main.__file__).resolve().absolute()
++                    except Exception:
++                        main_path = None
++                    if main_path is None or script_path != main_path:
++                        try:
++                            reloader.watch_file(script_path)
++                        except Exception:
++                            pass
++            except Exception:
++                pass
+             start_django(reloader, main_func, *args, **kwargs)
+         else:
+             exit_code = restart_with_reloader()

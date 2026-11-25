@@ -1,0 +1,41 @@
+diff --git a/lib/matplotlib/offsetbox.py b/lib/matplotlib/offsetbox.py
+index 1dee8a23d9..eea3be6fef 100644
+--- a/lib/matplotlib/offsetbox.py
++++ b/lib/matplotlib/offsetbox.py
+@@ -1514,6 +1514,36 @@ class DraggableBase:
+                 'button_release_event', self.on_release),
+         ]
+ 
++    def __getstate__(self):
++        """Return state for pickling, stripping unpicklable runtime state.
++
++        The canvas and callback ids are runtime-specific and may hold
++        references to backend objects (e.g. FigureCanvasQTAgg) which are
++        not picklable.  Drop them from the saved state so that the
++        parent artist (e.g., the Legend) can be pickled with the figure.
++        """
++        d = self.__dict__.copy()
++        # canvas holds a backend-specific object that is not picklable;
++        # remove it.  Callbacks ids and temporary state are runtime only.
++        for key in ("canvas", "cids", "_c1", "background"):
++            if key in d:
++                d[key] = None
++        # do not try to pickle bound methods or other transient state
++        d["got_artist"] = False
++        d["_use_blit"] = False
++        return d
++
++    def __setstate__(self, state):
++        # Rehydrate minimal state; the runtime-specific connections will
++        # be re-established if the user calls set_draggable again.
++        self.__dict__ = state
++        # Ensure these attributes exist even if they weren't in the state
++        if getattr(self, "cids", None) is None:
++            self.cids = []
++        if getattr(self, "canvas", None) is None:
++            self.canvas = None
++        self.got_artist = False
++
+     def on_motion(self, evt):
+         if self._check_still_parented() and self.got_artist:
+             dx = evt.x - self.mouse_x

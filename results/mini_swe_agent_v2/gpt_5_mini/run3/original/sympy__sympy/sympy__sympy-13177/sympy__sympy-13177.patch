@@ -1,0 +1,29 @@
+commit 40e2bf93bee88d774b7783cef89696eb8ce0801b
+Author: Test <test@example.com>
+Date:   Thu Nov 12 05:18:55 2026 +0000
+
+    Respect q integerness when simplifying p.is_Pow with base==q in Mod.eval to avoid incorrect zero for non-integer divisors
+
+diff --git a/sympy/core/mod.py b/sympy/core/mod.py
+index 11c800704b..52cf8fb6ff 100644
+--- a/sympy/core/mod.py
++++ b/sympy/core/mod.py
+@@ -38,8 +38,17 @@ def doit(p, q):
+ 
+             if p.is_infinite or q.is_infinite or p is nan or q is nan:
+                 return nan
++            # If p is exactly q (or -q) then remainder is 0.  Also, if p is a
++            # perfect power of q with integer exponent (p = q**n) then the
++            # remainder is 0 in the integer/arithmetic sense.  However, when
++            # q is a non-integer (e.g. a Float) using this shortcut would be
++            # incorrect because floating-point modulo does not generally
++            # satisfy q**n % q == 0 (for example 1.5**2 % 1.5 == 0.75).  So
++            # only apply the p.base == q shortcut when it is not known that
++            # q is non-integer (i.e. q.is_integer is not False).
+             if (p == q or p == -q or
+-                    p.is_Pow and p.exp.is_Integer and p.base == q or
++                    (p.is_Pow and p.exp.is_Integer and p.base == q
++                     and (q.is_integer is not False)) or
+                     p.is_integer and q == 1):
+                 return S.Zero
+ 

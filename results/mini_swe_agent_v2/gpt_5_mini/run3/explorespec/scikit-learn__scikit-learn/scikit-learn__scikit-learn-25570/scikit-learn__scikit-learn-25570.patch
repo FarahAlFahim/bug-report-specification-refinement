@@ -1,0 +1,56 @@
+diff --git a/sklearn/compose/_column_transformer.py b/sklearn/compose/_column_transformer.py
+index a26145117..e7b7b4f31 100644
+--- a/sklearn/compose/_column_transformer.py
++++ b/sklearn/compose/_column_transformer.py
+@@ -381,6 +381,17 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+         output_config = _get_output_config("transform", self)
+         for name, trans, columns in transformers:
+             if replace_strings:
++                # When consumers of this iterator ask to replace strings
++                # (e.g. to build DataFrame outputs) we must preserve the
++                # semantics regarding empty column selections. In
++                # particular, empty selections should be skipped for all
++                # transformer types including 'passthrough'. Checking for
++                # empty selections before replacing the 'passthrough'
++                # string ensures that producer and consumer see the same
++                # sequence of yielded entries and keeps bookkeeping in
++                # sync (see GH issue / PR referencing Length mismatch).
++                if _is_empty_column_selection(columns):
++                    continue
+                 # replace 'passthrough' with identity transformer and
+                 # skip in case of 'drop'
+                 if trans == "passthrough":
+@@ -391,8 +402,6 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+                     ).set_output(transform=output_config["dense"])
+                 elif trans == "drop":
+                     continue
+-                elif _is_empty_column_selection(columns):
+-                    continue
+ 
+             if column_as_strings:
+                 # Convert all columns to using their string labels
+@@ -585,7 +594,14 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+         self._name_to_fitted_passthrough = {}
+ 
+         for name, old, column, _ in self._iter():
+-            if old == "drop":
++            # If the column selection is empty we preserve the original
++            # transformer string and do not consume any fitted transformer
++            # from the iterator. This keeps the sequence of fitted
++            # transformers aligned with the producers that skip empty
++            # selections.
++            if _is_empty_column_selection(column):
++                trans = old
++            elif old == "drop":
+                 trans = "drop"
+             elif old == "passthrough":
+                 # FunctionTransformer is present in list of transformers,
+@@ -596,8 +612,6 @@ class ColumnTransformer(TransformerMixin, _BaseComposition):
+                 # The fitted FunctionTransformer is saved in another attribute,
+                 # so it can be used during transform for set_output.
+                 self._name_to_fitted_passthrough[name] = func_transformer
+-            elif _is_empty_column_selection(column):
+-                trans = old
+             else:
+                 trans = next(fitted_transformers)
+             transformers_.append((name, trans, column))

@@ -1,0 +1,32 @@
+diff --git a/django/db/models/query.py b/django/db/models/query.py
+index e0eeccefa6..d0eebbe39b 100644
+--- a/django/db/models/query.py
++++ b/django/db/models/query.py
+@@ -1141,6 +1141,10 @@ class QuerySet:
+         assert not self.query.is_sliced, \
+             "Cannot create distinct fields once a slice has been taken."
+         obj = self._chain()
++        # DISTINCT after combined queries is not supported. Guard here so
++        # callers get a clear NotSupportedError instead of having their
++        # distinct() call silently ignored by the SQL compiler.
++        obj._not_support_combined_queries('distinct')
+         obj.query.add_distinct_fields(*field_names)
+         return obj
+ 
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index bb230647eb..38580ecac1 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -1841,6 +1841,12 @@ class Query(BaseExpression):
+         """
+         Add and resolve the given fields to the query's "distinct on" clause.
+         """
++        # DISTINCT/DISTINCT ON is not supported for combined queries
++        # (UNION/INTERSECT/EXCEPT). Prevent callers from creating an
++        # invalid state where distinct_fields is set but the compiler
++        # will ignore it.
++        if self.combinator:
++            raise NotSupportedError('DISTINCT after %s() is not supported.' % self.combinator)
+         self.distinct_fields = field_names
+         self.distinct = True
+ 

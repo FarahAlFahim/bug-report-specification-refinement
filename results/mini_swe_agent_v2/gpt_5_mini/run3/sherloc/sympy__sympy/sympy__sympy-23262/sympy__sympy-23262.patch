@@ -1,0 +1,15 @@
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index da67263b19..19ff52c107 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -958,6 +958,10 @@ def _recursive_to_string(doprint, arg):
+         if isinstance(arg, list):
+             left, right = "[]"
+         elif isinstance(arg, tuple):
++            # Special-case single-element tuples so that the trailing comma
++            # is included in the literal, e.g. '(x,)' rather than '(x)'.
++            if len(arg) == 1:
++                return '(' + _recursive_to_string(doprint, arg[0]) + ',)'
+             left, right = "()"
+         else:
+             raise NotImplementedError("unhandled type: %s, %s" % (type(arg), arg))

@@ -1,0 +1,51 @@
+diff --git a/lib/matplotlib/colorbar.py b/lib/matplotlib/colorbar.py
+index d3d53e3d98..6a83ef0320 100644
+--- a/lib/matplotlib/colorbar.py
++++ b/lib/matplotlib/colorbar.py
+@@ -509,6 +509,18 @@ class Colorbar:
+         self.cmap = mappable.cmap
+         if mappable.norm != self.norm:
+             self.norm = mappable.norm
++            # If the newly assigned norm has unset vmin/vmax, try to
++            # initialize it from the mappable's data (autoscale_None).
++            # This is important for non-linear norms (e.g. LogNorm)
++            # which require vmin>0.  See PR description for details.
++            try:
++                if getattr(mappable, 'get_array', lambda: None)() is not None:
++                    mappable.autoscale_None()
++            except Exception:
++                # Be conservative: if autoscale_None fails for any reason,
++                # fall back to leaving the norm as-is; downstream code
++                # will handle defaults.
++                pass
+             self._reset_locator_formatter_scale()
+ 
+         self._draw_all()
+@@ -1102,8 +1114,25 @@ class Colorbar:
+ 
+         # transform from 0-1 to vmin-vmax:
+         if not self.norm.scaled():
+-            self.norm.vmin = 0
+-            self.norm.vmax = 1
++            # If the norm has not been scaled (vmin/vmax unset), try to
++            # initialize it from the mappable's data. This avoids using a
++            # hard-coded 0..1 range which is invalid for log-like norms
++            # (LogNorm requires vmin>0).
++            mappable = getattr(self, 'mappable', None)
++            initialized = False
++            if mappable is not None:
++                try:
++                    if getattr(mappable, 'get_array', lambda: None)() is not None:
++                        mappable.autoscale_None()
++                        initialized = True
++                except Exception:
++                    # if autoscale fails, we'll fall back to defaults below
++                    initialized = False
++            if not initialized:
++                # Fall back to a default 0..1 range when no mappable data
++                # is available to initialize the norm.
++                self.norm.vmin = 0
++                self.norm.vmax = 1
+         self.norm.vmin, self.norm.vmax = mtransforms.nonsingular(
+             self.norm.vmin, self.norm.vmax, expander=0.1)
+         if (not isinstance(self.norm, colors.BoundaryNorm) and

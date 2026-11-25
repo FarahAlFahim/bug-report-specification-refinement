@@ -1,0 +1,45 @@
+diff --git a/sphinx/environment/adapters/indexentries.py b/sphinx/environment/adapters/indexentries.py
+index 5af213932..e57fc3c82 100644
+--- a/sphinx/environment/adapters/indexentries.py
++++ b/sphinx/environment/adapters/indexentries.py
+@@ -11,6 +11,7 @@
+ import re
+ import unicodedata
+ from itertools import groupby
++import sys
+ from typing import Any, Dict, Pattern, List, Tuple
+ from typing import cast
+ 
+@@ -100,6 +101,14 @@ class IndexEntries:
+ 
+         # sort the index entries; put all symbols at the front, even those
+         # following the letters in ASCII, this is where the chr(127) comes from
++        # use a high unicode character so that letters are sorted after
++        # all symbol characters. Previously chr(127) was used which is
++        # smaller than many symbol code points (e.g. '£' (163)), causing
++        # some symbols to be ordered after letters and thus creating
++        # duplicate "Symbols" groups. Use sys.maxunicode to get the
++        # largest valid code point for this Python build.
++        HIGH_CHAR = chr(sys.maxunicode)
++
+         def keyfunc(entry: Tuple[str, List]) -> Tuple[str, str]:
+             key, (void, void, category_key) = entry
+             if category_key:
+@@ -109,7 +118,7 @@ class IndexEntries:
+             if lckey.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 lckey = lckey[1:]
+             if lckey[0:1].isalpha() or lckey.startswith('_'):
+-                lckey = chr(127) + lckey
++                lckey = HIGH_CHAR + lckey
+             # ensure a determinstic order *within* letters by also sorting on
+             # the entry itself
+             return (lckey, entry[0])
+@@ -151,7 +160,7 @@ class IndexEntries:
+             if key.startswith('\N{RIGHT-TO-LEFT MARK}'):
+                 key = key[1:]
+             if key[0:1].isalpha() or key.startswith('_'):
+-                key = chr(127) + key
++                key = HIGH_CHAR + key
+             return key
+ 
+         # group the entries by letter

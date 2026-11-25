@@ -1,0 +1,41 @@
+diff --git a/sympy/printing/pretty/pretty.py b/sympy/printing/pretty/pretty.py
+index 0545797d5f..ef2a0bb900 100644
+--- a/sympy/printing/pretty/pretty.py
++++ b/sympy/printing/pretty/pretty.py
+@@ -819,17 +819,34 @@ def _print_BlockMatrix(self, B):
+         return self._print(B.blocks)
+ 
+     def _print_MatAdd(self, expr):
++        # Print matrix addition terms inserting separators appropriately.
++        # Do not sympify MatrixSymbol names: determine the sign from the
++        # term's leading coefficient instead.
+         s = None
+         for item in expr.args:
++            # compute pretty form once
+             pform = self._print(item)
+             if s is None:
+                 s = pform     # First element
+             else:
+-                if S(item.args[0]).is_negative:
++                # Determine sign from the term's leading coefficient.
++                try:
++                    coeff = item.as_coeff_mmul()[0]
++                except Exception:
++                    coeff = None
++
++                neg = False
++                if coeff is not None:
++                    # _coeff_isneg handles numeric/mul cases; also check the
++                    # is_negative attribute for symbolic assumptions.
++                    if _coeff_isneg(coeff) or getattr(coeff, 'is_negative', False):
++                        neg = True
++
++                if neg:
+                     s = prettyForm(*stringPict.next(s, ' '))
+-                    pform = self._print(item)
+                 else:
+                     s = prettyForm(*stringPict.next(s, ' + '))
++
+                 s = prettyForm(*stringPict.next(s, pform))
+ 
+         return s

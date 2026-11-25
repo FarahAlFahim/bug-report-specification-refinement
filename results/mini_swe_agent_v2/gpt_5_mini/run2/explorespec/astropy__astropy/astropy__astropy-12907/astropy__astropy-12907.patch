@@ -1,0 +1,21 @@
+diff --git a/astropy/modeling/separable.py b/astropy/modeling/separable.py
+index a308e2729..27770425b 100644
+--- a/astropy/modeling/separable.py
++++ b/astropy/modeling/separable.py
+@@ -242,7 +242,15 @@ def _cstack(left, right):
+         cright = _coord_matrix(right, 'right', noutp)
+     else:
+         cright = np.zeros((noutp, right.shape[1]))
+-        cright[-right.shape[0]:, -right.shape[1]:] = 1
++        # If the right operand is already a coord_matrix ndarray (i.e., the
++        # result of a recursive separability computation), preserve its
++        # contents instead of overwriting with literal 1s. Previously this
++        # wrote ones into the right-bottom block which destroyed any
++        # structure encoded in the incoming array when a pre-built
++        # CompoundModel was reused as the right operand of another
++        # CompoundModel (nesting). Assign the incoming array to the
++        # corresponding block to retain its pattern.
++        cright[-right.shape[0]:, -right.shape[1]:] = right
+ 
+     return np.hstack([cleft, cright])
+ 

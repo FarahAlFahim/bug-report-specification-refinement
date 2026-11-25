@@ -1,0 +1,41 @@
+diff --git a/django/contrib/postgres/forms/array.py b/django/contrib/postgres/forms/array.py
+index 2e19cd574a..cccc3a6dab 100644
+--- a/django/contrib/postgres/forms/array.py
++++ b/django/contrib/postgres/forms/array.py
+@@ -125,9 +125,15 @@ class SplitArrayWidget(forms.Widget):
+         )
+ 
+     def id_for_label(self, id_):
+-        # See the comment for RadioSelect.id_for_label()
++        # See the comment for RadioSelect.id_for_label(): when no explicit
++        # index is provided, grouped widgets should avoid adding a for
++        # attribute on the top-level <label> (see RadioSelect.id_for_label).
++        # Returning an empty string (falsy) prevents BoundField.label_tag
++        # from adding a for="..." that would otherwise point at the
++        # first subwidget. Individual subwidget ids are still generated in
++        # get_context().
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def get_context(self, name, value, attrs=None):
+diff --git a/django/forms/widgets.py b/django/forms/widgets.py
+index 00c19e2c55..49e8383e3e 100644
+--- a/django/forms/widgets.py
++++ b/django/forms/widgets.py
+@@ -849,8 +849,13 @@ class MultiWidget(Widget):
+         return context
+ 
+     def id_for_label(self, id_):
++        # For multi-part widgets, don't return a specific subwidget id for
++        # the top-level label. Returning an empty string prevents
++        # BoundField.label_tag from rendering for="..." that would point at
++        # the first subwidget. Individual subwidget ids remain unchanged and
++        # are generated in get_context().
+         if id_:
+-            id_ += '_0'
++            return ''
+         return id_
+ 
+     def value_from_datadict(self, data, files, name):

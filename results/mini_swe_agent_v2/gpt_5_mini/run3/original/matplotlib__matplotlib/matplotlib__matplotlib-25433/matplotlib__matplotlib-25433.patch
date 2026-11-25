@@ -1,0 +1,46 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index ebe5da43e2..03a34404e3 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -582,6 +582,23 @@ class Slider(SliderBase):
+         if self.drawon:
+             self.ax.figure.canvas.draw_idle()
+         self.val = val
++        # If this widget currently has the mouse grabbed (e.g. during a
++        # drag), release it before invoking callbacks.  This mirrors the
++        # Button behavior which releases the mouse on button release
++        # prior to notifying observers.  If a callback clears or replaces
++        # axes/figures, holding the grab would prevent new widgets from
++        # receiving input.
++        if getattr(self, 'canvas', None) is not None:
++            try:
++                if self.canvas.mouse_grabber is self.ax:
++                    # Release ownership; callbacks may recreate axes/widgets
++                    # and should be free to grab the mouse as needed.
++                    self.canvas.release_mouse(self.ax)
++            except Exception:
++                # Be conservative: if the canvas does not have the expected
++                # attributes, do not raise from the widget callback path.
++                pass
++
+         if self.eventson:
+             self._observers.process('changed', val)
+ 
+@@ -965,6 +982,17 @@ class RangeSlider(SliderBase):
+         if self.drawon:
+             self.ax.figure.canvas.draw_idle()
+         self.val = (vmin, vmax)
++        # See comment in Slider.set_val: ensure we release any mouse grab
++        # before invoking callbacks so that callbacks which clear/redraw
++        # the figure do not leave the canvas in a grabbed state and block
++        # input to newly created widgets.
++        if getattr(self, 'canvas', None) is not None:
++            try:
++                if self.canvas.mouse_grabber is self.ax:
++                    self.canvas.release_mouse(self.ax)
++            except Exception:
++                pass
++
+         if self.eventson:
+             self._observers.process("changed", (vmin, vmax))
+ 

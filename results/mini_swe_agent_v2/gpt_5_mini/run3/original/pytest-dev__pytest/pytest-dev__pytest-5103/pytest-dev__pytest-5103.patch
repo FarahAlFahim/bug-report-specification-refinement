@@ -1,0 +1,25 @@
+diff --git a/src/_pytest/assertion/rewrite.py b/src/_pytest/assertion/rewrite.py
+index 2903b8995..2dd6e5e62 100644
+--- a/src/_pytest/assertion/rewrite.py
++++ b/src/_pytest/assertion/rewrite.py
+@@ -969,6 +969,20 @@ warn_explicit(
+         visit `ast.Call` nodes on Python3.5 and after
+         """
+         new_func, func_expl = self.visit(call.func)
++        # Special-case builtin all()/any() called with a generator expression.
++        # Converting the generator expression to a list comprehension
++        # yields a more informative representation in assertion
++        # failure messages (shows the evaluated items) instead of the
++        # opaque generator object.
++        try:
++            func_name = getattr(call.func, "id", None)
++        except Exception:
++            func_name = None
++        if func_name in ("all", "any") and len(call.args) == 1:
++            genarg = call.args[0]
++            if isinstance(genarg, ast.GeneratorExp):
++                # replace generator with listcomp equivalent
++                call = ast.Call(call.func, [ast.ListComp(genarg.elt, genarg.generators)], call.keywords)
+         arg_expls = []
+         new_args = []
+         new_kwargs = []

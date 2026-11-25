@@ -1,0 +1,56 @@
+diff --git a/sphinx/ext/autosummary/generate.py b/sphinx/ext/autosummary/generate.py
+index a57c73fb7..0bea70a29 100644
+--- a/sphinx/ext/autosummary/generate.py
++++ b/sphinx/ext/autosummary/generate.py
+@@ -246,7 +246,24 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+     ns.update(context)
+ 
+     if doc.objtype == 'module':
+-        ns['members'] = dir(obj)
++        # Build the members list honoring the imported_members flag so that
++        # templates see a consistent view of which names belong to this
++        # module. Previously ns['members'] was set unconditionally from
++        # dir(obj) which exposed imported names even when
++        # autosummary_imported_members was False.
++        if imported_members:
++            ns['members'] = dir(obj)
++        else:
++            filtered = []
++            for _name in dir(obj):
++                try:
++                    _value = safe_getattr(obj, _name)
++                except AttributeError:
++                    continue
++                # include only attributes that are defined in this module
++                if getattr(_value, '__module__', None) == obj.__name__:
++                    filtered.append(_name)
++            ns['members'] = filtered
+         ns['functions'], ns['all_functions'] = \
+             get_members(obj, {'function'}, imported=imported_members)
+         ns['classes'], ns['all_classes'] = \
+@@ -259,9 +276,22 @@ def generate_autosummary_content(name: str, obj: Any, parent: Any,
+         if ispackage and recursive:
+             ns['modules'], ns['all_modules'] = get_modules(obj)
+     elif doc.objtype == 'class':
+-        ns['members'] = dir(obj)
+-        ns['inherited_members'] = \
+-            set(dir(obj)) - set(obj.__dict__.keys())
++        # For classes, similarly filter members to exclude imported
++        # attributes (those not defined on the class' module) so that
++        # templates and module-attribute detection behave consistently.
++        if imported_members:
++            class_members = dir(obj)
++        else:
++            class_members = []
++            for _name in dir(obj):
++                try:
++                    _value = safe_getattr(obj, _name)
++                except AttributeError:
++                    continue
++                if getattr(_value, '__module__', None) == obj.__module__:
++                    class_members.append(_name)
++        ns['members'] = class_members
++        ns['inherited_members'] = set(class_members) - set(obj.__dict__.keys())
+         ns['methods'], ns['all_methods'] = \
+             get_members(obj, {'method'}, ['__init__'])
+         ns['attributes'], ns['all_attributes'] = \

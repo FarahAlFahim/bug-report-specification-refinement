@@ -1,0 +1,23 @@
+diff --git a/django/contrib/admin/utils.py b/django/contrib/admin/utils.py
+index e4ddc8f017..b5ffc313d8 100644
+--- a/django/contrib/admin/utils.py
++++ b/django/contrib/admin/utils.py
+@@ -398,6 +398,18 @@ def display_for_field(value, field, empty_value_display):
+         return formats.number_format(value)
+     elif isinstance(field, models.FileField) and value:
+         return format_html('<a href="{}">{}</a>', value.url, value)
++    # JSONField values should be presented as JSON when readonly in the
++    # admin list display. Use the form field's prepare_value() implementation
++    # (instead of json.dumps here) so that special cases like
++    # InvalidJSONInput are handled consistently.
++    elif isinstance(field, models.JSONField):
++        try:
++            form_field = field.formfield()
++            return form_field.prepare_value(value)
++        except Exception:
++            # If anything goes wrong, fall back to the generic value
++            # representation.
++            return display_for_value(value, empty_value_display)
+     else:
+         return display_for_value(value, empty_value_display)
+ 

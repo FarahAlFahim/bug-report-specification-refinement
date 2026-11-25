@@ -1,0 +1,32 @@
+diff --git a/pylint/lint/run.py b/pylint/lint/run.py
+index 778e64441..d1f5ece7a 100644
+--- a/pylint/lint/run.py
++++ b/pylint/lint/run.py
+@@ -14,6 +14,7 @@ from typing import Any
+ from pylint import config
+ from pylint.config.config_initialization import _config_initialization
+ from pylint.config.exceptions import ArgumentPreprocessingError
++from pylint.config.exceptions import _UnrecognizedOptionError
+ from pylint.config.utils import _preprocess_options
+ from pylint.constants import full_version
+ from pylint.lint.base_options import _make_run_options
+@@ -132,9 +133,16 @@ group are mutually exclusive.",
+         linter.disable("I")
+         linter.enable("c-extension-no-member")
+ 
+-        args = _config_initialization(
+-            linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
+-        )
++        try:
++            args = _config_initialization(
++                linter, args, reporter, config_file=self._rcfile, verbose_mode=self.verbose
++            )
++        except _UnrecognizedOptionError:
++            # _config_initialization already reports unrecognized options via
++            # the linter reporter (so a user-facing message has been emitted).
++            # Ensure we exit with a non-zero code and do not emit a Python
++            # traceback on the CLI.
++            sys.exit(32)
+ 
+         if linter.config.jobs < 0:
+             print(

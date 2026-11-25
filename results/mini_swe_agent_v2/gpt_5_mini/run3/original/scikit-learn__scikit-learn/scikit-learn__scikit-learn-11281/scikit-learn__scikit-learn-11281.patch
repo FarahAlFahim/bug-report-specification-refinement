@@ -1,0 +1,45 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..417ebc4ed 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -240,8 +240,40 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self._set_parameters(best_params)
+         self.n_iter_ = best_n_iter
+ 
++        # Store labels for compatibility with clusterer API
++        # Predict uses the fitted parameters and will validate the fit
++        try:
++            # Use the training data to compute labels_ as clusterers do
++            self.labels_ = self.predict(X)
++        except Exception:
++            # If prediction fails for any reason, ensure labels_ is not set
++            if hasattr(self, 'labels_'):
++                delattr(self, 'labels_')
++
+         return self
+ 
++    def fit_predict(self, X, y=None):
++        """Fit the model and return the labels for X.
++
++        This mirrors the clusterer API where fit_predict both fits the model
++        and returns the predicted labels for the training data.
++        """
++        self.fit(X, y)
++        # labels_ should have been set in fit; fall back to predict
++        if hasattr(self, 'labels_'):
++            return self.labels_
++        return self.predict(X)
++
++    @property
++    def n_clusters(self):
++        """Alias for n_components for clusterer compatibility."""
++        return self.n_components
++
++    @n_clusters.setter
++    def n_clusters(self, value):
++        # Keep the underlying parameter consistent
++        self.n_components = value
++
+     def _e_step(self, X):
+         """E step.
+ 

@@ -1,6 +1,6 @@
 {
   "dataset_name": "SWE-bench Lite",
-  "selection_name": "100-instance downstream evaluation subset",
+  "selection_name": "Fixed stratified random 100-instance downstream evaluation subset",
   "expected_total": 100,
   "instances_by_repository": {
     "astropy__astropy": [

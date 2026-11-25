@@ -1,0 +1,48 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..207ef803c 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -15,26 +15,16 @@ from _pytest.nodes import Item
+ from _pytest.store import StoreKey
+ 
+ 
+-evalcache_key = StoreKey[Dict[str, Any]]()
+-
+-
+-def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
+-    evalcache = config._store.setdefault(evalcache_key, default)
+-    try:
+-        return evalcache[expr]
+-    except KeyError:
+-        import _pytest._code
+-
+-        exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
+-        return x
++# Evaluate string expressions directly using the provided globals.
++# Caching by the expression string alone is incorrect because evaluation
++# may depend on the item's globals. Therefore we avoid cross-item caching
++# and compile/evaluate expressions per-use.
+ 
+ 
+ class MarkEvaluator:
+     def __init__(self, item: Item, name: str) -> None:
+         self.item = item
+-        self._marks = None  # type: Optional[List[Mark]]
++        self._marks = none = None  # type: Optional[List[Mark]]
+         self._mark = None  # type: Optional[Mark]
+         self._mark_name = name
+ 
+@@ -98,7 +88,10 @@ class MarkEvaluator:
+                     self.expr = expr
+                     if isinstance(expr, str):
+                         d = self._getglobals()
+-                        result = cached_eval(self.item.config, expr, d)
++                        import _pytest._code
++
++                        exprcode = _pytest._code.compile(expr, mode="eval")
++                        result = eval(exprcode, d)
+                     else:
+                         if "reason" not in mark.kwargs:
+                             # XXX better be checked at collection time

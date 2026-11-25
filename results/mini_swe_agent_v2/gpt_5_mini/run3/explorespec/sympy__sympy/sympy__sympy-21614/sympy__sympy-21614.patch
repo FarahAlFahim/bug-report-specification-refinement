@@ -1,0 +1,63 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..983eebb8c7 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1699,6 +1699,58 @@ def variable_count(self):
+     def derivative_count(self):
+         return sum([count for var, count in self.variable_count], 0)
+ 
++    @property
++    def kind(self):
++        """Infer the mathematical Kind of a Derivative.
++
++        The derived kind is based on the expression's kind and the kinds
++        of differentiation variables. The element kind used for
++        ArrayKind/MatrixKind is taken from ``expr.kind.element_kind`` if
++        present, otherwise from ``expr.kind`` itself.
++        """
++        # Defer imports to avoid potential circular imports at module
++        # import time.
++        from sympy.core.kind import UndefinedKind
++
++        expr_kind = getattr(self.expr, 'kind', UndefinedKind)
++        # canonical way to extract element kind used elsewhere
++        elem_kind = getattr(expr_kind, 'element_kind', expr_kind)
++
++        # If any differentiation variable is matrix- or array-like,
++        # the derivative should be matrix/array-kind parameterized by
++        # the element kind. We test the variable kinds first and then
++        # fall back to structural checks (shape attribute) for objects
++        # that may not expose kind properly.
++        for v in self._wrt_variables:
++            vk = getattr(v, 'kind', None)
++            # local imports to avoid circular import issues
++            try:
++                from sympy.matrices.common import MatrixKind
++            except Exception:
++                MatrixKind = None
++            try:
++                from sympy.tensor.array.ndim_array import ArrayKind
++            except Exception:
++                ArrayKind = None
++
++            if MatrixKind is not None and isinstance(vk, MatrixKind):
++                return MatrixKind(elem_kind)
++            if ArrayKind is not None and isinstance(vk, ArrayKind):
++                return ArrayKind(elem_kind)
++
++            # structural fallbacks
++            if hasattr(v, 'shape') or getattr(v, 'is_Matrix', False) or getattr(v, 'is_MatrixLike', False):
++                # treat shape-bearing objects as matrices
++                if MatrixKind is not None:
++                    return MatrixKind(elem_kind)
++            if hasattr(v, '_rank') or getattr(v, 'is_ndarray', False):
++                if ArrayKind is not None:
++                    return ArrayKind(elem_kind)
++
++        # No matrix/array-like differentiation variable: return the
++        # expression's kind (which may itself be MatrixKind/ArrayKind)
++        return expr_kind
++
+     @property
+     def free_symbols(self):
+         ret = self.expr.free_symbols

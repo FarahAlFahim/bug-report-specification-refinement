@@ -1,0 +1,51 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index dc413b5c2..44db6dbe0 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -676,16 +676,31 @@ class Documenter:
+         The user can override the skipping decision by connecting to the
+         ``autodoc-skip-member`` event.
+         """
++        # search for members in source code too
++        namespace = '.'.join(self.objpath)  # will be empty for modules
++
++        if self.analyzer:
++            attr_docs = self.analyzer.find_attr_docs()
++        else:
++            attr_docs = {}
++
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+             if inspect.isclass(self.object):
+                 for cls in self.object.__mro__:
+                     if cls.__name__ == self.options.inherited_members and cls != self.object:
+                         # given member is a member of specified *super class*
+                         return True
++                    # if the member is defined in the class dict or in annotations
++                    # it's not considered filtered as an inherited member
+                     elif name in cls.__dict__:
+                         return False
+                     elif name in self.get_attr(cls, '__annotations__', {}):
+                         return False
++                    # also consider attribute documentation collected by the
++                    # ModuleAnalyzer for the superclass (e.g. annotated-only
++                    # attributes documented via #: comments)
++                    elif (self.get_attr(cls, '__qualname__', None), name) in attr_docs:
++                        return False
+                     elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+                         return False
+ 
+@@ -693,14 +708,6 @@ class Documenter:
+ 
+         ret = []
+ 
+-        # search for members in source code too
+-        namespace = '.'.join(self.objpath)  # will be empty for modules
+-
+-        if self.analyzer:
+-            attr_docs = self.analyzer.find_attr_docs()
+-        else:
+-            attr_docs = {}
+-
+         # process members and determine which to skip
+         for obj in members:
+             membername, member = obj

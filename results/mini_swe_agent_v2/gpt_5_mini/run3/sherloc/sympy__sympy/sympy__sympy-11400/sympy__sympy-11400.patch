@@ -1,0 +1,30 @@
+diff --git a/sympy/printing/ccode.py b/sympy/printing/ccode.py
+index 30a07a7b59..355e155b7b 100644
+--- a/sympy/printing/ccode.py
++++ b/sympy/printing/ccode.py
+@@ -14,6 +14,7 @@
+ from __future__ import print_function, division
+ 
+ from sympy.core import S
++from sympy import Piecewise, Ne, sin
+ from sympy.core.compatibility import string_types, range
+ from sympy.codegen.ast import Assignment
+ from sympy.printing.codeprinter import CodePrinter
+@@ -152,6 +153,17 @@ def _print_Pow(self, expr):
+             return 'pow(%s, %s)' % (self._print(expr.base),
+                                  self._print(expr.exp))
+ 
++    def _print_sinc(self, expr):
++        """Print sinc(x) as a piecewise expression that is safe at 0.
++
++        sinc(x) -> Piecewise((sin(x)/x, Ne(x, 0)), (1, True))
++        This ensures portable C code without calling a non-standard sinc().
++        """
++        arg = expr.args[0]
++        pw = Piecewise((sin(arg)/arg, Ne(arg, 0)), (S.One, True))
++        return self._print(pw)
++
++
+     def _print_Rational(self, expr):
+         p, q = int(expr.p), int(expr.q)
+         return '%d.0L/%d.0L' % (p, q)

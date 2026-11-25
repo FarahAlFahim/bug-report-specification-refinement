@@ -1,0 +1,82 @@
+diff --git a/sphinx/ext/autodoc/__init__.py b/sphinx/ext/autodoc/__init__.py
+index 62631f7ff..83b2ad93d 100644
+--- a/sphinx/ext/autodoc/__init__.py
++++ b/sphinx/ext/autodoc/__init__.py
+@@ -110,11 +110,26 @@ def exclude_members_option(arg: Any) -> Union[object, Set[str]]:
+ 
+ 
+ def inherited_members_option(arg: Any) -> Union[object, Set[str]]:
+-    """Used to convert the :members: option to auto directives."""
++    """Used to convert the :inherited-members: option to auto directives.
++
++    Accept a comma-separated list of class names. If omitted or True, the
++    special value 'object' is used to indicate members inherited from
++    builtins.object should be considered inherited. If False is passed,
++    inherited-members is disabled (None).
++    """
+     if arg in (None, True):
+         return 'object'
++    elif arg is False:
++        return None
+     else:
+-        return arg
++        # split comma-separated class names and return a set (or a single
++        # name as string for backward compatibility)
++        parts = [x.strip() for x in str(arg).split(',') if x.strip()]
++        if not parts:
++            return None
++        if len(parts) == 1:
++            return parts[0]
++        return set(parts)
+ 
+ 
+ def member_order_option(arg: Any) -> Optional[str]:
+@@ -680,17 +695,37 @@ class Documenter:
+         ``autodoc-skip-member`` event.
+         """
+         def is_filtered_inherited_member(name: str, obj: Any) -> bool:
+-            if inspect.isclass(self.object):
+-                for cls in self.object.__mro__:
+-                    if cls.__name__ == self.options.inherited_members and cls != self.object:
+-                        # given member is a member of specified *super class*
+-                        return True
+-                    elif name in cls.__dict__:
+-                        return False
+-                    elif name in self.get_attr(cls, '__annotations__', {}):
+-                        return False
+-                    elif isinstance(obj, ObjectMember) and obj.class_ is cls:
+-                        return False
++            """Return True if *name* should be treated as inherited from a
++            requested base class to be ignored.
++
++            Support multiple class names in :inherited-members: (either a
++            single string or a set/list of names).
++            """
++            if not inspect.isclass(self.object):
++                return False
++
++            inherited = self.options.inherited_members
++            # iterate through MRO and decide whether the member comes from
++            # one of the ignored base classes. The order here matters: if we
++            # encounter a class that matches the ignored list before finding
++            # a class that actually defines the member, we consider it
++            # inherited from that ignored class.
++            for cls in self.object.__mro__:
++                # skip the class being documented for the "ignored base" check
++                if cls is not self.object and inherited:
++                    if isinstance(inherited, (set, list, tuple)):
++                        if cls.__name__ in inherited:
++                            return True
++                    else:
++                        if cls.__name__ == inherited:
++                            return True
++
++                if name in cls.__dict__:
++                    return False
++                if name in self.get_attr(cls, '__annotations__', {}):
++                    return False
++                if isinstance(obj, ObjectMember) and obj.class_ is cls:
++                    return False
+ 
+             return False
+ 

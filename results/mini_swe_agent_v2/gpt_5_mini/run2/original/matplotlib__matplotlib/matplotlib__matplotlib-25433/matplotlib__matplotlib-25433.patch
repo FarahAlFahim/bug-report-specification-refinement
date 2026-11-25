@@ -1,0 +1,46 @@
+diff --git a/lib/matplotlib/widgets.py b/lib/matplotlib/widgets.py
+index ebe5da43e2..643d3f4a25 100644
+--- a/lib/matplotlib/widgets.py
++++ b/lib/matplotlib/widgets.py
+@@ -583,6 +583,23 @@ class Slider(SliderBase):
+             self.ax.figure.canvas.draw_idle()
+         self.val = val
+         if self.eventson:
++            # If a callback triggered by changing the slider value clears
++            # or redraws the figure (for example via pyplot.clf() and
++            # pyplot.draw()), the canvas may still have this Axes set as
++            # the mouse_grabber which would block input to newly created
++            # widgets.  To avoid leaving the mouse grabbed by an Axes that
++            # is about to be destroyed by user callbacks, release the mouse
++            # grab before invoking the user callbacks.
++            try:
++                canvas = self.ax.figure.canvas
++            except Exception:
++                canvas = None
++            if getattr(canvas, "mouse_grabber", None) is self.ax:
++                try:
++                    canvas.release_mouse(self.ax)
++                except Exception:
++                    # Best-effort release; ignore errors from backends.
++                    pass
+             self._observers.process('changed', val)
+ 
+     def on_changed(self, func):
+@@ -966,6 +983,17 @@ class RangeSlider(SliderBase):
+             self.ax.figure.canvas.draw_idle()
+         self.val = (vmin, vmax)
+         if self.eventson:
++            # See comment in Slider.set_val regarding releasing mouse grab
++            # before invoking callbacks.
++            try:
++                canvas = self.ax.figure.canvas
++            except Exception:
++                canvas = None
++            if getattr(canvas, "mouse_grabber", None) is self.ax:
++                try:
++                    canvas.release_mouse(self.ax)
++                except Exception:
++                    pass
+             self._observers.process("changed", (vmin, vmax))
+ 
+     def on_changed(self, func):

@@ -1,0 +1,49 @@
+diff --git a/django/core/management/__init__.py b/django/core/management/__init__.py
+index 1ba093e51f..05f6dc2874 100644
+--- a/django/core/management/__init__.py
++++ b/django/core/management/__init__.py
+@@ -344,7 +344,17 @@ class ManagementUtility:
+         # Preprocess options to extract --settings and --pythonpath.
+         # These options could affect the commands that are available, so they
+         # must be processed early.
+-        parser = CommandParser(usage='%(prog)s subcommand [options] [args]', add_help=False, allow_abbrev=False)
++        # Ensure the parser's prog reflects the argv passed to ManagementUtility
++        # (self.prog_name) rather than defaulting to sys.argv[0]. This keeps
++        # usage/help messages consistent when ManagementUtility is invoked
++        # with an explicit argv (e.g., in embedded environments where
++        # sys.argv[0] may be None or incorrect).
++        parser = CommandParser(
++            usage='%(prog)s subcommand [options] [args]',
++            add_help=False,
++            allow_abbrev=False,
++            prog=(self.prog_name if self.prog_name else None),
++        )
+         parser.add_argument('--settings')
+         parser.add_argument('--pythonpath')
+         parser.add_argument('args', nargs='*')  # catch-all
+diff --git a/django/core/management/utils.py b/django/core/management/utils.py
+index 43addf8bdd..2baedfb4ba 100644
+--- a/django/core/management/utils.py
++++ b/django/core/management/utils.py
+@@ -115,7 +115,20 @@ def get_command_line_option(argv, option):
+     dashes, e.g. '--testrunner') from an argument list. Return None if the
+     option wasn't passed or if the argument list couldn't be parsed.
+     """
+-    parser = CommandParser(add_help=False, allow_abbrev=False)
++    # If an argv list is provided, make sure the parser uses the
++    # program name from that argv (basename of argv[0]) so help/usage
++    # messages reflect the supplied argv rather than sys.argv[0]. If
++    # argv is missing or argv[0] is falsy, don't pass prog so
++    # ArgumentParser will fall back to its default.
++    parser_kwargs = {"add_help": False, "allow_abbrev": False}
++    if argv and len(argv) > 0 and argv[0]:
++        try:
++            parser_kwargs["prog"] = os.path.basename(argv[0])
++        except Exception:
++            # Be conservative: if basename() fails for some reason,
++            # don't pass prog so argparse will use its default.
++            pass
++    parser = CommandParser(**parser_kwargs)
+     parser.add_argument(option, dest='value')
+     try:
+         options, _ = parser.parse_known_args(argv[2:])

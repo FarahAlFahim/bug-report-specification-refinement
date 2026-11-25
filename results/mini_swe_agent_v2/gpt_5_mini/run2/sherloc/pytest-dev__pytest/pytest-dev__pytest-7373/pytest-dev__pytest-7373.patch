@@ -1,0 +1,55 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..4a08b86ee 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -18,16 +18,47 @@ from _pytest.store import StoreKey
+ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
++def _module_cache_key_from_globals(d: Dict[str, object]) -> object:
++    """Return a stable key representing the module/global context in ``d``.
++
++    Prefer the module's __spec__ or __file__/__name__ when available so that
++    evaluations are cached per-module rather than globally across different
++    modules that happen to use the same expression string.
++    """
++    # d is expected to be a mapping containing the globals for evaluation;
++    # try to extract a module-identifying value.
++    # Prefer __spec__ if present (it may be unique per module), then __file__,
++    # then __name__. Fall back to id(d) as a last resort.
++    if not isinstance(d, dict):
++        return id(d)
++    if "__spec__" in d and d.get("__spec__") is not None:
++        try:
++            return ("spec", getattr(d["__spec__"], "name", None))
++        except Exception:
++            pass
++    if "__file__" in d and d.get("__file__") is not None:
++        return ("file", d.get("__file__"))
++    if "__name__" in d and d.get("__name__") is not None:
++        return ("name", d.get("__name__"))
++    return ("id", id(d))
++
++
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    default = {}  # type: Dict[object, object]
+     evalcache = config._store.setdefault(evalcache_key, default)
++    # Use a composite key of (expr, module_key) so that the same expression
++    # evaluated in different module global contexts does not share the cached
++    # result. Previously only the expression string was used which caused
++    # cross-module contamination.
++    module_key = _module_cache_key_from_globals(d)
++    key = (expr, module_key)
+     try:
+-        return evalcache[expr]
++        return evalcache[key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        evalcache[key] = x = eval(exprcode, d)
+         return x
+ 
+ 

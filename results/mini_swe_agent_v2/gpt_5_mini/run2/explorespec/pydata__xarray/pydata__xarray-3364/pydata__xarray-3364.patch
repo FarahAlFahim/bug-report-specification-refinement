@@ -1,0 +1,53 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..0a10653e 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -311,16 +311,38 @@ def _dataset_concat(
+     if variables_to_merge:
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++        # Build lists of Variable objects for merging. If a variable is
++        # missing from a dataset, construct a placeholder Variable filled
++        # with the appropriate NA fill value and promoted dtype so that
++        # unique_variable can operate on a homogeneous list of Variables.
++        for var in variables_to_merge:
++            # collect present variables to infer dtype and dims
++            present = [ds.variables[var] for ds in datasets if var in ds.variables]
++            # infer target dims from first present variable
++            first = present[0]
++            target_dims = first.dims
++            target_shape = tuple(dims_sizes.get(d, 1) for d in target_dims)
++
++            # determine promoted dtype and fill value
++            promoted = dtypes.result_type(*[v.dtype for v in present])
++            promoted_dtype, promoted_fill = dtypes.maybe_promote(promoted)
++
++            for ds in datasets:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # create placeholder array filled with promoted_fill
++                    import numpy as _np
++
++                    data = _np.full(target_shape, promoted_fill, dtype=promoted_dtype)
++                    # Preserve IndexVariable semantics when appropriate
++                    if getattr(first, "__class__", None) is IndexVariable or (
++                        len(target_dims) == 1 and target_dims == (var,)
++                    ):
++                        placeholder = IndexVariable(var, data)
++                    else:
++                        placeholder = Variable(target_dims, data)
++                    to_merge[var].append(placeholder)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(

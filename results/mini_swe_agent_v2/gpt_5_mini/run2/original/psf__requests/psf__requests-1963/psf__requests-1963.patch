@@ -1,0 +1,34 @@
+diff --git a/requests/sessions.py b/requests/sessions.py
+index 425db22c..5b97c4fe 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -87,8 +87,16 @@ class SessionRedirectMixin(object):
+ 
+         i = 0
+ 
++        # Use the most recent request as the basis for each redirect
++        # iteration. Previously this always copied the original ``req``
++        # which could reset the HTTP method (and other mutable state)
++        # to the initial values even after an intermediate redirect
++        # changed them (e.g. a 303 turning POST into GET). By keeping
++        # track of the current request we ensure subsequent redirects
++        # preserve method changes made earlier in the chain.
++        current_req = req
+         while resp.is_redirect:
+-            prepared_request = req.copy()
++            prepared_request = current_req.copy()
+ 
+             resp.content  # Consume socket so it can be released
+ 
+@@ -180,6 +188,11 @@ class SessionRedirectMixin(object):
+ 
+             extract_cookies_to_jar(self.cookies, prepared_request, resp.raw)
+ 
++            # Ensure the next iteration starts from the request we just
++            # issued (which may have had its method or other attributes
++            # altered), rather than the original request object.
++            current_req = resp.request
++
+             i += 1
+             yield resp
+ 

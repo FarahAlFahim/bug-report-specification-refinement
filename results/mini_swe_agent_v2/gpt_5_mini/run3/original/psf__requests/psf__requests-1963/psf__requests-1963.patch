@@ -1,0 +1,20 @@
+diff --git a/requests/sessions.py b/requests/sessions.py
+index 425db22c..06bda886 100644
+--- a/requests/sessions.py
++++ b/requests/sessions.py
+@@ -99,7 +99,14 @@ class SessionRedirectMixin(object):
+             resp.close()
+ 
+             url = resp.headers['location']
+-            method = req.method
++            # Use the method that was actually used for the request which
++            # generated this response (resp.request.method) when available.
++            # Session.resolve_redirects previously always used the original
++            # request object's method which caused intermediate redirects
++            # (e.g. 303 See Other converting POST -> GET) to be lost for
++            # subsequent redirects. Falling back to req.method maintains
++            # backwards compatibility when resp.request is unavailable.
++            method = getattr(resp.request, 'method', None) or req.method
+ 
+             # Handle redirection without scheme (see: RFC 1808 Section 4)
+             if url.startswith('//'):

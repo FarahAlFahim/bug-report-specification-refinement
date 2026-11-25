@@ -1,0 +1,19 @@
+diff --git a/sympy/printing/latex.py b/sympy/printing/latex.py
+index a0eb97792e..d63d8d38b0 100644
+--- a/sympy/printing/latex.py
++++ b/sympy/printing/latex.py
+@@ -1454,6 +1454,14 @@ def latexslice(x):
+     def _print_BlockMatrix(self, expr):
+         return self._print(expr.blocks)
+ 
++    def _print_Trace(self, expr):
++        """Print a Trace of a matrix expression in LaTeX.
++
++        The trace is printed as "\operatorname{Tr}{\left(...\right)}"
++        where the inner expression is recursively printed by the LaTeX printer.
++        """
++        return r"\operatorname{Tr}{\left(%s\right)}" % self._print(expr.arg)
++
+     def _print_Transpose(self, expr):
+         mat = expr.arg
+         from sympy.matrices import MatrixSymbol

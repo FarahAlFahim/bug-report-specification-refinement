@@ -1,0 +1,103 @@
+diff --git a/lib/mpl_toolkits/axes_grid1/axes_grid.py b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+index 2b1b1d3200..827a92f622 100644
+--- a/lib/mpl_toolkits/axes_grid1/axes_grid.py
++++ b/lib/mpl_toolkits/axes_grid1/axes_grid.py
+@@ -10,11 +10,87 @@ from .axes_divider import Size, SubplotDivider, Divider
+ from .mpl_axes import Axes
+ 
+ 
++def _get_axis_toggle_like(ax, name):
++    """Return an object with a ``toggle(...)`` method for the named
++    axis ("bottom", "top", "left", "right").
++
++    For the axes_grid1-provided Axes, ``ax.axis`` is an AxisDict and
++    supports indexing to get objects that provide ``toggle``.  For
++    downstream/custom Axes (e.g. cartopy GeoAxes), ``ax.axis`` is the
++    standard Axes.axis method and not subscriptable.  In that case we
++    provide a small wrapper that exposes a ``toggle`` method and maps
++    to the public ``set_tick_params`` / label visibility APIs on the
++    underlying Axes.
++    """
++    axis_attr = getattr(ax, "axis", None)
++
++    # If axis is subscriptable (like AxisDict), prefer that.
++    try:
++        if axis_attr is not None and not callable(axis_attr):
++            item = axis_attr[name]
++            # If the returned object already has ``toggle``, use it.
++            if hasattr(item, "toggle"):
++                return item
++    except Exception:
++        # Fall back to wrapper below on any failure.
++        pass
++
++    # Fallback wrapper for standard matplotlib Axes.
++    class _AxisToggleWrapper:
++        def __init__(self, axes, nm):
++            self._axes = axes
++            self._name = nm
++
++        def toggle(self, all=None, ticks=None, ticklabels=None, label=None):
++            # Map the axis name to X/Y axis and which side (1 or 2).
++            if self._name in ("bottom", "top"):
++                axis = self._axes.xaxis
++                axisnum = 1 if self._name == "bottom" else 2
++            else:
++                axis = self._axes.yaxis
++                axisnum = 1 if self._name == "left" else 2
++
++            # Interpret the API similarly to SimpleAxisArtist.toggle:
++            if all:
++                _ticks, _ticklabels, _label = True, True, True
++            elif all is not None:
++                _ticks, _ticklabels, _label = False, False, False
++            else:
++                _ticks, _ticklabels, _label = None, None, None
++
++            if ticks is not None:
++                _ticks = ticks
++            if ticklabels is not None:
++                _ticklabels = ticklabels
++            if label is not None:
++                _label = label
++
++            if _ticks is not None:
++                tickparam = {f"tick{axisnum}On": _ticks}
++                axis.set_tick_params(**tickparam)
++            if _ticklabels is not None:
++                tickparam = {f"label{axisnum}On": _ticklabels}
++                axis.set_tick_params(**tickparam)
++
++            if _label is not None:
++                # Use the public label object to set visibility/position.
++                pos = axis.get_label_position()
++                direction = ("bottom", "top") if axis is self._axes.xaxis else ("left", "right")
++                axis_direction = direction[axisnum - 1]
++                if (pos == axis_direction) and not _label:
++                    axis.label.set_visible(False)
++                elif _label:
++                    axis.label.set_visible(True)
++                    axis.set_label_position(axis_direction)
++
++    return _AxisToggleWrapper(ax, name)
++
++
+ def _tick_only(ax, bottom_on, left_on):
+     bottom_off = not bottom_on
+     left_off = not left_on
+-    ax.axis["bottom"].toggle(ticklabels=bottom_off, label=bottom_off)
+-    ax.axis["left"].toggle(ticklabels=left_off, label=left_off)
++    _get_axis_toggle_like(ax, "bottom").toggle(ticklabels=bottom_off, label=bottom_off)
++    _get_axis_toggle_like(ax, "left").toggle(ticklabels=left_off, label=left_off)
+ 
+ 
+ class CbarAxesBase:
+@@ -28,7 +104,7 @@ class CbarAxesBase:
+ 
+     @_api.deprecated("3.8", alternative="ax.tick_params and colorbar.set_label")
+     def toggle_label(self, b):
+-        axis = self.axis[self.orientation]
++        axis = _get_axis_toggle_like(self, self.orientation)
+         axis.toggle(ticklabels=b, label=b)
+ 
+ 

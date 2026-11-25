@@ -1,0 +1,60 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..1796f090dc 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -225,6 +225,12 @@ class Query(BaseExpression):
+         # are the fields to defer, or False if these are the only fields to
+         # load.
+         self.deferred_loading = (frozenset(), True)
++        # Invalidate cached loaded-field mapping when deferred_loading
++        # state changes.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
+ 
+         self._filtered_relations = {}
+ 
+@@ -678,7 +684,13 @@ class Query(BaseExpression):
+         "target", and the model and list of fields being added for that model.
+         """
+         field_names, defer = self.deferred_loading
+-        if not field_names:
++        # An empty field_names with defer==True means "no deferred fields"
++        # (i.e. no restrictions), so we can return early. However, an empty
++        # field_names with defer==False is a meaningful state (an explicit
++        # immediate-only set that happens to be empty) and must be decoded
++        # to the corresponding minimal set of fields to load. See
++        # add_deferred_loading/add_immediate_loading semantics for details.
++        if not field_names and defer:
+             return
+         orig_opts = self.get_meta()
+         seen = {}
+@@ -2088,6 +2100,13 @@ class Query(BaseExpression):
+             # Remove names from the set of any existing "immediate load" names.
+             self.deferred_loading = existing.difference(field_names), False
+ 
++        # Invalidate cached loaded-field mapping when deferred_loading
++        # state changes.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
++
+     def add_immediate_loading(self, field_names):
+         """
+         Add the given list of model field names to the set of fields to
+@@ -2112,6 +2131,13 @@ class Query(BaseExpression):
+             # Replace any existing "immediate load" field names.
+             self.deferred_loading = frozenset(field_names), False
+ 
++        # Invalidate cached loaded-field mapping when deferred_loading
++        # state changes.
++        try:
++            del self._loaded_field_names_cache
++        except AttributeError:
++            pass
++
+     def get_loaded_field_names(self):
+         """
+         If any fields are marked to be deferred, return a dictionary mapping

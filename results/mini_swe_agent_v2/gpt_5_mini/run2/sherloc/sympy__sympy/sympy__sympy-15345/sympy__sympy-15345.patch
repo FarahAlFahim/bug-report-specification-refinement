@@ -1,0 +1,66 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..be0f61ea5 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -40,6 +40,7 @@ class MCodePrinter(CodePrinter):
+     strings of the Wolfram's Mathematica code
+     """
+     printmethod = "_mcode"
++    language = 'Mathematica'
+ 
+     _default_settings = {
+         'order': None,
+@@ -101,6 +102,32 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++
++    def _print_LatticeOp(self, expr):
++        """
++        Print lattice operations (e.g. Min/Max) using Mathematica's
++        square-bracket convention and preserving the argument order.
++
++        StrPrinter prints these with parentheses and sorts the arguments;
++        for Mathematica output we need Name[arg1, arg2, ...].
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++
++
++    def _print_Max(self, expr):
++        """Print Max using Mathematica syntax Max[arg1, arg2, ...].
++
++        Max is implemented as a lattice operation in SymPy, so it does not
++        go through the normal Function printing path. Provide an explicit
++        printer here to ensure Mathematica output uses square brackets and
++        preserves argument order.
++        """
++        return "Max[%s]" % self.stringify(expr.args, ", ")
++
++    def _print_Min(self, expr):
++        """Analogous printer for Min."""
++        return "Min[%s]" % self.stringify(expr.args, ", ")
++
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]
+diff --git a/sympy/printing/str.py b/sympy/printing/str.py
+index a5185c713..c911aaa5a 100644
+--- a/sympy/printing/str.py
++++ b/sympy/printing/str.py
+@@ -220,6 +220,16 @@ def _print_Lambda(self, obj):
+             return "Lambda((%s), %s)" % (arg_string, self._print(expr))
+ 
+     def _print_LatticeOp(self, expr):
++        # By default, lattice ops are printed with parentheses and their
++        # arguments sorted for a consistent representation.  Some code
++        # generators (e.g. the Mathematica printer) expect a different
++        # convention: square brackets and preservation of the original
++        # argument order.  Detect that via the optional `language`
++        # attribute on the printer (set by language-specific printers)
++        # and adjust formatting accordingly.
++        if getattr(self, 'language', None) == 'Mathematica':
++            args = list(expr.args)
++            return expr.func.__name__ + "[%s]" % ", ".join(self._print(arg) for arg in args)
+         args = sorted(expr.args, key=default_sort_key)
+         return expr.func.__name__ + "(%s)" % ", ".join(self._print(arg) for arg in args)
+ 

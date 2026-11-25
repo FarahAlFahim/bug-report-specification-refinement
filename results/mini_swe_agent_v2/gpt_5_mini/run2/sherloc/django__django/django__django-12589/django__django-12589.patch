@@ -1,0 +1,32 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 63ca817355..54c624a153 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -6,7 +6,7 @@ from itertools import chain
+ from django.core.exceptions import EmptyResultSet, FieldError
+ from django.db import DatabaseError, NotSupportedError
+ from django.db.models.constants import LOOKUP_SEP
+-from django.db.models.expressions import OrderBy, Random, RawSQL, Ref, Value
++from django.db.models.expressions import OrderBy, Random, RawSQL, Ref, Value, Subquery
+ from django.db.models.functions import Cast
+ from django.db.models.query_utils import Q, select_related_descend
+ from django.db.models.sql.constants import (
+@@ -103,7 +103,17 @@ class SQLCompiler:
+             # Converts string references to expressions.
+             for expr in self.query.group_by:
+                 if not hasattr(expr, 'as_sql'):
+-                    expressions.append(self.query.resolve_ref(expr))
++                    resolved = self.query.resolve_ref(expr)
++                    expressions.append(resolved)
++                    continue
++                # If this is a Ref() referring to a Subquery source, use the
++                # underlying Subquery expression in the GROUP BY instead of
++                # leaving the bare alias. Leaving the Ref leads to SQL like
++                # GROUP BY "alias" which can be ambiguous when joined tables
++                # expose the same column name. Using the Subquery ensures the
++                # full subquery SQL is present in GROUP BY (as in Django 2.2).
++                if isinstance(expr, Ref) and isinstance(expr.source, Subquery):
++                    expressions.append(expr.source)
+                 else:
+                     expressions.append(expr)
+         # Note that even if the group_by is set, it is only the minimal

@@ -1,0 +1,107 @@
+diff --git a/django/db/models/base.py b/django/db/models/base.py
+index 0a5e5ff673..b8fb4e18d1 100644
+--- a/django/db/models/base.py
++++ b/django/db/models/base.py
+@@ -332,8 +332,12 @@ class ModelBase(type):
+         opts._prepare(cls)
+ 
+         if opts.order_with_respect_to:
+-            cls.get_next_in_order = partialmethod(cls._get_next_or_previous_in_order, is_next=True)
+-            cls.get_previous_in_order = partialmethod(cls._get_next_or_previous_in_order, is_next=False)
++            # Only install these helpers if the model class doesn't define
++            # them directly.
++            if 'get_next_in_order' not in cls.__dict__:
++                cls.get_next_in_order = partialmethod(cls._get_next_or_previous_in_order, is_next=True)
++            if 'get_previous_in_order' not in cls.__dict__:
++                cls.get_previous_in_order = partialmethod(cls._get_next_or_previous_in_order, is_next=False)
+ 
+             # Defer creating accessors on the foreign class until it has been
+             # created and registered. If remote_field is None, we're ordering
+@@ -351,7 +355,9 @@ class ModelBase(type):
+ 
+         get_absolute_url_override = settings.ABSOLUTE_URL_OVERRIDES.get(opts.label_lower)
+         if get_absolute_url_override:
+-            setattr(cls, 'get_absolute_url', get_absolute_url_override)
++            # Only override if the model class hasn't defined get_absolute_url
++            if 'get_absolute_url' not in cls.__dict__:
++                setattr(cls, 'get_absolute_url', get_absolute_url_override)
+ 
+         if not opts.managers:
+             if any(f.name == 'objects' for f in opts.fields):
+@@ -1880,16 +1886,21 @@ def method_get_order(self, ordered_obj):
+ 
+ 
+ def make_foreign_order_accessors(model, related_model):
+-    setattr(
+-        related_model,
+-        'get_%s_order' % model.__name__.lower(),
+-        partialmethod(method_get_order, model)
+-    )
+-    setattr(
+-        related_model,
+-        'set_%s_order' % model.__name__.lower(),
+-        partialmethod(method_set_order, model)
+-    )
++    name_get = 'get_%s_order' % model.__name__.lower()
++    name_set = 'set_%s_order' % model.__name__.lower()
++    # Only install the accessors if the related model doesn't define them.
++    if name_get not in related_model.__dict__:
++        setattr(
++            related_model,
++            name_get,
++            partialmethod(method_get_order, model)
++        )
++    if name_set not in related_model.__dict__:
++        setattr(
++            related_model,
++            name_set,
++            partialmethod(method_set_order, model)
++        )
+ 
+ ########
+ # MISC #
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index ee45bb941e..38d93b4d95 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -763,8 +763,10 @@ class Field(RegisterLookupMixin):
+             if not getattr(cls, self.attname, None):
+                 setattr(cls, self.attname, self.descriptor_class(self))
+         if self.choices is not None:
+-            setattr(cls, 'get_%s_display' % self.name,
+-                    partialmethod(cls._get_FIELD_display, field=self))
++            name = 'get_%s_display' % self.name
++            # Only install the accessor if the class doesn't define it directly.
++            if name not in cls.__dict__:
++                setattr(cls, name, partialmethod(cls._get_FIELD_display, field=self))
+ 
+     def get_filter_kwargs_for_object(self, obj):
+         """
+@@ -1189,14 +1191,19 @@ class DateField(DateTimeCheckMixin, Field):
+     def contribute_to_class(self, cls, name, **kwargs):
+         super().contribute_to_class(cls, name, **kwargs)
+         if not self.null:
+-            setattr(
+-                cls, 'get_next_by_%s' % self.name,
+-                partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=True)
+-            )
+-            setattr(
+-                cls, 'get_previous_by_%s' % self.name,
+-                partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=False)
+-            )
++            name_next = 'get_next_by_%s' % self.name
++            name_prev = 'get_previous_by_%s' % self.name
++            # Only install the accessors if the class doesn't define them directly.
++            if name_next not in cls.__dict__:
++                setattr(
++                    cls, name_next,
++                    partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=True)
++                )
++            if name_prev not in cls.__dict__:
++                setattr(
++                    cls, name_prev,
++                    partialmethod(cls._get_next_or_previous_by_FIELD, field=self, is_next=False)
++                )
+ 
+     def get_prep_value(self, value):
+         value = super().get_prep_value(value)

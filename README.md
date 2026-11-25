@@ -32,7 +32,7 @@ In this artifact, ExploreSpec's unverified trajectory-collection run is implemen
 │   └── sherloc_system.txt
 ├── data/
 │   ├── by_repo/                  # Official SWE-bench Lite dataset: 300 instances grouped by repository
-│   ├── evaluation_subset_100.json # Shared AutoCodeRover and Agentless evaluation subset
+│   ├── evaluation_subset_100.json # Shared 100-instance downstream evaluation subset
 │   └── output/
 │       ├── gpt_5_mini/           # Generated reports and saved trajectories for GPT-5-mini runs
 │       ├── minimax2.5/           # Generated reports and saved trajectories for MiniMax M2.5 runs
@@ -40,7 +40,7 @@ In this artifact, ExploreSpec's unverified trajectory-collection run is implemen
 ├── results/
 │   ├── auto_code_rover/          # 100-instance downstream evaluation
 │   ├── agentless/                # 100-instance downstream evaluation
-│   └── mini_swe_agent_v2/        # Full 300-instance downstream evaluation
+│   └── mini_swe_agent_v2/        # Mini-SWE-Agent V2 full and stratified-subset evaluation runs
 └── src/
     ├── agents/
     │   ├── multi_agent.py
@@ -93,11 +93,13 @@ The `data/output/` directory contains the generated artifact outputs included wi
 
 The `results/` directory contains downstream repair outputs organized by repair agent, model, and report variant. Each `combined_eval_summary.json` reports aggregate, per-repository, and per-instance results across the available report variants. Each variant's `evaluation_results.jsonl` indexes its resolved statuses, patches, and compressed trajectories.
 
-Mini-SWE-Agent V2 was evaluated on all 300 SWE-bench Lite instances. AutoCodeRover and Agentless were evaluated on the same 100-instance subset listed in `data/evaluation_subset_100.json`.
+Mini-SWE-Agent V2 GPT-5-mini run 1 was evaluated on all 300 SWE-bench Lite instances. A stratified random sample of 100 instances was drawn once and fixed in `data/evaluation_subset_100.json`. The same subset was reused for AutoCodeRover and Agentless to evaluate generalization across repair agents, and for GPT-5-mini runs 2 and 3 to measure LLM run-to-run variability. MiniMax M2.5 uses all 300 instances.
 
 The organization and file formats of the evaluation artifacts are described in `results/README.md`.
 
-The manual analysis of why refined reports help is in `results/mini_swe_agent_v2/gpt_5_mini/ExploreSpec_Paired_Gain_Manual_Study.xlsx`. It covers the 56 GPT-5-mini instances where Mini-SWE-Agent V2 fails with the original report but succeeds with the ExploreSpec report, and assigns each instance its primary repair-relevant information difference. Its contents and label definitions are described in `results/README.md`.
+The GPT-5-mini run comparison, including per-instance outcomes for the fixed stratified random 100-instance subset, is in `results/mini_swe_agent_v2/gpt_5_mini/100_instances_run_comparison.json`.
+
+The manual analysis of why refined reports help is in `results/mini_swe_agent_v2/gpt_5_mini/run1/ExploreSpec_Paired_Gain_Manual_Study.xlsx`. It covers the 56 GPT-5-mini run-1 instances where Mini-SWE-Agent V2 fails with the original report but succeeds with the ExploreSpec report, and assigns each instance its primary repair-relevant information difference. Its contents and label definitions are described in `results/README.md`.
 
 Each generation phase expects:
 

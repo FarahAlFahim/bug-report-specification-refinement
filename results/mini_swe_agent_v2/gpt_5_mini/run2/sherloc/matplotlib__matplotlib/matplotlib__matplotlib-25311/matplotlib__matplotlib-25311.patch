@@ -1,0 +1,34 @@
+diff --git a/lib/matplotlib/legend.py b/lib/matplotlib/legend.py
+index ff6abdb958..fdcaee4667 100644
+--- a/lib/matplotlib/legend.py
++++ b/lib/matplotlib/legend.py
+@@ -1203,6 +1203,13 @@ class Legend(Artist):
+                 self._draggable.disconnect()
+             self._draggable = None
+         return self._draggable
++    def __getstate__(self):
++        d = super().__getstate__()
++        # _draggable holds runtime-only state (canvas refs & callbacks);
++        # do not pickle it.
++        d['_draggable'] = None
++        return d
++
+ 
+     def get_draggable(self):
+         """Return ``True`` if the legend is draggable, ``False`` otherwise."""
+diff --git a/lib/matplotlib/text.py b/lib/matplotlib/text.py
+index 0f874ba33d..62bf58bfe9 100644
+--- a/lib/matplotlib/text.py
++++ b/lib/matplotlib/text.py
+@@ -236,6 +236,11 @@ class Text(Artist):
+         d = super().__getstate__()
+         # remove the cached _renderer (if it exists)
+         d['_renderer'] = None
++        # _draggable holds runtime-only references to the FigureCanvas and
++        # callback ids which are backend-specific and not picklable.  Do
++        # not try to pickle them; clear the helper so pickling the artist
++        # does not attempt to serialize the canvas.
++        d['_draggable'] = None
+         return d
+ 
+     def contains(self, mouseevent):

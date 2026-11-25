@@ -1,0 +1,41 @@
+diff --git a/sympy/geometry/util.py b/sympy/geometry/util.py
+index d32adc3066..6d6f943bf3 100644
+--- a/sympy/geometry/util.py
++++ b/sympy/geometry/util.py
+@@ -565,13 +565,35 @@ def idiff(eq, y, x, n=1):
+     sympy.core.function.diff: explicitly differentiates wrt symbols
+ 
+     """
++    # allow passing an Eq(...) by turning it into an expression lhs - rhs
++    if hasattr(eq, 'lhs') and hasattr(eq, 'rhs'):
++        eq = eq.lhs - eq.rhs
++
+     if is_sequence(y):
+         dep = set(y)
+         y = y[0]
+     elif isinstance(y, Symbol):
+         dep = {y}
+     else:
+-        raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
++        # Allow passing an applied function like f(x) as the dependent
++        # variable. Extract the base function name and treat that as the
++        # dependent symbol. If that is not possible, raise the original
++        # ValueError.
++        try:
++            func = getattr(y, 'func', None)
++            args = getattr(y, 'args', None)
++            fname = None
++            if func is not None:
++                # try common attribute names for function identifier
++                fname = getattr(func, 'name', None) or getattr(func, '__name__', None)
++            if fname and args:
++                y_sym = Symbol(fname)
++                dep = {y_sym}
++                y = y_sym
++            else:
++                raise ValueError
++        except Exception:
++            raise ValueError("expecting x-dependent symbol(s) but got: %s" % y)
+ 
+     f = dict([(s, Function(
+         s.name)(x)) for s in eq.free_symbols if s != x and s in dep])

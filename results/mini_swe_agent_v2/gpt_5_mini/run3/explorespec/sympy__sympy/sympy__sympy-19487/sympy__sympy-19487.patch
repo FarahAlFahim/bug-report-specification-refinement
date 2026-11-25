@@ -1,0 +1,32 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..070906ab43 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -394,6 +394,27 @@ def _eval_rewrite_as_Heaviside(self, arg, **kwargs):
+         if arg.is_extended_real:
+             return Heaviside(arg, H0=S(1)/2) * 2 - 1
+ 
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        """
++        Rewrite sign(z) in terms of Abs as z/Abs(z) for non-zero z.
++
++        To avoid creating an undefined 0/0 form at z == 0 this returns
++        S.Zero when the argument is known to be zero, the algebraic
++        fraction when the argument is known to be non-zero, and a
++        Piecewise expression otherwise.
++        """
++        from sympy import Piecewise, Eq
++
++        # If we know the argument is zero or non-zero, return the
++        # appropriate direct expression to avoid 0/0. Otherwise return
++        # a Piecewise that matches sign(0) == 0 while exposing the
++        # algebraic form for non-zero values.
++        if arg.is_zero:
++            return S.Zero
++        if fuzzy_not(arg.is_zero):
++            return arg / Abs(arg)
++        return Piecewise((S.Zero, Eq(arg, 0)), (arg/Abs(arg), True))
++
+     def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 

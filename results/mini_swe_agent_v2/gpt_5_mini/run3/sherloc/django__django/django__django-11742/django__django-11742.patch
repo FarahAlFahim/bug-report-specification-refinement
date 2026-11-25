@@ -1,0 +1,91 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..fb446edba4 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,6 +955,7 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_choices_max_length(**kwargs),
+         ]
+ 
+     def _check_max_length_attribute(self, **kwargs):
+@@ -978,6 +979,78 @@ class CharField(Field):
+         else:
+             return []
+ 
++    def _check_choices_max_length(self, **kwargs):
++        """Ensure that stored choice values are not longer than max_length.
++
++        Skip lazy translations (Promise) and non-string values.
++        """
++        if not self.choices or self.max_length is None:
++            return []
++
++        offending = []
++
++        def iter_values(choices):
++            # Yield stored values from choices, handling grouped choices.
++            for choice in choices:
++                # Special case: choices may be a string like ['ab']
++                if isinstance(choice, str):
++                    yield choice
++                    continue
++                try:
++                    first, second = choice
++                except Exception:
++                    # Unexpected structure, treat the whole item as a value.
++                    yield choice
++                    continue
++
++                # If second is an iterable of pairs, it's a group of choices.
++                try:
++                    iterator = iter(second)
++                except TypeError:
++                    yield first
++                    continue
++
++                # Detect whether 'second' is a sequence of (value, label) pairs.
++                is_group = True
++                for item in second:
++                    try:
++                        v, h = item
++                    except Exception:
++                        is_group = False
++                        break
++                if is_group:
++                    for item in second:
++                        yield item[0]
++                else:
++                    yield first
++
++        for value in iter_values(self.choices):
++            # Skip lazy translations and non-strings.
++            if isinstance(value, Promise):
++                continue
++            if not isinstance(value, str):
++                continue
++            if len(value) > self.max_length:
++                offending.append(value)
++
++        if offending:
++            displayed = ', '.join(repr(o) for o in offending[:3])
++            if len(offending) > 3:
++                displayed += ', ...'
++            return [
++                checks.Error(
++                    "Some choices have a value longer than the field's 'max_length' (%d): %s" % (
++                        self.max_length, displayed
++                    ),
++                    hint=(
++                        "Increase the field's 'max_length' or shorten the choice values."
++                    ),
++                    obj=self,
++                    id='fields.E122',
++                )
++            ]
++        return []
++
+     def cast_db_type(self, connection):
+         if self.max_length is None:
+             return connection.ops.cast_char_field_without_max_length

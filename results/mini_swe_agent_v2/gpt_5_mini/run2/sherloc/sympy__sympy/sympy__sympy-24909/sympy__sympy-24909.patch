@@ -1,0 +1,32 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..90510ef3ed 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -85,7 +85,14 @@ def __mul__(self, other):
+ 
+         fact = self.scale_factor * other.scale_factor
+ 
+-        if fact == 1:
++        # Only treat exact cancellation to the dimensionless 1 when both
++        # operands are Prefix instances. If "other" is a Quantity (a unit),
++        # numeric cancellation of scale_factors does not imply the result
++        # should be the integer 1; it should instead produce a scaled unit
++        # expression (e.g. milli * watt -> 1/1000*watt). See GH issue where
++        # milli.scale_factor * W.scale_factor == 1 but milli * W must not
++        # evaluate to the integer 1.
++        if isinstance(other, Prefix) and fact == 1:
+             return 1
+         elif isinstance(other, Prefix):
+             # simplify prefix
+@@ -102,7 +109,10 @@ def __truediv__(self, other):
+ 
+         fact = self.scale_factor / other.scale_factor
+ 
+-        if fact == 1:
++        # See comment in __mul__: only return the integer 1 when dividing
++        # two Prefix objects cancels to unity. For Quantity operands, return
++        # a scaled Quantity instead.
++        if isinstance(other, Prefix) and fact == 1:
+             return 1
+         elif isinstance(other, Prefix):
+             for p in PREFIXES:

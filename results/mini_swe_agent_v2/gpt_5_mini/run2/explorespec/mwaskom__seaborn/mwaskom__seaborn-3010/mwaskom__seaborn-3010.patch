@@ -1,0 +1,29 @@
+diff --git a/seaborn/_stats/regression.py b/seaborn/_stats/regression.py
+index 7b7ddc8d..705c089d 100644
+--- a/seaborn/_stats/regression.py
++++ b/seaborn/_stats/regression.py
+@@ -20,13 +20,21 @@ class PolyFit(Stat):
+     gridsize: int = 100
+ 
+     def _fit_predict(self, data):
++        # Filter to complete observations. GroupBy will hand us the subgroup
++        # DataFrame (or the full DataFrame) and it is the Stat's
++        # responsibility to handle missing values relevant to the computation.
++        xy = data[["x", "y"]].dropna()
++
++        # Work with the filtered series for uniqueness and fitting.
++        x = xy["x"]
++        y = xy["y"]
+ 
+-        x = data["x"]
+-        y = data["y"]
+         if x.nunique() <= self.order:
+-            # TODO warn?
++            # Not enough distinct x values to fit the requested polynomial.
+             xx = yy = []
+         else:
++            # np.polyfit will raise if NaNs are present; by dropping NA above
++            # we ensure safe inputs. Compute the fit on the valid pairs.
+             p = np.polyfit(x, y, self.order)
+             xx = np.linspace(x.min(), x.max(), self.gridsize)
+             yy = np.polyval(p, xx)

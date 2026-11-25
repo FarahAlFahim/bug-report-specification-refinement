@@ -1,0 +1,43 @@
+diff --git a/sklearn/model_selection/_split.py b/sklearn/model_selection/_split.py
+index c49a3ce6a..6b8301142 100644
+--- a/sklearn/model_selection/_split.py
++++ b/sklearn/model_selection/_split.py
+@@ -1063,7 +1063,7 @@ class LeavePGroupsOut(BaseCrossValidator):
+         return super().split(X, y, groups)
+ 
+ 
+-class _RepeatedSplits(metaclass=ABCMeta):
++class _RepeatedSplits(BaseCrossValidator, metaclass=ABCMeta):
+     """Repeated splits for an arbitrary randomized CV splitter.
+ 
+     Repeats splits for cross-validators n times with different randomization
+@@ -1213,8 +1213,13 @@ class RepeatedKFold(_RepeatedSplits):
+     RepeatedStratifiedKFold: Repeats Stratified K-Fold n times.
+     """
+     def __init__(self, n_splits=5, n_repeats=10, random_state=None):
+-        super().__init__(
+-            KFold, n_repeats, random_state, n_splits=n_splits)
++        # expose n_splits on the repeated-wrapper instance so that
++        # the human-readable __repr__ (built from the __init__ signature)
++        # can find and display it. The _RepeatedSplits base stores
++        # constructor args for the underlying CV in cvargs, but tools
++        # building the repr inspect instance attributes by name.
++        self.n_splits = n_splits
++        super().__init__(KFold, n_repeats, random_state, n_splits=n_splits)
+ 
+ 
+ class RepeatedStratifiedKFold(_RepeatedSplits):
+@@ -1266,8 +1271,11 @@ class RepeatedStratifiedKFold(_RepeatedSplits):
+     RepeatedKFold: Repeats K-Fold n times.
+     """
+     def __init__(self, n_splits=5, n_repeats=10, random_state=None):
+-        super().__init__(
+-            StratifiedKFold, n_repeats, random_state, n_splits=n_splits)
++        # expose n_splits on the repeated-wrapper instance for the same
++        # reason as in RepeatedKFold: to ensure a readable repr.
++        self.n_splits = n_splits
++        super().__init__(StratifiedKFold, n_repeats, random_state,
++                         n_splits=n_splits)
+ 
+ 
+ class BaseShuffleSplit(metaclass=ABCMeta):

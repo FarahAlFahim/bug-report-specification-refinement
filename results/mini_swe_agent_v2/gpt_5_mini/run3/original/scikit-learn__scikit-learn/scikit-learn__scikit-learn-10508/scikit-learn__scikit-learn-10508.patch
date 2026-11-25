@@ -1,0 +1,20 @@
+diff --git a/sklearn/preprocessing/label.py b/sklearn/preprocessing/label.py
+index 61b8d4a21..ed5508e74 100644
+--- a/sklearn/preprocessing/label.py
++++ b/sklearn/preprocessing/label.py
+@@ -127,6 +127,15 @@ class LabelEncoder(BaseEstimator, TransformerMixin):
+         check_is_fitted(self, 'classes_')
+         y = column_or_1d(y, warn=True)
+ 
++        # If y is empty, return an empty integer array. This avoids issues
++        # when classes_ has a non-numeric dtype (e.g. strings) and y is
++        # converted to an empty float array by column_or_1d/np.asarray,
++        # which would cause numpy to attempt unsafe casts in
++        # searchsorted. Returning an empty integer array is the expected
++        # behavior for an empty input.
++        if getattr(y, 'size', None) == 0:
++            return np.array([], dtype=np.intp)
++
+         classes = np.unique(y)
+         if len(np.intersect1d(classes, self.classes_)) < len(classes):
+             diff = np.setdiff1d(classes, self.classes_)

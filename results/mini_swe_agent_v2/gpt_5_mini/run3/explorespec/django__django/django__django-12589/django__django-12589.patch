@@ -1,0 +1,23 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 84960d77e1..72ac2ece64 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -817,6 +817,18 @@ class Ref(Expression):
+         return self
+ 
+     def as_sql(self, compiler, connection):
++        # If this Ref references a Subquery annotation, emit the
++        # subquery SQL rather than the quoted alias. Emitting the
++        # quoted alias ("alias") in GROUP BY can produce an
++        # ambiguous column error if any table in the FROM/JOIN tree
++        # defines the same column name. Compiling the underlying
++        # Subquery preserves the intended, unambiguous expression.
++        try:
++            from django.db.models.expressions import Subquery
++        except Exception:
++            Subquery = None
++        if Subquery is not None and isinstance(self.source, Subquery):
++            return compiler.compile(self.source)
+         return connection.ops.quote_name(self.refs), []
+ 
+     def get_group_by_cols(self, alias=None):

@@ -1,0 +1,60 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..fec306bde9 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1670,6 +1670,55 @@ def eval(x):
+     def expr(self):
+         return self._args[0]
+ 
++
++    @property
++    def kind(self):
++        """
++        Infer the mathematical kind of the derivative from the
++        differentiated expression and the differentiation variables.
++
++        Rules implemented:
++        - The element kind is derived from the expression's kind. If
++          the expression kind carries an ``element_kind`` attribute
++          (e.g. MatrixKind, ArrayKind), that is used; otherwise the
++          expression kind itself is taken as the element kind.
++        - If any differentiation variable is array-like (has kind
++          ArrayKind) then the derivative is ArrayKind(element_kind).
++        - Else if any differentiation variable is matrix-like
++          (has kind MatrixKind) then the derivative is
++          MatrixKind(element_kind).
++        - Otherwise the derivative kind is the same as the
++          expression's kind.
++        """
++        from sympy.matrices.common import MatrixKind
++        from sympy.tensor.array.ndim_array import ArrayKind
++
++        expr_kind = getattr(self.expr, 'kind', None)
++        if expr_kind is None:
++            from sympy.core.kind import UndefinedKind
++            return UndefinedKind
++
++        # derive element kind as used elsewhere in the codebase
++        element_kind = getattr(expr_kind, 'element_kind', expr_kind)
++
++        # collect kinds of differentiation variables
++        var_kinds = []
++        for v, _ in getattr(self, 'variable_count', []):
++            vk = getattr(v, 'kind', None)
++            if vk is not None:
++                var_kinds.append(vk)
++
++        # if any variable is an ArrayKind -> ArrayKind(element_kind)
++        if any(isinstance(k, ArrayKind) for k in var_kinds):
++            return ArrayKind(element_kind)
++
++        # if any variable is a MatrixKind -> MatrixKind(element_kind)
++        if any(isinstance(k, MatrixKind) for k in var_kinds):
++            return MatrixKind(element_kind)
++
++        # fallback to expression's kind
++        return expr_kind
++
+     @property
+     def _wrt_variables(self):
+         # return the variables of differentiation without

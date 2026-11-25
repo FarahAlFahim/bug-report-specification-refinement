@@ -1,0 +1,72 @@
+diff --git a/django/db/models/expressions.py b/django/db/models/expressions.py
+index 6f26dff0e0..58ae0cb9cb 100644
+--- a/django/db/models/expressions.py
++++ b/django/db/models/expressions.py
+@@ -1150,6 +1150,18 @@ class Subquery(BaseExpression, Combinable):
+     def __init__(self, queryset, output_field=None, **extra):
+         # Allow the usage of both QuerySet and sql.Query objects.
+         self.query = getattr(queryset, 'query', queryset)
++        # Ensure the inner query is marked as a subquery so that
++        # Query.as_sql() will wrap it in parentheses. Some callers may
++        # pass a Query instance that isn't already flagged as a
++        # subquery; make this explicit to avoid relying on caller
++        # behaviour.
++        try:
++            self.query.subquery = True
++        except Exception:
++            # Be defensive: if the query object doesn't have the
++            # attribute or is otherwise not settable, ignore and let
++            # Query.as_sql handle it (it may raise later).
++            pass
+         self.extra = extra
+         super().__init__(output_field)
+ 
+@@ -1158,13 +1170,24 @@ class Subquery(BaseExpression, Combinable):
+ 
+     def set_source_expressions(self, exprs):
+         self.query = exprs[0]
++        try:
++            self.query.subquery = True
++        except Exception:
++            pass
+ 
+     def _resolve_output_field(self):
+         return self.query.output_field
+ 
+     def copy(self):
+         clone = super().copy()
++        # Clone the inner query and ensure the cloned query is
++        # marked as a subquery. The clone() call may return a
++        # lightweight copy that doesn't preserve the subquery flag.
+         clone.query = clone.query.clone()
++        try:
++            clone.query.subquery = True
++        except Exception:
++            pass
+         return clone
+ 
+     @property
+@@ -1178,8 +1201,22 @@ class Subquery(BaseExpression, Combinable):
+         connection.ops.check_expression_support(self)
+         template_params = {**self.extra, **extra_context}
+         query = query or self.query
++        # Ensure the query is treated as a subquery so that
++        # Query.as_sql() will wrap it in parentheses. Some callers may
++        # pass Query objects that aren't flagged as subqueries.
++        try:
++            query.subquery = True
++        except Exception:
++            pass
++
+         subquery_sql, sql_params = query.as_sql(compiler, connection)
+-        template_params['subquery'] = subquery_sql[1:-1]
++        # Query.as_sql() is expected to return a parenthesized SQL
++        # string for subqueries. Be defensive: if it's not
++        # parenthesized, don't slice to avoid corrupting the SQL.
++        if subquery_sql.startswith('(') and subquery_sql.endswith(')'):
++            template_params['subquery'] = subquery_sql[1:-1]
++        else:
++            template_params['subquery'] = subquery_sql
+ 
+         template = template or template_params.get('template', self.template)
+         sql = template % template_params

@@ -1,0 +1,28 @@
+diff --git a/django/db/models/sql/query.py b/django/db/models/sql/query.py
+index 8837881579..57640fc887 100644
+--- a/django/db/models/sql/query.py
++++ b/django/db/models/sql/query.py
+@@ -2086,7 +2086,22 @@ class Query(BaseExpression):
+             self.deferred_loading = existing.union(field_names), True
+         else:
+             # Remove names from the set of any existing "immediate load" names.
+-            self.deferred_loading = existing.difference(field_names), False
++            new_existing = existing.difference(field_names)
++            if new_existing:
++                # Still have immediate fields remaining, keep immediate mode.
++                self.deferred_loading = new_existing, False
++            else:
++                # No immediate fields left: switch to deferred mode.
++                # Build a deferred set consisting of all concrete non-PK
++                # field names on the base model so that only the PK is
++                # loaded (matching the semantics of only(...).defer(...)).
++                opts = self.get_meta()
++                all_field_names = {
++                    f.name for f in opts.concrete_fields if not getattr(f, 'primary_key', False)
++                }
++                # Ensure we include any fields explicitly passed to be
++                # deferred (in case they refer to related fields etc.).
++                self.deferred_loading = frozenset(all_field_names.union(set(field_names))), True
+ 
+     def add_immediate_loading(self, field_names):
+         """

@@ -1,0 +1,30 @@
+diff --git a/django/urls/resolvers.py b/django/urls/resolvers.py
+index 2154a46320..226dfd6d00 100644
+--- a/django/urls/resolvers.py
++++ b/django/urls/resolvers.py
+@@ -26,6 +26,7 @@ from django.utils.translation import get_language
+ from .converters import get_converter
+ from .exceptions import NoReverseMatch, Resolver404
+ from .utils import get_callable
++from django.http import Http404
+ 
+ 
+ class ResolverMatch:
+@@ -260,6 +261,17 @@ class RoutePattern(CheckURLMixin):
+                     kwargs[key] = converter.to_python(value)
+                 except ValueError:
+                     return None
++                except Http404 as e:
++                    # A converter may raise Http404 to signal that the
++                    # route matches but the parameter value is invalid
++                    # (for example, a get_object_or_404 used inside the
++                    # converter). In that case, raise a Resolver404 so the
++                    # URL resolver treats this as a definitive 404 for the
++                    # matched route (instead of treating it as a non-match
++                    # or letting a bare Http404 bubble up in an unexpected
++                    # way). Include the remaining path in the Resolver404
++                    # payload to keep the resolver's expected structure.
++                    raise Resolver404({'path': path}) from e
+             return path[match.end():], (), kwargs
+         return None
+ 

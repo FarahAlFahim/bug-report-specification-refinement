@@ -1,0 +1,43 @@
+diff --git a/src/_pytest/mark/evaluate.py b/src/_pytest/mark/evaluate.py
+index 759191668..383ec7f11 100644
+--- a/src/_pytest/mark/evaluate.py
++++ b/src/_pytest/mark/evaluate.py
+@@ -19,15 +19,35 @@ evalcache_key = StoreKey[Dict[str, Any]]()
+ 
+ 
+ def cached_eval(config: Config, expr: str, d: Dict[str, object]) -> Any:
+-    default = {}  # type: Dict[str, object]
++    """
++    Evaluate the expression `expr` within globals `d`, caching results per
++    expression and per evaluation-global context. Previously caching only
++    used the expression string which could leak results across modules that
++    have different globals but the same expression. Use the module name if
++    present in the globals dict as part of the cache key, otherwise fall
++    back to the id() of the globals mapping to distinguish contexts.
++    """
++    default = {}  # type: Dict[object, Any]
+     evalcache = config._store.setdefault(evalcache_key, default)
++
++    # Prefer the module name when available (most common case), fallback to
++    # the id() of the globals dict which is stable for the lifetime of the
++    # module object in memory.
++    module_name = None
++    try:
++        module_name = d.get("__name__")  # type: ignore[union-attr]
++    except Exception:
++        module_name = None
++
++    cache_key = (expr, module_name if module_name is not None else id(d))
++
+     try:
+-        return evalcache[expr]
++        return evalcache[cache_key]
+     except KeyError:
+         import _pytest._code
+ 
+         exprcode = _pytest._code.compile(expr, mode="eval")
+-        evalcache[expr] = x = eval(exprcode, d)
++        evalcache[cache_key] = x = eval(exprcode, d)
+         return x
+ 
+ 

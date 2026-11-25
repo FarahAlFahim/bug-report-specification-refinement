@@ -1,0 +1,37 @@
+diff --git a/sympy/physics/units/util.py b/sympy/physics/units/util.py
+index b03ed4cd88..087a9eacd9 100644
+--- a/sympy/physics/units/util.py
++++ b/sympy/physics/units/util.py
+@@ -31,6 +31,32 @@ def _get_conversion_matrix_for_expr(expr, target_units, unit_system):
+     exprmat = Matrix([dim_dependencies.get(k, 0) for k in canon_dim_units])
+ 
+     res_exponents = camat.solve_least_squares(exprmat, method=None)
++
++    # Ensure the least-squares solution actually satisfies the linear
++    # relation exactly (within a small numerical tolerance).  If it does
++    # not, return None to indicate the expression cannot be represented
++    # in the provided target units. This avoids accepting approximate
++    # least-squares solutions that would lead to spurious fractional
++    # exponents (see issue where convert_to(joule*second, joule)
++    # produced joule**(7/9)).
++    residual = camat * res_exponents - exprmat
++
++    # tolerance: allow a tiny numerical slack for Float arithmetic
++    tol = 1e-12
++    for i in range(residual.rows):
++        entry = residual[i, 0]
++        # If the entry is exactly zero (symbolically), accept
++        if entry == 0:
++            continue
++        # If the entry is numeric, check magnitude against tolerance
++        try:
++            val = float(entry)
++        except Exception:
++            # unable to interpret entry as numeric: treat as non-zero
++            return None
++        if abs(val) > tol:
++            return None
++
+     return res_exponents
+ 
+ 

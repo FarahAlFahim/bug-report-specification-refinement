@@ -1,0 +1,27 @@
+diff --git a/django/db/backends/ddl_references.py b/django/db/backends/ddl_references.py
+index c06386a2fa..a7571b1e71 100644
+--- a/django/db/backends/ddl_references.py
++++ b/django/db/backends/ddl_references.py
+@@ -231,6 +231,21 @@ class Expressions(TableColumns):
+         self.expressions = expressions
+ 
+     def __str__(self):
+-        sql, params = self.compiler.compile(self.expressions)
++        # Compile a copy of the expression tree with any column aliases
++        # removed so the generated SQL does not contain table-qualified
++        # column references (which SQLite disallows inside index
++        # expressions).
++        expressions = deepcopy(self.expressions)
++        # _gen_cols() yields Col instances for column references in the
++        # expression tree. Remove any alias on those Col objects so
++        # Col.as_sql() emits unqualified column names. If anything goes
++        # wrong, fall back to compiling the original expressions.
++        try:
++            for col in self.compiler.query._gen_cols([expressions]):
++                col.alias = None
++        except Exception:
++            expressions = self.expressions
++
++        sql, params = self.compiler.compile(expressions)
+         params = map(self.quote_value, params)
+         return sql % tuple(params)

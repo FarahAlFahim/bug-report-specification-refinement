@@ -1,0 +1,34 @@
+diff --git a/sympy/core/function.py b/sympy/core/function.py
+index 69df976b8b..23c7d41341 100644
+--- a/sympy/core/function.py
++++ b/sympy/core/function.py
+@@ -1670,6 +1670,14 @@ def eval(x):
+     def expr(self):
+         return self._args[0]
+ 
++    @property
++    def kind(self):
++        """Forward the kind of the wrapped expression.
++
++        For unevaluated Derivative objects the kind should reflect the
++        kind of the expression being wrapped."""
++        return self.expr.kind
++
+     @property
+     def _wrt_variables(self):
+         # return the variables of differentiation without
+@@ -2337,6 +2345,14 @@ def expr(self):
+         """The expression on which the substitution operates"""
+         return self._args[0]
+ 
++    @property
++    def kind(self):
++        """Forward the kind of the wrapped expression.
++
++        Subs represents an unevaluated substitution on an expression and
++        should therefore report the kind of that expression."""
++        return self.expr.kind
++
+     @property
+     def point(self):
+         """The values for which the variables are to be substituted"""

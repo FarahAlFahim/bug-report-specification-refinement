@@ -1,0 +1,15 @@
+diff --git a/sympy/functions/elementary/complexes.py b/sympy/functions/elementary/complexes.py
+index 7fda45982b..d586b70c8a 100644
+--- a/sympy/functions/elementary/complexes.py
++++ b/sympy/functions/elementary/complexes.py
+@@ -398,6 +398,10 @@ def _eval_simplify(self, **kwargs):
+         return self.func(self.args[0].factor())  # XXX include doit?
+ 
+ 
++
++    def _eval_rewrite_as_Abs(self, arg, **kwargs):
++        return self.args[0]/Abs(self.args[0])
++
+ class Abs(Function):
+     """
+     Return the absolute value of the argument.

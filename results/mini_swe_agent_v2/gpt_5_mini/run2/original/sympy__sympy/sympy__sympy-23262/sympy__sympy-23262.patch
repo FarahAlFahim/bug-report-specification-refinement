@@ -1,0 +1,31 @@
+diff --git a/sympy/utilities/lambdify.py b/sympy/utilities/lambdify.py
+index da67263b19..c94d84f0ef 100644
+--- a/sympy/utilities/lambdify.py
++++ b/sympy/utilities/lambdify.py
+@@ -955,13 +955,25 @@ def _recursive_to_string(doprint, arg):
+     if isinstance(arg, (Basic, MatrixOperations)):
+         return doprint(arg)
+     elif iterable(arg):
++        # For lists and tuples we need to preserve Python literal syntax.
++        # In particular, a 1-tuple must be printed with a trailing comma
++        # so that ``(1,)`` is distinguished from ``(1)`` (which is just 1
++        # parenthesized).  Previously this emitted ``(1)`` which changes the
++        # semantics of generated lambdified code.
+         if isinstance(arg, list):
+             left, right = "[]"
++            inner = ', '.join(_recursive_to_string(doprint, e) for e in arg)
+         elif isinstance(arg, tuple):
+             left, right = "()"
++            items = [_recursive_to_string(doprint, e) for e in arg]
++            if len(items) == 1:
++                # single-element tuple needs a trailing comma
++                inner = items[0] + ','
++            else:
++                inner = ', '.join(items)
+         else:
+             raise NotImplementedError("unhandled type: %s, %s" % (type(arg), arg))
+-        return left +', '.join(_recursive_to_string(doprint, e) for e in arg) + right
++        return left + inner + right
+     elif isinstance(arg, str):
+         return arg
+     else:

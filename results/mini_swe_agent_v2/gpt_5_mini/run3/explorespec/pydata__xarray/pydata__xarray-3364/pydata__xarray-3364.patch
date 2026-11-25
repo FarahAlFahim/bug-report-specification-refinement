@@ -1,0 +1,125 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..cb51e45f 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -311,16 +311,52 @@ def _dataset_concat(
+     if variables_to_merge:
+         to_merge = {var: [] for var in variables_to_merge}
+ 
+-        for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
+-
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++        for var in variables_to_merge:
++            # find a template variable from datasets that contains this var
++            template = None
++            for ds in datasets:
++                if var in ds.variables:
++                    template = ds.variables[var]
++                    break
++            if template is None:
++                # should not happen as variables_to_merge is built from union
++                raise ValueError("variable %r not found in any dataset" % var)
++
++            # for each dataset, append real variable or construct placeholder
++            for ds in datasets:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # construct placeholder with same dims and sizes
++                    shape = tuple(dims_sizes.get(d, None) for d in template.dims)
++                    # None should not appear, but defensively replace with 1
++                    shape = tuple(int(s) if s is not None else 1 for s in shape)
++
++                    # determine fill and dtype promotion
++                    if fill_value is dtypes.NA:
++                        promoted_dtype, promoted_fill = dtypes.maybe_promote(
++                            template.dtype
++                        )
++                        fill = promoted_fill
++                        dtype = promoted_dtype
++                    else:
++                        import numpy as _np
++                        try:
++                            fill_arr = _np.asarray(fill_value)
++                            dtype = dtypes.result_type(template.dtype, fill_arr.dtype)
++                        except Exception:
++                            dtype = template.dtype
++                        fill = _np.asarray(fill_value, dtype=dtype)
++
++                    import numpy as _np
++                    data = _np.full(shape, fill, dtype=dtype)
++                    # preserve IndexVariable semantics if template is one
++                    if isinstance(template, IndexVariable):
++                        placeholder = IndexVariable(template.dims, data)
++                    else:
++                        placeholder = Variable(template.dims, data)
++
++                    to_merge[var].append(placeholder)
+ 
+         for var in variables_to_merge:
+             result_vars[var] = unique_variable(
+@@ -345,7 +381,7 @@ def _dataset_concat(
+         # ensure each variable with the given name shares the same
+         # dimensions and the same shape for all of them except along the
+         # concat dimension
+-        common_dims = tuple(pd.unique([d for v in vars for d in v.dims]))
++        common_dims = tuple(pd.Index([d for v in vars for d in v.dims]).unique())
+         if dim not in common_dims:
+             common_dims = (dim,) + common_dims
+         for var, dim_len in zip(vars, concat_dim_lengths):
+@@ -358,8 +394,47 @@ def _dataset_concat(
+     # n.b. this loop preserves variable order, needed for groupby.
+     for k in datasets[0].variables:
+         if k in concat_over:
++            # build list of variables, inserting placeholders for missing ones
++            vars_list = []
++            template = None
++            for ds in datasets:
++                if k in ds.variables:
++                    template = ds.variables[k]
++                    break
++            if template is None:
++                raise ValueError("%r is not present in any dataset." % k)
++
++            for ds in datasets:
++                if k in ds.variables:
++                    vars_list.append(ds.variables[k])
++                else:
++                    # construct placeholder using same logic as for merge vars
++                    shape = tuple(dims_sizes.get(d, None) for d in template.dims)
++                    shape = tuple(int(s) if s is not None else 1 for s in shape)
++                    if fill_value is dtypes.NA:
++                        promoted_dtype, promoted_fill = dtypes.maybe_promote(
++                            template.dtype
++                        )
++                        fill = promoted_fill
++                        dtype = promoted_dtype
++                    else:
++                        import numpy as _np
++                        try:
++                            fill_arr = _np.asarray(fill_value)
++                            dtype = dtypes.result_type(template.dtype, fill_arr.dtype)
++                        except Exception:
++                            dtype = template.dtype
++                        fill = _np.asarray(fill_value, dtype=dtype)
++                    import numpy as _np
++                    data = _np.full(shape, fill, dtype=dtype)
++                    if isinstance(template, IndexVariable):
++                        placeholder = IndexVariable(template.dims, data)
++                    else:
++                        placeholder = Variable(template.dims, data)
++                    vars_list.append(placeholder)
++
+             try:
+-                vars = ensure_common_dims([ds.variables[k] for ds in datasets])
++                vars = ensure_common_dims(vars_list)
+             except KeyError:
+                 raise ValueError("%r is not present in all datasets." % k)
+             combined = concat_vars(vars, dim, positions)

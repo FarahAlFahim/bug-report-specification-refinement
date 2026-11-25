@@ -1,0 +1,65 @@
+diff --git a/xarray/core/concat.py b/xarray/core/concat.py
+index ecae2566..83388358 100644
+--- a/xarray/core/concat.py
++++ b/xarray/core/concat.py
+@@ -309,20 +309,49 @@ def _dataset_concat(
+ 
+     result_vars = {}
+     if variables_to_merge:
+-        to_merge = {var: [] for var in variables_to_merge}
+-
++        # build ordered list of variables: preserve order from first dataset,
++        # then append first-seen new variables from later datasets
++        ordered_vars = []
++        seen = set()
+         for ds in datasets:
+-            absent_merge_vars = variables_to_merge - set(ds.variables)
+-            if absent_merge_vars:
+-                raise ValueError(
+-                    "variables %r are present in some datasets but not others. "
+-                    % absent_merge_vars
+-                )
++            for k in ds.variables:
++                if k in variables_to_merge and k not in seen:
++                    ordered_vars.append(k)
++                    seen.add(k)
+ 
+-            for var in variables_to_merge:
+-                to_merge[var].append(ds.variables[var])
++        to_merge = {var: [] for var in ordered_vars}
+ 
+-        for var in variables_to_merge:
++        for ds in datasets:
++            for var in ordered_vars:
++                if var in ds.variables:
++                    to_merge[var].append(ds.variables[var])
++                else:
++                    # construct placeholder Variable for missing variable
++                    # choose a reference variable from those present in other datasets
++                    # to determine dims and dtype/fill_value
++                    ref = None
++                    for other in datasets:
++                        if var in other.variables:
++                            ref = other.variables[var]
++                            break
++                    if ref is None:
++                        # shouldn't happen, but be defensive
++                        raise KeyError(var)
++
++                    # determine placeholder shape from dims_sizes
++                    placeholder_shape = tuple(dims_sizes.get(d, 1) for d in ref.dims)
++
++                    # determine dtype and filler when fill_value is dtypes.NA
++                    if fill_value is dtypes.NA:
++                        dtype, filler = dtypes.maybe_promote(ref.dtype)
++                    else:
++                        dtype = ref.dtype
++                        filler = fill_value
++
++                    placeholder = Variable(ref.dims, __import__('numpy').full(placeholder_shape, filler, dtype=dtype))
++                    to_merge[var].append(placeholder)
++
++        for var in ordered_vars:
+             result_vars[var] = unique_variable(
+                 var, to_merge[var], compat=compat, equals=equals.get(var, None)
+             )

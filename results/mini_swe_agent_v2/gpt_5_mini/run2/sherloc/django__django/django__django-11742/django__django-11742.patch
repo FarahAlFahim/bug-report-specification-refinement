@@ -1,0 +1,73 @@
+diff --git a/django/db/models/fields/__init__.py b/django/db/models/fields/__init__.py
+index 9ce46e3f73..8a505ea559 100644
+--- a/django/db/models/fields/__init__.py
++++ b/django/db/models/fields/__init__.py
+@@ -955,6 +955,7 @@ class CharField(Field):
+         return [
+             *super().check(**kwargs),
+             *self._check_max_length_attribute(**kwargs),
++            *self._check_choices_max_length(),
+         ]
+ 
+     def _check_max_length_attribute(self, **kwargs):
+@@ -1006,6 +1007,60 @@ class CharField(Field):
+         defaults.update(kwargs)
+         return super().formfield(**defaults)
+ 
++    def _check_choices_max_length(self):
++        """
++        Ensure that any stored choice values (the values saved to the DB)
++        are not longer than this field's max_length. Skip lazy translations
++        (Promise instances) and non-string values.
++        """
++        if not self.choices or self.max_length is None:
++            return []
++
++        # Flatten choices: accept grouped choices and simple iterable choices.
++        offending = []
++
++        def iter_choices(choices):
++            for choice in choices:
++                # Grouped choices are like (group_name, group_choices)
++                try:
++                    group_name, group_choices = choice
++                except Exception:
++                    # Not a group, treat as a single (value, display) pair
++                    yield choice
++                else:
++                    # If group_choices is an iterable of pairs, yield them
++                    for c in group_choices:
++                        yield c
++
++        for pair in iter_choices(self.choices):
++            try:
++                value, _ = pair
++            except Exception:
++                # Unexpected structure, skip (other checks will catch malformed choices)
++                continue
++            # Skip lazy translations and non-string values
++            if isinstance(value, Promise) or not isinstance(value, str):
++                continue
++            if len(value) > self.max_length:
++                offending.append(value)
++
++        if not offending:
++            return []
++
++        # Show a subset of offending values to avoid huge messages
++        sample = ', '.join(repr(v) for v in offending[:3])
++        hint = 'Increase max_length or shorten the choices.'
++        return [
++            checks.Error(
++                "Some choices for '%s' have values longer than 'max_length' (%d): %s" % (
++                    self.name, self.max_length, sample
++                ),
++                hint=hint,
++                obj=self,
++                id='fields.E122',
++            )
++        ]
++
+ 
+ class CommaSeparatedIntegerField(CharField):
+     default_validators = [validators.validate_comma_separated_integer_list]

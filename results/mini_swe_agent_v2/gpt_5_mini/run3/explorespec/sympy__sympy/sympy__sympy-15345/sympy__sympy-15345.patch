@@ -1,0 +1,36 @@
+diff --git a/sympy/printing/mathematica.py b/sympy/printing/mathematica.py
+index ea7e3a2d9..080c793a0 100644
+--- a/sympy/printing/mathematica.py
++++ b/sympy/printing/mathematica.py
+@@ -101,6 +101,31 @@ def _print_Function(self, expr):
+                     return "%s[%s]" % (mfunc, self.stringify(expr.args, ", "))
+         return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
+ 
++    def _print_LatticeOp(self, expr):
++        """Mathematica formatting for LatticeOp-derived classes (e.g. Max, Min).
++
++        The StrPrinter prints LatticeOp objects with parentheses and
++        canonicalizes/sorts the arguments. For Mathematica we want the
++        Function-like representation using square brackets and preserving
++        the argument order as present in the expression.
++        """
++        return expr.func.__name__ + "[%s]" % self.stringify(expr.args, ", ")
++    def _print_Expr(self, expr):
++        """Ensure LatticeOp-derived Exprs (e.g. Max/Min) use Mathematica-style
++        formatting. CodePrinter defines _print_Expr which is tried before
++        _print_LatticeOp during dispatch, so intercept Expr here and
++        delegate to the LatticeOp printer when appropriate.
++        """
++        try:
++            # Import locally to avoid circular import at module load time
++            from sympy.core.operations import LatticeOp
++        except Exception:
++            LatticeOp = None
++
++        if LatticeOp is not None and isinstance(expr, LatticeOp):
++            return self._print_LatticeOp(expr)
++        # fall back to CodePrinter behaviour
++        return super(MCodePrinter, self)._print_Expr(expr)
+     def _print_Integral(self, expr):
+         if len(expr.variables) == 1 and not expr.limits[0][1:]:
+             args = [expr.args[0], expr.variables[0]]

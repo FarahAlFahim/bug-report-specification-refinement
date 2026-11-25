@@ -1,0 +1,35 @@
+diff --git a/django/dispatch/dispatcher.py b/django/dispatch/dispatcher.py
+index b7d9d26389..2b9dd0588a 100644
+--- a/django/dispatch/dispatcher.py
++++ b/django/dispatch/dispatcher.py
+@@ -1,3 +1,4 @@
++import logging
+ import threading
+ import warnings
+ import weakref
+@@ -203,11 +204,25 @@ class Signal:
+ 
+         # Call each receiver with whatever arguments it can accept.
+         # Return a list of tuple pairs [(receiver, response), ... ].
++        logger = logging.getLogger('django.dispatch')
+         responses = []
+         for receiver in self._live_receivers(sender):
+             try:
+                 response = receiver(signal=self, sender=sender, **named)
+             except Exception as err:
++                # Log the exception so that errors in signal receivers are
++                # visible in logging/error monitoring systems (e.g. Sentry).
++                # Receivers that expect certain exceptions should handle them
++                # themselves.
++                try:
++                    logger.exception(
++                        'Error calling signal receiver %r for signal %r (sender: %r).',
++                        receiver, self, sender
++                    )
++                except Exception:
++                    # Ensure that logging problems don't interfere with
++                    # robust signal delivery.
++                    pass
+                 responses.append((receiver, err))
+             else:
+                 responses.append((receiver, response))

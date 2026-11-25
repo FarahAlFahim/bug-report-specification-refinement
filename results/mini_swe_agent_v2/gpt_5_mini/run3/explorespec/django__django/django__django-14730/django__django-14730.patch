@@ -1,0 +1,72 @@
+diff --git a/django/db/models/fields/related.py b/django/db/models/fields/related.py
+index febaadbb5b..fd5c4f6b7e 100644
+--- a/django/db/models/fields/related.py
++++ b/django/db/models/fields/related.py
+@@ -1210,6 +1210,7 @@ class ManyToManyField(RelatedField):
+     def check(self, **kwargs):
+         return [
+             *super().check(**kwargs),
++            *self._check_symmetrical_self_related_name(**kwargs),
+             *self._check_unique(**kwargs),
+             *self._check_relationship_model(**kwargs),
+             *self._check_ignored_options(**kwargs),
+@@ -1259,6 +1260,45 @@ class ManyToManyField(RelatedField):
+             )
+ 
+         return warnings
++    def _check_symmetrical_self_related_name(self, from_model=None, **kwargs):
++        """
++        Warn if a developer supplied a related_name on a symmetrical self
++        ManyToManyField. In that configuration Django does not create a
++        reverse accessor for the relation, so the provided related_name is
++        effectively ignored at runtime. This check needs a concrete
++        ``from_model`` to resolve relation strings, so it is a no-op when
++        ``from_model`` is None (e.g. during some abstract/unresolved
++        contexts).
++        """
++        if from_model is None:
++            return []
++        # Resolve the to-model in the context of the model that owns this
++        # field.
++        to_model = resolve_relation(from_model, self.remote_field.model)
++        try:
++            is_self_referential = (to_model == from_model)
++        except Exception:
++            # If resolution yields a string or otherwise cannot be compared
++            # to the concrete from_model, skip the check.
++            return []
++
++        if self.remote_field.symmetrical and is_self_referential and self._related_name is not None:
++            return [
++                checks.Warning(
++                    "The related_name '%s' for field %s.%s is ignored for a symmetrical self ManyToManyField." % (
++                        self._related_name, from_model._meta.object_name, self.name
++                    ),
++                    hint=(
++                        "A symmetrical self ManyToManyField does not create a "
++                        "reverse accessor. Remove the related_name or use "
++                        "related_name='+' if you want to explicitly hide the reverse relation."
++                    ),
++                    obj=self,
++                    id='fields.W343',
++                )
++            ]
++        return []
++
+ 
+     def _check_relationship_model(self, from_model=None, **kwargs):
+         if hasattr(self.remote_field.through, '_meta'):
+@@ -1636,7 +1676,12 @@ class ManyToManyField(RelatedField):
+             self.remote_field.model == RECURSIVE_RELATIONSHIP_CONSTANT or
+             self.remote_field.model == cls._meta.object_name
+         ):
+-            self.remote_field.related_name = "%s_rel_+" % name
++            # Only assign an internal related_name for symmetrical self
++            # relations when the developer did not explicitly provide a
++            # related_name. If a related_name was supplied, leave it
++            # untouched (it will be covered by the system check above).
++            if self._related_name is None:
++                self.remote_field.related_name = "%s_rel_+" % name
+         elif self.remote_field.is_hidden():
+             # If the backwards relation is disabled, replace the original
+             # related_name with one generated from the m2m field name. Django

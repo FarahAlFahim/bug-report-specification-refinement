@@ -1,0 +1,52 @@
+diff --git a/sympy/physics/units/prefixes.py b/sympy/physics/units/prefixes.py
+index ca6a642156..2572890982 100644
+--- a/sympy/physics/units/prefixes.py
++++ b/sympy/physics/units/prefixes.py
+@@ -83,28 +83,41 @@ def __mul__(self, other):
+         if not isinstance(other, (Quantity, Prefix)):
+             return super().__mul__(other)
+ 
++        # If multiplying two prefixes, try to simplify/return a prefix or
++        # a plain factor. If multiplying a prefix by a Quantity, always
++        # return the Quantity scaled by the prefix factor. Previously the
++        # code collapsed the product to the number 1 when the product of
++        # the scale factors was 1 (e.g. milli * watt), which incorrectly
++        # returned 1 for cases where the unit's own scale factor canceled
++        # the prefix. Only prefix-prefix multiplication should attempt to
++        # simplify to 1 or another prefix.
+         fact = self.scale_factor * other.scale_factor
+ 
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        if isinstance(other, Prefix):
++            if fact == 1:
++                return 1
+             # simplify prefix
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]
+             return fact
+ 
++        # other is a Quantity: always return the quantity scaled by the
++        # prefix factor (even if the numeric factor equals 1)
+         return self.scale_factor * other
+ 
+     def __truediv__(self, other):
+         if not hasattr(other, "scale_factor"):
+             return super().__truediv__(other)
+ 
++        # Similar logic as in __mul__: only simplify when dividing by a
++        # Prefix. When dividing a Prefix by a Quantity, return the
++        # scaled Quantity expression.
+         fact = self.scale_factor / other.scale_factor
+ 
+-        if fact == 1:
+-            return 1
+-        elif isinstance(other, Prefix):
++        if isinstance(other, Prefix):
++            if fact == 1:
++                return 1
+             for p in PREFIXES:
+                 if PREFIXES[p].scale_factor == fact:
+                     return PREFIXES[p]

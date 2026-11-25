@@ -1,0 +1,25 @@
+diff --git a/sympy/core/sympify.py b/sympy/core/sympify.py
+index 591e784133..f5e2695d7c 100644
+--- a/sympy/core/sympify.py
++++ b/sympy/core/sympify.py
+@@ -476,6 +476,20 @@ def sympify(a, locals=None, convert_xor=True, strict=False, rational=False,
+         expr = parse_expr(a, local_dict=locals, transformations=transformations, evaluate=evaluate)
+     except (TokenError, SyntaxError) as exc:
+         raise SympifyError('could not parse %r' % a, exc)
++    except ValueError as exc:
++        # Some constructors (e.g. geometry Point) perform validation that
++        # can raise ValueError during evaluation. If sympify was called with
++        # evaluate=False via the global parameters (i.e. evaluate was set
++        # from global_parameters.evaluate) then the parser may end up
++        # invoking constructors in a state that triggers validation even
++        # though the intent was to avoid evaluation. In that case retry
++        # parsing with evaluation enabled to construct the object normally.
++        msg = str(exc)
++        if evaluate is False and 'Imaginary coordinates are not permitted.' in msg:
++            # retry parsing with evaluation enabled
++            expr = parse_expr(a, local_dict=locals, transformations=transformations, evaluate=True)
++        else:
++            raise
+ 
+     return expr
+ 

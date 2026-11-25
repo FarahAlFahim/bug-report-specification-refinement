@@ -1,0 +1,81 @@
+diff --git a/sklearn/mixture/base.py b/sklearn/mixture/base.py
+index a9f66740f..1aa3056d3 100644
+--- a/sklearn/mixture/base.py
++++ b/sklearn/mixture/base.py
+@@ -241,6 +241,42 @@ class BaseMixture(six.with_metaclass(ABCMeta, DensityMixin, BaseEstimator)):
+         self.n_iter_ = best_n_iter
+ 
+         return self
++        # For clusterer-like compatibility, expose labels_ for the
++        # training data (labels_ == predict(X) after fitting).
++        # Note: predict relies on the fitted parameters (weights_, means_,
++        # precisions_cholesky_), which have been set by _set_parameters.
++        try:
++            # X is still in scope above; set labels_ to the training labels
++            # so that code that expects a clusterer-like API can access it.
++            self.labels_ = self.predict(X)
++        except Exception:
++            # In case predict raises for any reason (defensive), ensure we do
++            # not break the normal fit return value.
++            if hasattr(self, 'labels_'):
++                delattr(self, 'labels_')
++
++        return self
++
++    def fit_predict(self, X, y=None):
++        """Fit the mixture model and return the labels for X.
++
++        This mirrors ClusterMixin.fit_predict behavior for clusterers and
++        provides interoperability where code expects fit_predict to exist.
++        """
++        self.fit(X)
++        return self.labels_
++
++    @property
++    def n_clusters(self):
++        """Alias for n_components for clusterer compatibility.
++
++        n_clusters == n_components.
++        """
++        return self.n_components
++
++    @n_clusters.setter
++    def n_clusters(self, value):
++        self.n_components = value
+ 
+     def _e_step(self, X):
+         """E step.
+diff --git a/sklearn/mixture/bayesian_mixture.py b/sklearn/mixture/bayesian_mixture.py
+index aef6828fa..e52b234f8 100644
+--- a/sklearn/mixture/bayesian_mixture.py
++++ b/sklearn/mixture/bayesian_mixture.py
+@@ -313,7 +313,11 @@ class BayesianGaussianMixture(BaseMixture):
+                  mean_precision_prior=None, mean_prior=None,
+                  degrees_of_freedom_prior=None, covariance_prior=None,
+                  random_state=None, warm_start=False, verbose=0,
+-                 verbose_interval=10):
++                 verbose_interval=10, n_clusters=None):
++        # Support n_clusters alias for compatibility with clusterers
++        if n_clusters is not None:
++            n_components = n_clusters
++
+         super(BayesianGaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,
+diff --git a/sklearn/mixture/gaussian_mixture.py b/sklearn/mixture/gaussian_mixture.py
+index d58a9e326..d868a8ec6 100644
+--- a/sklearn/mixture/gaussian_mixture.py
++++ b/sklearn/mixture/gaussian_mixture.py
+@@ -584,7 +584,11 @@ class GaussianMixture(BaseMixture):
+                  reg_covar=1e-6, max_iter=100, n_init=1, init_params='kmeans',
+                  weights_init=None, means_init=None, precisions_init=None,
+                  random_state=None, warm_start=False,
+-                 verbose=0, verbose_interval=10):
++                 verbose=0, verbose_interval=10, n_clusters=None):
++        # Support n_clusters alias for compatibility with clusterers
++        if n_clusters is not None:
++            n_components = n_clusters
++
+         super(GaussianMixture, self).__init__(
+             n_components=n_components, tol=tol, reg_covar=reg_covar,
+             max_iter=max_iter, n_init=n_init, init_params=init_params,

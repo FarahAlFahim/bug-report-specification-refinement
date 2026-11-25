@@ -1,0 +1,25 @@
+diff --git a/django/db/models/sql/compiler.py b/django/db/models/sql/compiler.py
+index 63ca817355..e29c328517 100644
+--- a/django/db/models/sql/compiler.py
++++ b/django/db/models/sql/compiler.py
+@@ -105,7 +105,19 @@ class SQLCompiler:
+                 if not hasattr(expr, 'as_sql'):
+                     expressions.append(self.query.resolve_ref(expr))
+                 else:
+-                    expressions.append(expr)
++                    # If the group-by item is a Ref to a select/annotation
++                    # (for example, an annotation of a Subquery that
++                    # returned Ref(alias, Subquery)), use the underlying
++                    # source expression for grouping rather than the
++                    # Ref. Leaving the Ref in the group-by can lead to
++                    # ambiguous column references (e.g. GROUP BY "status")
++                    # when the source is a Subquery; using the source
++                    # ensures the full expression (SELECT ...) is present
++                    # in the GROUP BY clause.
++                    if isinstance(expr, Ref):
++                        expressions.append(expr.source)
++                    else:
++                        expressions.append(expr)
+         # Note that even if the group_by is set, it is only the minimal
+         # set to group by. So, we need to add cols in select, order_by, and
+         # having into the select in any case.

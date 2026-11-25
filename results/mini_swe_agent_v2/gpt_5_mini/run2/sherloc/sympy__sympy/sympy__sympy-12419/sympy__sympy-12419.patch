@@ -1,0 +1,130 @@
+diff --git a/sympy/assumptions/sathandlers.py b/sympy/assumptions/sathandlers.py
+index 61d62d04c..9a81f635b 100644
+--- a/sympy/assumptions/sathandlers.py
++++ b/sympy/assumptions/sathandlers.py
+@@ -1,6 +1,10 @@
+ from __future__ import print_function, division
+ 
+-from collections import MutableMapping, defaultdict
++try:
++    from collections.abc import MutableMapping
++except Exception:
++    from collections import MutableMapping
++from collections import defaultdict
+ 
+ from sympy.core import (Add, Mul, Pow, Integer, Number, NumberSymbol,)
+ from sympy.core.numbers import ImaginaryUnit
+diff --git a/sympy/core/basic.py b/sympy/core/basic.py
+index b992b45c2..40c7dbb8e 100644
+--- a/sympy/core/basic.py
++++ b/sympy/core/basic.py
+@@ -1,6 +1,10 @@
+ """Base class for all the objects in SymPy"""
+ from __future__ import print_function, division
+-from collections import Mapping
++try:
++    # Python 3.3+ moved abstract base classes to collections.abc
++    from collections.abc import Mapping
++except Exception:
++    from collections import Mapping
+ 
+ from .assumptions import BasicMeta, ManagedProperties
+ from .cache import cacheit
+diff --git a/sympy/matrices/expressions/matexpr.py b/sympy/matrices/expressions/matexpr.py
+index b4d759836..2b99033ae 100644
+--- a/sympy/matrices/expressions/matexpr.py
++++ b/sympy/matrices/expressions/matexpr.py
+@@ -358,12 +358,58 @@ def __new__(cls, name, n, m):
+         return obj
+ 
+     def doit(self, **kwargs):
++        """Return the indexed element, but avoid eagerly reducing
++        Identity entries with undecidable symbolic indices.
++
++        If the parent is an Identity matrix, return
++            1 if i == j is True,
++            0 if i == j is False,
++            KroneckerDelta(i, j) if undecidable.
++
++        For concrete MatrixBase parents, delegate to the parent
++        indexing as before.
++        """
+         deep = kwargs.get('deep', True)
+         if deep:
+             args = [arg.doit(**kwargs) for arg in self.args]
+         else:
+             args = self.args
+-        return args[0][args[1], args[2]]
++
++        parent = args[0]
++        i = args[1]
++        j = args[2]
++
++        # Special-case Identity so that undecidable symbolic indices
++        # are represented as KroneckerDelta rather than being eagerly
++        # evaluated to Zero by Identity._entry when i and j are
++        # distinct Symbol objects.
++        from sympy import KroneckerDelta
++        from sympy import MatrixBase
++        # If parent reports being an Identity MatrixExpr, decide equality.
++        try:
++            is_identity = getattr(parent, 'is_Identity', False)
++        except Exception:
++            is_identity = False
++
++        if is_identity:
++            # If indices are structurally identical, return 1. If both are
++            # concrete integers and different, return 0. Otherwise return
++            # KroneckerDelta so that symbolic summation can handle the
++            # dependency between indices.
++            if i == j:
++                return S.One
++            from sympy import Integer
++            if isinstance(i, Integer) and isinstance(j, Integer):
++                return S.Zero
++            return KroneckerDelta(i, j)
++
++        # If parent is a concrete Matrix (MatrixBase), delegate
++        # to its indexing which will return concrete elements.
++        if isinstance(parent, MatrixBase):
++            return parent[i, j]
++
++        # Fallback: delegate to parent's __getitem__ as before.
++        return parent[i, j]
+ 
+     def _eval_derivative(self, v):
+         if not isinstance(v, MatrixElement):
+@@ -476,10 +522,16 @@ def conjugate(self):
+         return self
+ 
+     def _entry(self, i, j):
++        # If equality of indices is decidable, return the concrete
++        # value. Otherwise return KroneckerDelta so that symbolic
++        # summations can be handled correctly.
+         if i == j:
+             return S.One
+-        else:
++        # If both are concrete integers and different, return zero.
++        from sympy import Integer, KroneckerDelta
++        if isinstance(i, Integer) and isinstance(j, Integer):
+             return S.Zero
++        return KroneckerDelta(i, j)
+ 
+     def _eval_determinant(self):
+         return S.One
+diff --git a/sympy/plotting/plot.py b/sympy/plotting/plot.py
+index 664602d6b..8c2065317 100644
+--- a/sympy/plotting/plot.py
++++ b/sympy/plotting/plot.py
+@@ -25,7 +25,10 @@
+ from __future__ import print_function, division
+ 
+ import inspect
+-from collections import Callable
++try:
++    from collections.abc import Callable
++except Exception:
++    from collections import Callable
+ import warnings
+ import sys
+ 

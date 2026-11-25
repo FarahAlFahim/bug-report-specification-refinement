@@ -1,0 +1,33 @@
+diff --git a/django/contrib/syndication/views.py b/django/contrib/syndication/views.py
+index 68ffb0bfe0..d049969685 100644
+--- a/django/contrib/syndication/views.py
++++ b/django/contrib/syndication/views.py
+@@ -199,6 +199,19 @@ class Feed:
+             if updateddate and is_naive(updateddate):
+                 updateddate = make_aware(updateddate, tz)
+ 
++            # Determine per-item comments. Prefer a first-class item_comments
++            # hook if it returns a non-None value; otherwise fall back to any
++            # 'comments' key provided by item_extra_kwargs(). Ensure that the
++            # 'comments' key is removed from the extra kwargs to avoid
++            # duplicate-key errors when passing comments explicitly below.
++            item_comments = self._get_dynamic_attr('item_comments', item)
++            extra_kwargs = dict(self.item_extra_kwargs(item) or {})
++            # Compute comments value with deterministic precedence.
++            comments = item_comments if item_comments is not None else extra_kwargs.get('comments')
++            # Remove 'comments' from extra kwargs so it won't conflict with
++            # the explicit comments argument passed to add_item().
++            extra_kwargs.pop('comments', None)
++
+             feed.add_item(
+                 title=title,
+                 link=link,
+@@ -214,6 +227,7 @@ class Feed:
+                 author_link=author_link,
+                 categories=self._get_dynamic_attr('item_categories', item),
+                 item_copyright=self._get_dynamic_attr('item_copyright', item),
+-                **self.item_extra_kwargs(item)
++                comments=comments,
++                **extra_kwargs
+             )
+         return feed

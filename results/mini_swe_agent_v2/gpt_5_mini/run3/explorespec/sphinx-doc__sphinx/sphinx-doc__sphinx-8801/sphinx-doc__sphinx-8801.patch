@@ -1,0 +1,70 @@
+diff --git a/sphinx/ext/autodoc/importer.py b/sphinx/ext/autodoc/importer.py
+index 477aae247..539e21e78 100644
+--- a/sphinx/ext/autodoc/importer.py
++++ b/sphinx/ext/autodoc/importer.py
+@@ -236,8 +236,19 @@ def get_object_members(subject: Any, objpath: List[str], attrgetter: Callable,
+         # append instance attributes (cf. self.attr1) if analyzer knows
+         namespace = '.'.join(objpath)
+         for (ns, name) in analyzer.find_attr_docs():
+-            if namespace == ns and name not in members:
+-                members[name] = Attribute(name, True, INSTANCEATTR)
++            if namespace == ns:
++                if name not in members:
++                    members[name] = Attribute(name, True, INSTANCEATTR)
++                else:
++                    # ensure existing entry reflects that analyzer found
++                    # an instance attribute here; prefer marking it as
++                    # directly defined when analyzer indicates it
++                    try:
++                        existing = members[name]
++                        if not existing.directly_defined:
++                            members[name] = Attribute(name, True, existing.value)
++                    except Exception:
++                        pass
+ 
+     return members
+ 
+@@ -297,8 +308,17 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+             # annotation only member (ex. attr: int)
+             for name in getannotations(cls):
+                 name = unmangle(cls, name)
+-                if name and name not in members:
+-                    members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
++                if name:
++                    if name not in members:
++                        members[name] = ObjectMember(name, INSTANCEATTR, class_=cls)
++                    else:
++                        # ensure existing entry knows its owning class if
++                        # annotation discovery found it here
++                        try:
++                            if getattr(members[name], "class_", None) is None:
++                                members[name].class_ = cls
++                        except Exception:
++                            pass
+ 
+             # append instance attributes (cf. self.attr1) if analyzer knows
+             try:
+@@ -307,9 +327,20 @@ def get_class_members(subject: Any, objpath: List[str], attrgetter: Callable
+                 analyzer = ModuleAnalyzer.for_module(modname)
+                 analyzer.analyze()
+                 for (ns, name), docstring in analyzer.attr_docs.items():
+-                    if ns == qualname and name not in members:
+-                        members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
+-                                                     docstring='\n'.join(docstring))
++                    if ns == qualname:
++                        if name not in members:
++                            members[name] = ObjectMember(name, INSTANCEATTR, class_=cls,
++                                                         docstring='\n'.join(docstring))
++                        else:
++                            # attach analyzer-provided docstring and ensure
++                            # class ownership is present on existing entry
++                            try:
++                                if not getattr(members[name], 'docstring', None):
++                                    members[name].docstring = '\n'.join(docstring)
++                                if getattr(members[name], 'class_', None) is None:
++                                    members[name].class_ = cls
++                            except Exception:
++                                pass
+             except (AttributeError, PycodeError):
+                 pass
+     except AttributeError:
